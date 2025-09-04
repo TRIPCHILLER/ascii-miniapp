@@ -19,6 +19,7 @@
     <div class="stage"><pre id="out"></pre></div>
   </div>
 
+  <!-- Дисклеймер -->
   <div id="consent" class="modal" hidden>
     <div class="card">
       <h3>Доступ к камере</h3>
@@ -42,13 +43,19 @@
     };
 
     const app = new AsciiApp(ui.out, { fps: 30, invert: true });
+    app.setOptions({}); // применяем дефолтные цвета/фон
 
-    // Ensure the colors are applied to PRE
-    app.setOptions({});
+    // Дисклеймер только при первом запуске
+    if (localStorage.getItem("consent-ok") !== "1") {
+      ui.consent.hidden = false;
+    }
 
-    // Show consent on first load (can be hidden by default if not needed)
-    // ui.consent.hidden = false;
-    if (ui.agree) ui.agree.onclick = () => { ui.consent.hidden = true; };
+    if (ui.agree) {
+      ui.agree.onclick = () => {
+        ui.consent.hidden = true;
+        localStorage.setItem("consent-ok", "1");
+      };
+    }
 
     ui.start.onclick = () => app.start()
       .then(() => { ui.start.disabled = true; ui.stop.disabled = false; })
