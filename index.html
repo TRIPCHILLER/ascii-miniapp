@@ -19,16 +19,42 @@
     <div class="stage"><pre id="out"></pre></div>
   </div>
 
-  <!-- Дисклеймер -->
+  <!-- Дисклеймер (скрыт по умолчанию — покажем его только на первом запуске) -->
   <div id="consent" class="modal" hidden>
     <div class="card">
       <h3>Доступ к камере</h3>
       <p>Видеопоток обрабатывается локально, без отправки на сервер.</p>
       <p><a href="privacy.html" target="_blank" rel="noopener">Подробнее</a></p>
-      <button id="agree" class="btn">OK</button>
+      <!-- Инлайновый обработчик: работает даже если модуль не загрузился -->
+      <button id="agree" class="btn"
+        onclick="
+          try {
+            localStorage.setItem('consent-ok','1');
+            var m = document.getElementById('consent');
+            if (m) m.setAttribute('hidden','');
+          } catch(e) {}
+          return false;
+        ">OK</button>
     </div>
   </div>
 
+  <!-- Мини-скрипт, НЕ модуль: сам показывает дисклеймер на ПЕРВОМ запуске -->
+  <script>
+    (function () {
+      try {
+        if (localStorage.getItem('consent-ok') !== '1') {
+          var m = document.getElementById('consent');
+          if (m) m.hidden = false;
+        }
+      } catch (e) {
+        // если localStorage недоступен — просто покажем модалку
+        var m = document.getElementById('consent');
+        if (m) m.hidden = false;
+      }
+    })();
+  </script>
+
+  <!-- Основное приложение (module). Если оно не загрузится — кнопка OK всё равно сработает. -->
   <script type="module">
     import { AsciiApp, wireFullscreen } from './ascii.js';
 
@@ -37,25 +63,11 @@
       stop:    document.getElementById('stop'),
       flip:    document.getElementById('flip'),
       fs:      document.getElementById('fs'),
-      out:     document.getElementById('out'),
-      consent: document.getElementById('consent'),
-      agree:   document.getElementById('agree'),
+      out:     document.getElementById('out')
     };
 
     const app = new AsciiApp(ui.out, { fps: 30, invert: true });
-    app.setOptions({}); // применяем дефолтные цвета/фон
-
-    // Дисклеймер только при первом запуске
-    if (localStorage.getItem("consent-ok") !== "1") {
-      ui.consent.hidden = false;
-    }
-
-    if (ui.agree) {
-      ui.agree.onclick = () => {
-        ui.consent.hidden = true;
-        localStorage.setItem("consent-ok", "1");
-      };
-    }
+    app.setOptions({});
 
     ui.start.onclick = () => app.start()
       .then(() => { ui.start.disabled = true; ui.stop.disabled = false; })
@@ -63,8 +75,13 @@
 
     ui.stop.onclick  = () => { app.stop(); ui.start.disabled = false; ui.stop.disabled = true; };
     ui.flip.onclick  = () => app.flip();
-
     wireFullscreen(ui.fs);
   </script>
+
+  <noscript>
+    <div class="card" style="margin:16px">
+      Для работы приложения нужен JavaScript.
+    </div>
+  </noscript>
 </body>
 </html>
