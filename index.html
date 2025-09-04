@@ -21,12 +21,12 @@
 
   <!-- Дисклеймер (скрыт по умолчанию — покажем его только на первом запуске) -->
   <div id="consent" class="modal" hidden>
-    <div class="card">
+    <div class="card" role="dialog" aria-modal="true">
       <h3>Доступ к камере</h3>
       <p>Видеопоток обрабатывается локально, без отправки на сервер.</p>
       <p><a href="privacy.html" target="_blank" rel="noopener">Подробнее</a></p>
       <!-- Инлайновый обработчик: работает даже если модуль не загрузился -->
-      <button id="agree" class="btn"
+      <button id="agree" class="btn" type="button"
         onclick="
           try {
             localStorage.setItem('consent-ok','1');
@@ -47,7 +47,6 @@
           if (m) m.hidden = false;
         }
       } catch (e) {
-        // если localStorage недоступен — просто покажем модалку
         var m = document.getElementById('consent');
         if (m) m.hidden = false;
       }
