@@ -1,69 +1,133 @@
-<!doctype html><html><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ASCII live · pro</title>
-<link rel="stylesheet" href="styles.css">
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
-</head><body class="theme-dark">
-<div class="wrap">
-  <div class="toolbar">
-    <button id="start" class="btn">Начать</button>
-    <button id="stop"  class="btn" disabled>Стоп</button>
-    <button id="flip"  class="btn">Фронт/Тыл</button>
-    <a class="btn ghost" href="app.html">Fullscreen</a>
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ASCII live · pro</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body class="theme-dark">
+  <div class="wrap">
+    <div class="toolbar">
+      <button id="start" class="btn">Начать</button>
+      <button id="stop"  class="btn" disabled>Стоп</button>
+      <button id="flip"  class="btn">Фронт/Тыл</button>
+      <button id="fs"    class="btn ghost">Fullscreen</button>
+      <a class="btn ghost" href="index.html">Приложение</a>
+    </div>
+
+    <div class="panel">
+      <label>Ширина (симв.)
+        <input id="w" type="range" min="40" max="240" value="140">
+        <span id="wv">140</span>
+      </label>
+
+      <label>Контраст
+        <input id="contrast" type="range" min="0.2" max="3" step="0.05" value="1.15">
+        <span id="contrastv">1.15</span>
+      </label>
+
+      <label>Гамма
+        <input id="gamma" type="range" min="0.2" max="3" step="0.05" value="1.2">
+        <span id="gammav">1.2</span>
+      </label>
+
+      <label>Передний цвет
+        <input id="fg" type="color" value="#8ac7ff">
+      </label>
+
+      <label>Фон
+        <input id="bg" type="color" value="#000000">
+      </label>
+
+      <label>FPS
+        <input id="fps" type="range" min="5" max="60" step="1" value="30">
+        <span id="fpsv">30</span>
+      </label>
+
+      <label>Символы
+        <select id="ramp">
+          <option value=" .'`&quot;,:;Il!i~+_-?][}{1tfjrxnuvczXYUJCLQ0089@#">Плотная</option>
+          <option value=" .:-=+*#%@">Короткая</option>
+          <option value="$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/|()1{}[]?-_+~&lt;&gt;i!lI;:,^`'. ">Длинная</option>
+        </select>
+      </label>
+
+      <label class="check">
+        <input id="invert" type="checkbox" checked> Инверсия
+      </label>
+
+      <label>Коэфф. символов (шир/выс)
+        <input id="aspect" type="range" min="0.35" max="0.75" step="0.01" value="0.50">
+        <span id="aspectv">0.50</span>
+      </label>
+    </div>
+
+    <div class="stage"><pre id="out"></pre></div>
   </div>
 
-  <div class="panel">
-    <label>Ширина (симв.): <input id="w" type="range" min="40" max="240" value="140"><span id="wv">140</span></label>
-    <label>Контраст: <input id="contrast" type="range" min="50" max="200" value="115"><span id="cv">1.15</span></label>
-    <label>Гамма: <input id="gamma" type="range" min="60" max="180" value="120"><span id="gv">1.20</span></label>
-    <label>Цвет символов: <input id="fg" type="color" value="#8ac7ff"></label>
-    <label>Цвет фона: <input id="bg" type="color" value="#000000"></label>
-    <label>FPS лимит: 
-      <select id="fps">
-        <option>30</option><option selected>20</option><option>15</option><option>10</option>
-      </select>
-    </label>
-    <label>Набор символов:
-      <input id="ramp" type="text" value=" .'`^&quot;,:;Il!i~+_-?][}{1tfjrxnuvczXYUJCLQ0089@#">
-    </label>
-    <label><input id="invert" type="checkbox"> Инвертировать яркость</label>
-  </div>
+  <script type="module">
+    import { AsciiApp, wireFullscreen } from './ascii.js';
 
-  <div class="stage"><pre id="out"></pre></div>
-</div>
+    const ui = {
+      start: document.getElementById('start'),
+      stop:  document.getElementById('stop'),
+      flip:  document.getElementById('flip'),
+      fs:    document.getElementById('fs'),
+      out:   document.getElementById('out')
+    };
+    const app = new AsciiApp(ui.out, { fps: 30, invert: true });
 
-<script type="module">
-import { AsciiApp } from './ascii.js';
-if (window.Telegram?.WebApp) { Telegram.WebApp.ready(); Telegram.WebApp.expand(); }
+    // controls
+    const w = document.getElementById('w');
+    const contrast = document.getElementById('contrast');
+    const gamma = document.getElementById('gamma');
+    const fg = document.getElementById('fg');
+    const bg = document.getElementById('bg');
+    const fps = document.getElementById('fps');
+    const ramp = document.getElementById('ramp');
+    const invert = document.getElementById('invert');
+    const aspect = document.getElementById('aspect');
 
-const $ = (id)=>document.getElementById(id);
-const ui = { start:$('start'), stop:$('stop'), flip:$('flip'), out:$('out') };
-const app = new AsciiApp(ui.out);
+    const wv = document.getElementById('wv');
+    const contrastv = document.getElementById('contrastv');
+    const gammav = document.getElementById('gammav');
+    const fpsv = document.getElementById('fpsv');
+    const aspectv = document.getElementById('aspectv');
 
-const w=$('w'), wv=$('wv'), contrast=$('contrast'), cv=$('cv'), gamma=$('gamma'), gv=$('gv'),
-      fg=$('fg'), bg=$('bg'), fps=$('fps'), ramp=$('ramp'), invert=$('invert');
+    function apply() {
+      wv.textContent = w.value;
+      contrastv.textContent = contrast.value;
+      gammav.textContent = gamma.value;
+      fpsv.textContent = fps.value;
+      aspectv.textContent = (+aspect.value).toFixed(2);
 
-function apply() {
-  wv.textContent = w.value;
-  cv.textContent = (contrast.value/100).toFixed(2);
-  gv.textContent = (gamma.value/100).toFixed(2);
-  app.setOptions({
-    widthChars: +w.value,
-    contrast:   +contrast.value/100,
-    gamma:      +gamma.value/100,
-    color:      fg.value,
-    background: bg.value,
-    fps:        +fps.value,
-    ramp:       ramp.value,
-    invert:     invert.checked
-  });
-}
-[w,contrast,gamma,fg,bg,fps,ramp,invert].forEach(el => el.addEventListener('input', apply));
-apply();
+      app.setOptions({
+        widthChars: +w.value,
+        contrast: +contrast.value,
+        gamma: +gamma.value,
+        color: fg.value,
+        background: bg.value,
+        fps: +fps.value,
+        ramp: ramp.value,
+        invert: invert.checked,
+        charAspect: +aspect.value
+      });
+    }
 
-ui.start.onclick = () => app.start().then(()=>{ ui.start.disabled = true; ui.stop.disabled = false; })
-  .catch(e=>alert('Камера недоступна: '+e.message));
-ui.stop.onclick  = () => { app.stop(); ui.start.disabled=false; ui.stop.disabled=true; };
-ui.flip.onclick  = () => app.flip();
-</script>
-</body></html>
+    [w, contrast, gamma, fg, bg, fps, ramp, invert, aspect].forEach(el => {
+      el.addEventListener('input', apply);
+      el.addEventListener('change', apply);
+    });
+    apply();
+
+    ui.start.onclick = () => app.start().then(() => { ui.start.disabled = true; ui.stop.disabled = false; })
+      .catch(e => alert('Камера недоступна: ' + e.message));
+    ui.stop.onclick = () => { app.stop(); ui.start.disabled = false; ui.stop.disabled = true; };
+    ui.flip.onclick = () => app.flip();
+
+    wireFullscreen(ui.fs);
+  </script>
+</body>
+</html>
