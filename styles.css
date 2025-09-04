@@ -23,6 +23,8 @@ pre{
   border:1px solid #223a60;
 }
 
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:grid;place-items:center}
-.card{background:#0f1626;border:1px solid #223a60;border-radius:12px;padding:18px;max-width:420px;color:#cfe6ff}
+/* Consent modal must be on top and clickable even inside Telegram WebApp */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:grid;place-items:center;z-index:999999;pointer-events:auto}
+.modal[hidden]{display:none !important}
+.card{background:#0f1626;border:1px solid #223a60;border-radius:12px;padding:18px;max-width:420px;color:#cfe6ff;pointer-events:auto}
 .card h3{margin:0 0 8px}
