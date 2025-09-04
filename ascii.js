@@ -76,11 +76,10 @@ export class AsciiApp {
 }
 
 // 🔹 мобильный fullscreen (убираем меню, показываем кнопку назад)
-export function enableMobileFullscreen(button, toolbar, outWrap){
+export function enableMobileFullscreen(button, toolbar){
   if (!button) return;
   button.addEventListener('click', ()=>{
     if (/Mobi|Android/i.test(navigator.userAgent)) {
-      // Телефон: прячем тулбар
       toolbar.style.display = 'none';
       const exitBtn = document.createElement('button');
       exitBtn.textContent = '⤺';
@@ -89,7 +88,6 @@ export function enableMobileFullscreen(button, toolbar, outWrap){
       document.body.appendChild(exitBtn);
       exitBtn.onclick = ()=>{ toolbar.style.display='flex'; exitBtn.remove(); };
     } else {
-      // ПК: обычный fullscreen API
       document.documentElement.requestFullscreen?.();
     }
   });
