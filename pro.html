@@ -9,24 +9,34 @@
 <div class="wrap">
   <div class="toolbar" id="toolbar">
     <button id="flip" class="btn">Фронт/Тыл</button>
+    <button id="fs"   class="btn ghost">Fullscreen</button>
     <a class="btn ghost" href="index.html">Приложение</a>
   </div>
 
   <div class="panel">
-    <label>Ширина <input id="w" type="range" min="40" max="240" value="140"><span id="wv">140</span></label>
-    <label>Контраст <input id="contrast" type="range" min="50" max="200" value="115"><span id="cv">1.15</span></label>
+    <label>Ширина <input id="w" type="range" min="40" max="300" value="160"><span id="wv">160</span></label>
+    <label>Контраст <input id="contrast" type="range" min="50" max="220" value="115"><span id="cv">1.15</span></label>
     <label>Гамма <input id="gamma" type="range" min="60" max="180" value="120"><span id="gv">1.20</span></label>
     <label>Цвет <input id="fg" type="color" value="#8ac7ff"></label>
     <label>Фон <input id="bg" type="color" value="#000000"></label>
     <label>FPS <input id="fps" type="range" min="5" max="60" value="30"><span id="fpsv">30</span></label>
-    <label>Набор <input id="ramp" type="text" value=" .'`&quot;,:;Il!i~+_-?][}{1tfjrxnuvczXYUJCLQ0089@#"></label>
+    <label>Набор
+      <select id="preset">
+        <option value="classic">Классический</option>
+        <option value="digits">Только цифры</option>
+        <option value="letters">Только буквы</option>
+        <option value="dots">Точки/тонкий</option>
+        <option value="blocks">Блоки ░▒▓█</option>
+        <option value="custom">Свой…</option>
+      </select>
+      <input id="ramp" type="text" placeholder="свой набор символов" style="width:240px;display:none">
+    </label>
     <label><input id="invert" type="checkbox" checked> Инверсия</label>
   </div>
 
   <div class="stage"><pre id="out"></pre></div>
 </div>
 
-<!-- одноразовый дисклеймер для прямого захода в настройки -->
 <div class="modal" id="consent" hidden>
   <div class="card">
     <h3>Доступ к камере</h3>
@@ -36,19 +46,37 @@
 </div>
 
 <script type="module">
-import { AsciiApp } from './ascii.js';
+import { AsciiApp, wireFullscreen } from './ascii.js';
 if (window.Telegram?.WebApp) { Telegram.WebApp.ready(); Telegram.WebApp.expand(); }
 
 const $ = id => document.getElementById(id);
-const ui = { out:$('out'), flip:$('flip') };
+const ui = { out:$('out'), flip:$('flip'), fs:$('fs'), toolbar:$('toolbar') };
 const app = new AsciiApp(ui.out);
 
-// Применение настроек в реальном времени
+function presetRamp(name){
+  switch(name){
+    case 'digits': return ' 00112233445566778899';
+    case 'letters': return '  iIl1tTjfJrRvxXcCuUnNzZmwWQO';
+    case 'dots': return " .'`^,:;-_~";
+    case 'blocks': return ' ░▒▓█';
+    case 'classic': default: return " .'`\",:;Il!i~+_-?][}{1tfjrxnuvczXYUJCLQ0089@#";
+  }
+}
+
 function apply(){
   $('wv').textContent = $('w').value;
   $('cv').textContent = (+$('contrast').value/100).toFixed(2);
   $('gv').textContent = (+$('gamma').value/100).toFixed(2);
   $('fpsv').textContent = $('fps').value;
+
+  let ramp = presetRamp($('preset').value);
+  if ($('preset').value === 'custom') {
+    $('ramp').style.display = 'inline-block';
+    ramp = $('ramp').value || ramp;
+  } else {
+    $('ramp').style.display = 'none';
+  }
+
   app.setOptions({
     widthChars:+$('w').value,
     contrast:+$('contrast').value/100,
@@ -56,22 +84,21 @@ function apply(){
     color:$('fg').value,
     background:$('bg').value,
     fps:+$('fps').value,
-    ramp:$('ramp').value,
+    ramp,
     invert:$('invert').checked
   });
 }
-['w','contrast','gamma','fg','bg','fps','ramp','invert'].forEach(id=>{
+['w','contrast','gamma','fg','bg','fps','preset','ramp','invert'].forEach(id=>{
   $(id).addEventListener('input', apply);
+  $(id).addEventListener('change', apply);
 });
 apply();
 
-// Стартуем КАМЕРУ:
-// - если уже дано согласие (localStorage) — сразу
-// - если нет — после события от consent.js ('consent-ready')
 function startNow(){ app.start().catch(e=>alert('Камера недоступна: '+e.message)); }
 if (localStorage.getItem('consent-ok') === '1') startNow();
 else document.addEventListener('consent-ready', startNow, {once:true});
 
 ui.flip.onclick = () => app.flip();
+wireFullscreen(ui.fs, ui.toolbar);
 </script>
 </body></html>
