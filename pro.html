@@ -1,5 +1,6 @@
 <!doctype html><html><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>ASCII live · pro</title>
 <link rel="stylesheet" href="styles.css">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -14,7 +15,7 @@
   </div>
 
   <div class="panel">
-    <label>Ширина <input id="w" type="range" min="40" max="300" value="160"><span id="wv">160</span></label>
+    <label>Ширина <input id="w" type="range" min="40" max="320" value="160"><span id="wv">160</span></label>
     <label>Контраст <input id="contrast" type="range" min="50" max="220" value="115"><span id="cv">1.15</span></label>
     <label>Гамма <input id="gamma" type="range" min="60" max="180" value="120"><span id="gv">1.20</span></label>
     <label>Цвет <input id="fg" type="color" value="#8ac7ff"></label>
@@ -34,6 +35,7 @@
     <label><input id="invert" type="checkbox" checked> Инверсия</label>
   </div>
 
+  <!-- фиксированная рамка вывода, забирает весь остаток окна -->
   <div class="stage"><pre id="out"></pre></div>
 </div>
 
@@ -55,14 +57,14 @@ const app = new AsciiApp(ui.out);
 
 function presetRamp(name){
   switch(name){
-    case 'digits': return ' 00112233445566778899';
+    case 'digits':  return ' 00112233445566778899';
     case 'letters': return '  iIl1tTjfJrRvxXcCuUnNzZmwWQO';
-    case 'dots': return " .'`^,:;-_~";
-    case 'blocks': return ' ░▒▓█';
-    case 'classic': default: return " .'`\",:;Il!i~+_-?][}{1tfjrxnuvczXYUJCLQ0089@#";
+    case 'dots':    return " .'`^,:;-_~";
+    case 'blocks':  return ' ░▒▓█';
+    case 'classic':
+    default:        return " .'`\",:;Il!i~+_-?][}{1tfjrxnuvczXYUJCLQ0089@#";
   }
 }
-
 function apply(){
   $('wv').textContent = $('w').value;
   $('cv').textContent = (+$('contrast').value/100).toFixed(2);
@@ -70,13 +72,12 @@ function apply(){
   $('fpsv').textContent = $('fps').value;
 
   let ramp = presetRamp($('preset').value);
-  if ($('preset').value === 'custom') {
+  if ($('preset').value === 'custom'){
     $('ramp').style.display = 'inline-block';
     ramp = $('ramp').value || ramp;
   } else {
     $('ramp').style.display = 'none';
   }
-
   app.setOptions({
     widthChars:+$('w').value,
     contrast:+$('contrast').value/100,
@@ -94,9 +95,9 @@ function apply(){
 });
 apply();
 
-function startNow(){ app.start().catch(e=>alert('Камера недоступна: '+e.message)); }
+function startNow(){ app.start().catch(e=>alert('Камера недоступна: ' + e.message)); }
 if (localStorage.getItem('consent-ok') === '1') startNow();
-else document.addEventListener('consent-ready', startNow, {once:true});
+else document.addEventListener('consent-ready', startNow, { once:true });
 
 ui.flip.onclick = () => app.flip();
 wireFullscreen(ui.fs, ui.toolbar);
