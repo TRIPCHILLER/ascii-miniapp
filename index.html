@@ -127,12 +127,22 @@ else document.addEventListener('consent-ready', startNow, { once:true });
 // переключение фронт/тыл
 ui.flip.onclick = () => app.flip();
 
-// настройки как плашка: показываем/скрываем
+// при старте читаем состояние
+const saved = localStorage.getItem('ui-settings-open') === '1';
+if (saved) ui.settings.removeAttribute('hidden');
+else ui.settings.setAttribute('hidden','');
+
+// кнопка: показать/скрыть + сохранить
 ui.toggle.onclick = () => {
   const hidden = ui.settings.hasAttribute('hidden');
-  if (hidden) ui.settings.removeAttribute('hidden');
-  else ui.settings.setAttribute('hidden','');
-  // движок сам подстроит размер через ResizeObserver
+  if (hidden) {
+    ui.settings.removeAttribute('hidden');
+    localStorage.setItem('ui-settings-open','1');
+  } else {
+    ui.settings.setAttribute('hidden','');
+    localStorage.setItem('ui-settings-open','0');
+  }
 };
 </script>
 </body></html>
+
