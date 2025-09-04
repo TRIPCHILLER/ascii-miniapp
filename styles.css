@@ -122,3 +122,24 @@ input[type="range"]{ width:160px; background:transparent; border:none; }
 
 /* безопасная зона iOS */
 .wrap{padding-bottom:env(safe-area-inset-bottom)}
+:root{
+  --ui-bg:    #141414;
+  --ui-panel: #1b1b1b;
+  --ui-border:#ffffff;
+  --ui-text:  #ffffff;
+}
+
+body.theme-dark,
+button, input, select, textarea, label,
+.toolbar, .panel, .card, h1,h2,h3,h4,h5,h6, a, .btn {
+  font-family:'BetterVCR', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial !important;
+  color: var(--ui-text) !important;
+}
+
+/* Кнопки — белая квадратная обводка */
+.btn{
+  background:transparent;
+  color:var(--ui-text) !important;
+  border:1px solid var(--ui-border) !important;
+  border-radius:0 !important;
+}
