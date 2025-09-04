@@ -3,9 +3,12 @@
 <title>ASCII live · app</title>
 <link rel="stylesheet" href="styles.css">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-</head><body class="theme-dark">
+<!-- внешний скрипт, который чинит модалку и старт -->
+<script src="consent.js" defer></script>
+</head>
+<body class="theme-dark">
 <div class="wrap">
-  <div class="toolbar">
+  <div class="toolbar" id="toolbar">
     <button id="start" class="btn">Начать</button>
     <button id="stop"  class="btn" disabled>Стоп</button>
     <button id="flip"  class="btn">Фронт/Тыл</button>
@@ -14,23 +17,13 @@
   <div class="stage"><pre id="out"></pre></div>
 </div>
 
-<!-- МОДАЛКА: выше всех слоёв + работает даже без JS-модуля -->
-<div class="modal" id="consent">
+<!-- Модалка: фон некликабельный, поверх всего -->
+<div class="modal" id="consent" hidden>
   <div class="card" role="dialog" aria-modal="true">
-    <h3>Внимание</h3>
-    <p>Видео обрабатывается <b>локально</b> на вашем устройстве. Мы ничего не записываем и не отправляем.</p>
-    <p><a href="privacy.html" target="_blank" rel="noopener">Подробнее о приватности</a></p>
-    <button id="agree" class="btn" type="button"
-      onclick="
-        try {
-          localStorage.setItem('consent-ok','1');
-        } catch(e){}
-        // скрыть модалку
-        var m=document.getElementById('consent'); if(m){ m.setAttribute('hidden',''); }
-        // инициировать пользовательский жест для запуска камеры
-        var s=document.getElementById('start'); if(s){ s.click(); }
-        return false;
-      ">Ок, понимаю</button>
+    <h3>Доступ к камере</h3>
+    <p>Видеопоток обрабатывается локально на вашем устройстве, без отправки на сервер.</p>
+    <p><a href="privacy.html" target="_blank" rel="noopener">Подробнее</a></p>
+    <button id="agree" class="btn" type="button">Ок, понимаю</button>
   </div>
 </div>
 
@@ -43,18 +36,10 @@ const ui = {
   stop:  document.getElementById('stop'),
   flip:  document.getElementById('flip'),
   out:   document.getElementById('out'),
-  consent: document.getElementById('consent'),
-  agree: document.getElementById('agree'),
 };
 
 const app = new AsciiApp(ui.out);
 
-// Если пользователь уже соглашался ранее — не показываем модалку
-try {
-  if (localStorage.getItem('consent-ok') === '1') ui.consent.setAttribute('hidden','');
-} catch(e){}
-
-// КНОПКИ
 ui.start.onclick = () => app.start()
   .then(()=>{ ui.start.disabled = true; ui.stop.disabled = false; })
   .catch(e => alert('Камера недоступна: ' + e.message));
