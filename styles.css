@@ -1,0 +1,15 @@
+html,body{height:100%;margin:0}
+body.theme-dark{background:#000;color:#8ac7ff;font-family:ui-monospace,Consolas,monospace}
+.wrap{display:flex;flex-direction:column;height:100%}
+.toolbar{display:flex;gap:8px;align-items:center;padding:10px;background:#0b0f18}
+.btn{background:#13223a;color:#cfe6ff;border:1px solid #223a60;padding:.55rem 1rem;border-radius:.6rem;cursor:pointer}
+.btn.ghost{background:transparent}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.panel{display:flex;flex-wrap:wrap;gap:12px;padding:8px;background:#0b0f18}
+.panel label{display:flex;gap:8px;align-items:center;background:#0f1626;border:1px solid #223a60;padding:6px 8px;border-radius:.5rem}
+.stage{flex:1;display:grid;place-items:center;overflow:auto}
+pre{white-space:pre;line-height:1ch;font-size:1.1ch;margin:0;user-select:none}
+
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:grid;place-items:center}
+.card{background:#0f1626;border:1px solid #223a60;border-radius:12px;padding:18px;max-width:420px}
+.card h3{margin:0 0 8px}
