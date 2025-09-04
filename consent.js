@@ -1,69 +1,62 @@
-// Работает в index.html и pro.html
+<!-- consent.js -->
+<script>
 (function () {
   function byId(id){ return document.getElementById(id); }
-
-  function enableModal() {
-    const consent = byId('consent');
-    if (!consent) return;
-    document.body.classList.add('has-modal');
-    consent.hidden = false;
-  }
-
-  function disableModal() {
-    const consent = byId('consent');
-    if (!consent) return;
-    consent.hidden = true;
-    document.body.classList.remove('has-modal');
-  }
 
   function alreadyConsented() {
     try { return localStorage.getItem('consent-ok') === '1'; } catch (e) { return false; }
   }
-
   function setConsented() {
     try { localStorage.setItem('consent-ok','1'); } catch (e) {}
   }
 
-  function setupIndex() {
-    const startBtn = byId('start');
-    const agree = byId('agree');
-    if (!startBtn || !agree) return;
-
-    if (!alreadyConsented()) enableModal();
-
-    agree.addEventListener('click', () => {
-      setConsented();
-      disableModal();
-      // Старт камеры в рамках пользовательского жеста
-      startBtn.click();
-    });
+  function showModal() {
+    const modal = byId('consent');
+    if (!modal) return;
+    modal.hidden = false;
+    // Если где-то ещё используешь этот класс — оставим, но он больше не обязателен
+    document.body.classList.add('has-modal');
+  }
+  function hideModal() {
+    const modal = byId('consent');
+    if (!modal) return;
+    modal.hidden = true;
+    document.body.classList.remove('has-modal');
   }
 
-  function setupPro() {
-    // На pro.html камеры нет кнопки Start — стартуем сразу после согласия
-    const agree = byId('agree');
-    if (!agree) return;
-
-    // Если уже согласились ранее — модалку не показываем
-    if (alreadyConsented()) {
-      const consent = byId('consent');
-      if (consent) consent.hidden = true;
-      document.body.classList.remove('has-modal');
-      document.dispatchEvent(new CustomEvent('consent-ready'));
-      return;
-    }
-
-    enableModal();
-
-    agree.addEventListener('click', () => {
-      setConsented();
-      disableModal();
-      document.dispatchEvent(new CustomEvent('consent-ready'));
-    });
+  function dispatchReady() {
+    // Новый путь: страницы слушают это событие и сами стартуют камеру
+    document.dispatchEvent(new Event('consent-ready'));
+    // Старый путь (обратная совместимость): если есть кнопка #start — нажмём
+    const startBtn = byId('start');
+    if (startBtn) { try { startBtn.click(); } catch(e){} }
   }
 
   document.addEventListener('DOMContentLoaded', () => {
-    // Определим страницу по наличию кнопок/элементов
-    if (byId('start')) setupIndex(); else setupPro();
+    const modal = byId('consent');
+    const agree = byId('agree');
+
+    // Если на странице нет модалки — ничего не делаем
+    if (!modal || !agree) {
+      // но если согласие уже было — всё равно дёрнем готовность,
+      // чтобы index.html смог стартовать камеру
+      if (alreadyConsented()) dispatchReady();
+      return;
+    }
+
+    if (alreadyConsented()) {
+      hideModal();
+      dispatchReady();
+      return;
+    }
+
+    // Согласия нет — показываем модалку и ждём клика
+    showModal();
+    agree.addEventListener('click', () => {
+      setConsented();
+      hideModal();
+      dispatchReady();
+    }, { once:true });
   });
 })();
+</script>
