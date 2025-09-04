@@ -1,47 +1,63 @@
-<!doctype html><html><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ASCII live · app</title>
-<link rel="stylesheet" href="styles.css">
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
-</head><body class="theme-dark">
-<div class="wrap">
-  <div class="toolbar">
-    <button id="start" class="btn">Начать</button>
-    <button id="stop"  class="btn" disabled>Стоп</button>
-    <button id="flip"  class="btn">Фронт/Тыл</button>
-    <a class="btn ghost" href="pro.html">Настройки</a>
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ASCII live · app</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body class="theme-dark">
+  <div class="wrap">
+    <div class="toolbar">
+      <button id="start" class="btn">Начать</button>
+      <button id="stop"  class="btn" disabled>Стоп</button>
+      <button id="flip"  class="btn">Фронт/Тыл</button>
+      <button id="fs"    class="btn ghost">Fullscreen</button>
+      <a class="btn ghost" href="pro.html">Настройки</a>
+    </div>
+    <div class="stage"><pre id="out"></pre></div>
   </div>
-  <div class="stage"><pre id="out"></pre></div>
-</div>
 
-<div class="modal" id="consent">
-  <div class="card">
-    <h3>Внимание</h3>
-    <p>Видео обрабатывается <b>локально</b> на вашем устройстве. Мы ничего не записываем и не отправляем.</p>
-    <p><a href="privacy.html" target="_blank">Подробнее о приватности</a></p>
-    <button class="btn" id="agree">Ок, понимаю</button>
+  <div id="consent" class="modal" hidden>
+    <div class="card">
+      <h3>Доступ к камере</h3>
+      <p>Видеопоток обрабатывается локально, без отправки на сервер.</p>
+      <p><a href="privacy.html" target="_blank" rel="noopener">Подробнее</a></p>
+      <button id="agree" class="btn">OK</button>
+    </div>
   </div>
-</div>
 
-<script type="module">
-import { AsciiApp } from './ascii.js';
-if (window.Telegram?.WebApp) { Telegram.WebApp.ready(); Telegram.WebApp.expand(); }
+  <script type="module">
+    import { AsciiApp, wireFullscreen } from './ascii.js';
 
-const ui = {
-  start: document.getElementById('start'),
-  stop:  document.getElementById('stop'),
-  flip:  document.getElementById('flip'),
-  out:   document.getElementById('out'),
-  consent: document.getElementById('consent'),
-  agree: document.getElementById('agree'),
-};
-const app = new AsciiApp(ui.out);
+    const ui = {
+      start:   document.getElementById('start'),
+      stop:    document.getElementById('stop'),
+      flip:    document.getElementById('flip'),
+      fs:      document.getElementById('fs'),
+      out:     document.getElementById('out'),
+      consent: document.getElementById('consent'),
+      agree:   document.getElementById('agree'),
+    };
 
-ui.agree.onclick = () => ui.consent.remove();
-ui.start.onclick = () => app.start().then(()=>{ ui.start.disabled = true; ui.stop.disabled = false; })
-  .catch(e=>alert('Камера недоступна: '+e.message));
-ui.stop.onclick  = () => { app.stop(); ui.start.disabled=false; ui.stop.disabled=true; };
-ui.flip.onclick  = () => app.flip();
+    const app = new AsciiApp(ui.out, { fps: 30, invert: true });
 
-</script>
-</body></html>
+    // Ensure the colors are applied to PRE
+    app.setOptions({});
+
+    // Show consent on first load (can be hidden by default if not needed)
+    // ui.consent.hidden = false;
+    if (ui.agree) ui.agree.onclick = () => { ui.consent.hidden = true; };
+
+    ui.start.onclick = () => app.start()
+      .then(() => { ui.start.disabled = true; ui.stop.disabled = false; })
+      .catch(e => alert('Камера недоступна: ' + e.message));
+
+    ui.stop.onclick  = () => { app.stop(); ui.start.disabled = false; ui.stop.disabled = true; };
+    ui.flip.onclick  = () => app.flip();
+
+    wireFullscreen(ui.fs);
+  </script>
+</body>
+</html>
