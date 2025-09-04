@@ -13,13 +13,13 @@
   <div class="stage"><pre id="out"></pre></div>
 </div>
 
-<!-- Дисклеймер -->
+<!-- Дисклеймер: показываем до старта камеры -->
 <div class="modal" id="consent" hidden>
   <div class="card">
-    <h3>Внимание</h3>
-    <p>Видео обрабатывается <b>локально</b> на вашем устройстве. Мы ничего не записываем и не отправляем.</p>
-    <p><a href="privacy.html" target="_blank">Подробнее о приватности</a></p>
-    <button class="btn" id="agree">Ок, понимаю</button>
+    <h3>Доступ к камере</h3>
+    <p>Видеопоток обрабатывается локально на вашем устройстве, без отправки на сервер.</p>
+    <p><a href="privacy.html" target="_blank" rel="noopener">Подробнее</a></p>
+    <button id="agree" class="btn" type="button">Ок, понимаю</button>
   </div>
 </div>
 
@@ -27,21 +27,33 @@
 import { AsciiApp, enableMobileFullscreen } from './ascii.js';
 if (window.Telegram?.WebApp) { Telegram.WebApp.ready(); Telegram.WebApp.expand(); }
 
-const ui={ flip:document.getElementById('flip'),
-           fs:document.getElementById('fs'),
-           out:document.getElementById('out'),
-           toolbar:document.getElementById('toolbar'),
-           consent:document.getElementById('consent'),
-           agree:document.getElementById('agree') };
+const ui = {
+  flip: document.getElementById('flip'),
+  fs: document.getElementById('fs'),
+  out: document.getElementById('out'),
+  toolbar: document.getElementById('toolbar'),
+  consent: document.getElementById('consent'),
+  agree: document.getElementById('agree')
+};
 
-const app=new AsciiApp(ui.out);
-app.start().catch(e=>alert('Камера недоступна: '+e.message));
+const app = new AsciiApp(ui.out);
 enableMobileFullscreen(ui.fs, ui.toolbar);
+app.setOptions({}); // цвета
 
-// дисклеймер при первом запуске
-if(localStorage.getItem('consent-ok')!=='1'){ ui.consent.hidden=false; }
-ui.agree.onclick=()=>{ ui.consent.hidden=true; localStorage.setItem('consent-ok','1'); };
+// Порядок старта:
+// 1) если есть согласие — стартуем сразу;
+// 2) если нет — показываем модалку и стартуем по клику «Ок».
+if (localStorage.getItem('consent-ok') === '1') {
+  app.start().catch(e => alert('Камера недоступна: ' + e.message));
+} else {
+  ui.consent.hidden = false;
+}
+ui.agree.onclick = () => {
+  localStorage.setItem('consent-ok','1');
+  ui.consent.hidden = true;
+  app.start().catch(e => alert('Камера недоступна: ' + e.message));
+};
 
-ui.flip.onclick=()=>app.flip();
+ui.flip.onclick = () => app.flip();
 </script>
 </body></html>
