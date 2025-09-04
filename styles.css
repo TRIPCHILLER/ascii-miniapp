@@ -66,6 +66,10 @@ body.theme-dark{ background:#000; }
   padding:6px 8px;
   border-radius:0; /* квадратные */
 }
+/* Панель настроек скрыта по умолчанию */
+.panel[hidden] {
+  display: none !important;
+}
 
 /* Область вывода */
 .stage{
@@ -181,3 +185,4 @@ input[type="range"]::-moz-range-thumb{
 
 /* безопасная зона на iOS */
 .wrap{padding-bottom:env(safe-area-inset-bottom)}
+
