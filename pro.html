@@ -8,44 +8,48 @@
   <div class="toolbar" id="toolbar">
     <button id="flip" class="btn">Фронт/Тыл</button>
     <button id="fs" class="btn ghost">Fullscreen</button>
-    <a class="btn ghost" href="index.html">Назад</a>
+    <a class="btn ghost" href="index.html">Приложение</a>
   </div>
 
   <div class="panel">
-    <label>Ширина: <input id="w" type="range" min="40" max="240" value="140"><span id="wv">140</span></label>
-    <label>Контраст: <input id="contrast" type="range" min="50" max="200" value="115"><span id="cv">1.15</span></label>
-    <label>Гамма: <input id="gamma" type="range" min="60" max="180" value="120"><span id="gv">1.20</span></label>
-    <label>Цвет: <input id="fg" type="color" value="#8ac7ff"></label>
-    <label>Фон: <input id="bg" type="color" value="#000000"></label>
-    <label>FPS: <input id="fps" type="range" min="5" max="60" value="30"><span id="fpsv">30</span></label>
-    <label>Набор: <input id="ramp" type="text" value=" .'`^&quot;,:;Il!i~+_-?][}{1tfjrxnuvczXYUJCLQ0089@#"></label>
+    <label>Ширина <input id="w" type="range" min="40" max="240" value="140"><span id="wv">140</span></label>
+    <label>Контраст <input id="contrast" type="range" min="50" max="200" value="115"><span id="cv">1.15</span></label>
+    <label>Гамма <input id="gamma" type="range" min="60" max="180" value="120"><span id="gv">1.20</span></label>
+    <label>Цвет <input id="fg" type="color" value="#8ac7ff"></label>
+    <label>Фон <input id="bg" type="color" value="#000000"></label>
+    <label>FPS <input id="fps" type="range" min="5" max="60" value="30"><span id="fpsv">30</span></label>
+    <label>Набор <input id="ramp" type="text" value=" .'`&quot;,:;Il!i~+_-?][}{1tfjrxnuvczXYUJCLQ0089@#"></label>
     <label><input id="invert" type="checkbox" checked> Инверсия</label>
   </div>
 
   <div class="stage"><pre id="out"></pre></div>
 </div>
 
+<!-- Тот же одноразовый дисклеймер, если пользователь зашел сразу сюда -->
+<div class="modal" id="consent" hidden>
+  <div class="card">
+    <h3>Доступ к камере</h3>
+    <p>Видеопоток обрабатывается локально на вашем устройстве.</p>
+    <button id="agree" class="btn" type="button">Ок, понимаю</button>
+  </div>
+</div>
+
 <script type="module">
 import { AsciiApp, enableMobileFullscreen } from './ascii.js';
 if (window.Telegram?.WebApp) { Telegram.WebApp.ready(); Telegram.WebApp.expand(); }
 
-const $=id=>document.getElementById(id);
-const ui={ flip:$('flip'), fs:$('fs'), out:$('out'), toolbar:$('toolbar') };
-const app=new AsciiApp(ui.out);
+const $ = id => document.getElementById(id);
+const ui = { flip:$('flip'), fs:$('fs'), out:$('out'), toolbar:$('toolbar'),
+             consent:$('consent'), agree:$('agree') };
 
-// автостарт камеры ✅
-app.start().catch(e=>alert('Камера недоступна: '+e.message));
+const app = new AsciiApp(ui.out);
+enableMobileFullscreen(ui.fs, ui.toolbar);
 
-// fullscreen-логика
-enableMobileFullscreen(ui.fs, ui.toolbar, ui.out);
-
-// настройки в реальном времени ✅
 function apply(){
-  $('wv').textContent=$('w').value;
-  $('cv').textContent=( $('contrast').value/100).toFixed(2);
-  $('gv').textContent=( $('gamma').value/100).toFixed(2);
-  $('fpsv').textContent=$('fps').value;
-
+  $('wv').textContent = $('w').value;
+  $('cv').textContent = (+$('contrast').value/100).toFixed(2);
+  $('gv').textContent = (+$('gamma').value/100).toFixed(2);
+  $('fpsv').textContent = $('fps').value;
   app.setOptions({
     widthChars:+$('w').value,
     contrast:+$('contrast').value/100,
@@ -58,10 +62,19 @@ function apply(){
   });
 }
 ['w','contrast','gamma','fg','bg','fps','ramp','invert'].forEach(id=>{
-  $(id).addEventListener('input',apply);
+  $(id).addEventListener('input', apply);
 });
 apply();
 
-ui.flip.onclick=()=>app.flip();
+// Старт камеры только после согласия (или мгновенно, если уже дано)
+const startNow = () => app.start().catch(e=>alert('Камера недоступна: '+e.message));
+if (localStorage.getItem('consent-ok') === '1') {
+  startNow();
+} else {
+  ui.consent.hidden = false;
+  ui.agree.onclick = ()=>{ localStorage.setItem('consent-ok','1'); ui.consent.hidden = true; startNow(); };
+}
+
+ui.flip.onclick = () => app.flip();
 </script>
 </body></html>
