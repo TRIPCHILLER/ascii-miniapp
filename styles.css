@@ -10,6 +10,7 @@ body.theme-dark{background:#000;color:#8ac7ff;font-family:ui-monospace,Consolas,
 .stage{flex:1;display:grid;place-items:center;overflow:auto}
 pre{white-space:pre;line-height:1ch;font-size:1.1ch;margin:0;user-select:none}
 
+/* модалка всегда поверх и кликабельная */
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:grid;place-items:center;z-index:9999}
 .card{background:#0f1626;border:1px solid #223a60;border-radius:12px;padding:18px;max-width:420px;color:#cfe6ff}
 .card h3{margin:0 0 8px}
