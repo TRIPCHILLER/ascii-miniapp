@@ -1,59 +1,124 @@
-/* Базовые размеры: занимаем всё окно, без прокрутки */
+/* ====== БАЗА ====== */
 html,body{
-  height:100svh;           /* корректно на мобильных с панелями */
+  height:100svh;
   margin:0;
-  overflow:hidden;         /* убираем скролл всей страницы */
+  overflow:hidden;
 }
 
-/* BetterVCR только для UI. Сам ASCII — строгий monospace */
+/* Подключаем BetterVCR (положи файлы в /assets строго с этими именами) */
 @font-face{
   font-family:'BetterVCR';
-  src:url('assets/BetterVCR.woff2') format('woff2'),
-      url('assets/BetterVCR.woff')  format('woff');
+  src:url('assets/BetterVCR.woff2?v=1') format('woff2'),
+      url('assets/BetterVCR.woff?v=1')  format('woff');
   font-display:swap;
-}
-body.theme-dark{
-  background:#000;
-  color:#8ac7ff;
-  font-family:'BetterVCR', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  font-weight:400;
+  font-style:normal;
+  font-synthesis:none;
 }
 
-/* Макет */
+/* Палитра (тёмно-серая тема) */
+:root{
+  --ui-bg:      #141414; /* фон тулбаров/панелей */
+  --ui-panel:   #1b1b1b; /* фон блоков/карточек */
+  --ui-border:  #ffffff; /* белая обводка */
+  --ui-text:    #ffffff; /* белый текст */
+  --ui-muted:   #bdbdbd; /* вторичный текст */
+}
+
+/* Применяем BetterVCR ко всему UI — кроме ASCII <pre> */
+body.theme-dark,
+button, input, select, textarea, label,
+.toolbar, .panel, .card, h1,h2,h3,h4,h5,h6, a, .btn {
+  font-family:'BetterVCR', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial !important;
+  color: var(--ui-text);
+}
+
+/* Общий фон */
+body.theme-dark{ background:#000; }
+
+/* ====== МАКЕТ ====== */
 .wrap{display:flex;flex-direction:column;height:100%}
-.toolbar{display:flex;gap:8px;align-items:center;padding:10px;flex-wrap:wrap;background:#0b0f18}
-.btn{background:#13223a;color:#cfe6ff;border:1px solid #223a60;padding:.55rem 1rem;border-radius:.6rem;cursor:pointer}
-.btn.ghost{background:transparent}
-.btn[disabled]{opacity:.5;cursor:not-allowed}
-.panel{display:flex;flex-wrap:wrap;gap:12px;padding:8px;background:#0b0f18}
-.panel label{display:flex;gap:8px;align-items:center;background:#0f1626;border:1px solid #223a60;padding:6px 8px;border-radius:.5rem}
 
-/* Фиксированная рамка показа: заполняет остаток окна; min-height:0 чтобы flex-child не "распирал" страницу */
+/* Верхняя панель */
+.toolbar{
+  display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+  padding:10px;background:var(--ui-bg);
+  border-bottom:1px solid var(--ui-border);
+}
+
+/* Панель настроек */
+.panel{
+  display:flex;flex-wrap:wrap;gap:12px;padding:8px;background:var(--ui-bg);
+  border-bottom:1px solid var(--ui-border);
+}
+.panel label{
+  display:flex;gap:8px;align-items:center;
+  background:var(--ui-panel);
+  border:1px solid var(--ui-border);
+  padding:6px 8px;border-radius:0; /* квадратные */
+}
+
+/* Область вывода — фиксированная рамка */
 .stage{flex:1;display:grid;place-items:center;overflow:hidden;min-height:0}
 
-/* ASCII — строгий monospace; вписываемся в .stage */
+/* ASCII — строго monospace, чтобы не ехала сетка */
 pre{
   white-space:pre;
-  font-family:ui-monospace,Menlo,Consolas,monospace;
+  font-family:ui-monospace,Menlo,Consolas,monospace !important;
   line-height:1ch;
   font-size:12px; /* реальный размер подберёт JS */
-  margin:0;
-  user-select:none;
-  color:var(--fg,#8ac7ff);
+  margin:0; user-select:none;
+  color:var(--fg,#8ac7ff);           /* цвет ASCII управляется из JS/про */
   background:var(--bg,#000);
   padding:10px 12px;
-  border-radius:12px;
-  border:1px solid #223a60;
+  border:1px solid var(--ui-border);
+  border-radius:0;                   /* квадратная рамка */
   box-sizing:border-box;
-  max-width:100%;
-  max-height:100%;
+  max-width:100%; max-height:100%;
 }
 
-/* Модалка согласия */
+/* ====== КНОПКИ ====== */
+.btn{
+  background:transparent;
+  color:var(--ui-text);
+  border:1px solid var(--ui-border);
+  padding:.55rem 1rem;
+  border-radius:0;                   /* квадратные */
+  cursor:pointer;
+}
+.btn.ghost{ background:transparent }
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.btn:focus-visible{ outline:2px dashed var(--ui-border); outline-offset:2px }
+
+/* Ссылки — тоже белые */
+a{ color:var(--ui-text); text-decoration:underline }
+a:hover{ text-decoration:none }
+
+/* ====== ФОРМЫ ====== */
+input, select, textarea{
+  color:var(--ui-text);
+  background:var(--ui-panel);
+  border:1px solid var(--ui-border);
+  border-radius:0;
+  padding:4px 6px;
+}
+input[type="range"]{ width:160px; background:transparent; border:none; }
+
+/* ====== МОДАЛКА ====== */
 .has-modal .toolbar, .has-modal .stage { pointer-events:none !important }
-.modal{position:fixed;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.72);z-index:2147483647}
+.modal{
+  position:fixed;inset:0;display:grid;place-items:center;
+  background:rgba(0,0,0,.72);z-index:2147483647
+}
 .modal[hidden]{display:none !important}
-.card{background:#0f1626;border:1px solid #223a60;border-radius:12px;padding:18px;max-width:420px;width:min(420px,90vw);color:#cfe6ff}
+.card{
+  background:var(--ui-panel);
+  border:1px solid var(--ui-border);
+  border-radius:0;                   /* квадратная */
+  padding:18px;max-width:420px;width:min(420px,90vw);
+  color:var(--ui-text)
+}
 .card h3{margin:0 0 8px}
 
-/* безопасная зона на iOS */
+/* безопасная зона iOS */
 .wrap{padding-bottom:env(safe-area-inset-bottom)}
