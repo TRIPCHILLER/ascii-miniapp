@@ -5,15 +5,12 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <title>ASCII live · app</title>
 
-  <!-- общий стиль -->
-  <link rel="stylesheet" href="styles.css?v=22" />
-
-  <!-- дисклеймер (оставь, как у тебя) -->
+  <link rel="stylesheet" href="styles.css?v=23" />
   <script src="consent.js" defer></script>
 </head>
 <body class="theme-dark">
 
-  <!-- модальное окно согласия (оставь как у тебя, пример) -->
+  <!-- Модалка согласия -->
   <div class="modal" id="consent" hidden>
     <div class="card">
       <h3>Доступ к камере</h3>
@@ -25,14 +22,12 @@
   </div>
 
   <div class="wrap">
-
-    <!-- верхняя панель -->
     <div class="toolbar">
       <button id="flip" class="btn">Фронт/Тыл</button>
       <button id="toggle" class="btn">Настройки</button>
     </div>
 
-    <!-- панель настроек (по умолчанию скрыта) -->
+    <!-- Панель по умолчанию скрыта -->
     <div class="panel" id="settings" hidden>
       <label>
         <span>Ширина</span>
@@ -85,7 +80,6 @@
       </label>
     </div>
 
-    <!-- рабочая область -->
     <div class="stage">
       <pre id="out"></pre>
     </div>
@@ -93,8 +87,6 @@
 
   <script type="module">
     import { AsciiApp } from './ascii.js';
-
-    // короткий доступ к элементам
     const $ = id => document.getElementById(id);
 
     const ui = {
@@ -102,20 +94,16 @@
       flip: $('flip'),
       toggle: $('toggle'),
       settings: $('settings'),
-
       w: $('w'), c: $('c'), g: $('g'),
       fg: $('fg'), bg: $('bg'),
       fps: $('fps'),
       ramp: $('ramp'),
       inv: $('inv'),
-
       w_out: $('w_out'), c_out: $('c_out'), g_out: $('g_out'), fps_out: $('fps_out'),
     };
 
-    // приложение
     const app = new AsciiApp(ui.out);
 
-    // применить настройки из UI
     function apply(){
       ui.w_out.textContent   = ui.w.value;
       ui.c_out.textContent   = Number(ui.c.value).toFixed(2);
@@ -134,14 +122,12 @@
       });
     }
 
-    // события UI
     ['w','c','g','fg','bg','fps','ramp','inv'].forEach(id=>{
       const el = $(id);
       el.addEventListener('input', apply);
       el.addEventListener('change', apply);
     });
 
-    // показать/скрыть панель + запоминание
     ui.toggle.addEventListener('click', () => {
       const hidden = ui.settings.hasAttribute('hidden');
       if (hidden) {
@@ -153,27 +139,23 @@
       }
     });
 
-    // восстановим состояние панели
     const savedPanelOpen = localStorage.getItem('ui-settings-open') === '1';
     if (savedPanelOpen) ui.settings.removeAttribute('hidden');
     else ui.settings.setAttribute('hidden','');
 
-    // фронт/тыл
     ui.flip.addEventListener('click', () => app.flip());
 
-    // старт после согласия
     document.addEventListener('consent-ready', async () => {
       await app.start();
-      apply(); // применить текущие значения
+      apply();
     });
 
-    // если согласие уже дано — стартуем сразу (consent.js поставит флаг 'consent-ok')
-    try {
-      if (localStorage.getItem('consent-ok') === '1') {
+    try{
+      if(localStorage.getItem('consent-ok') === '1'){
         await app.start();
         apply();
       }
-    } catch(e) {}
+    }catch(e){}
   </script>
 </body>
 </html>
