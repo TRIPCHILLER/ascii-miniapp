@@ -1,4 +1,5 @@
-// ascii.js — рендер из камеры в ASCII с авто-вписыванием
+// Прочный рендер: авто-вписывание по реальному измерению текста,
+// рефит не зависит от контраста/гаммы
 
 export class AsciiApp {
   constructor(outEl) {
@@ -23,10 +24,17 @@ export class AsciiApp {
     this._running = false;
     this._timer = 0;
     this._lastFrameTs = 0;
-    this._measure = null;
 
-    // следим за .stage и подгоняем
-    this._ro = new ResizeObserver(() => this._refit());
+    // элемент для измерений
+    this._probe = document.createElement('span');
+    Object.assign(this._probe.style, {
+      position:'absolute', left:'-99999px', top:'-99999px',
+      whiteSpace:'pre', visibility:'hidden', pointerEvents:'none'
+    });
+    document.body.appendChild(this._probe);
+
+    // наблюдаем сцену
+    this._ro = new ResizeObserver(() => this.refit());
     this._ro.observe(this.out.parentElement);
 
     this._applyColors();
@@ -47,13 +55,17 @@ export class AsciiApp {
   async flip() {
     this.facing = (this.facing === 'user') ? 'environment' : 'user';
     await this._openCamera(true);
-    this._refit();
   }
 
   setOptions(opts) {
     Object.assign(this.options, opts);
-    this._applyColors();
-    this._refit();
+    this._applyColors(); // обновим цвета, но НЕ рефитим
+  }
+
+  refit() {
+    const cols = Math.max(1, this.options.widthChars | 0);
+    const rows = this._estimateRows(cols);
+    this._fitByProbe(cols, rows);
   }
 
   // ====== камера ======
@@ -72,9 +84,8 @@ export class AsciiApp {
       this.video.muted = true;
       this.video.autoplay = true;
       this.video.srcObject = this.stream;
-
-      this.video.addEventListener('loadedmetadata', () => this._refit(), { once:true });
-      this.video.addEventListener('playing', () => this._refit(), { once:true });
+      this.video.addEventListener('loadedmetadata', () => this.refit(), { once:true });
+      this.video.addEventListener('playing', () => this.refit(), { once:true });
     } else {
       this.video.srcObject = this.stream;
     }
@@ -84,64 +95,59 @@ export class AsciiApp {
 
   // ====== цвета/фон ======
   _applyColors() {
-    if (!this.out) return;
     const fg = this.options.color || '#8ac7ff';
     const bg = this.options.background || '#000000';
-
     this.out.style.setProperty('--fg', fg);
     this.out.style.setProperty('--bg', bg);
 
-    this.out.style.color = fg;              // сам ASCII
-    this.out.style.backgroundColor = bg;    // фон ASCII
+    this.out.style.color = fg;
+    this.out.style.backgroundColor = bg;
 
-    const stage = this.out.parentElement;   // и фон вокруг совпадает
+    const stage = this.out.parentElement;
     if (stage) stage.style.backgroundColor = bg;
   }
 
-  // ====== авто-вписывание в .stage ======
-  _measureChPx(){
-    if (!this._measure) {
-      this._measure = document.createElement('div');
-      this._measure.style.position = 'absolute';
-      this._measure.style.visibility = 'hidden';
-      this._measure.style.pointerEvents = 'none';
-      this._measure.style.width = '1ch';
-      this._measure.style.height = '0';
-      // читаем именно текущий шрифт <pre>
-      this._measure.style.fontFamily = getComputedStyle(this.out).fontFamily;
-      this._measure.style.fontSize = '1px';
-      this._measure.style.fontVariantLigatures = 'none';
-      this._measure.style.letterSpacing = '0';
-      document.body.appendChild(this._measure);
-    }
-    const k = this._measure.getBoundingClientRect().width || 1;
-    return k; // px на 1ch при font-size=1px
-  }
-
+  // ====== расчёт строк по аспекту ======
   _estimateRows(cols){
     const vw = this.video?.videoWidth  || 640;
     const vh = this.video?.videoHeight || 480;
     return Math.max(1, Math.round(cols * (vh / vw)));
   }
 
-  _fitToStage(cols){
-    const stage = this.out?.parentElement;
-    if (!stage || !cols) return;
-    const sw = stage.clientWidth, sh = stage.clientHeight;
-    if (!sw || !sh) return;
+  // ====== прочный рефит по реальному измерению ======
+  _fitByProbe(cols, rows){
+    const stage = this.out.parentElement;
+    if (!stage) return;
 
-    const rows = this._estimateRows(cols);
-    const chPxTarget = Math.floor(Math.min(sw / cols, sh / rows)); // contain
-    if (!isFinite(chPxTarget) || chPxTarget <= 0) return;
+    // подставляем тот же шрифт и свойства, что у <pre>
+    const cs = getComputedStyle(this.out);
+    const probeStyle = this._probe.style;
+    probeStyle.fontFamily = cs.fontFamily;
+    probeStyle.fontVariantLigatures = cs.fontVariantLigatures || 'none';
+    probeStyle.letterSpacing = cs.letterSpacing || '0';
+    probeStyle.lineHeight = cs.lineHeight || '1.0';
 
-    const k = this._measureChPx();
-    const fontSizePx = chPxTarget / k;
-    this.out.style.fontSize = fontSizePx + 'px';
-  }
+    // строим прямоугольник cols×rows
+    const line = '0'.repeat(cols);
+    this._probe.textContent = Array.from({length: rows}, () => line).join('\n');
 
-  _refit(){
-    const cols = this.options?.widthChars || 160;
-    this._fitToStage(cols);
+    // стартовая прикидка
+    let fontSize = 12; // px
+    probeStyle.fontSize = fontSize + 'px';
+
+    // реальные размеры при стартовой прикидке
+    let rect = this._probe.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+
+    const sw = stage.clientWidth  || 1;
+    const sh = stage.clientHeight || 1;
+
+    // коэффициент вписывания (contain)
+    const k = Math.min(sw / rect.width, sh / rect.height);
+    fontSize = Math.max(1, Math.floor(fontSize * k));
+
+    // финальный размер
+    this.out.style.fontSize = fontSize + 'px';
   }
 
   // ====== рендер ======
@@ -158,12 +164,11 @@ export class AsciiApp {
 
   _renderFrame() {
     if (!this.video || !this.ctx) return;
+
     const cols = Math.max(1, this.options.widthChars | 0);
     const rows = this._estimateRows(cols);
 
-    // на всякий — подгон
-    this._fitToStage(cols);
-
+    // геометрию не трогаем — только рисуем
     this.canvas.width = cols;
     this.canvas.height = rows;
     this.ctx.drawImage(this.video, 0, 0, cols, rows);
@@ -192,9 +197,9 @@ export class AsciiApp {
         // яркость
         let Y = 0.2126*r + 0.7152*g + 0.0722*b;
 
-        // мягче контраст, чтобы не «ломало» картинку
+        // мягкий контраст (clamp)
         if (contrast !== 1) {
-          const k = Math.max(0, Math.min(2.5, contrast)); // clamp
+          const k = Math.max(0, Math.min(2.5, contrast));
           Y = ((Y - 0.5) * k) + 0.5;
         }
 
