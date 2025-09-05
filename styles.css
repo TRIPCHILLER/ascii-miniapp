@@ -1,188 +1,74 @@
-/* ========== БАЗА ========== */
-html,body{
-  height:100%;
-  margin:0;
-  overflow:hidden;
-}
+/* ===== БАЗА ===== */
+* { box-sizing: border-box; }
+html,body{ height:100%; margin:0; }
+body.theme-dark{ background:#000; color:#fff; }
 
-/* Подключаем BetterVCR (файлы: /assets/BetterVCR.woff2 и .woff) */
-@font-face{
-  font-family:'BetterVCR';
-  src:url('assets/BetterVCR.woff2?v=1') format('woff2'),
-      url('assets/BetterVCR.woff?v=1')  format('woff');
-  font-display:swap;
-  font-weight:400;
-  font-style:normal;
-  font-synthesis:none;
-}
-
-/* Цветовая схема (тёмно-серая) */
+/* mono UI + аккуратные контрастные кнопки */
 :root{
-  --ui-bg:#141414;
+  --ui-bg:#151515;
   --ui-panel:#1b1b1b;
   --ui-border:#ffffff;
   --ui-text:#ffffff;
 }
 
-/* Применяем BetterVCR ко всему UI */
-body.theme-dark,
-button, input, select, textarea, label,
-.toolbar, .panel, .card, .btn, a, h1,h2,h3,h4,h5,h6 {
-  font-family:'BetterVCR', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial !important;
-  color: var(--ui-text) !important;
-  font-weight:400;
-}
+.wrap{ display:flex; flex-direction:column; height:100%; }
 
-/* Основной фон */
-body.theme-dark{ background:#000; }
-
-/* ========== МАКЕТ ========== */
-.wrap{display:flex;flex-direction:column;height:100%}
-
+/* ===== ТУЛБАР ===== */
 .toolbar{
-  display:flex;
-  gap:8px;
-  align-items:center;
-  padding:10px;
-  flex-wrap:wrap;
-  background:var(--ui-bg);
+  display:flex; gap:8px; align-items:center;
+  padding:10px; background:var(--ui-bg);
   border-bottom:1px solid var(--ui-border);
+}
+.btn{
+  background:transparent; color:var(--ui-text);
+  border:1px solid var(--ui-border);
+  padding:.55rem 1rem; border-radius:0; cursor:pointer;
 }
 
+/* ===== ПАНЕЛЬ ===== */
 .panel{
-  display:flex;
-  flex-wrap:wrap;
-  gap:12px;
-  padding:8px;
-  background:var(--ui-bg);
-  border-bottom:1px solid var(--ui-border);
+  display:flex; flex-wrap:wrap; gap:12px; padding:8px;
+  background:var(--ui-bg); border-bottom:1px solid var(--ui-border);
 }
+.panel[hidden]{ display:none !important; }
 .panel label{
-  display:flex;
-  gap:8px;
-  align-items:center;
+  display:flex; gap:8px; align-items:center;
   background:var(--ui-panel);
   border:1px solid var(--ui-border);
-  padding:6px 8px;
-  border-radius:0; /* квадратные */
+  padding:6px 8px; border-radius:0;
 }
-/* Панель настроек скрыта по умолчанию */
-.panel[hidden] {
-  display: none !important;
-}
+.panel input[type="range"]{ width:160px; }
+.panel output{ min-width:42px; text-align:right; }
 
-/* Область вывода */
+/* чекбокс компактный */
+.check{ display:flex; align-items:center; gap:8px; padding:6px 8px; }
+
+/* ===== СЦЕНА/ВЫВОД ===== */
 .stage{
-  flex:1;
-  display:grid;
-  place-items:center;
-  overflow:hidden;
-  min-height:0;
+  flex:1; min-height:0; display:grid; place-items:center; overflow:hidden;
+  /* ВАЖНО: цвет сцены мы будем менять из JS (под цвет фона ASCII) */
+  background:#000;
 }
 
-/* ASCII вывод — строго monospace */
-pre{
-  white-space:pre;
-  font-family:ui-monospace,Menlo,Consolas,monospace !important;
-  line-height:1ch;
-  font-size:12px;              /* реальный размер подбирает JS */
+/* Сам ASCII-блок */
+#out{
   margin:0;
+  white-space:pre;
   user-select:none;
-  color:var(--fg,#8ac7ff);     /* эти две переменные меняем из JS/про */
-  background:var(--bg,#000);
-  padding:10px 12px;
+  font-family: ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
+  /* ВАЖНО: высота строки в «кадровых» единицах */
+  line-height: 1ch;
+  /* Размер шрифта вычисляет JS (чтобы блок всегда влезал) */
+  font-size: 16px;
+  color:#8ac7ff;
+  background:#000;
   border:1px solid var(--ui-border);
   border-radius:0;
-  box-sizing:border-box;
   max-width:100%;
   max-height:100%;
 }
 
-/* ========== КНОПКИ ========== */
-.btn{
-  background:transparent;
-  color:var(--ui-text) !important;
-  border:1px solid var(--ui-border) !important;
-  padding:.55rem 1rem;
-  border-radius:0 !important;  /* квадратные */
-  cursor:pointer;
+/* небольшая защита от «прыжков» при клавиатуре на мобилках */
+@supports (padding: env(safe-area-inset-bottom)){
+  .wrap{ padding-bottom: env(safe-area-inset-bottom); }
 }
-.btn.ghost{ background:transparent }
-.btn[disabled]{opacity:.5;cursor:not-allowed}
-.btn:focus-visible{ outline:2px dashed var(--ui-border); outline-offset:2px }
-
-/* Ссылки */
-a{ color:var(--ui-text); text-decoration:underline }
-a:hover{ text-decoration:none }
-
-/* ========== ФОРМЫ ========== */
-input, select, textarea{
-  color:var(--ui-text);
-  background:var(--ui-panel);
-  border:1px solid var(--ui-border);
-  border-radius:0;
-  padding:4px 6px;
-}
-
-/* Поле цвета — тоже с белой рамкой */
-input[type="color"]{
-  padding:0;
-  height:28px;
-  width:56px;
-  border-radius:0;
-}
-
-/* Ползунки — белые (WebKit/Chromium/Telegram WebView) */
-input[type="range"]{
-  -webkit-appearance:none;
-  width:160px;
-  height:2px;
-  background:var(--ui-border);
-  border:none;
-  outline:none;
-  border-radius:0;
-}
-input[type="range"]::-webkit-slider-thumb{
-  -webkit-appearance:none;
-  width:14px; height:14px;
-  background:var(--ui-text);
-  border:1px solid var(--ui-border);
-  border-radius:0;
-  margin-top:-6px; /* выравниваем по треку */
-}
-input[type="range"]::-webkit-slider-runnable-track{
-  height:2px; background:var(--ui-border);
-}
-
-/* Firefox */
-input[type="range"]::-moz-range-track{
-  height:2px; background:var(--ui-border);
-}
-input[type="range"]::-moz-range-thumb{
-  width:14px; height:14px; border-radius:0;
-  background:var(--ui-text); border:1px solid var(--ui-border);
-}
-
-/* ========== МОДАЛКА ========== */
-.has-modal .toolbar, .has-modal .stage { pointer-events:none !important }
-.modal{
-  position:fixed;inset:0;
-  display:grid;place-items:center;
-  background:rgba(0,0,0,.72);
-  z-index:2147483647;
-}
-.modal[hidden]{display:none !important}
-.card{
-  background:var(--ui-panel);
-  border:1px solid var(--ui-border);
-  border-radius:0;
-  padding:18px;
-  max-width:420px;
-  width:min(420px,90vw);
-  color:var(--ui-text);
-}
-.card h3{margin:0 0 8px}
-
-/* безопасная зона на iOS */
-.wrap{padding-bottom:env(safe-area-inset-bottom)}
-
