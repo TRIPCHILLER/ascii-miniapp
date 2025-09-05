@@ -4,13 +4,11 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <title>ASCII live · app</title>
-
   <link rel="stylesheet" href="styles.css?v=24" />
-  <script src="consent.js" defer></script>
 </head>
 <body class="theme-dark">
 
-  <!-- Модалка согласия -->
+  <!-- Модалка согласия (встроенная логика ниже) -->
   <div class="modal" id="consent" hidden>
     <div class="card">
       <h3>Доступ к камере</h3>
@@ -27,7 +25,7 @@
       <button id="toggle" class="btn">Настройки</button>
     </div>
 
-    <!-- Настройки (скрыты при старте) -->
+    <!-- ПАНЕЛЬ НАСТРОЕК (по умолчанию скрыта) -->
     <div class="panel" id="settings" hidden>
       <label>
         <span>Ширина</span>
@@ -94,19 +92,16 @@
       flip: $('flip'),
       toggle: $('toggle'),
       settings: $('settings'),
-
       w: $('w'), c: $('c'), g: $('g'),
       fg: $('fg'), bg: $('bg'),
       fps: $('fps'),
       ramp: $('ramp'),
       inv: $('inv'),
-
       w_out: $('w_out'), c_out: $('c_out'), g_out: $('g_out'), fps_out: $('fps_out'),
     };
 
     const app = new AsciiApp(ui.out);
 
-    // применяем опции в движок
     function apply(changed = {}) {
       ui.w_out.textContent   = ui.w.value;
       ui.c_out.textContent   = Number(ui.c.value).toFixed(2);
@@ -124,14 +119,13 @@
         invert:      ui.inv.checked
       });
 
-      // РЕФИТ только если меняли ширину или набор
+      // рефитим только если меняли ширину или набор
       if (changed.w || changed.ramp) app.refit();
     }
 
     // события
     ui.w.addEventListener('input',  () => apply({ w:true }));
     ui.ramp.addEventListener('change', () => apply({ ramp:true }));
-
     ['c','g','fg','bg','fps','inv'].forEach(id=>{
       const el = $(id);
       el.addEventListener('input',  () => apply({}));
@@ -142,10 +136,10 @@
       const hidden = ui.settings.hasAttribute('hidden');
       if (hidden) {
         ui.settings.removeAttribute('hidden');
-        localStorage.setItem('ui-settings-open', '1');
+        localStorage.setItem('ui-settings-open','1');
       } else {
         ui.settings.setAttribute('hidden','');
-        localStorage.setItem('ui-settings-open', '0');
+        localStorage.setItem('ui-settings-open','0');
       }
     });
 
@@ -157,21 +151,41 @@
       app.refit();
     });
 
-    // старт после согласия
-    document.addEventListener('consent-ready', async () => {
+    // ===== Согласие =====
+    const consent = document.getElementById('consent');
+    const agree   = document.getElementById('agree');
+
+    function showConsent() {
+      consent.hidden = false;
+      document.body.classList.add('has-modal');
+    }
+    function hideConsent() {
+      consent.hidden = true;
+      document.body.classList.remove('has-modal');
+    }
+
+    // если согласие уже было — стартуем сразу
+    (async () => {
+      try {
+        if (localStorage.getItem('consent-ok') === '1') {
+          await app.start();
+          app.refit();
+          apply({});
+        } else {
+          showConsent();
+        }
+      } catch(e) {
+        showConsent();
+      }
+    })();
+
+    agree.addEventListener('click', async () => {
+      try { localStorage.setItem('consent-ok','1'); } catch(e){}
+      hideConsent();
       await app.start();
       app.refit();
       apply({});
     });
-
-    // если согласие уже было
-    try{
-      if(localStorage.getItem('consent-ok') === '1'){
-        await app.start();
-        app.refit();
-        apply({});
-      }
-    }catch(e){}
   </script>
 </body>
 </html>
