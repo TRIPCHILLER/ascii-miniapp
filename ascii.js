@@ -1,210 +1,171 @@
-// Надёжный рендер + «вписывание» ASCII в сцену.
-// Контраст/гамма/цвет/инверсия больше НЕ меняют геометрию.
-
+// ASCII Engine — фиксированная рамка, адаптивный font-size, корректные пропорции, fullscreen toggle
 export class AsciiApp {
-  constructor(outEl) {
+  constructor(outEl){
     this.out = outEl;
-    this.video = null;
-    this.stream = null;
-    this.ctx = null;
-    this.canvas = document.createElement('canvas');
-
-    this.options = {
-      widthChars: 160,
-      contrast: 1.15,
-      gamma: 1.20,
-      color: '#8ac7ff',
-      background: '#000000',
-      fps: 30,
-      ramp: " .'`\",:;Il!i~+_-?][}{1tfjrxnuvczXYUJCLQ0089@#",
-      invert: true,
+    this.opts = {
+      widthChars: 140, contrast: 1.15, gamma: 1.2,
+      color: '#8ac7ff', background: '#000', fps: 30,
+      ramp: " .'`\",:;Il!i~+_-?][}{1tfjrxnuvczXYUJCLQ0089@#", invert: true
     };
-
     this.facing = 'user';
-    this._running = false;
-    this._timer = 0;
-    this._lastFrameTs = 0;
 
-    // Спан для измерений
-    this._probe = document.createElement('span');
-    Object.assign(this._probe.style, {
-      position:'absolute', left:'-99999px', top:'-99999px',
-      whiteSpace:'pre', visibility:'hidden', pointerEvents:'none'
-    });
-    document.body.appendChild(this._probe);
+    this._c = document.createElement('canvas');
+    this._ctx = this._c.getContext('2d', { willReadFrequently: true });
 
-    // Наблюдаем сцену
-    this._ro = new ResizeObserver(() => this.refit());
-    this._ro.observe(this.out.parentElement);
+    this._video = document.createElement('video');
+    this._video.playsInline = true;
+    this._video.muted = true;
+    this._video.autoplay = true;
 
-    this._applyColors();
+    this._stream = null;
+    this._raf = 0; this._timer = 0;
+
+    this._resizeObs = null;
   }
 
-  async start() {
-    await this._openCamera();
-    this._running = true;
+  setOptions(o){
+    Object.assign(this.opts, o || {});
+    this.out.style.color = this.opts.color;
+    document.body.style.background = this.opts.background;
+  }
+
+  async start(){
+    if (this._stream) return;
+    const constraints = { audio:false, video:{ facingMode: this.facing } };
+    this._stream = await navigator.mediaDevices.getUserMedia(constraints);
+    this._video.srcObject = this._stream;
+    try { await this._video.play(); } catch(_) {}
+
+    // следим за контейнером, чтобы обновлять font-size
+    const container = this.out.parentElement || document.body;
+    if (!this._resizeObs){
+      this._resizeObs = new ResizeObserver(() => this._fitFont());
+      this._resizeObs.observe(container);
+    }
+    window.addEventListener('orientationchange', this._fitFont, { passive:true });
+    window.addEventListener('resize', this._fitFont, { passive:true });
+
     this._loop();
   }
 
-  stop() {
-    this._running = false;
-    if (this.stream) this.stream.getTracks().forEach(t => t.stop());
-    this.stream = null;
+  stop(){
+    cancelAnimationFrame(this._raf);
+    clearTimeout(this._timer);
+    if (this._stream){ this._stream.getTracks().forEach(t=>t.stop()); this._stream = null; }
+    if (this._resizeObs){ try{ this._resizeObs.disconnect(); }catch(e){} this._resizeObs=null; }
   }
 
-  async flip() {
+  flip(){
     this.facing = (this.facing === 'user') ? 'environment' : 'user';
-    await this._openCamera(true);
+    this.stop();
+    return this.start();
   }
 
-  setOptions(opts) {
-    Object.assign(this.options, opts);
-    this._applyColors(); // только цвета
+  _calcGrid(){
+    const v = this._video;
+    const W = this.opts.widthChars | 0;
+    const aspect = (v && v.videoWidth) ? (v.videoHeight / v.videoWidth) : (9/16);
+    const H = Math.max(1, Math.round(W * aspect));
+    return { W, H };
   }
 
-  refit() {
-    const cols = Math.max(1, this.options.widthChars | 0);
-    const rows = this._estimateRows(cols);
-    this._fitByProbe(cols, rows);
-  }
+  _fitFont = () => {
+    // фикс. рамка = родитель <pre> (.stage). мы вписываем ASCII строго в её внутренние размеры
+    const container = this.out.parentElement || document.body;
+    const rect = container.getBoundingClientRect();
 
-  // ====== камера ======
-  async _openCamera(restart = false) {
-    if (restart) this.stop();
-
-    const constraints = {
-      audio: false,
-      video: { facingMode: this.facing, width: { ideal: 1280 }, height: { ideal: 720 } }
-    };
-    this.stream = await navigator.mediaDevices.getUserMedia(constraints);
-
-    if (!this.video) {
-      this.video = document.createElement('video');
-      this.video.playsInline = true;
-      this.video.muted = true;
-      this.video.autoplay = true;
-      this.video.srcObject = this.stream;
-      this.video.addEventListener('loadedmetadata', () => this.refit(), { once:true });
-      this.video.addEventListener('playing', () => this.refit(), { once:true });
-    } else {
-      this.video.srcObject = this.stream;
-    }
-
-    if (!this.ctx) this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
-  }
-
-  // ====== цвета/фон ======
-  _applyColors() {
-    const fg = this.options.color || '#8ac7ff';
-    const bg = this.options.background || '#000000';
-    this.out.style.setProperty('--fg', fg);
-    this.out.style.setProperty('--bg', bg);
-
-    this.out.style.color = fg;
-    this.out.style.backgroundColor = bg;
-
-    const stage = this.out.parentElement;
-    if (stage) stage.style.backgroundColor = bg;
-  }
-
-  // ====== расчёт строк по аспекту ======
-  _estimateRows(cols){
-    const vw = this.video?.videoWidth  || 640;
-    const vh = this.video?.videoHeight || 480;
-    return Math.max(1, Math.round(cols * (vh / vw)));
-  }
-
-  // ====== «вписывание» ======
-  _fitByProbe(cols, rows){
-    const stage = this.out.parentElement;
-    if (!stage) return;
-
-    // тот же шрифт, что у <pre>
+    // учитываем padding/border самого <pre>, чтобы символы не залезали под рамку
     const cs = getComputedStyle(this.out);
-    const s = this._probe.style;
-    s.fontFamily = cs.fontFamily;
-    s.fontVariantLigatures = cs.fontVariantLigatures || 'none';
-    s.letterSpacing = cs.letterSpacing || '0';
-    s.lineHeight = cs.lineHeight || '1.0';
+    const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight)
+               + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth);
+    const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)
+               + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
 
-    const line = '0'.repeat(cols);
-    this._probe.textContent = Array.from({length: rows}, () => line).join('\n');
+    const innerW = Math.max(0, rect.width  - padX);
+    const innerH = Math.max(0, rect.height - padY);
 
-    let fontSize = 12;
-    s.fontSize = fontSize + 'px';
+    const { W, H } = this._calcGrid();
+    if (!W || !H || innerW <= 0 || innerH <= 0) return;
 
-    let rect = this._probe.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
+    // подбираем font-size так, чтобы ASCII целиком влезал в прямоугольник
+    const fw = innerW / W;
+    const fh = innerH / H;
+    const f = Math.max(8, Math.floor(Math.min(fw, fh))); // px
 
-    const sw = stage.clientWidth  || 1;
-    const sh = stage.clientHeight || 1;
-
-    const k = Math.min(sw / rect.width, sh / rect.height);
-    fontSize = Math.max(1, Math.floor(fontSize * k));
-    this.out.style.fontSize = fontSize + 'px';
+    this.out.style.fontSize   = f + 'px';
+    this.out.style.lineHeight = '1em';
   }
 
-  // ====== рендер ======
-  _loop(ts = 0) {
-    if (!this._running) return;
+  _loop = () => {
+    const v = this._video;
+    if (!v || v.readyState < 2){ this._raf = requestAnimationFrame(this._loop); return; }
 
-    const msPerFrame = 1000 / Math.max(1, this.options.fps || 30);
-    if (ts - this._lastFrameTs >= msPerFrame) {
-      this._lastFrameTs = ts;
-      this._renderFrame();
+    const { W, H } = this._calcGrid();
+    this._c.width = W; this._c.height = H;
+
+    // зеркалим фронталку (как нативные камеры)
+    this._ctx.save();
+    if (this.facing === 'user') {
+      this._ctx.translate(W, 0);
+      this._ctx.scale(-1, 1);
     }
-    this._timer = requestAnimationFrame(this._loop.bind(this));
-  }
+    this._ctx.drawImage(v, 0, 0, W, H);
+    this._ctx.restore();
 
-  _renderFrame() {
-    if (!this.video || !this.ctx) return;
+    const data = this._ctx.getImageData(0,0,W,H).data;
+    const ramp = this.opts.ramp;
+    const rlen = ramp.length - 1;
+    const inv  = !!this.opts.invert;
 
-    const cols = Math.max(1, this.options.widthChars | 0);
-    const rows = this._estimateRows(cols);
-
-    // геометрию не трогаем — только рисуем
-    this.canvas.width = cols;
-    this.canvas.height = rows;
-    this.ctx.drawImage(this.video, 0, 0, cols, rows);
-
-    const img = this.ctx.getImageData(0, 0, cols, rows).data;
-
-    const contrast = Math.min(2.5, Math.max(0.5, this.options.contrast || 1.0)); // мягкое ограничение
-    const gamma = this.options.gamma || 1.0;
-    const inv = !!this.options.invert;
-
-    const ramp = (this.options.ramp && this.options.ramp.length > 1)
-      ? this.options.ramp
-      : " .'`\",:;Il!i~+_-?][}{1tfjrxnuvczXYUJCLQ0089@#";
-
-    const rampLen = ramp.length;
-    const gammaInv = 1 / gamma;
-
-    let out = '';
-    let p = 0;
-    for (let y = 0; y < rows; y++) {
-      for (let x = 0; x < cols; x++, p += 4) {
-        const r = img[p]   / 255;
-        const g = img[p+1] / 255;
-        const b = img[p+2] / 255;
-
-        // яркость
-        let Y = 0.2126*r + 0.7152*g + 0.0722*b;
-
-        // мягкий контраст с клампом
-        Y = ((Y - 0.5) * contrast) + 0.5;
-
-        // гамма + кламп
-        Y = Math.max(0, Math.min(1, Math.pow(Y, gammaInv)));
-
-        if (inv) Y = 1 - Y;
-
-        const idx = Math.min(rampLen - 1, Math.max(0, Math.floor(Y * rampLen)));
-        out += ramp[idx];
+    let s = '';
+    for (let y=0; y<H; y++){
+      let row = '';
+      for (let x=0; x<W; x++){
+        const i = (y*W + x)*4;
+        let L = 0.2126*data[i] + 0.7152*data[i+1] + 0.0722*data[i+2];
+        L = (L-128)*this.opts.contrast + 128;
+        L = 255 * Math.pow(Math.min(255,Math.max(0,L))/255, 1/this.opts.gamma);
+        const idx = Math.round((inv ? L : (255-L)) / 255 * rlen);
+        row += ramp[idx];
       }
-      if (y !== rows - 1) out += '\n';
+      s += row + '\n';
     }
+    this.out.textContent = s;
 
-    this.out.textContent = out;
+    // подгоняем под рамку
+    this._fitFont();
+
+    const interval = 1000 / Math.max(1, this.opts.fps|0);
+    this._timer = setTimeout(()=>{ this._raf = requestAnimationFrame(this._loop); }, interval);
   }
+}
+
+/* Fullscreen helpers */
+export function toggleFullscreenDesktop(){
+  if (document.fullscreenElement) return document.exitFullscreen?.();
+  return document.documentElement.requestFullscreen?.();
+}
+export function toggleMobileFullscreen(toolbar){
+  const hidden = toolbar.dataset.hidden === '1';
+  if (hidden){
+    toolbar.style.display='flex'; toolbar.dataset.hidden='0';
+    document.getElementById('__fs_exit')?.remove();
+  } else {
+    toolbar.style.display='none'; toolbar.dataset.hidden='1';
+    const exitBtn = document.createElement('button');
+    exitBtn.id='__fs_exit';
+    exitBtn.textContent='⤺';
+    exitBtn.className='btn ghost';
+    Object.assign(exitBtn.style,{position:'fixed',top:'8px',right:'8px',zIndex:'1000'});
+    document.body.appendChild(exitBtn);
+    exitBtn.onclick = () => toggleMobileFullscreen(toolbar);
+  }
+}
+export function wireFullscreen(btn, toolbar){
+  if (!btn) return;
+  btn.addEventListener('click', ()=>{
+    const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+    if (isMobile) toggleMobileFullscreen(toolbar);
+    else toggleFullscreenDesktop();
+  });
 }
