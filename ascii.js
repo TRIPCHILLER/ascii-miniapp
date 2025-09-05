@@ -1,220 +1,307 @@
-/* =========================================================
-   ASCII renderer — версия fixA1
-   Главное:
-   - вписываем ASCII строго в окно .stage (без «уезда»)
-   - горизонтальная коррекция: разные коэффициенты для ПК и мобильных
-   - цвет фона меняется и вокруг, и под самим ASCII
-   - сохраняем твою простую палитру <input type="color">
-   ========================================================= */
+(() => {
+  // ============== УТИЛИТЫ ==============
+  const $ = s => document.querySelector(s);
+  const app = {
+    vid:  $('#vid'),
+    out:  $('#out'),
+    stage:$('#stage'),
+    ui: {
+      flip:     $('#flip'),
+      toggle:   $('#toggle'),
+      settings: $('#settings'),
+      width:    $('#width'),
+      widthVal: $('#width_val'),
+      contrast: $('#contrast'),
+      contrastVal: $('#contrast_val'),
+      gamma:    $('#gamma'),
+      gammaVal: $('#gamma_val'),
+      fps:      $('#fps'),
+      fpsVal:   $('#fps_val'),
+      fg:       $('#fg'),
+      bg:       $('#bg'),
+      charset:  $('#charset'),
+      invert:   $('#invert'),
+    }
+  };
 
-class AsciiPlayer {
-  constructor(opts){
-    this.out = opts.out;
-    this.video = document.createElement('video');
-    this.video.playsInline = true;
-    this.video.autoplay   = true;
-    this.video.muted      = true;
+  // Значения по умолчанию (как в v18)
+  const state = {
+    facing: 'user',
+    widthChars: 160,
+    contrast: 1.15,
+    gamma: 1.20,
+    fps: 30,
+    color: '#8ac7ff',
+    background: '#000000',
+    charset: '@%#*+=-:. ',
+    invert: true,
+  };
 
-    // состояние
-    this.stream = null;
-    this.facing = 'user';
+  // Вспомогательные канвасы
+  const off = document.createElement('canvas');
+  const ctx = off.getContext('2d', { willReadFrequently: true });
 
-    // параметры
-    this.opts = {
-      width: opts.width || 160,
-      contrast: opts.contrast || 1.15,
-      gamma: opts.gamma || 1.20,
-      color: opts.color || '#8ac7ff',
-      background: opts.background || '#000000',
-      fps: opts.fps || 30,
-      charset: opts.charset || 'classic',
-      invert: !!opts.invert,
-    };
+  // Для авто-подгонки шрифта
+  const measurePre = document.createElement('pre');
+  measurePre.style.cssText = `
+    position:absolute; left:-99999px; top:-99999px; margin:0;
+    white-space:pre; line-height:1ch; font-family: ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
+  `;
+  document.body.appendChild(measurePre);
 
-    // рабочие элементы
-    this.canvas = document.createElement('canvas');
-    this.ctx = this.canvas.getContext('2d', { willReadFrequently:true });
-
-    // буфер символов
-    this.chars = this._getCharset(this.opts.charset);
-
-    // коррекция горизонтали:
-    // на десктопе немного «растянуть», на мобиле — «сузить»
-    this.isMobile = matchMedia('(pointer:coarse)').matches || /Android|iPhone|iPad/i.test(navigator.userAgent);
-    this.scaleX = this.isMobile ? 0.90 : 1.15;
-
-    // применим цвета
-    this.setOptions(this.opts);
-
-    // запускаем камеру и цикл рендера
-    this._start();
-    this._bindResize();
-  }
-
-  /* ---------- публичные ---------- */
-  setOptions(o){
-    Object.assign(this.opts, o || {});
-    // цвет текста ASCII
-    this.out.style.setProperty('--fg', this.opts.color);
-
-    // фон — и вокруг, и под ASCII (через CSS-переменную)
-    document.documentElement.style.setProperty('--bg', this.opts.background);
-    this.out.style.background = this.opts.background;
-
-    // при изменениях размеров/настроек — пересоберём кадр
-    this._fitFont();
-  }
-
-  toggleFacingMode(){
-    this.facing = (this.facing === 'user') ? 'environment' : 'user';
-    this._start(true);
-  }
-
-  /* ---------- приватные ---------- */
-
-  async _start(restart=false){
+  // ============== КАМЕРА ==============
+  async function startStream() {
     try {
-      if (restart && this.stream){
-        this.stream.getTracks().forEach(t => t.stop());
-      }
-      this.stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: this.facing }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: state.facing }
       });
-      this.video.srcObject = this.stream;
-
-      this.video.onloadedmetadata = () => {
-        this.video.play();
-        this._fitFont();
-        this._schedule();
-      };
-    } catch(e){
-      console.error('camera error', e);
+      app.vid.srcObject = stream;
+      await app.vid.play();
+    } catch (e) {
+      console.error('getUserMedia error', e);
+      alert('Камера недоступна');
     }
   }
 
-  _schedule(){
-    clearTimeout(this._tid);
-    const interval = Math.max(16, 1000/this.opts.fps|0);
-    const tick = () => {
-      this._render();
-      this._tid = setTimeout(tick, interval);
-    };
-    tick();
+  // ============== РЕНДЕРИНГ ==============
+  let raf = null;
+  let lastFrameTime = 0;
+
+  function setUI() {
+    // Инициализация контролов
+    app.ui.width.value = state.widthChars;
+    app.ui.widthVal.textContent = state.widthChars;
+
+    app.ui.contrast.value = state.contrast;
+    app.ui.contrastVal.textContent = state.contrast.toFixed(2);
+
+    app.ui.gamma.value = state.gamma;
+    app.ui.gammaVal.textContent = state.gamma.toFixed(2);
+
+    app.ui.fps.value = state.fps;
+    app.ui.fpsVal.textContent = state.fps;
+
+    app.ui.fg.value = state.color;
+    app.ui.bg.value = state.background;
+
+    app.ui.charset.value = state.charset;
+    app.ui.invert.checked = state.invert;
+
+    // Цвет применяем к самому ASCII и сцене
+    app.out.style.color = state.color;
+    app.out.style.backgroundColor = state.background;
+    app.stage.style.backgroundColor = state.background;
   }
 
-  _bindResize(){
-    const ro = new ResizeObserver(()=>this._fitFont());
-    ro.observe(this.out.parentElement || document.body);
-    window.addEventListener('orientationchange', ()=>this._fitFont());
-    this._ro = ro;
+  // Пересчёт h и подготовка offscreen размера
+  function updateGridSize() {
+    const v = app.vid;
+    if (!v.videoWidth || !v.videoHeight) return { w: state.widthChars, h: 1 };
+
+    // Коэффициент «плоскости» символа (ширина/высота). Для большинства моношрифтов ~0.5–0.6.
+    // Мы измерим его на лету, чтобы не гадать.
+    const ratio = measureCharAspect();
+    const aspect = (v.videoHeight / v.videoWidth) / ratio;
+
+    const w = Math.max(1, Math.round(state.widthChars));
+    const h = Math.max(1, Math.round(w * aspect));
+
+    off.width = w;
+    off.height = h;
+    return { w, h };
   }
 
-  _getCharset(kind){
-    switch(kind){
-      case 'digits':  return ' .,:;+*?%#@0123456789';
-      case 'letters': return ' .,:;-_+*=ixvcloOQ0UXJY';
-      case 'dots':    return ' .·:•oO@';
-      case 'mixed':   return ' `.-_:;=+*ixvcluJYUZCX0Q#%@';
-      default:        return ' .`^",:;Il!i~+_-?][}{1)(/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$';
-    }
+  // Измерение фактического отношения W/H одного символа при текущем font-size
+  function measureCharAspect() {
+    // Пишем «М» в две строки, чтобы корректно поймать высоту строки с line-height:1ch
+    measurePre.textContent = 'M\nM';
+    measurePre.style.fontSize = app.out.style.fontSize || '16px';
+    const rect = measurePre.getBoundingClientRect();
+    const lineH = rect.height / 2;
+    const chW = rect.width / 1; // ширина одной «M» (почти равно ширине символа)
+    // отношение высоты к ширине одного символа:
+    const charRatio = lineH / chW; // H/W
+    // нам нужен W/H (ширина/высота) → обратное:
+    return 1 / charRatio;
   }
 
-  _calcGrid(){
-    // ширина в символах — как в UI
-    const W = Math.max(10, Math.min(1000, this.opts.width|0));
+  // Главный цикл
+  function loop(ts) {
+    raf = requestAnimationFrame(loop);
 
-    // соотношение сторон источника
-    const vw = this.video.videoWidth  || 640;
-    const vh = this.video.videoHeight || 480;
-    const srcRatio = vh / vw;
+    // FPS-ограничитель
+    const frameInterval = 1000 / state.fps;
+    if (ts - lastFrameTime < frameInterval) return;
+    lastFrameTime = ts;
 
-    // оценка «высоты символа к ширине»
-    // (после горизонтальной коррекции scaleX)
-    // символ «высокий», ширина ~ 0.6em -> после scaleX меняется
-    const charWtoH = (0.60 * this.scaleX); // чем больше scaleX, тем «шире» символ
-    const H = Math.max(5, Math.round(W * srcRatio / charWtoH));
+    const v = app.vid;
+    if (!v.videoWidth || !v.videoHeight) return;
 
-    return { W, H };
-  }
+    const { w, h } = updateGridSize();
 
-  _fitFont(){
-    // контейнер — родитель <pre> = .stage
-    const container = this.out.parentElement || document.body;
-    const rect = container.getBoundingClientRect();
+    // Рисуем видео кадр на offscreen
+    ctx.drawImage(v, 0, 0, w, h);
+    let data = ctx.getImageData(0, 0, w, h).data;
 
-    // внутренние отступы самого <pre> (рамка/паддинги)
-    const cs = getComputedStyle(this.out);
-    const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight)
-               + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth);
-    const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)
-               + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
+    // Генерация ASCII
+    const chars = state.charset;
+    const n = chars.length - 1;
+    const inv = state.invert ? -1 : 1;
+    const bias = state.invert ? 255 : 0;
 
-    const innerW = Math.max(0, rect.width  - padX);
-    const innerH = Math.max(0, rect.height - padY);
+    const gamma = state.gamma;
+    const contrast = state.contrast;
 
-    const { W, H } = this._calcGrid();
-    if (!W || !H || innerW <= 0 || innerH <= 0) return;
-
-    // важный момент: учитываем горизонтальное масштабирование
-    // фактическая ширина = (W * fontSize) * scaleX
-    const fw = innerW / (W * this.scaleX);
-    const fh = innerH /  H;
-
-    // минимальный размер позволяем мелким — для больших ширин
-    const f = Math.max(4, Math.floor(Math.min(fw, fh))); // px
-
-    this.out.style.fontSize   = f + 'px';
-    this.out.style.lineHeight = '1em';
-    this.out.style.transform  = `scaleX(${this.scaleX})`;
-
-    // принудительно перерисуем
-    this._render();
-  }
-
-  _render(){
-    const { W, H } = this._calcGrid();
-
-    // подготовим канвас
-    this.canvas.width  = W;
-    this.canvas.height = H;
-
-    // уменьшаем видео в канвас
-    this.ctx.drawImage(this.video, 0, 0, W, H);
-    const img = this.ctx.getImageData(0,0,W,H).data;
-
-    const { contrast, gamma, invert } = this.opts;
-    const g = 1/Math.max(0.1, Math.min(3, gamma));
-    const chars = this.chars;
-
+    // Собираем строку
     let out = '';
-    for (let y=0; y<H; y++){
-      let row = '';
-      for (let x=0; x<W; x++){
-        const i = ((y*W)+x)*4;
-        let r=img[i], gch=img[i+1], b=img[i+2];
+    let i = 0;
+    for (let y = 0; y < h; y++) {
+      let line = '';
+      for (let x = 0; x < w; x++, i += 4) {
+        const r = data[i], g = data[i+1], b = data[i+2];
+        // Y (перцептуальная яркость)
+        let Y = 0.2126*r + 0.7152*g + 0.0722*b;
 
-        // яркость
-        let v = (r*0.2126 + gch*0.7152 + b*0.0722) / 255;
+        // Контраст (нормируем к 0..1, затем снова в 0..255)
+        let v01 = Y / 255;
+        v01 = ((v01 - 0.5) * contrast) + 0.5;
+        v01 = Math.min(1, Math.max(0, v01));
 
-        // гамма / контраст
-        v = Math.pow(v, g);
-        v = (v - 0.5)*contrast + 0.5;
+        // Гамма
+        v01 = Math.pow(v01, 1 / gamma);
 
-        // инверсия
-        if (invert) v = 1 - v;
-
-        // к диапазону
-        v = Math.max(0, Math.min(1, v));
-
-        const idx = Math.floor(v * (chars.length-1));
-        row += chars[idx];
+        // Инверсия
+        const Yc = Math.max(0, Math.min(255, (bias + inv * (v01 * 255))));
+        const idx = Math.round((Yc / 255) * n);
+        line += chars[idx];
       }
-      out += row + '\n';
+      out += line + '\n';
     }
 
-    this.out.textContent = out;
-  }
-}
+    app.out.textContent = out;
 
-/* экспорт в глобальную область */
-window.AsciiPlayer = AsciiPlayer;
+    // Подогнать font-size, чтобы целиком влезло в .stage
+    refitFont(w, h);
+  }
+
+  // Подбор font-size так, чтобы #out (w×h) влезал в .stage
+  let refitLock = false;
+  function refitFont(cols, rows) {
+    if (refitLock) return;
+    refitLock = true;
+
+    // Берём текущий размер и меряем
+    const stageW = app.stage.clientWidth;
+    const stageH = app.stage.clientHeight;
+
+    // Для оценки размеров строим «измеритель»
+    measurePre.textContent = ('M'.repeat(cols) + '\n').repeat(rows);
+    // Стартуем с текущего размера out (или 16px)
+    const currentFS = parseFloat(getComputedStyle(app.out).fontSize) || 16;
+    measurePre.style.fontSize = currentFS + 'px';
+
+    // Сколько сейчас занимает?
+    let mRect = measurePre.getBoundingClientRect();
+    // Коэффициенты подгонки по сторонам
+    const kW = stageW / mRect.width;
+    const kH = stageH / mRect.height;
+    // Окончательный масштаб
+    const k = Math.min(kW, kH);
+
+    // Новый размер шрифта
+    const newFS = Math.max(6, Math.floor(currentFS * k));
+    app.out.style.fontSize = newFS + 'px';
+
+    // Финальная корректировка одной итерацией (чуть точнее)
+    measurePre.style.fontSize = newFS + 'px';
+    mRect = measurePre.getBoundingClientRect();
+    const k2 = Math.min(stageW / mRect.width, stageH / mRect.height);
+    const finalFS = Math.max(6, Math.floor(newFS * k2));
+    app.out.style.fontSize = finalFS + 'px';
+
+    refitLock = false;
+  }
+
+  // ============== СВЯЗКА UI ==============
+  function bindUI() {
+    // Показ/скрытие панели
+    app.ui.toggle.addEventListener('click', () => {
+      const hidden = app.ui.settings.hasAttribute('hidden');
+      if (hidden) app.ui.settings.removeAttribute('hidden');
+      else app.ui.settings.setAttribute('hidden', '');
+      // Подгон после изменения доступной площади
+      setTimeout(() => {
+        const { w, h } = updateGridSize();
+        refitFont(w, h);
+      }, 0);
+    });
+
+    // Смена камеры
+    app.ui.flip.addEventListener('click', async () => {
+      state.facing = state.facing === 'user' ? 'environment' : 'user';
+      const s = app.vid.srcObject;
+      if (s) s.getTracks().forEach(t => t.stop());
+      await startStream();
+    });
+
+    app.ui.width.addEventListener('input', e => {
+      state.widthChars = +e.target.value;
+      app.ui.widthVal.textContent = state.widthChars;
+      // пересчёт сетки → refit сделаем в кадре
+    });
+
+    app.ui.contrast.addEventListener('input', e => {
+      state.contrast = +e.target.value;
+      app.ui.contrastVal.textContent = state.contrast.toFixed(2);
+    });
+    app.ui.gamma.addEventListener('input', e => {
+      state.gamma = +e.target.value;
+      app.ui.gammaVal.textContent = state.gamma.toFixed(2);
+    });
+
+    app.ui.fps.addEventListener('input', e => {
+      state.fps = +e.target.value;
+      app.ui.fpsVal.textContent = state.fps;
+    });
+
+    app.ui.fg.addEventListener('input', e => {
+      state.color = e.target.value;
+      app.out.style.color = state.color;
+    });
+    app.ui.bg.addEventListener('input', e => {
+      state.background = e.target.value;
+      app.out.style.backgroundColor = state.background;
+      app.stage.style.backgroundColor = state.background;
+    });
+
+    app.ui.charset.addEventListener('change', e => {
+      state.charset = e.target.value;
+    });
+    app.ui.invert.addEventListener('change', e => {
+      state.invert = e.target.checked;
+    });
+
+    // Подгон при изменении окна/ориентации
+    new ResizeObserver(() => {
+      const { w, h } = updateGridSize();
+      refitFont(w, h);
+    }).observe(app.stage);
+  }
+
+  // ============== СТАРТ ==============
+  async function init() {
+    setUI();
+    bindUI();
+    await startStream();
+
+    // Запускаем цикл
+    if (raf) cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(loop);
+
+    // Первая подгонка
+    const { w, h } = updateGridSize();
+    refitFont(w, h);
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
+})();
