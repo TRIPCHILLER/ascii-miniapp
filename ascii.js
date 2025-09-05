@@ -23,11 +23,17 @@ export class AsciiApp {
     this._resizeObs = null;
   }
 
-  setOptions(o){
-    Object.assign(this.opts, o || {});
-    this.out.style.color = this.opts.color;
-    document.body.style.background = this.opts.background;
-  }
+setOptions(o){
+  Object.assign(this.opts, o || {});
+  this.out.style.color = this.opts.color;
+  
+  // Устанавливаем фон для всех элементов
+  document.body.style.background = this.opts.background;
+  this.out.style.background = this.opts.background;
+  
+  // Также устанавливаем CSS переменную для единообразия
+  document.documentElement.style.setProperty('--bg', this.opts.background);
+}
 
   async start(){
     if (this._stream) return;
@@ -69,32 +75,36 @@ export class AsciiApp {
     return { W, H };
   }
 
-  _fitFont = () => {
-    // фикс. рамка = родитель <pre> (.stage). мы вписываем ASCII строго в её внутренние размеры
-    const container = this.out.parentElement || document.body;
-    const rect = container.getBoundingClientRect();
+_fitFont = () => {
+  // Фиксируем контейнер как родительский элемент
+  const container = this.out.parentElement || document.body;
+  const rect = container.getBoundingClientRect();
+  
+  // Учитываем padding/border самого <pre>
+  const cs = getComputedStyle(this.out);
+  const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight)
+             + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth);
+  const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)
+             + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
 
-    // учитываем padding/border самого <pre>, чтобы символы не залезали под рамку
-    const cs = getComputedStyle(this.out);
-    const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight)
-               + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth);
-    const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)
-               + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
+  const innerW = Math.max(0, rect.width - padX);
+  const innerH = Math.max(0, rect.height - padY);
 
-    const innerW = Math.max(0, rect.width  - padX);
-    const innerH = Math.max(0, rect.height - padY);
+  const { W, H } = this._calcGrid();
+  if (!W || !H || innerW <= 0 || innerH <= 0) return;
 
-    const { W, H } = this._calcGrid();
-    if (!W || !H || innerW <= 0 || innerH <= 0) return;
+  // ВАЖНОЕ ИЗМЕНЕНИЕ: Убираем минимальный размер шрифта 8px
+  const fw = innerW / W;
+  const fh = innerH / H;
+  const f = Math.max(1, Math.min(fw, fh)); // Был Math.max(8, ...)
 
-    // подбираем font-size так, чтобы ASCII целиком влезал в прямоугольник
-    const fw = innerW / W;
-    const fh = innerH / H;
-    const f = Math.max(8, Math.floor(Math.min(fw, fh))); // px
-
-    this.out.style.fontSize   = f + 'px';
-    this.out.style.lineHeight = '1em';
-  }
+  this.out.style.fontSize = f + 'px';
+  this.out.style.lineHeight = '1em';
+  
+  // Добавляем прокрутку если контент не помещается
+  container.style.overflow = 'auto';
+  container.style.maxHeight = '70vh'; // Ограничиваем высоту контейнера
+}
 
   _loop = () => {
     const v = this._video;
@@ -169,3 +179,4 @@ export function wireFullscreen(btn, toolbar){
     else toggleFullscreenDesktop();
   });
 }
+
