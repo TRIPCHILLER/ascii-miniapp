@@ -1,9 +1,8 @@
-// ascii.js — рендер из камеры в ASCII
-// Важное: автоматически вписывает ASCII в .stage при любой "Ширине"
+// ascii.js — рендер из камеры в ASCII с авто-вписыванием
 
 export class AsciiApp {
   constructor(outEl) {
-    this.out = outEl;               // <pre id="out">
+    this.out = outEl;
     this.video = null;
     this.stream = null;
     this.ctx = null;
@@ -26,9 +25,9 @@ export class AsciiApp {
     this._lastFrameTs = 0;
     this._measure = null;
 
-    // подгонка под размер окна
+    // следим за .stage и подгоняем
     this._ro = new ResizeObserver(() => this._refit());
-    this._ro.observe(this.out.parentElement); // .stage
+    this._ro.observe(this.out.parentElement);
 
     this._applyColors();
   }
@@ -57,7 +56,7 @@ export class AsciiApp {
     this._refit();
   }
 
-  // ===== камера =====
+  // ====== камера ======
   async _openCamera(restart = false) {
     if (restart) this.stop();
 
@@ -83,7 +82,7 @@ export class AsciiApp {
     if (!this.ctx) this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
   }
 
-  // ===== цвета/фон =====
+  // ====== цвета/фон ======
   _applyColors() {
     if (!this.out) return;
     const fg = this.options.color || '#8ac7ff';
@@ -95,11 +94,11 @@ export class AsciiApp {
     this.out.style.color = fg;              // сам ASCII
     this.out.style.backgroundColor = bg;    // фон ASCII
 
-    const stage = this.out.parentElement;   // фон вокруг — чтобы совпадал
+    const stage = this.out.parentElement;   // и фон вокруг совпадает
     if (stage) stage.style.backgroundColor = bg;
   }
 
-  // ===== авто-вписывание в .stage =====
+  // ====== авто-вписывание в .stage ======
   _measureChPx(){
     if (!this._measure) {
       this._measure = document.createElement('div');
@@ -108,12 +107,15 @@ export class AsciiApp {
       this._measure.style.pointerEvents = 'none';
       this._measure.style.width = '1ch';
       this._measure.style.height = '0';
+      // читаем именно текущий шрифт <pre>
       this._measure.style.fontFamily = getComputedStyle(this.out).fontFamily;
       this._measure.style.fontSize = '1px';
+      this._measure.style.fontVariantLigatures = 'none';
+      this._measure.style.letterSpacing = '0';
       document.body.appendChild(this._measure);
     }
     const k = this._measure.getBoundingClientRect().width || 1;
-    return k; // px per 1ch when font-size=1px
+    return k; // px на 1ch при font-size=1px
   }
 
   _estimateRows(cols){
@@ -142,7 +144,7 @@ export class AsciiApp {
     this._fitToStage(cols);
   }
 
-  // ===== рендер =====
+  // ====== рендер ======
   _loop(ts = 0) {
     if (!this._running) return;
 
@@ -159,7 +161,7 @@ export class AsciiApp {
     const cols = Math.max(1, this.options.widthChars | 0);
     const rows = this._estimateRows(cols);
 
-    // на всякий — следим за размерами
+    // на всякий — подгон
     this._fitToStage(cols);
 
     this.canvas.width = cols;
@@ -187,9 +189,17 @@ export class AsciiApp {
         const g = img[p+1] / 255;
         const b = img[p+2] / 255;
 
-        let Y = 0.2126*r + 0.7152*g + 0.0722*b; // luma
-        Y = ((Y - 0.5) * contrast) + 0.5;       // контраст
-        Y = Math.max(0, Math.min(1, Math.pow(Y, gammaInv))); // гамма
+        // яркость
+        let Y = 0.2126*r + 0.7152*g + 0.0722*b;
+
+        // мягче контраст, чтобы не «ломало» картинку
+        if (contrast !== 1) {
+          const k = Math.max(0, Math.min(2.5, contrast)); // clamp
+          Y = ((Y - 0.5) * k) + 0.5;
+        }
+
+        // гамма + кламп
+        Y = Math.max(0, Math.min(1, Math.pow(Y, gammaInv)));
 
         if (inv) Y = 1 - Y;
 
