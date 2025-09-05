@@ -21,7 +21,7 @@
 html,body{ height:100%; margin:0; overflow:hidden; }
 body.theme-dark{ background:#000; color:#fff; }
 
-/* UI — в BetterVCR (жёстко) */
+/* UI — BetterVCR */
 .toolbar, .panel, .btn,
 .toolbar *,.panel *,.btn *,.card,.card *{
   font-family:'BetterVCR', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial !important;
@@ -71,14 +71,17 @@ body.theme-dark{ background:#000; color:#fff; }
   background:#000;
 }
 
-/* ASCII: строго моноширинный и стабильный */
+/* ASCII: жёсткий моноширинный, без лигатур и «улучшайзеров» */
 pre{
   white-space:pre;
   font-family:ui-monospace, Menlo, Consolas, monospace !important;
   font-variant-ligatures:none !important;
+  font-kerning:none !important;
+  text-rendering:optimizeSpeed;
   letter-spacing:0 !important;
-  line-height:1ch;         /* квадратная «клетка» */
-  font-size:12px;          /* стартовое — дальше регулирует JS */
+
+  line-height:1.0;        /* высоту строки считаем измерением (см. JS), не 1ch */
+  font-size:12px;         /* будет пересчитано JS */
   margin:0; user-select:none;
   color:var(--fg,#8ac7ff);
   background:var(--bg,#000);
@@ -104,7 +107,7 @@ pre{
 }
 .card h3{ margin:0 0 8px }
 
-/* Пока модалка открыта — блокируем клики по сцене/тулбару */
+/* Блокируем клики под модалкой */
 .modal:not([hidden]) ~ .wrap .toolbar,
 .modal:not([hidden]) ~ .wrap .stage{
   pointer-events:none !important;
