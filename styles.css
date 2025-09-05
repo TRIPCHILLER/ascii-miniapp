@@ -71,7 +71,7 @@ body.theme-dark{ background:#000; color:#fff; }
   background:#000;
 }
 
-/* ASCII: жёсткий моноширинный, без лигатур и «улучшайзеров» */
+/* ASCII: жёсткий моноширинный */
 pre{
   white-space:pre;
   font-family:ui-monospace, Menlo, Consolas, monospace !important;
@@ -80,8 +80,8 @@ pre{
   text-rendering:optimizeSpeed;
   letter-spacing:0 !important;
 
-  line-height:1.0;        /* высоту строки считаем измерением (см. JS), не 1ch */
-  font-size:12px;         /* будет пересчитано JS */
+  line-height:1.0;   /* высоту строки считаем измерением (см. JS) */
+  font-size:12px;    /* пересчитывается JS */
   margin:0; user-select:none;
   color:var(--fg,#8ac7ff);
   background:var(--bg,#000);
