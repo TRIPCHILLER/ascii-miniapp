@@ -1,4 +1,4 @@
-/* ====== Подключение BetterVCR (для UI) ====== */
+/* ===== BetterVCR для UI ===== */
 @font-face{
   font-family:'BetterVCR';
   src:url('assets/BetterVCR.woff2') format('woff2'),
@@ -9,78 +9,51 @@
   font-synthesis:none;
 }
 
-/* ====== Цвета ====== */
+/* ===== Цвета интерфейса ===== */
 :root{
-  --ui-bg:#141414;      /* тёмно-серый фон панели/тулбара */
-  --ui-panel:#1b1b1b;   /* панели */
-  --ui-border:#ffffff;  /* белая обводка */
-  --ui-text:#ffffff;    /* белый текст */
+  --ui-bg:#141414;
+  --ui-panel:#1b1b1b;
+  --ui-border:#ffffff;
+  --ui-text:#ffffff;
 }
 
-/* ====== Базовые ====== */
-html,body{
-  height:100%;
-  margin:0;
-  overflow:hidden;
-}
+/* ===== База ===== */
+html,body{ height:100%; margin:0; overflow:hidden; }
+body.theme-dark{ background:#000; color:#fff; }
 
-body.theme-dark{
-  background:#000;
-  color:#fff;
-  font-family:'BetterVCR', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
-}
-
-/* Сетка */
-.wrap{
-  display:flex;
-  flex-direction:column;
-  height:100%;
-}
-
-/* ====== ТУЛБАР ====== */
-.toolbar{
-  display:flex;
-  gap:8px;
-  align-items:center;
-  padding:10px;
-  flex-wrap:wrap;
-  background:var(--ui-bg);
-  border-bottom:1px solid var(--ui-border);
-}
-
-/* ====== ПАНЕЛЬ ====== */
-.panel{
-  display:flex;
-  flex-wrap:wrap;
-  gap:12px;
-  padding:8px;
-  background:var(--ui-bg);
-  border-bottom:1px solid var(--ui-border);
-}
-
-.panel label{
-  display:flex;
-  gap:8px;
-  align-items:center;
-  background:var(--ui-panel);
-  border:1px solid var(--ui-border);
-  padding:6px 8px;
-  border-radius:0;
+/* UI — в BetterVCR (жёстко) */
+.toolbar, .panel, .btn,
+.toolbar *,.panel *,.btn *,.card,.card *{
+  font-family:'BetterVCR', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial !important;
   color:var(--ui-text);
 }
 
-.panel [type="range"]{ width:180px }
-.panel output{ min-width:40px; text-align:right }
+/* Макет */
+.wrap{ display:flex; flex-direction:column; height:100%; }
 
-.panel .check{
-  display:flex; align-items:center; gap:8px;
-  padding:6px 10px;
+/* Toolbar */
+.toolbar{
+  display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+  padding:10px; background:var(--ui-bg); border-bottom:1px solid var(--ui-border);
 }
 
-/* Скрытие панели по умолчанию */
+/* Панель */
+.panel{
+  display:flex; flex-wrap:wrap; gap:12px; padding:8px;
+  background:var(--ui-bg); border-bottom:1px solid var(--ui-border);
+}
 .panel[hidden]{ display:none !important; }
+.panel label{
+  display:flex; gap:8px; align-items:center;
+  background:var(--ui-panel);
+  border:1px solid var(--ui-border);
+  padding:6px 8px; border-radius:0;
+}
+.panel [type="range"]{ width:180px }
+.panel output{ min-width:40px; text-align:right }
+.panel .check{ display:flex; align-items:center; gap:8px; padding:6px 10px; }
 
-/* ====== КНОПКИ ====== */
+/* Кнопки */
 .btn{
   background:transparent;
   color:var(--ui-text);
@@ -92,24 +65,21 @@ body.theme-dark{
 .btn[disabled]{opacity:.5;cursor:not-allowed}
 .btn:focus-visible{ outline:2px dashed var(--ui-border); outline-offset:2px; }
 
-/* ====== СЦЕНА ====== */
+/* Сцена */
 .stage{
-  flex:1;
-  display:grid;
-  place-items:center;
-  overflow:hidden;
-  min-height:0;
-  background:#000; /* подложка вокруг ASCII */
+  flex:1; display:grid; place-items:center; overflow:hidden; min-height:0;
+  background:#000;
 }
 
-/* ASCII-вывод */
+/* ASCII: строго моноширинный и стабильный */
 pre{
   white-space:pre;
-  font-family:ui-monospace,Menlo,Consolas,monospace !important; /* строго моноширинный */
-  line-height:1ch;      /* квадратная «клетка» */
-  font-size:12px;       /* стартовое — дальше регулирует JS */
-  margin:0;
-  user-select:none;
+  font-family:ui-monospace, Menlo, Consolas, monospace !important;
+  font-variant-ligatures:none !important;
+  letter-spacing:0 !important;
+  line-height:1ch;         /* квадратная «клетка» */
+  font-size:12px;          /* стартовое — дальше регулирует JS */
+  margin:0; user-select:none;
   color:var(--fg,#8ac7ff);
   background:var(--bg,#000);
   padding:10px 12px;
@@ -120,33 +90,25 @@ pre{
   max-height:100%;
 }
 
-/* ====== МОДАЛКА ====== */
+/* Модалка */
 .modal{
-  position:fixed;
-  inset:0;
-  display:grid;
-  place-items:center;
-  background:rgba(0,0,0,.72);
-  z-index:2147483647;
+  position:fixed; inset:0; display:grid; place-items:center;
+  background:rgba(0,0,0,.72); z-index:2147483647;
 }
 .modal[hidden]{ display:none !important; }
 
 .card{
-  background:var(--ui-panel);
-  border:1px solid var(--ui-border);
-  border-radius:0;
-  padding:18px;
-  max-width:420px;
-  width:min(420px,90vw);
-  color:var(--ui-text);
+  background:var(--ui-panel); border:1px solid var(--ui-border);
+  border-radius:0; padding:18px;
+  max-width:420px; width:min(420px,90vw); color:var(--ui-text);
 }
 .card h3{ margin:0 0 8px }
 
-/* Блокируем клики по UI только пока модалка видима */
+/* Пока модалка открыта — блокируем клики по сцене/тулбару */
 .modal:not([hidden]) ~ .wrap .toolbar,
 .modal:not([hidden]) ~ .wrap .stage{
   pointer-events:none !important;
 }
 
-/* безоп. зона iOS */
+/* Безопасная зона iOS */
 .wrap{ padding-bottom:env(safe-area-inset-bottom) }
