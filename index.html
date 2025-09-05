@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <title>ASCII live · app</title>
 
-  <link rel="stylesheet" href="styles.css?v=23" />
+  <link rel="stylesheet" href="styles.css?v=24" />
   <script src="consent.js" defer></script>
 </head>
 <body class="theme-dark">
@@ -27,7 +27,7 @@
       <button id="toggle" class="btn">Настройки</button>
     </div>
 
-    <!-- Панель по умолчанию скрыта -->
+    <!-- Настройки (скрыты при старте) -->
     <div class="panel" id="settings" hidden>
       <label>
         <span>Ширина</span>
@@ -94,17 +94,20 @@
       flip: $('flip'),
       toggle: $('toggle'),
       settings: $('settings'),
+
       w: $('w'), c: $('c'), g: $('g'),
       fg: $('fg'), bg: $('bg'),
       fps: $('fps'),
       ramp: $('ramp'),
       inv: $('inv'),
+
       w_out: $('w_out'), c_out: $('c_out'), g_out: $('g_out'), fps_out: $('fps_out'),
     };
 
     const app = new AsciiApp(ui.out);
 
-    function apply(){
+    // применяем опции в движок
+    function apply(changed = {}) {
       ui.w_out.textContent   = ui.w.value;
       ui.c_out.textContent   = Number(ui.c.value).toFixed(2);
       ui.g_out.textContent   = Number(ui.g.value).toFixed(2);
@@ -120,12 +123,19 @@
         ramp:        ui.ramp.value,
         invert:      ui.inv.checked
       });
+
+      // РЕФИТ только если меняли ширину или набор
+      if (changed.w || changed.ramp) app.refit();
     }
 
-    ['w','c','g','fg','bg','fps','ramp','inv'].forEach(id=>{
+    // события
+    ui.w.addEventListener('input',  () => apply({ w:true }));
+    ui.ramp.addEventListener('change', () => apply({ ramp:true }));
+
+    ['c','g','fg','bg','fps','inv'].forEach(id=>{
       const el = $(id);
-      el.addEventListener('input', apply);
-      el.addEventListener('change', apply);
+      el.addEventListener('input',  () => apply({}));
+      el.addEventListener('change', () => apply({}));
     });
 
     ui.toggle.addEventListener('click', () => {
@@ -139,21 +149,27 @@
       }
     });
 
-    const savedPanelOpen = localStorage.getItem('ui-settings-open') === '1';
-    if (savedPanelOpen) ui.settings.removeAttribute('hidden');
-    else ui.settings.setAttribute('hidden','');
+    // восстановить состояние панели
+    if (localStorage.getItem('ui-settings-open') === '1') ui.settings.removeAttribute('hidden');
 
-    ui.flip.addEventListener('click', () => app.flip());
-
-    document.addEventListener('consent-ready', async () => {
-      await app.start();
-      apply();
+    ui.flip.addEventListener('click', async () => {
+      await app.flip();
+      app.refit();
     });
 
+    // старт после согласия
+    document.addEventListener('consent-ready', async () => {
+      await app.start();
+      app.refit();
+      apply({});
+    });
+
+    // если согласие уже было
     try{
       if(localStorage.getItem('consent-ok') === '1'){
         await app.start();
-        apply();
+        app.refit();
+        apply({});
       }
     }catch(e){}
   </script>
