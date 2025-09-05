@@ -72,3 +72,8 @@ body.theme-dark{ background:#000; color:#fff; }
 @supports (padding: env(safe-area-inset-bottom)){
   .wrap{ padding-bottom: env(safe-area-inset-bottom); }
 }
+
+/* === Фирменный шрифт для интерфейса === */
+body, .toolbar, .panel, .btn, label, output, select, option {
+  font-family: 'Better VCR', sans-serif;
+}
