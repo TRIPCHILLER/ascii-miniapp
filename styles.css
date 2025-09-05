@@ -1,71 +1,74 @@
-/* ====== базовые переменные ====== */
+/* ===== БАЗА ===== */
+* { box-sizing: border-box; }
+html,body{ height:100%; margin:0; }
+body.theme-dark{ background:#000; color:#fff; }
+
+/* mono UI + аккуратные контрастные кнопки */
 :root{
-  --ui-bg:#0f0f10;
-  --ui-panel:#121214;
+  --ui-bg:#151515;
+  --ui-panel:#1b1b1b;
   --ui-border:#ffffff;
   --ui-text:#ffffff;
-
-  /* цвет фона сцены и ASCII — управляется через JS */
-  --bg:#000000;
 }
 
-/* ====== базовая раскладка ====== */
-html,body{height:100%;margin:0;overflow:hidden}
-body.theme-dark{background:#000;color:var(--ui-text);font-family:'BetterVCR',ui-sans-serif,system-ui}
+.wrap{ display:flex; flex-direction:column; height:100%; }
 
-/* wrap */
-.wrap{display:flex;flex-direction:column;height:100%}
-
-/* toolbar */
+/* ===== ТУЛБАР ===== */
 .toolbar{
-  display:flex;gap:8px;align-items:center;padding:10px;
-  background:var(--ui-bg);border-bottom:1px solid var(--ui-border);
+  display:flex; gap:8px; align-items:center;
+  padding:10px; background:var(--ui-bg);
+  border-bottom:1px solid var(--ui-border);
 }
 .btn{
-  background:transparent;color:var(--ui-text);
-  border:1px solid var(--ui-border);padding:.55rem 1rem;border-radius:0;cursor:pointer;
+  background:transparent; color:var(--ui-text);
+  border:1px solid var(--ui-border);
+  padding:.55rem 1rem; border-radius:0; cursor:pointer;
 }
-.btn:focus-visible{outline:2px dashed var(--ui-border);outline-offset:2px}
 
-/* settings panel */
+/* ===== ПАНЕЛЬ ===== */
 .panel{
-  display:flex;flex-wrap:wrap;gap:12px;padding:8px;
-  background:var(--ui-bg);border-bottom:1px solid var(--ui-border);
+  display:flex; flex-wrap:wrap; gap:12px; padding:8px;
+  background:var(--ui-bg); border-bottom:1px solid var(--ui-border);
 }
-.panel[hidden]{display:none!important}
+.panel[hidden]{ display:none !important; }
 .panel label{
-  display:flex;gap:8px;align-items:center;background:var(--ui-panel);
-  border:1px solid var(--ui-border);padding:6px 8px;border-radius:0;
+  display:flex; gap:8px; align-items:center;
+  background:var(--ui-panel);
+  border:1px solid var(--ui-border);
+  padding:6px 8px; border-radius:0;
 }
-.panel input[type="range"]{width:160px}
-.panel .check{align-items:center}
+.panel input[type="range"]{ width:160px; }
+.panel output{ min-width:42px; text-align:right; }
 
-/* сцена */
+/* чекбокс компактный */
+.check{ display:flex; align-items:center; gap:8px; padding:6px 8px; }
+
+/* ===== СЦЕНА/ВЫВОД ===== */
 .stage{
-  /* ВСЯ видимая область под ASCII — фиксированная рамка */
-  flex:1;min-height:0;display:flex;place-content:center;place-items:center;
-  background:var(--bg);
-  overflow:hidden; /* без скроллов */
-  position:relative;
+  flex:1; min-height:0; display:grid; place-items:center; overflow:hidden;
+  /* ВАЖНО: цвет сцены мы будем менять из JS (под цвет фона ASCII) */
+  background:#000;
 }
 
-/* сам ASCII */
+/* Сам ASCII-блок */
 #out{
-  margin:0;white-space:pre;user-select:none;pointer-events:none;
-  color:var(--fg,#8ac7ff);background:var(--bg);
-  border:1px solid var(--ui-border);border-radius:0;padding:10px 12px;box-sizing:border-box;
-
-  /* вписывание — ограничиваем по контейнеру */
-  max-width:100%;max-height:100%;
-
-  /* подготовка к горизонтальной коррекции */
-  transform-origin:center center;
-  font-family:ui-monospace,Menlo,Consolas,monospace;
-  line-height:1em;
+  margin:0;
+  white-space:pre;
+  user-select:none;
+  font-family: ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
+  /* ВАЖНО: высота строки в «кадровых» единицах */
+  line-height: 1ch;
+  /* Размер шрифта вычисляет JS (чтобы блок всегда влезал) */
+  font-size: 16px;
+  color:#8ac7ff;
+  background:#000;
+  border:1px solid var(--ui-border);
+  border-radius:0;
+  max-width:100%;
+  max-height:100%;
 }
 
-/* мобильная панель — вертикалью удобнее */
-@media (max-width: 768px){
-  .panel{flex-direction:column}
-  .panel label{flex-direction:row}
+/* небольшая защита от «прыжков» при клавиатуре на мобилках */
+@supports (padding: env(safe-area-inset-bottom)){
+  .wrap{ padding-bottom: env(safe-area-inset-bottom); }
 }
