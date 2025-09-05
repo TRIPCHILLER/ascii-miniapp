@@ -213,4 +213,27 @@ body.theme-dark {
 
 /* Панель настроек тоже должна использовать общий фон */
 .panel {
-  background: var(--bg, #1b1b1b
+  background: var(--bg, #1b1b1b);
+}
+
+/* Верхняя панель */
+.toolbar {
+  background: var(--bg, #141414);
+}
+
+/* Улучшения для мобильных устройств */
+@media (max-width: 768px) {
+  .stage {
+    max-height: 60vh; /* Еще больше места для арта на мобильных */
+  }
+  
+  .panel {
+    flex-direction: column; /* Вертикальное расположение настроек */
+    gap: 8px;
+  }
+  
+  .panel label {
+    flex-direction: column; /* Вертикальное расположение элементов в настройках */
+    align-items: flex-start;
+  }
+}
