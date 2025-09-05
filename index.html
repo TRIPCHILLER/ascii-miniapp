@@ -1,148 +1,82 @@
-<!doctype html><html><head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>ASCII live · app</title>
-
-<!-- кэш-бастер для стилей -->
-<link rel="stylesheet" href="styles.css?v=16">
-
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
-<!-- твой одноразовый дисклеймер. Он кладёт localStorage: consent-ok=1 и шлёт событие 'consent-ready' -->
-<script src="consent.js" defer></script>
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>ASCII live · app</title>
+  <link rel="stylesheet" href="styles.css?v=fit1" />
 </head>
 <body class="theme-dark">
-<div class="wrap">
-  <!-- Верхняя полоска: только камера и настройки -->
-  <div class="toolbar" id="toolbar">
-    <button id="flip" class="btn">Фронт/Тыл</button>
-    <button id="toggleSettings" class="btn">Настройки</button>
+  <div class="wrap" id="app">
+
+    <!-- Верхняя панель -->
+    <div class="toolbar">
+      <button class="btn" id="flip">Фронт/Тыл</button>
+      <button class="btn" id="toggle">Настройки</button>
+    </div>
+
+    <!-- Панель настроек (по умолчанию скрыта) -->
+    <div class="panel" id="settings" hidden>
+      <label>
+        <span>Ширина</span>
+        <input id="width" type="range" min="40" max="360" step="1" />
+        <output id="width_val"></output>
+      </label>
+
+      <label>
+        <span>Контраст</span>
+        <input id="contrast" type="range" min="0.4" max="2.2" step="0.01" />
+        <output id="contrast_val"></output>
+      </label>
+
+      <label>
+        <span>Гамма</span>
+        <input id="gamma" type="range" min="0.6" max="2.0" step="0.01" />
+        <output id="gamma_val"></output>
+      </label>
+
+      <label>
+        <span>Цвет</span>
+        <input id="fg" type="color" />
+      </label>
+
+      <label>
+        <span>Фон</span>
+        <input id="bg" type="color" />
+      </label>
+
+      <label>
+        <span>FPS</span>
+        <input id="fps" type="range" min="5" max="60" step="1" />
+        <output id="fps_val"></output>
+      </label>
+
+      <label>
+        <span>Набор</span>
+        <select id="charset">
+          <option value='@%#*+=-:. ' selected>Классический</option>
+          <option value='0123456789'>Только цифры</option>
+          <option value='ABCDEFGHIJKLMNOPQRSTUVWXYZ'>Только буквы (A–Z)</option>
+          <option value='····•○◦ '>. · • ○</option>
+          <option value='░▒▓█ ' >Блоки ░▒▓█</option>
+        </select>
+      </label>
+
+      <label class="check">
+        <input id="invert" type="checkbox" />
+        <span>Инверсия</span>
+      </label>
+    </div>
+
+    <!-- Сцена вывода -->
+    <div class="stage" id="stage">
+      <pre id="out"></pre>
+    </div>
+
+    <!-- Скрытое видео (источник камеры) -->
+    <video id="vid" playsinline autoplay muted hidden></video>
   </div>
 
-  <!-- Плашка с настройками (как раньше на pro.html). По умолчанию скрыта. -->
-  <div class="panel" id="settings" hidden>
-    <label>Ширина <input id="w" type="range" min="40" max="320" value="160"><span id="wv">160</span></label>
-    <label>Контраст <input id="contrast" type="range" min="50" max="220" value="115"><span id="cv">1.15</span></label>
-    <label>Гамма <input id="gamma" type="range" min="60" max="180" value="120"><span id="gv">1.20</span></label>
-    <label>Цвет <input id="fg" type="color" value="#8ac7ff"></label>
-    <label>Фон <input id="bg" type="color" value="#000000"></label>
-    <label>FPS <input id="fps" type="range" min="5" max="60" value="30"><span id="fpsv">30</span></label>
-    <label>Набор
-      <select id="preset">
-        <option value="classic">Классический</option>
-        <option value="digits">Только цифры</option>
-        <option value="letters">Только буквы</option>
-        <option value="dots">Точки/тонкий</option>
-        <option value="blocks">Блоки ░▒▓█</option>
-        <option value="custom">Свой…</option>
-      </select>
-      <input id="ramp" type="text" placeholder="свой набор символов" style="width:240px;display:none">
-    </label>
-    <label><input id="invert" type="checkbox" checked> Инверсия</label>
-  </div>
-
-  <!-- Рамка показа — всегда занимает всё остальное место -->
-  <div class="stage"><pre id="out"></pre></div>
-</div>
-
-<!-- одноразовый дисклеймер -->
-<div class="modal" id="consent" hidden>
-  <div class="card" role="dialog" aria-modal="true">
-    <h3>Доступ к камере</h3>
-    <p>Видеопоток обрабатывается локально на вашем устройстве, без отправки на сервер.</p>
-    <p><a href="privacy.html" target="_blank" rel="noopener">Подробнее</a></p>
-    <button id="agree" class="btn" type="button">Ок, понимаю</button>
-  </div>
-</div>
-
-<script type="module">
-import { AsciiApp } from './ascii.js';
-if (window.Telegram?.WebApp) { Telegram.WebApp.ready(); Telegram.WebApp.expand(); }
-
-const $ = id => document.getElementById(id);
-
-const ui = {
-  out: $('out'),
-  flip: $('flip'),
-  toggle: $('toggleSettings'),
-  settings: $('settings'),
-  toolbar: $('toolbar'),
-};
-
-const app = new AsciiApp(ui.out);
-
-/* --- пресеты наборов символов --- */
-function presetRamp(name){
-  switch(name){
-    case 'digits':  return ' 00112233445566778899';
-    case 'letters': return '  iIl1tTjfJrRvxXcCuUnNzZmwWQO';
-    case 'dots':    return " .'`^,:;-_~";
-    case 'blocks':  return ' ░▒▓█';
-    case 'classic':
-    default:        return " .'`\",:;Il!i~+_-?][}{1tfjrxnuvczXYUJCLQ0089@#";
-  }
-}
-function apply(){
-  $('wv').textContent = $('w').value;
-  $('cv').textContent = (+$('contrast').value/100).toFixed(2);
-  $('gv').textContent = (+$('gamma').value/100).toFixed(2);
-  $('fpsv').textContent = $('fps').value;
-
-  let ramp = presetRamp($('preset').value);
-  if ($('preset').value === 'custom'){
-    $('ramp').style.display = 'inline-block';
-    ramp = $('ramp').value || ramp;
-  } else {
-    $('ramp').style.display = 'none';
-  }
-  app.setOptions({
-    widthChars:+$('w').value,
-    contrast:+$('contrast').value/100,
-    gamma:+$('gamma').value/100,
-    color:$('fg').value,
-    background:$('bg').value,
-    fps:+$('fps').value,
-    ramp,
-    invert:$('invert').checked
-  });
-}
-['w','contrast','gamma','fg','bg','fps','preset','ramp','invert'].forEach(id=>{
-  const el = $(id); if (!el) return;
-  el.addEventListener('input', apply);
-  el.addEventListener('change', apply);
-});
-apply();
-
-/* --- автозапуск камеры --- */
-function startNow(){
-  app.start().catch(e=>{
-    alert('Камера недоступна: ' + e.message);
-  });
-}
-// если согласие уже было — стартуем сразу
-if (localStorage.getItem('consent-ok') === '1') startNow();
-// иначе ждём «Ок, понимаю» из consent.js
-else document.addEventListener('consent-ready', startNow, { once:true });
-
-/* --- управление --- */
-// переключение фронт/тыл
-ui.flip.onclick = () => app.flip();
-
-// при старте читаем состояние
-const saved = localStorage.getItem('ui-settings-open') === '1';
-if (saved) ui.settings.removeAttribute('hidden');
-else ui.settings.setAttribute('hidden','');
-
-// кнопка: показать/скрыть + сохранить
-ui.toggle.onclick = () => {
-  const hidden = ui.settings.hasAttribute('hidden');
-  if (hidden) {
-    ui.settings.removeAttribute('hidden');
-    localStorage.setItem('ui-settings-open','1');
-  } else {
-    ui.settings.setAttribute('hidden','');
-    localStorage.setItem('ui-settings-open','0');
-  }
-};
-</script>
-</body></html>
-
+  <script defer src="ascii.js?v=fit1"></script>
+</body>
+</html>
