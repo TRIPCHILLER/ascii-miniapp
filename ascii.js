@@ -1,5 +1,5 @@
-// Прочный рендер: авто-вписывание по реальному измерению текста,
-// рефит не зависит от контраста/гаммы
+// Надёжный рендер + «вписывание» ASCII в сцену.
+// Контраст/гамма/цвет/инверсия больше НЕ меняют геометрию.
 
 export class AsciiApp {
   constructor(outEl) {
@@ -25,7 +25,7 @@ export class AsciiApp {
     this._timer = 0;
     this._lastFrameTs = 0;
 
-    // элемент для измерений
+    // Спан для измерений
     this._probe = document.createElement('span');
     Object.assign(this._probe.style, {
       position:'absolute', left:'-99999px', top:'-99999px',
@@ -33,7 +33,7 @@ export class AsciiApp {
     });
     document.body.appendChild(this._probe);
 
-    // наблюдаем сцену
+    // Наблюдаем сцену
     this._ro = new ResizeObserver(() => this.refit());
     this._ro.observe(this.out.parentElement);
 
@@ -59,7 +59,7 @@ export class AsciiApp {
 
   setOptions(opts) {
     Object.assign(this.options, opts);
-    this._applyColors(); // обновим цвета, но НЕ рефитим
+    this._applyColors(); // только цвета
   }
 
   refit() {
@@ -114,39 +114,33 @@ export class AsciiApp {
     return Math.max(1, Math.round(cols * (vh / vw)));
   }
 
-  // ====== прочный рефит по реальному измерению ======
+  // ====== «вписывание» ======
   _fitByProbe(cols, rows){
     const stage = this.out.parentElement;
     if (!stage) return;
 
-    // подставляем тот же шрифт и свойства, что у <pre>
+    // тот же шрифт, что у <pre>
     const cs = getComputedStyle(this.out);
-    const probeStyle = this._probe.style;
-    probeStyle.fontFamily = cs.fontFamily;
-    probeStyle.fontVariantLigatures = cs.fontVariantLigatures || 'none';
-    probeStyle.letterSpacing = cs.letterSpacing || '0';
-    probeStyle.lineHeight = cs.lineHeight || '1.0';
+    const s = this._probe.style;
+    s.fontFamily = cs.fontFamily;
+    s.fontVariantLigatures = cs.fontVariantLigatures || 'none';
+    s.letterSpacing = cs.letterSpacing || '0';
+    s.lineHeight = cs.lineHeight || '1.0';
 
-    // строим прямоугольник cols×rows
     const line = '0'.repeat(cols);
     this._probe.textContent = Array.from({length: rows}, () => line).join('\n');
 
-    // стартовая прикидка
-    let fontSize = 12; // px
-    probeStyle.fontSize = fontSize + 'px';
+    let fontSize = 12;
+    s.fontSize = fontSize + 'px';
 
-    // реальные размеры при стартовой прикидке
     let rect = this._probe.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
 
     const sw = stage.clientWidth  || 1;
     const sh = stage.clientHeight || 1;
 
-    // коэффициент вписывания (contain)
     const k = Math.min(sw / rect.width, sh / rect.height);
     fontSize = Math.max(1, Math.floor(fontSize * k));
-
-    // финальный размер
     this.out.style.fontSize = fontSize + 'px';
   }
 
@@ -175,7 +169,7 @@ export class AsciiApp {
 
     const img = this.ctx.getImageData(0, 0, cols, rows).data;
 
-    const contrast = this.options.contrast || 1.0;
+    const contrast = Math.min(2.5, Math.max(0.5, this.options.contrast || 1.0)); // мягкое ограничение
     const gamma = this.options.gamma || 1.0;
     const inv = !!this.options.invert;
 
@@ -197,11 +191,8 @@ export class AsciiApp {
         // яркость
         let Y = 0.2126*r + 0.7152*g + 0.0722*b;
 
-        // мягкий контраст (clamp)
-        if (contrast !== 1) {
-          const k = Math.max(0, Math.min(2.5, contrast));
-          Y = ((Y - 0.5) * k) + 0.5;
-        }
+        // мягкий контраст с клампом
+        Y = ((Y - 0.5) * contrast) + 0.5;
 
         // гамма + кламп
         Y = Math.max(0, Math.min(1, Math.pow(Y, gammaInv)));
