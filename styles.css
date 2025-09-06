@@ -77,3 +77,31 @@ body.theme-dark{ background:#000; color:#fff; }
 body, .toolbar, .panel, .btn, label, output, select, option {
   font-family: 'Better VCR', sans-serif;
 }
+
+/* ===== FULLSCREEN ===== */
+:fullscreen .toolbar,
+:fullscreen .panel { display: none !important; }
+
+/* когда мы сами прячем UI (например, iOS без настоящего fullscreen) */
+.body-fullscreen .toolbar,
+.body-fullscreen .panel { display: none !important; }
+
+.fs-exit {
+  position: fixed;
+  top: 10px; right: 10px;
+  width: 36px; height: 36px;
+  display:flex; align-items:center; justify-content:center;
+  border:1px solid var(--ui-border);
+  background: rgba(0,0,0,.6);
+  color: var(--ui-text);
+  cursor:pointer; z-index: 9999;
+  user-select: none;
+}
+
+/* простой «иконкой» будет символ ⤢ */
+.fs-exit::after { content: "⤢"; font-size: 18px; line-height: 1; }
+
+/* фолбэк-поворот сцены на мобилках, если lock() не доступен */
+.body-fullscreen .stage {
+  width: 100vw; height: 100vh;
+}
