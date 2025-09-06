@@ -1,6 +1,8 @@
 (() => {
   // ============== УТИЛИТЫ ==============
   const $ = s => document.querySelector(s);
+  const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
+
   const app = {
     vid:  $('#vid'),
     out:  $('#out'),
@@ -21,12 +23,16 @@
       bg:       $('#bg'),
       charset:  $('#charset'),
       invert:   $('#invert'),
+      fs:       $('#fs'),
     }
   };
 
-  // Значения по умолчанию (как в v18)
+  // Значения по умолчанию
+  // ВАЖНО: mirror = true означает "НЕ-зеркальная картинка" (мы инвертируем стандартный селфи-вид).
+  // Это даёт "оригинальное" восприятие, как ты просил — стартуем сразу с правильным горизонтальным отражением.
   const state = {
-    facing: 'user',
+    facing: 'user',         // какая камера для мобилок
+    mirror: true,           // режим рисования: true = отразить по X (НЕ-зеркало)
     widthChars: 160,
     contrast: 1.15,
     gamma: 1.20,
@@ -35,6 +41,7 @@
     background: '#000000',
     charset: '@%#*+=-:. ',
     invert: true,
+    isFullscreen: false,    // наш флаг
   };
 
   // Вспомогательные канвасы
@@ -68,7 +75,6 @@
   let lastFrameTime = 0;
 
   function setUI() {
-    // Инициализация контролов
     app.ui.width.value = state.widthChars;
     app.ui.widthVal.textContent = state.widthChars;
 
@@ -87,7 +93,6 @@
     app.ui.charset.value = state.charset;
     app.ui.invert.checked = state.invert;
 
-    // Цвет применяем к самому ASCII и сцене
     app.out.style.color = state.color;
     app.out.style.backgroundColor = state.background;
     app.stage.style.backgroundColor = state.background;
@@ -98,8 +103,6 @@
     const v = app.vid;
     if (!v.videoWidth || !v.videoHeight) return { w: state.widthChars, h: 1 };
 
-    // Коэффициент «плоскости» символа (ширина/высота). Для большинства моношрифтов ~0.5–0.6.
-    // Мы измерим его на лету, чтобы не гадать.
     const ratio = measureCharAspect();
     const aspect = (v.videoHeight / v.videoWidth) / ratio;
 
@@ -111,21 +114,16 @@
     return { w, h };
   }
 
-  // Измерение фактического отношения W/H одного символа при текущем font-size
   function measureCharAspect() {
-    // Пишем «М» в две строки, чтобы корректно поймать высоту строки с line-height:1ch
     measurePre.textContent = 'M\nM';
     measurePre.style.fontSize = app.out.style.fontSize || '16px';
     const rect = measurePre.getBoundingClientRect();
     const lineH = rect.height / 2;
-    const chW = rect.width / 1; // ширина одной «M» (почти равно ширине символа)
-    // отношение высоты к ширине одного символа:
+    const chW = rect.width / 1;
     const charRatio = lineH / chW; // H/W
-    // нам нужен W/H (ширина/высота) → обратное:
-    return 1 / charRatio;
+    return 1 / charRatio;          // W/H
   }
 
-  // Главный цикл
   function loop(ts) {
     raf = requestAnimationFrame(loop);
 
@@ -139,9 +137,13 @@
 
     const { w, h } = updateGridSize();
 
-    // Рисуем видео кадр на offscreen
+    // Подготовка трансформа для зеркала
+    // mirror = true ⇒ рисуем с scaleX(-1), чтобы получить НЕ-зеркальную картинку
+    ctx.setTransform(state.mirror ? -1 : 1, 0, 0, 1, state.mirror ? w : 0, 0);
     ctx.drawImage(v, 0, 0, w, h);
-    let data = ctx.getImageData(0, 0, w, h).data;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+    const data = ctx.getImageData(0, 0, w, h).data;
 
     // Генерация ASCII
     const chars = state.charset;
@@ -152,25 +154,19 @@
     const gamma = state.gamma;
     const contrast = state.contrast;
 
-    // Собираем строку
     let out = '';
     let i = 0;
     for (let y = 0; y < h; y++) {
       let line = '';
       for (let x = 0; x < w; x++, i += 4) {
         const r = data[i], g = data[i+1], b = data[i+2];
-        // Y (перцептуальная яркость)
         let Y = 0.2126*r + 0.7152*g + 0.0722*b;
 
-        // Контраст (нормируем к 0..1, затем снова в 0..255)
         let v01 = Y / 255;
         v01 = ((v01 - 0.5) * contrast) + 0.5;
         v01 = Math.min(1, Math.max(0, v01));
-
-        // Гамма
         v01 = Math.pow(v01, 1 / gamma);
 
-        // Инверсия
         const Yc = Math.max(0, Math.min(255, (bias + inv * (v01 * 255))));
         const idx = Math.round((Yc / 255) * n);
         line += chars[idx];
@@ -179,40 +175,30 @@
     }
 
     app.out.textContent = out;
-
-    // Подогнать font-size, чтобы целиком влезло в .stage
     refitFont(w, h);
   }
 
-  // Подбор font-size так, чтобы #out (w×h) влезал в .stage
+  // Подбор font-size
   let refitLock = false;
   function refitFont(cols, rows) {
     if (refitLock) return;
     refitLock = true;
 
-    // Берём текущий размер и меряем
     const stageW = app.stage.clientWidth;
     const stageH = app.stage.clientHeight;
 
-    // Для оценки размеров строим «измеритель»
     measurePre.textContent = ('M'.repeat(cols) + '\n').repeat(rows);
-    // Стартуем с текущего размера out (или 16px)
     const currentFS = parseFloat(getComputedStyle(app.out).fontSize) || 16;
     measurePre.style.fontSize = currentFS + 'px';
 
-    // Сколько сейчас занимает?
     let mRect = measurePre.getBoundingClientRect();
-    // Коэффициенты подгонки по сторонам
     const kW = stageW / mRect.width;
     const kH = stageH / mRect.height;
-    // Окончательный масштаб
     const k = Math.min(kW, kH);
 
-    // Новый размер шрифта
     const newFS = Math.max(6, Math.floor(currentFS * k));
     app.out.style.fontSize = newFS + 'px';
 
-    // Финальная корректировка одной итерацией (чуть точнее)
     measurePre.style.fontSize = newFS + 'px';
     mRect = measurePre.getBoundingClientRect();
     const k2 = Math.min(stageW / mRect.width, stageH / mRect.height);
@@ -222,6 +208,84 @@
     refitLock = false;
   }
 
+  // ============== FULLSCREEN ==============
+  let exitBtn = null;
+
+  function inNativeFullscreen() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+  }
+
+  async function requestFull() {
+    try {
+      if (app.stage.requestFullscreen) await app.stage.requestFullscreen();
+      else if (app.stage.webkitRequestFullscreen) await app.stage.webkitRequestFullscreen();
+      state.isFullscreen = true;
+    } catch(e) {
+      // игнорируем — пойдём фолбэком
+    }
+  }
+
+  async function lockLandscapeIfPossible() {
+    try {
+      if (screen.orientation && screen.orientation.lock) {
+        await screen.orientation.lock('landscape');
+      } else {
+        // iOS / старые браузеры — фолбэк: дадим хотя бы чистый экран
+        document.body.classList.add('body-fullscreen');
+      }
+    } catch(e) {
+      // если запретили — фолбэк
+      document.body.classList.add('body-fullscreen');
+    }
+  }
+
+  function createExitButton() {
+    if (exitBtn) return;
+    exitBtn = document.createElement('button');
+    exitBtn.className = 'fs-exit';
+    exitBtn.type = 'button';
+    exitBtn.addEventListener('click', exitFullscreen);
+    document.body.appendChild(exitBtn);
+  }
+
+  async function enterFullscreen() {
+    if (isMobile) {
+      // мобилки: fullscreen + ландшафт
+      await requestFull();
+      await lockLandscapeIfPossible();
+    } else {
+      // десктоп: чистый fullscreen
+      await requestFull();
+    }
+    createExitButton();
+  }
+
+  async function exitFullscreen() {
+    try {
+      if (inNativeFullscreen()) {
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else if (document.webkitExitFullscreen) await document.webkitExitFullscreen();
+      }
+    } catch(e) {}
+    document.body.classList.remove('body-fullscreen');
+    state.isFullscreen = false;
+
+    if (screen.orientation && screen.orientation.unlock) {
+      try { screen.orientation.unlock(); } catch(e) {}
+    }
+    if (exitBtn) { exitBtn.remove(); exitBtn = null; }
+  }
+
+  document.addEventListener('fullscreenchange', () => {
+    const active = inNativeFullscreen();
+    state.isFullscreen = active;
+    if (!active) {
+      // вышли из nat FS — подчистим фолбэк
+      document.body.classList.remove('body-fullscreen');
+      if (exitBtn) { exitBtn.remove(); exitBtn = null; }
+    }
+  });
+
   // ============== СВЯЗКА UI ==============
   function bindUI() {
     // Показ/скрытие панели
@@ -229,25 +293,39 @@
       const hidden = app.ui.settings.hasAttribute('hidden');
       if (hidden) app.ui.settings.removeAttribute('hidden');
       else app.ui.settings.setAttribute('hidden', '');
-      // Подгон после изменения доступной площади
       setTimeout(() => {
         const { w, h } = updateGridSize();
         refitFont(w, h);
       }, 0);
     });
 
-    // Смена камеры
+    // Кнопка "Фронт/Тыл"
     app.ui.flip.addEventListener('click', async () => {
-      state.facing = state.facing === 'user' ? 'environment' : 'user';
-      const s = app.vid.srcObject;
-      if (s) s.getTracks().forEach(t => t.stop());
-      await startStream();
+      if (isMobile) {
+        // Мобилки: реальный свитч камеры
+        state.facing = state.facing === 'user' ? 'environment' : 'user';
+        const s = app.vid.srcObject;
+        if (s) s.getTracks().forEach(t => t.stop());
+        await startStream();
+        // В мобильном режиме оставляем текущее "правильное" отображение
+        state.mirror = true;
+      } else {
+        // Десктоп: просто зеркалим/раззеркаливаем
+        state.mirror = !state.mirror;
+      }
     });
+
+    // Полноэкранный режим
+    if (app.ui.fs) {
+      app.ui.fs.addEventListener('click', () => {
+        if (!state.isFullscreen) enterFullscreen();
+        else exitFullscreen();
+      });
+    }
 
     app.ui.width.addEventListener('input', e => {
       state.widthChars = +e.target.value;
       app.ui.widthVal.textContent = state.widthChars;
-      // пересчёт сетки → refit сделаем в кадре
     });
 
     app.ui.contrast.addEventListener('input', e => {
@@ -294,11 +372,12 @@
     bindUI();
     await startStream();
 
-    // Запускаем цикл
+    // Стартуем сразу с НЕ-зеркального вида (нормальная ориентация по горизонтали)
+    state.mirror = true;
+
     if (raf) cancelAnimationFrame(raf);
     raf = requestAnimationFrame(loop);
 
-    // Первая подгонка
     const { w, h } = updateGridSize();
     refitFont(w, h);
   }
