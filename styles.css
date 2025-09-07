@@ -135,4 +135,12 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 }
 .fs-exit::after { content:"⤢"; font-size:18px; line-height:1; }
 
+/* Горизонтальное зеркало для видео (только когда класс добавлен из JS) */
+.mirror-x {
+  transform: scaleX(-1);
+  -webkit-transform: scaleX(-1);
+  transform-origin: center center;
+}
+
 .body-fullscreen .stage { width:100vw; height:100vh; }
+
