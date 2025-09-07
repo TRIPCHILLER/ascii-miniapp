@@ -314,8 +314,6 @@ app.ui.flip.addEventListener('click', async () => {
     const s = app.vid.srcObject;
     if (s) s.getTracks().forEach(t => t.stop());
     await startStream();
-// Стартуем сразу с НЕ-зеркального вида (нормальная ориентация по горизонтали)
-state.mirror = true;
     // НИЧЕГО не трогаем с state.mirror — рендер сам поймёт по state.facing
   } else {
     // Десктоп: кнопка «развернуть» включает/выключает зеркалирование вручную
@@ -389,5 +387,6 @@ state.mirror = true;
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
