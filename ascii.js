@@ -29,7 +29,7 @@
 
   // Значения по умолчанию
   const state = {
-    facing: 'user',         // стартуем с фронталки; при переключении на environment включится зеркало
+    facing: 'user',         // стартуем с фронталки
     widthChars: 160,
     contrast: 1.15,
     gamma: 1.20,
@@ -61,18 +61,25 @@
       });
       app.vid.srcObject = stream;
 
-      // --- MIRROR: включаем зеркало для основной камеры на телефонах ---
-      const track = stream.getVideoTracks && stream.getVideoTracks()[0];
+      // --- MIRROR: теперь зеркалим ТОЛЬКО фронталку (user) на мобилках ---
+      const track    = stream.getVideoTracks && stream.getVideoTracks()[0];
       const settings = track && track.getSettings ? track.getSettings() : {};
-      const facing = (settings.facingMode || '').toLowerCase();
-      const byLabel = (track && track.label ? track.label.toLowerCase() : '');
-      const isEnvironment = facing.includes('environment') || byLabel.includes('back') || byLabel.includes('rear');
+      const facing   = (settings.facingMode || '').toLowerCase();
+      const label    = (track && track.label ? track.label.toLowerCase() : '');
 
-      // флаг в глобальную область
-      window.__MIRROR_ENV = Boolean(isMobile && isEnvironment);
+      const isEnv = facing.includes('environment')
+                 || label.includes('back')
+                 || label.includes('rear')
+                 || label.includes('environment');
 
-      // визуально зеркалим ПРЕВЬЮ только когда это основная камера на телефоне
-      if (window.__MIRROR_ENV) {
+      const isUserCam = facing.includes('user')
+                     || (!isEnv && (label.includes('front') || label.includes('selfie') || label.includes('user')));
+
+      // Итоговое правило: мобильная фронталка = зеркалим, остальное = нет
+      window.__MIRROR = Boolean(isMobile && isUserCam);
+
+      // Превью <video>
+      if (window.__MIRROR) {
         app.vid.classList.add('mirror-x');
       } else {
         app.vid.classList.remove('mirror-x');
@@ -153,9 +160,9 @@
 
     const { w, h } = updateGridSize();
 
-    // Рисуем кадр. Зеркалим ТОЛЬКО когда основная камера на телефоне.
+    // Рисуем кадр: зеркалим ТОЛЬКО фронталку на мобилках
     ctx.save();
-    if (window.__MIRROR_ENV) {
+    if (window.__MIRROR) {
       ctx.translate(w, 0);
       ctx.scale(-1, 1);
     }
@@ -316,13 +323,12 @@
     // Кнопка "Фронт/Тыл"
     app.ui.flip.addEventListener('click', async () => {
       if (isMobile) {
-        // Мобилки: реальный свитч камеры
         state.facing = state.facing === 'user' ? 'environment' : 'user';
         const s = app.vid.srcObject;
         if (s) s.getTracks().forEach(t => t.stop());
-        await startStream(); // MIRROR пересчитается внутри startStream()
+        await startStream(); // пересчитает window.__MIRROR и класс mirror-x
       } else {
-        // desktop — ничего не зеркалим
+        // desktop — без зеркала
       }
     });
 
