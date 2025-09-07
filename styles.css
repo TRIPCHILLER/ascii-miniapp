@@ -15,12 +15,11 @@ body.theme-dark{ background:#000; color:#fff; }
 .toolbar{
   display:flex; gap:8px; align-items:center;
   padding:10px; background:var(--ui-bg);
+  z-index:10;
 }
-.brand{ font-family:'Better VCR',sans-serif; letter-spacing:.06em; opacity:.9; }
-.spacer{ flex:1 1 auto; }
 .btn{
   background:transparent; color:var(--ui-text);
-  padding:.55rem 1rem; cursor:pointer; border:none; /* убрали рамки */
+  padding:.55rem 1rem; cursor:pointer; border:none;
   font-family:'Better VCR',sans-serif;
 }
 
@@ -35,7 +34,7 @@ body.theme-dark{ background:#000; color:#fff; }
   display:flex; gap:8px; align-items:center;
   background:var(--ui-panel);
   padding:6px 8px;
-  border:none; /* убрали рамки */
+  border:none;
 }
 .panel input[type="range"]{ width:160px; }
 .panel output{ min-width:42px; text-align:right; }
@@ -44,10 +43,10 @@ body.theme-dark{ background:#000; color:#fff; }
 /* ===== СЦЕНА/ВЫВОД ===== */
 .stage{
   flex:1; min-height:0; display:grid; place-items:center; overflow:hidden;
-  background:#000;  /* будет синхронизироваться с палитрой */
+  background:#000;  /* синхронизируется с палитрой */
 }
 
-/* Сам ASCII-блок: ТОЛЬКО моноширинные шрифты + CJK-mono */
+/* монопринт + CJK-mono стек */
 #out{
   margin:0;
   white-space:pre;
@@ -57,10 +56,15 @@ body.theme-dark{ background:#000; color:#fff; }
   font-size: 16px;
   color:#8ac7ff;
   background:#000;
-  border:none;           /* убрали белую рамку вокруг вывода */
+  border:none;           /* убрана белая рамка */
   max-width:100%;
   max-height:100%;
 }
+
+/* Fullscreen-профиль: скрываем UI, сцена на весь экран */
+body.fs .toolbar,
+body.fs .panel{ display:none !important; }
+body.fs .stage{ height:100vh; }
 
 /* мобильная кнопка зеркала */
 .mobile-only { display:none; }
@@ -68,7 +72,7 @@ body.theme-dark{ background:#000; color:#fff; }
   .mobile-only { display:inline-block; }
 }
 
-/* небольшая защита от «прыжков» при клавиатуре на мобилках */
+/* безопасная зона для iOS */
 @supports (padding: env(safe-area-inset-bottom)){
   .wrap{ padding-bottom: env(safe-area-inset-bottom); }
 }
