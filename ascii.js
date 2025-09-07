@@ -1,14 +1,19 @@
 (() => {
   // ============== УТИЛИТЫ ==============
   const $ = s => document.querySelector(s);
-  const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|Mobi/i.test(navigator.userAgent);
+
+  // Надёжнее определяем "мобильность" (Telegram WebView, iOS/Android, т.д.)
+  const isMobileUA =
+    /(Android|iPhone|iPad|iPod|Mobile|Mobi)/i.test(navigator.userAgent) ||
+    (navigator.userAgentData && navigator.userAgentData.mobile === true) ||
+    (('ontouchstart' in window) && Math.min(screen.width, screen.height) <= 1024);
 
   const app = {
     vid:  $('#vid'),
     out:  $('#out'),
     stage:$('#stage'),
     ui: {
-      flip:     $('#flip'),      // "Фронт/Тыл" на мобилках, "Развернуть" (зеркало) на ПК
+      flip:     $('#flip'),      // на мобилках — фронт/тыл; на ПК — "развернуть" (зеркало)
       toggle:   $('#toggle'),
       settings: $('#settings'),
       width:    $('#width'),
@@ -29,10 +34,15 @@
 
   // ============== СОСТОЯНИЕ ==============
   const state = {
-    // Мобилки: переключаем между 'user' и 'environment'
+    // Мобилки: переключаем между 'user' (фронт) и 'environment' (основная)
     facing: 'user',
-    // ПК: состояние зеркала управляется кнопкой "развернуть"
+
+    // ПК: состояние зеркала управляется кнопкой "развернуть".
+    // По умолчанию БЕЗ зеркала (как было раньше).
     mirrorDesktop: false,
+
+    // флажок-подсказка для рендера (ставится при старте камеры)
+    isMobileLikeStream: false,
 
     widthChars: 160,
     contrast: 1.15,
@@ -60,17 +70,27 @@
   // ============== КАМЕРА ==============
   async function startStream() {
     try {
-      const constraints = isMobile
+      const constraints = isMobileUA
         ? { video: { facingMode: state.facing } }
         : { video: true };
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       app.vid.srcObject = stream;
 
+      // Определяем, "мобильный" ли поток (на многих десктопах facingMode отсутствует)
+      const track    = stream.getVideoTracks()[0];
+      const settings = track && track.getSettings ? track.getSettings() : {};
+      const hasFacingMode = settings && Object.prototype.hasOwnProperty.call(settings, 'facingMode');
+
+      // Итог: любое "мобильное" окружение ИЛИ наличие facingMode считаем мобильным сценарием.
+      state.isMobileLikeStream = Boolean(isMobileUA || hasFacingMode);
+
       // ----- ПРАВИЛО ЗЕРКАЛА -----
-      // Мобилки: всегда зеркало (и превью, и ASCII) ДЛЯ ЛЮБОЙ камеры.
-      // ПК: зеркало определяется state.mirrorDesktop (кнопка "развернуть").
-      if (isMobile || state.mirrorDesktop) {
+      // Телефон: зеркалим ВСЕГДА (и фронталка, и основная).
+      // ПК: зеркалим только если включен state.mirrorDesktop (кнопкой).
+      const needMirrorPreview = state.isMobileLikeStream || state.mirrorDesktop;
+
+      if (needMirrorPreview) {
         app.vid.classList.add('mirror-x');
       } else {
         app.vid.classList.remove('mirror-x');
@@ -150,12 +170,10 @@
     const { w, h } = updateGridSize();
 
     // ----- Рисуем кадр с нужным зеркалом -----
-    // На телефоне ВСЕГДА зеркалим.
-    // На ПК — зеркалим, только если включено state.mirrorDesktop.
-    const needMirror = isMobile || state.mirrorDesktop;
+    const needMirrorRender = state.isMobileLikeStream || state.mirrorDesktop;
 
     ctx.save();
-    if (needMirror) {
+    if (needMirrorRender) {
       ctx.translate(w, 0);
       ctx.scale(-1, 1);
     }
@@ -265,7 +283,7 @@
   }
 
   async function enterFullscreen() {
-    if (isMobile) {
+    if (isMobileUA) {
       await requestFull();
       await lockLandscapeIfPossible();
     } else {
@@ -312,18 +330,17 @@
       }, 0);
     });
 
-    // Кнопка "Фронт/Тыл" на мобилках, "Развернуть" (зеркало) на ПК
+    // Кнопка:
+    // - мобилки: переключение фронт/тыл (зеркало остаётся включённым всегда)
+    // - ПК: "развернуть" (вкл/выкл зеркало)
     app.ui.flip.addEventListener('click', async () => {
-      if (isMobile) {
-        // Мобилки: просто переключаем камеру; зеркало включено всегда
+      if (isMobileUA) {
         state.facing = state.facing === 'user' ? 'environment' : 'user';
         const s = app.vid.srcObject;
         if (s) s.getTracks().forEach(t => t.stop());
-        await startStream();
+        await startStream(); // зеркало применится заново
       } else {
-        // ПК: переключаем состояние зеркала
         state.mirrorDesktop = !state.mirrorDesktop;
-        // обновим <video> класс под новое состояние
         if (state.mirrorDesktop) app.vid.classList.add('mirror-x');
         else app.vid.classList.remove('mirror-x');
       }
