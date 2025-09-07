@@ -7,6 +7,7 @@
     ui: {
       flip:     $('#flip'),
       toggle:   $('#toggle'),
+      fullscreen: $('#fullscreen'),
       settings: $('#settings'),
       width:    $('#width'),
       widthVal: $('#width_val'),
@@ -23,6 +24,7 @@
     }
   };
 
+  // значения по умолчанию
   const state = {
     facing: 'user',
     widthChars: 160,
@@ -33,9 +35,10 @@
     background: '#000000',
     charset: '@%#*+=-:. ',
     invert: true,
-    mirror: false
+    mirror: false       // ручное зеркало (кнопка ⇋)
   };
 
+  // готовые палитры
   const palettes = {
     macintosh:   { bg:"#333319", fg:"#e5ffff" },
     zenith:      { bg:"#3f291e", fg:"#fdca55" },
@@ -47,16 +50,20 @@
     matrix:      { bg:"#000000", fg:"#00ff40" },
   };
 
+  // offscreen
   const off = document.createElement('canvas');
   const ctx = off.getContext('2d', { willReadFrequently: true });
 
+  // измеритель метрик символа
   const measurePre = document.createElement('pre');
   measurePre.style.cssText = `
     position:absolute; left:-99999px; top:-99999px; margin:0;
-    white-space:pre; line-height:1ch; font-family: monospace !important;
+    white-space:pre; line-height:1ch;
+    font-family:"Cascadia Mono","Menlo","Consolas","Noto Sans Mono CJK JP","MS Gothic",monospace !important;
   `;
   document.body.appendChild(measurePre);
 
+  // ===== камера =====
   async function startStream() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -70,6 +77,7 @@
     }
   }
 
+  // ===== рендер =====
   let raf = null;
   let lastFrameTime = 0;
 
@@ -85,16 +93,21 @@
     app.ui.charset.value = state.charset;
     app.ui.invert.checked = state.invert;
 
-    app.out.style.color = state.color;
-    app.out.style.backgroundColor = state.background;
-    app.stage.style.backgroundColor = state.background;
+    applyColors(state.background, state.color);
+  }
+
+  function applyColors(bg, fg){
+    state.background = bg; state.color = fg;
+    app.out.style.backgroundColor = bg;
+    app.stage.style.backgroundColor = bg;
+    app.out.style.color = fg;
   }
 
   function updateGridSize() {
     const v = app.vid;
     if (!v.videoWidth || !v.videoHeight) return { w: state.widthChars, h: 1 };
 
-    const ratio = measureCharAspect();
+    const ratio = measureCharAspect(); // W/H одного символа
     const aspect = (v.videoHeight / v.videoWidth) / ratio;
 
     const w = Math.max(1, Math.round(state.widthChars));
@@ -110,9 +123,9 @@
     measurePre.style.fontSize = app.out.style.fontSize || '16px';
     const rect = measurePre.getBoundingClientRect();
     const lineH = rect.height / 2;
-    const chW = rect.width / 1;
+    const chW = rect.width; // ширина одной строки "M"
     const charRatio = lineH / chW;
-    return 1 / charRatio;
+    return 1 / charRatio; // W/H
   }
 
   function loop(ts) {
@@ -127,7 +140,10 @@
 
     const { w, h } = updateGridSize();
 
-    if (state.facing === 'environment' || state.mirror) {
+    // антизеркало для back-camera + ручное зеркало по кнопке
+    const needMirror = (state.facing === 'environment') || state.mirror;
+
+    if (needMirror) {
       ctx.save();
       ctx.scale(-1, 1);
       ctx.drawImage(v, -w, 0, w, h);
@@ -136,7 +152,7 @@
       ctx.drawImage(v, 0, 0, w, h);
     }
 
-    let data = ctx.getImageData(0, 0, w, h).data;
+    const data = ctx.getImageData(0, 0, w, h).data;
 
     const chars = state.charset;
     const n = chars.length - 1;
@@ -169,6 +185,7 @@
     refitFont(w, h);
   }
 
+  // авто-подгонка размера шрифта
   let refitLock = false;
   function refitFont(cols, rows) {
     if (refitLock) return;
@@ -198,6 +215,7 @@
     refitLock = false;
   }
 
+  // ===== UI =====
   function bindUI() {
     app.ui.toggle.addEventListener('click', () => {
       const hidden = app.ui.settings.hasAttribute('hidden');
@@ -214,6 +232,12 @@
       const s = app.vid.srcObject;
       if (s) s.getTracks().forEach(t => t.stop());
       await startStream();
+    });
+
+    app.ui.fullscreen.addEventListener('click', () => {
+      const el = document.documentElement;
+      if (!document.fullscreenElement) el.requestFullscreen?.();
+      else document.exitFullscreen?.();
     });
 
     app.ui.width.addEventListener('input', e => {
@@ -239,17 +263,14 @@
     app.ui.charset.addEventListener('change', e => {
       state.charset = e.target.value;
     });
+
     app.ui.invert.addEventListener('change', e => {
       state.invert = e.target.checked;
     });
 
     app.ui.palette.addEventListener('change', e => {
       const p = palettes[e.target.value];
-      state.background = p.bg;
-      state.color = p.fg;
-      app.out.style.backgroundColor = p.bg;
-      app.stage.style.backgroundColor = p.bg;
-      app.out.style.color = p.fg;
+      applyColors(p.bg, p.fg);
     });
 
     if (app.ui.mirrorBtn) {
