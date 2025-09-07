@@ -63,6 +63,24 @@
         video: { facingMode: state.facing }
       });
       app.vid.srcObject = stream;
+      // --- MIRROR: включаем зеркало для основной камеры на телефонах ---
+const track = stream.getVideoTracks && stream.getVideoTracks()[0];
+const settings = track && track.getSettings ? track.getSettings() : {};
+const isEnvironment = (settings.facingMode || '').includes('environment');
+
+// очень простая проверка "мобильности"
+const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+// флаг в глобальную область, чтобы использовать в рендере ASCII
+window.__MIRROR_ENV = Boolean(isMobile && isEnvironment);
+
+// визуально зеркалим ПРЕВЬЮ только когда это основная камера на телефоне
+if (window.__MIRROR_ENV) {
+  video.classList.add('mirror-x');
+} else {
+  video.classList.remove('mirror-x');
+}
+// --- /MIRROR ---
       await app.vid.play();
     } catch (e) {
       console.error('getUserMedia error', e);
@@ -140,7 +158,13 @@
     // Подготовка трансформа для зеркала
     // mirror = true ⇒ рисуем с scaleX(-1), чтобы получить НЕ-зеркальную картинку
     ctx.setTransform(state.mirror ? -1 : 1, 0, 0, 1, state.mirror ? w : 0, 0);
-    ctx.drawImage(v, 0, 0, w, h);
+ctx.save();
+if (window.__MIRROR_ENV) {
+  ctx.translate(w, 0);
+  ctx.scale(-1, 1);
+}
+ctx.drawImage(video, 0, 0, w, h);
+ctx.restore();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     const data = ctx.getImageData(0, 0, w, h).data;
@@ -384,3 +408,4 @@
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
