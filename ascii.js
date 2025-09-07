@@ -137,11 +137,16 @@
 
     const { w, h } = updateGridSize();
 
-    // Подготовка трансформа для зеркала
-    // mirror = true ⇒ рисуем с scaleX(-1), чтобы получить НЕ-зеркальную картинку
-    ctx.setTransform(state.mirror ? -1 : 1, 0, 0, 1, state.mirror ? w : 0, 0);
-    ctx.drawImage(v, 0, 0, w, h);
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+// Мобилка: переворачиваем ТОЛЬКО основную камеру (environment)
+// Десктоп: используем ручной переключатель state.mirror
+const flip =
+  isMobile
+    ? (state.facing === 'environment')
+    : state.mirror;
+
+ctx.setTransform(flip ? -1 : 1, 0, 0, 1, flip ? w : 0, 0);
+ctx.drawImage(v, 0, 0, w, h);
+ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     const data = ctx.getImageData(0, 0, w, h).data;
 
@@ -300,7 +305,7 @@
     });
 
     // Кнопка "Фронт/Тыл"
-    app.ui.flip.addEventListener('click', async () => {
+app.ui.flip.addEventListener('click', async () => {
   if (isMobile) {
     // Мобилка: реально меняем камеру между фронталкой и основной
     state.facing = (state.facing === 'user') ? 'environment' : 'user';
@@ -310,14 +315,13 @@
     if (s) s.getTracks().forEach(t => t.stop());
     await startStream();
 
-    // ВАЖНО: зеркалим ТОЛЬКО основную камеру
-    state.mirror = (state.facing === 'environment'); // true для основной, false для фронталки
+    // НИЧЕГО не трогаем с state.mirror — рендер сам поймёт по state.facing
   } else {
-    // Десктоп: кнопка «развернуть» просто включает/выключает зеркалирование
+    // Десктоп: кнопка «развернуть» включает/выключает зеркалирование вручную
     state.mirror = !state.mirror;
   }
 });
-
+    
     // Полноэкранный режим
     if (app.ui.fs) {
       app.ui.fs.addEventListener('click', () => {
@@ -375,9 +379,6 @@
     bindUI();
     await startStream();
 
-    // Стартуем сразу с НЕ-зеркального вида (нормальная ориентация по горизонтали)
-    state.mirror = true;
-
     if (raf) cancelAnimationFrame(raf);
     raf = requestAnimationFrame(loop);
 
@@ -387,4 +388,5 @@
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
