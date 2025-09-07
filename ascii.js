@@ -137,13 +137,6 @@
 
     const { w, h } = updateGridSize();
 
-// Мобилка: переворачиваем ТОЛЬКО основную камеру (environment)
-// Десктоп: используем ручной переключатель state.mirror
-const flip =
-  isMobile
-    ? (state.facing === 'environment')
-    : state.mirror;
-
 // Телефон: ВСЕГДА переворачиваем по горизонтали (и фронталка, и основная)
 // ПК: старое поведение — управляем через state.mirror
 const flip = isMobile ? true : state.mirror;
@@ -391,6 +384,7 @@ app.ui.flip.addEventListener('click', async () => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
