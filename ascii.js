@@ -137,13 +137,11 @@
 
     const { w, h } = updateGridSize();
 
-// Телефон: ВСЕГДА переворачиваем по горизонтали (и фронталка, и основная)
-// ПК: старое поведение — управляем через state.mirror
-const flip = isMobile ? true : state.mirror;
-
-ctx.setTransform(flip ? -1 : 1, 0, 0, 1, flip ? w : 0, 0);
-ctx.drawImage(v, 0, 0, w, h);
-ctx.setTransform(1, 0, 0, 1, 0, 0);
+    // Подготовка трансформа для зеркала
+    // mirror = true ⇒ рисуем с scaleX(-1), чтобы получить НЕ-зеркальную картинку
+    ctx.setTransform(state.mirror ? -1 : 1, 0, 0, 1, state.mirror ? w : 0, 0);
+    ctx.drawImage(v, 0, 0, w, h);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     const data = ctx.getImageData(0, 0, w, h).data;
 
@@ -302,22 +300,21 @@ ctx.setTransform(1, 0, 0, 1, 0, 0);
     });
 
     // Кнопка "Фронт/Тыл"
-app.ui.flip.addEventListener('click', async () => {
-  if (isMobile) {
-    // Мобилка: реально меняем камеру между фронталкой и основной
-    state.facing = (state.facing === 'user') ? 'environment' : 'user';
+    app.ui.flip.addEventListener('click', async () => {
+      if (isMobile) {
+        // Мобилки: реальный свитч камеры
+        state.facing = state.facing === 'user' ? 'environment' : 'user';
+        const s = app.vid.srcObject;
+        if (s) s.getTracks().forEach(t => t.stop());
+        await startStream();
+        // В мобильном режиме оставляем текущее "правильное" отображение
+        state.mirror = true;
+      } else {
+        // Десктоп: просто зеркалим/раззеркаливаем
+        state.mirror = !state.mirror;
+      }
+    });
 
-    // Останавливаем старые треки и запускаем новый стрим
-    const s = app.vid.srcObject;
-    if (s) s.getTracks().forEach(t => t.stop());
-    await startStream();
-    // НИЧЕГО не трогаем с state.mirror — рендер сам поймёт по state.facing
-  } else {
-    // Десктоп: кнопка «развернуть» включает/выключает зеркалирование вручную
-    state.mirror = !state.mirror;
-  }
-});
-    
     // Полноэкранный режим
     if (app.ui.fs) {
       app.ui.fs.addEventListener('click', () => {
@@ -375,6 +372,9 @@ app.ui.flip.addEventListener('click', async () => {
     bindUI();
     await startStream();
 
+    // Стартуем сразу с НЕ-зеркального вида (нормальная ориентация по горизонтали)
+    state.mirror = true;
+
     if (raf) cancelAnimationFrame(raf);
     raf = requestAnimationFrame(loop);
 
@@ -384,8 +384,3 @@ app.ui.flip.addEventListener('click', async () => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
-
-
-
-
-
