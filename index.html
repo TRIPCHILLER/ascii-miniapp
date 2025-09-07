@@ -3,19 +3,25 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>ASCII live · app</title>
+  <title>ASCII ⛶ VISOR</title>
+
+  <!-- фирменный шрифт только для UI -->
   <link rel="stylesheet" href="https://fonts.cdnfonts.com/css/better-vcr" />
-  <link rel="stylesheet" href="styles.css?v=fit1" />
+  <link rel="stylesheet" href="styles.css?v=32" />
 </head>
 <body class="theme-dark">
   <div class="wrap" id="app">
 
-<!-- Верхняя панель -->
-<div class="toolbar">
-  <button class="btn" id="flip">Развернуть</button>
-  <button class="btn" id="toggle">Настройки</button>
-  <button class="btn ghost" id="fs" aria-label="Fullscreen">Fullscreen</button>
-</div>
+    <!-- Верхняя панель -->
+    <div class="toolbar">
+      <div class="brand">: ASCII ⛶ VISOR :</div>
+      <div class="spacer"></div>
+      <button class="btn" id="flip">РАЗВЕРНУТЬ</button>
+      <button class="btn" id="toggle">НАСТРОЙКИ</button>
+      <button class="btn" id="fullscreen">FULLSCREEN</button>
+      <!-- зеркало показываем только на мобиле -->
+      <button class="btn mobile-only" id="mirrorBtn" title="Зеркало">⇋</button>
+    </div>
 
     <!-- Панель настроек (по умолчанию скрыта) -->
     <div class="panel" id="settings" hidden>
@@ -38,16 +44,6 @@
       </label>
 
       <label>
-        <span>Цвет</span>
-        <input id="fg" type="color" />
-      </label>
-
-      <label>
-        <span>Фон</span>
-        <input id="bg" type="color" />
-      </label>
-
-      <label>
         <span>FPS</span>
         <input id="fps" type="range" min="5" max="60" step="1" />
         <output id="fps_val"></output>
@@ -56,22 +52,33 @@
       <label>
         <span>Набор</span>
         <select id="charset">
-          <option value='@%#*+=-:. ' >Классический</option>
-          <option value=' 0123456789' >Только цифры</option>
-          <option value=' ABCDEFGHIJKLMNOPQRSTUVWXYZ' >Только буквы (A–Z)</option>
-          <option value=' aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyYzZ' >
-  Все буквы (a–z, A–Z)
-</option>
-          <option value=' アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン' >
-  カタカナ
-</option>
-<option value=' あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん' >
-  ひらがな
-</option>
-          <option value=' ····•○◦ '>. · • ○</option>
-          <option value=' ░▒▓█ ' >Блоки ░▒▓█</option>
+          <option value='@%#*+=-:. ' selected>Классический</option>
+          <option value='0123456789'>Только цифры</option>
+          <option value='ABCDEFGHIJKLMNOPQRSTUVWXYZ'>Только буквы (A–Z)</option>
+          <!-- Точки/штрихи только ASCII — не ломают сетку -->
+          <option value=' .`^,:;-_~'>Точки (моно)</option>
+          <option value='░▒▓█ '>Блоки ░▒▓█</option>
+          <!-- Halfwidth Katakana U+FF61–FF9F (моноширина) -->
+          <option value=' ･｡ｰｦｧｨｩｪｫｬｭｮｯｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ'>
+            Katakana (half-width)
+          </option>
         </select>
       </label>
+
+      <label>
+        <span>Палитра</span>
+        <select id="palette">
+          <option value="macintosh">Macintosh</option>
+          <option value="zenith">Zenith ZVM 1240</option>
+          <option value="ibm8503">IBM 8503</option>
+          <option value="commodore">Commodore 1084</option>
+          <option value="obra">Obra Dinn</option>
+          <option value="oldlcd">Old LCD</option>
+          <option value="ibm5151">IBM 5151</option>
+          <option value="matrix">Matrix</option>
+        </select>
+      </label>
+
       <label class="check">
         <input id="invert" type="checkbox" />
         <span>Инверсия</span>
@@ -83,17 +90,10 @@
       <pre id="out"></pre>
     </div>
 
-    <!-- Скрытое видео (источник камеры) -->
+    <!-- Видео (источник камеры) -->
     <video id="vid" playsinline autoplay muted hidden></video>
   </div>
 
-  <script defer src="ascii.js?v=fit1"></script>
+  <script defer src="ascii.js?v=32"></script>
 </body>
 </html>
-
-
-
-
-
-
-
