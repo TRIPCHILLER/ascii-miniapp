@@ -3,10 +3,9 @@
 html,body{ height:100%; margin:0; }
 body.theme-dark{ background:#000; color:#fff; }
 
-/* mono UI */
 :root{
-  --ui-bg:#151515;
-  --ui-panel:#1b1b1b;
+  --ui-bg:#151515;     /* тулбар/фон панели */
+  --ui-panel:#1b1b1b;  /* карточки внутри панели */
   --ui-text:#ffffff;
 }
 
@@ -18,30 +17,21 @@ body.theme-dark{ background:#000; color:#fff; }
   padding:10px; background:var(--ui-bg);
 }
 
-/* ===== КНОПКИ (полный ресет под прозрачность) ===== */
+/* ===== КНОПКИ — полностью прозрачные ===== */
 button, .btn, input[type="button"], input[type="submit"]{
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  background: transparent !important;
-  background-image: none !important;
-  color: var(--ui-text);
-  border: 0 !important;
-  outline: none !important;
-  box-shadow: none !important;
-  padding:.55rem 1rem;
-  border-radius:0;
-  cursor:pointer;
-  -webkit-tap-highlight-color: transparent;
+  appearance:none; -webkit-appearance:none; -moz-appearance:none;
+  background:transparent !important;
+  background-image:none !important;
+  color:var(--ui-text);
+  border:0 !important; outline:none !important; box-shadow:none !important;
+  padding:.55rem 1rem; border-radius:0; cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
 }
-/* никакого псевдо-объёма на ховерах/активах/фокусах */
 button:hover, .btn:hover,
 button:active, .btn:active,
 button:focus, .btn:focus{
-  background: transparent !important;
-  border: 0 !important;
-  outline: none !important;
-  box-shadow: none !important;
+  background:transparent !important;
+  border:0 !important; outline:none !important; box-shadow:none !important;
 }
 
 /* ===== ПАНЕЛЬ ===== */
@@ -58,73 +48,91 @@ button:focus, .btn:focus{
 .panel input[type="range"]{ width:160px; }
 .panel output{ min-width:42px; text-align:right; }
 
-/* чекбокс компактный */
+/* компактный чекбокс */
 .check{ display:flex; align-items:center; gap:8px; padding:6px 8px; }
 
 /* ===== СЦЕНА/ВЫВОД ===== */
 .stage{
   flex:1; min-height:0; display:grid; place-items:center; overflow:hidden;
-  background:#000; /* цвет сцены JS меняет под цвет ASCII */
-}
-
-/* Сам ASCII-блок */
-#out{
-  margin:0;
-  white-space:pre;
-  user-select:none;
-  font-family: ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
-  line-height: 1ch; /* «кадровые» единицы */
-  font-size: 16px;  /* JS пересчитывает */
-  color:#8ac7ff;
   background:#000;
-  border-radius:0;
-  max-width:100%;
-  max-height:100%;
+}
+#out{
+  margin:0; white-space:pre; user-select:none;
+  font-family: ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
+  line-height:1ch; font-size:16px;
+  color:#8ac7ff; background:#000;
+  border-radius:0; max-width:100%; max-height:100%;
 }
 
-/* УБИРАЕМ РАМКИ ИЗ ВСЕГО ФОРМ-UI */
-input, select, textarea{
-  appearance:none;
+/* ===== RANGE (ползунки) — белый тонкий трек, квадратный белый бегунок ===== */
+input[type="range"]{
+  appearance:none; -webkit-appearance:none; -moz-appearance:none;
+  background:transparent; height:18px;
+  margin:0; padding:0;
+}
+/* WebKit */
+input[type="range"]::-webkit-slider-runnable-track{
+  height:2px; background:#fff; border:none; box-shadow:none;
+}
+input[type="range"]::-webkit-slider-thumb{
   -webkit-appearance:none;
-  -moz-appearance:none;
-  background: transparent;
-  border:0 !important;
-  outline:none !important;
-  box-shadow:none !important;
+  width:16px; height:16px; background:#fff;
+  border:none; border-radius:0; margin-top:-7px; box-shadow:none;
 }
-select{
-  background-image:none !important;
+/* Firefox */
+input[type="range"]::-moz-range-track{
+  height:2px; background:#fff; border:none;
 }
+input[type="range"]::-moz-range-thumb{
+  width:16px; height:16px; background:#fff;
+  border:none; border-radius:0; box-shadow:none;
+}
+/* MS Edge (old) */
+input[type="range"]::-ms-track{
+  height:2px; background:transparent; border-color:transparent; color:transparent;
+}
+input[type="range"]::-ms-fill-lower,
+input[type="range"]::-ms-fill-upper{
+  background:#fff; border:none;
+}
+input[type="range"]::-ms-thumb{
+  width:16px; height:16px; background:#fff;
+  border:none; border-radius:0; margin-top:0; box-shadow:none;
+}
+
+/* ===== SELECT/INPUT — без рамок/заливок, белый текст ===== */
+input, select, textarea{
+  appearance:none; -webkit-appearance:none; -moz-appearance:none;
+  background:transparent; color:var(--ui-text);
+  border:0 !important; outline:none !important; box-shadow:none !important;
+}
+select{ background:transparent; color:var(--ui-text); }
+option{ background:var(--ui-panel); color:var(--ui-text); }
 
 /* небольшая защита от «прыжков» при клавиатуре на мобилках */
 @supports (padding: env(safe-area-inset-bottom)){
   .wrap{ padding-bottom: env(safe-area-inset-bottom); }
 }
 
-/* === Фирменный шрифт для интерфейса === */
+/* === Шрифт интерфейса === */
 body, .toolbar, .panel, .btn, label, output, select, option {
   font-family: 'Better VCR', sans-serif;
 }
 
 /* ===== FULLSCREEN ===== */
 :fullscreen .toolbar,
-:fullscreen .panel { display: none !important; }
+:fullscreen .panel { display:none !important; }
 
 .body-fullscreen .toolbar,
-.body-fullscreen .panel { display: none !important; }
+.body-fullscreen .panel { display:none !important; }
 
 .fs-exit {
-  position: fixed;
-  top: 10px; right: 10px;
-  width: 36px; height: 36px;
+  position:fixed; top:10px; right:10px; width:36px; height:36px;
   display:flex; align-items:center; justify-content:center;
-  background: rgba(0,0,0,.6);
-  color: var(--ui-text);
-  cursor:pointer; z-index: 9999;
-  user-select: none;
+  background:rgba(0,0,0,.6);
+  color:var(--ui-text);
+  cursor:pointer; z-index:9999; user-select:none;
 }
-.fs-exit::after { content: "⤢"; font-size: 18px; line-height: 1; }
+.fs-exit::after { content:"⤢"; font-size:18px; line-height:1; }
 
-.body-fullscreen .stage {
-  width: 100vw; height: 100vh;
-}
+.body-fullscreen .stage { width:100vw; height:100vh; }
