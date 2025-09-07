@@ -24,9 +24,9 @@
     }
   };
 
-  // значения по умолчанию
+  // состояние
   const state = {
-    facing: 'user',
+    facing: 'user',          // 'user' | 'environment'
     widthChars: 160,
     contrast: 1.15,
     gamma: 1.20,
@@ -35,10 +35,10 @@
     background: '#000000',
     charset: '@%#*+=-:. ',
     invert: true,
-    mirror: false       // ручное зеркало (кнопка ⇋)
+    mirror: false            // ручной переключатель ⇋ (XOR с базовой логикой)
   };
 
-  // готовые палитры
+  // палитры
   const palettes = {
     macintosh:   { bg:"#333319", fg:"#e5ffff" },
     zenith:      { bg:"#3f291e", fg:"#fdca55" },
@@ -92,7 +92,6 @@
     app.ui.fpsVal.textContent = state.fps;
     app.ui.charset.value = state.charset;
     app.ui.invert.checked = state.invert;
-
     applyColors(state.background, state.color);
   }
 
@@ -123,7 +122,7 @@
     measurePre.style.fontSize = app.out.style.fontSize || '16px';
     const rect = measurePre.getBoundingClientRect();
     const lineH = rect.height / 2;
-    const chW = rect.width; // ширина одной строки "M"
+    const chW = rect.width; // ширина строки "M"
     const charRatio = lineH / chW;
     return 1 / charRatio; // W/H
   }
@@ -140,8 +139,10 @@
 
     const { w, h } = updateGridSize();
 
-    // антизеркало для back-camera + ручное зеркало по кнопке
-    const needMirror = (state.facing === 'environment') || state.mirror;
+    // Базовая логика: back-camera (environment) зеркалим ПО УМОЛЧАНИЮ.
+    // Кнопка ⇋ делает XOR — меняет состояние и для front, и для back.
+    let needMirror = (state.facing === 'environment');
+    if (state.mirror) needMirror = !needMirror;
 
     if (needMirror) {
       ctx.save();
@@ -229,15 +230,33 @@
 
     app.ui.flip.addEventListener('click', async () => {
       state.facing = state.facing === 'user' ? 'environment' : 'user';
+      // при смене камеры сбрасывать ручной переключатель не будем
       const s = app.vid.srcObject;
       if (s) s.getTracks().forEach(t => t.stop());
       await startStream();
     });
 
-    app.ui.fullscreen.addEventListener('click', () => {
-      const el = document.documentElement;
-      if (!document.fullscreenElement) el.requestFullscreen?.();
-      else document.exitFullscreen?.();
+    // Классический fullscreen: скрываем UI и разворачиваем сцену
+    app.ui.fullscreen.addEventListener('click', async () => {
+      if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+        document.body.classList.add('fs');
+        const el = document.documentElement; // на весь документ — надёжнее на мобилах
+        if (el.requestFullscreen) await el.requestFullscreen();
+        else if (el.webkitRequestFullscreen) await el.webkitRequestFullscreen();
+      } else {
+        document.body.classList.remove('fs');
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else if (document.webkitExitFullscreen) await document.webkitExitFullscreen();
+      }
+    });
+
+    // держим CSS-состояние в sync, если юзер вышел ESC-ом
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement) document.body.classList.remove('fs');
+    });
+    document.addEventListener('webkitfullscreenchange', () => {
+      const active = document.webkitFullscreenElement != null;
+      if (!active) document.body.classList.remove('fs');
     });
 
     app.ui.width.addEventListener('input', e => {
@@ -275,7 +294,7 @@
 
     if (app.ui.mirrorBtn) {
       app.ui.mirrorBtn.addEventListener('click', () => {
-        state.mirror = !state.mirror;
+        state.mirror = !state.mirror;  // XOR с базовым поведением
       });
     }
 
