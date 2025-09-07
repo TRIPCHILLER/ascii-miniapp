@@ -1,7 +1,7 @@
 (() => {
   // ============== УТИЛИТЫ ==============
   const $ = s => document.querySelector(s);
-  const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
+  const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|Mobi/i.test(navigator.userAgent);
 
   const app = {
     vid:  $('#vid'),
@@ -28,11 +28,8 @@
   };
 
   // Значения по умолчанию
-  // ВАЖНО: mirror = true означает "НЕ-зеркальная картинка" (мы инвертируем стандартный селфи-вид).
-  // Это даёт "оригинальное" восприятие, как ты просил — стартуем сразу с правильным горизонтальным отражением.
   const state = {
-    facing: 'user',         // какая камера для мобилок
-    mirror: true,           // режим рисования: true = отразить по X (НЕ-зеркало)
+    facing: 'user',         // стартуем с фронталки; при переключении на environment включится зеркало
     widthChars: 160,
     contrast: 1.15,
     gamma: 1.20,
@@ -41,7 +38,7 @@
     background: '#000000',
     charset: '@%#*+=-:. ',
     invert: true,
-    isFullscreen: false,    // наш флаг
+    isFullscreen: false,
   };
 
   // Вспомогательные канвасы
@@ -63,24 +60,25 @@
         video: { facingMode: state.facing }
       });
       app.vid.srcObject = stream;
+
       // --- MIRROR: включаем зеркало для основной камеры на телефонах ---
-const track = stream.getVideoTracks && stream.getVideoTracks()[0];
-const settings = track && track.getSettings ? track.getSettings() : {};
-const isEnvironment = (settings.facingMode || '').includes('environment');
+      const track = stream.getVideoTracks && stream.getVideoTracks()[0];
+      const settings = track && track.getSettings ? track.getSettings() : {};
+      const facing = (settings.facingMode || '').toLowerCase();
+      const byLabel = (track && track.label ? track.label.toLowerCase() : '');
+      const isEnvironment = facing.includes('environment') || byLabel.includes('back') || byLabel.includes('rear');
 
-// очень простая проверка "мобильности"
-const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      // флаг в глобальную область
+      window.__MIRROR_ENV = Boolean(isMobile && isEnvironment);
 
-// флаг в глобальную область, чтобы использовать в рендере ASCII
-window.__MIRROR_ENV = Boolean(isMobile && isEnvironment);
+      // визуально зеркалим ПРЕВЬЮ только когда это основная камера на телефоне
+      if (window.__MIRROR_ENV) {
+        app.vid.classList.add('mirror-x');
+      } else {
+        app.vid.classList.remove('mirror-x');
+      }
+      // --- /MIRROR ---
 
-// визуально зеркалим ПРЕВЬЮ только когда это основная камера на телефоне
-if (window.__MIRROR_ENV) {
-  video.classList.add('mirror-x');
-} else {
-  video.classList.remove('mirror-x');
-}
-// --- /MIRROR ---
       await app.vid.play();
     } catch (e) {
       console.error('getUserMedia error', e);
@@ -155,17 +153,14 @@ if (window.__MIRROR_ENV) {
 
     const { w, h } = updateGridSize();
 
-    // Подготовка трансформа для зеркала
-    // mirror = true ⇒ рисуем с scaleX(-1), чтобы получить НЕ-зеркальную картинку
-    ctx.setTransform(state.mirror ? -1 : 1, 0, 0, 1, state.mirror ? w : 0, 0);
-ctx.save();
-if (window.__MIRROR_ENV) {
-  ctx.translate(w, 0);
-  ctx.scale(-1, 1);
-}
-ctx.drawImage(video, 0, 0, w, h);
-ctx.restore();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    // Рисуем кадр. Зеркалим ТОЛЬКО когда основная камера на телефоне.
+    ctx.save();
+    if (window.__MIRROR_ENV) {
+      ctx.translate(w, 0);
+      ctx.scale(-1, 1);
+    }
+    ctx.drawImage(app.vid, 0, 0, w, h);
+    ctx.restore();
 
     const data = ctx.getImageData(0, 0, w, h).data;
 
@@ -245,7 +240,7 @@ ctx.restore();
       else if (app.stage.webkitRequestFullscreen) await app.stage.webkitRequestFullscreen();
       state.isFullscreen = true;
     } catch(e) {
-      // игнорируем — пойдём фолбэком
+      // игнорируем
     }
   }
 
@@ -254,11 +249,9 @@ ctx.restore();
       if (screen.orientation && screen.orientation.lock) {
         await screen.orientation.lock('landscape');
       } else {
-        // iOS / старые браузеры — фолбэк: дадим хотя бы чистый экран
         document.body.classList.add('body-fullscreen');
       }
     } catch(e) {
-      // если запретили — фолбэк
       document.body.classList.add('body-fullscreen');
     }
   }
@@ -274,11 +267,9 @@ ctx.restore();
 
   async function enterFullscreen() {
     if (isMobile) {
-      // мобилки: fullscreen + ландшафт
       await requestFull();
       await lockLandscapeIfPossible();
     } else {
-      // десктоп: чистый fullscreen
       await requestFull();
     }
     createExitButton();
@@ -304,7 +295,6 @@ ctx.restore();
     const active = inNativeFullscreen();
     state.isFullscreen = active;
     if (!active) {
-      // вышли из nat FS — подчистим фолбэк
       document.body.classList.remove('body-fullscreen');
       if (exitBtn) { exitBtn.remove(); exitBtn = null; }
     }
@@ -330,12 +320,9 @@ ctx.restore();
         state.facing = state.facing === 'user' ? 'environment' : 'user';
         const s = app.vid.srcObject;
         if (s) s.getTracks().forEach(t => t.stop());
-        await startStream();
-        // В мобильном режиме оставляем текущее "правильное" отображение
-        state.mirror = true;
+        await startStream(); // MIRROR пересчитается внутри startStream()
       } else {
-        // Десктоп: просто зеркалим/раззеркаливаем
-        state.mirror = !state.mirror;
+        // desktop — ничего не зеркалим
       }
     });
 
@@ -396,9 +383,6 @@ ctx.restore();
     bindUI();
     await startStream();
 
-    // Стартуем сразу с НЕ-зеркального вида (нормальная ориентация по горизонтали)
-    state.mirror = true;
-
     if (raf) cancelAnimationFrame(raf);
     raf = requestAnimationFrame(loop);
 
@@ -408,4 +392,3 @@ ctx.restore();
 
   document.addEventListener('DOMContentLoaded', init);
 })();
-
