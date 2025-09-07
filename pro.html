@@ -2,7 +2,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>ASCII live · pro</title>
-<link rel="stylesheet" href="styles.css?v=16">
+<link rel="stylesheet" href="styles.css?v=15">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="consent.js" defer></script>
 </head>
@@ -24,12 +24,9 @@
     <label>Набор
       <select id="preset">
         <option value="classic">Классический</option>
-        <option value="digits">Цифры</option>
-        <option value="letters">Буквы A–Z</option>
-        <option value="allLetters">Все буквы a–z, A–Z</option>
-        <option value="katakana">カタカナ</option>
-        <option value="hiragana">ひらがな</option>
-        <option value="dots">Точки</option>
+        <option value="digits">Только цифры</option>
+        <option value="letters">Только буквы</option>
+        <option value="dots">Точки/тонкий</option>
         <option value="blocks">Блоки ░▒▓█</option>
         <option value="custom">Свой…</option>
       </select>
@@ -38,6 +35,7 @@
     <label><input id="invert" type="checkbox" checked> Инверсия</label>
   </div>
 
+  <!-- фиксированная рамка вывода, забирает весь остаток окна -->
   <div class="stage"><pre id="out"></pre></div>
 </div>
 
@@ -50,28 +48,36 @@
 </div>
 
 <script type="module">
-import { AsciiApp, wireFullscreen, CHARSETS } from './ascii.js';
+import { AsciiApp, wireFullscreen } from './ascii.js';
 if (window.Telegram?.WebApp) { Telegram.WebApp.ready(); Telegram.WebApp.expand(); }
 
 const $ = id => document.getElementById(id);
 const ui = { out:$('out'), flip:$('flip'), fs:$('fs'), toolbar:$('toolbar') };
 const app = new AsciiApp(ui.out);
 
+function presetRamp(name){
+  switch(name){
+    case 'digits':  return ' 00112233445566778899';
+    case 'letters': return '  iIl1tTjfJrRvxXcCuUnNzZmwWQO';
+    case 'dots':    return " .'`^,:;-_~";
+    case 'blocks':  return ' ░▒▓█';
+    case 'classic':
+    default:        return " .'`\",:;Il!i~+_-?][}{1tfjrxnuvczXYUJCLQ0089@#";
+  }
+}
 function apply(){
   $('wv').textContent = $('w').value;
   $('cv').textContent = (+$('contrast').value/100).toFixed(2);
   $('gv').textContent = (+$('gamma').value/100).toFixed(2);
   $('fpsv').textContent = $('fps').value;
 
-  let preset = $('preset').value;
-  let ramp = CHARSETS[preset] || CHARSETS.classic;
-  if (preset === 'custom'){
+  let ramp = presetRamp($('preset').value);
+  if ($('preset').value === 'custom'){
     $('ramp').style.display = 'inline-block';
-    if ($('ramp').value.trim()) ramp = $('ramp').value;
+    ramp = $('ramp').value || ramp;
   } else {
     $('ramp').style.display = 'none';
   }
-
   app.setOptions({
     widthChars:+$('w').value,
     contrast:+$('contrast').value/100,
@@ -97,3 +103,4 @@ ui.flip.onclick = () => app.flip();
 wireFullscreen(ui.fs, ui.toolbar);
 </script>
 </body></html>
+
