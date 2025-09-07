@@ -3,11 +3,10 @@
 html,body{ height:100%; margin:0; }
 body.theme-dark{ background:#000; color:#fff; }
 
-/* mono UI + аккуратные контрастные кнопки */
+/* mono UI + аккуратные кнопки */
 :root{
   --ui-bg:#151515;
   --ui-panel:#1b1b1b;
-  --ui-border:#ffffff;
   --ui-text:#ffffff;
 }
 
@@ -17,24 +16,21 @@ body.theme-dark{ background:#000; color:#fff; }
 .toolbar{
   display:flex; gap:8px; align-items:center;
   padding:10px; background:var(--ui-bg);
-  border-bottom:1px solid var(--ui-border);
 }
 .btn{
   background:transparent; color:var(--ui-text);
-  border:1px solid var(--ui-border);
   padding:.55rem 1rem; border-radius:0; cursor:pointer;
 }
 
 /* ===== ПАНЕЛЬ ===== */
 .panel{
   display:flex; flex-wrap:wrap; gap:12px; padding:8px;
-  background:var(--ui-bg); border-bottom:1px solid var(--ui-border);
+  background:var(--ui-bg);
 }
 .panel[hidden]{ display:none !important; }
 .panel label{
   display:flex; gap:8px; align-items:center;
   background:var(--ui-panel);
-  border:1px solid var(--ui-border);
   padding:6px 8px; border-radius:0;
 }
 .panel input[type="range"]{ width:160px; }
@@ -46,8 +42,7 @@ body.theme-dark{ background:#000; color:#fff; }
 /* ===== СЦЕНА/ВЫВОД ===== */
 .stage{
   flex:1; min-height:0; display:grid; place-items:center; overflow:hidden;
-  /* ВАЖНО: цвет сцены мы будем менять из JS (под цвет фона ASCII) */
-  background:#000;
+  background:#000; /* цвет сцены JS меняет под цвет ASCII */
 }
 
 /* Сам ASCII-блок */
@@ -56,13 +51,10 @@ body.theme-dark{ background:#000; color:#fff; }
   white-space:pre;
   user-select:none;
   font-family: ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
-  /* ВАЖНО: высота строки в «кадровых» единицах */
-  line-height: 1ch;
-  /* Размер шрифта вычисляет JS (чтобы блок всегда влезал) */
-  font-size: 16px;
+  line-height: 1ch; /* «кадровые» единицы */
+  font-size: 16px;  /* JS пересчитывает */
   color:#8ac7ff;
   background:#000;
-  border:1px solid var(--ui-border);
   border-radius:0;
   max-width:100%;
   max-height:100%;
@@ -82,7 +74,6 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 :fullscreen .toolbar,
 :fullscreen .panel { display: none !important; }
 
-/* когда мы сами прячем UI (например, iOS без настоящего fullscreen) */
 .body-fullscreen .toolbar,
 .body-fullscreen .panel { display: none !important; }
 
@@ -91,17 +82,13 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   top: 10px; right: 10px;
   width: 36px; height: 36px;
   display:flex; align-items:center; justify-content:center;
-  border:1px solid var(--ui-border);
   background: rgba(0,0,0,.6);
   color: var(--ui-text);
   cursor:pointer; z-index: 9999;
   user-select: none;
 }
-
-/* простой «иконкой» будет символ ⤢ */
 .fs-exit::after { content: "⤢"; font-size: 18px; line-height: 1; }
 
-/* фолбэк-поворот сцены на мобилках, если lock() не доступен */
 .body-fullscreen .stage {
   width: 100vw; height: 100vh;
 }
