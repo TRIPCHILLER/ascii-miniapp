@@ -301,19 +301,22 @@
 
     // Кнопка "Фронт/Тыл"
     app.ui.flip.addEventListener('click', async () => {
-      if (isMobile) {
-        // Мобилки: реальный свитч камеры
-        state.facing = state.facing === 'user' ? 'environment' : 'user';
-        const s = app.vid.srcObject;
-        if (s) s.getTracks().forEach(t => t.stop());
-        await startStream();
-        // В мобильном режиме оставляем текущее "правильное" отображение
-        state.mirror = true;
-      } else {
-        // Десктоп: просто зеркалим/раззеркаливаем
-        state.mirror = !state.mirror;
-      }
-    });
+  if (isMobile) {
+    // Мобилка: реально меняем камеру между фронталкой и основной
+    state.facing = (state.facing === 'user') ? 'environment' : 'user';
+
+    // Останавливаем старые треки и запускаем новый стрим
+    const s = app.vid.srcObject;
+    if (s) s.getTracks().forEach(t => t.stop());
+    await startStream();
+
+    // ВАЖНО: зеркалим ТОЛЬКО основную камеру
+    state.mirror = (state.facing === 'environment'); // true для основной, false для фронталки
+  } else {
+    // Десктоп: кнопка «развернуть» просто включает/выключает зеркалирование
+    state.mirror = !state.mirror;
+  }
+});
 
     // Полноэкранный режим
     if (app.ui.fs) {
@@ -384,3 +387,4 @@
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
