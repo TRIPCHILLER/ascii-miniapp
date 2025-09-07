@@ -1,3 +1,4 @@
+/* ===== БАЗА ===== */
 * { box-sizing: border-box; }
 html,body{ height:100%; margin:0; }
 body.theme-dark{ background:#000; color:#fff; }
@@ -15,16 +16,19 @@ body.theme-dark{ background:#000; color:#fff; }
   display:flex; gap:8px; align-items:center;
   padding:10px; background:var(--ui-bg);
 }
+.brand{ font-family:'Better VCR',sans-serif; letter-spacing:.06em; opacity:.9; }
+.spacer{ flex:1 1 auto; }
 .btn{
   background:transparent; color:var(--ui-text);
-  padding:.55rem 1rem; cursor:pointer;
-  border:none; /* убрали рамки */
+  padding:.55rem 1rem; cursor:pointer; border:none; /* убрали рамки */
+  font-family:'Better VCR',sans-serif;
 }
 
 /* ===== ПАНЕЛЬ ===== */
 .panel{
   display:flex; flex-wrap:wrap; gap:12px; padding:8px;
   background:var(--ui-bg);
+  font-family:'Better VCR',sans-serif;
 }
 .panel[hidden]{ display:none !important; }
 .panel label{
@@ -35,30 +39,36 @@ body.theme-dark{ background:#000; color:#fff; }
 }
 .panel input[type="range"]{ width:160px; }
 .panel output{ min-width:42px; text-align:right; }
-
 .check{ display:flex; align-items:center; gap:8px; padding:6px 8px; }
 
 /* ===== СЦЕНА/ВЫВОД ===== */
 .stage{
   flex:1; min-height:0; display:grid; place-items:center; overflow:hidden;
-  background:#000;
+  background:#000;  /* будет синхронизироваться с палитрой */
 }
 
+/* Сам ASCII-блок: ТОЛЬКО моноширинные шрифты + CJK-mono */
 #out{
   margin:0;
   white-space:pre;
   user-select:none;
-  font-family: monospace !important;
+  font-family:"Cascadia Mono","Menlo","Consolas","Noto Sans Mono CJK JP","MS Gothic",monospace !important;
   line-height: 1ch;
   font-size: 16px;
   color:#8ac7ff;
   background:#000;
-  border:none; /* убрали рамку */
+  border:none;           /* убрали белую рамку вокруг вывода */
   max-width:100%;
   max-height:100%;
 }
 
+/* мобильная кнопка зеркала */
 .mobile-only { display:none; }
 @media (max-width: 768px) {
   .mobile-only { display:inline-block; }
+}
+
+/* небольшая защита от «прыжков» при клавиатуре на мобилках */
+@supports (padding: env(safe-area-inset-bottom)){
+  .wrap{ padding-bottom: env(safe-area-inset-bottom); }
 }
