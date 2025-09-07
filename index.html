@@ -7,19 +7,17 @@
 
   <!-- фирменный шрифт только для UI -->
   <link rel="stylesheet" href="https://fonts.cdnfonts.com/css/better-vcr" />
-  <link rel="stylesheet" href="styles.css?v=32" />
+  <link rel="stylesheet" href="styles.css?v=33" />
 </head>
 <body class="theme-dark">
   <div class="wrap" id="app">
 
     <!-- Верхняя панель -->
     <div class="toolbar">
-      <div class="brand">: ASCII ⛶ VISOR :</div>
-      <div class="spacer"></div>
-      <button class="btn" id="flip">РАЗВЕРНУТЬ</button>
-      <button class="btn" id="toggle">НАСТРОЙКИ</button>
-      <button class="btn" id="fullscreen">FULLSCREEN</button>
-      <!-- зеркало показываем только на мобиле -->
+      <button class="btn" id="flip">Фронт/Тыл</button>
+      <button class="btn" id="toggle">Настройки</button>
+      <button class="btn" id="fullscreen">Fullscreen</button>
+      <!-- кнопка зеркала показываем только на мобиле -->
       <button class="btn mobile-only" id="mirrorBtn" title="Зеркало">⇋</button>
     </div>
 
@@ -55,10 +53,10 @@
           <option value='@%#*+=-:. ' selected>Классический</option>
           <option value='0123456789'>Только цифры</option>
           <option value='ABCDEFGHIJKLMNOPQRSTUVWXYZ'>Только буквы (A–Z)</option>
-          <!-- Точки/штрихи только ASCII — не ломают сетку -->
+          <!-- Точки/штрихи только ASCII — моноширинные -->
           <option value=' .`^,:;-_~'>Точки (моно)</option>
           <option value='░▒▓█ '>Блоки ░▒▓█</option>
-          <!-- Halfwidth Katakana U+FF61–FF9F (моноширина) -->
+          <!-- Halfwidth Katakana U+FF61–FF9F (моноширина, сетку не ломает) -->
           <option value=' ･｡ｰｦｧｨｩｪｫｬｭｮｯｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ'>
             Katakana (half-width)
           </option>
@@ -94,6 +92,6 @@
     <video id="vid" playsinline autoplay muted hidden></video>
   </div>
 
-  <script defer src="ascii.js?v=32"></script>
+  <script defer src="ascii.js?v=33"></script>
 </body>
 </html>
