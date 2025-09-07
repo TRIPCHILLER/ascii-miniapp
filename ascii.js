@@ -144,6 +144,10 @@ const flip =
     ? (state.facing === 'environment')
     : state.mirror;
 
+// Телефон: ВСЕГДА переворачиваем по горизонтали (и фронталка, и основная)
+// ПК: старое поведение — управляем через state.mirror
+const flip = isMobile ? true : state.mirror;
+
 ctx.setTransform(flip ? -1 : 1, 0, 0, 1, flip ? w : 0, 0);
 ctx.drawImage(v, 0, 0, w, h);
 ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -387,6 +391,7 @@ app.ui.flip.addEventListener('click', async () => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
