@@ -4,9 +4,6 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>ASCII ⛶ VISOR</title>
-
-  <!-- фирменный шрифт только для UI -->
-  <link rel="stylesheet" href="https://fonts.cdnfonts.com/css/better-vcr" />
   <link rel="stylesheet" href="styles.css?v=33" />
 </head>
 <body class="theme-dark">
@@ -14,10 +11,9 @@
 
     <!-- Верхняя панель -->
     <div class="toolbar">
-      <button class="btn" id="flip">Фронт/Тыл</button>
+      <button class="btn" id="flip">Развернуть</button>
       <button class="btn" id="toggle">Настройки</button>
       <button class="btn" id="fullscreen">Fullscreen</button>
-      <!-- кнопка зеркала показываем только на мобиле -->
       <button class="btn mobile-only" id="mirrorBtn" title="Зеркало">⇋</button>
     </div>
 
@@ -53,27 +49,11 @@
           <option value='@%#*+=-:. ' selected>Классический</option>
           <option value='0123456789'>Только цифры</option>
           <option value='ABCDEFGHIJKLMNOPQRSTUVWXYZ'>Только буквы (A–Z)</option>
-          <!-- Точки/штрихи только ASCII — моноширинные -->
           <option value=' .`^,:;-_~'>Точки (моно)</option>
-          <option value='░▒▓█ '>Блоки ░▒▓█</option>
-          <!-- Halfwidth Katakana U+FF61–FF9F (моноширина, сетку не ломает) -->
+          <option value='░▒▓█ ' >Блоки ░▒▓█</option>
           <option value=' ･｡ｰｦｧｨｩｪｫｬｭｮｯｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ'>
             Katakana (half-width)
           </option>
-        </select>
-      </label>
-
-      <label>
-        <span>Палитра</span>
-        <select id="palette">
-          <option value="macintosh">Macintosh</option>
-          <option value="zenith">Zenith ZVM 1240</option>
-          <option value="ibm8503">IBM 8503</option>
-          <option value="commodore">Commodore 1084</option>
-          <option value="obra">Obra Dinn</option>
-          <option value="oldlcd">Old LCD</option>
-          <option value="ibm5151">IBM 5151</option>
-          <option value="matrix">Matrix</option>
         </select>
       </label>
 
