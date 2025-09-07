@@ -24,15 +24,15 @@
       charset:  $('#charset'),
       invert:   $('#invert'),
       fs:       $('#fs'),
+      mirror:   $('#mirror'),
     }
   };
 
   // Значения по умолчанию
-  // ВАЖНО: mirror = true означает "НЕ-зеркальная картинка" (мы инвертируем стандартный селфи-вид).
-  // Это даёт "оригинальное" восприятие, как ты просил — стартуем сразу с правильным горизонтальным отражением.
+  // mirror = true ⇒ рисуем с scaleX(-1)
   const state = {
-    facing: 'user',         // какая камера для мобилок
-    mirror: true,           // режим рисования: true = отразить по X (НЕ-зеркало)
+    facing: 'user',         // по умолчанию фронталка
+    mirror: true,           // для фронталки оставляем -1 (зеркало)
     widthChars: 160,
     contrast: 1.15,
     gamma: 1.20,
@@ -41,7 +41,7 @@
     background: '#000000',
     charset: '@%#*+=-:. ',
     invert: true,
-    isFullscreen: false,    // наш флаг
+    isFullscreen: false,
   };
 
   // Вспомогательные канвасы
@@ -64,6 +64,13 @@
       });
       app.vid.srcObject = stream;
       await app.vid.play();
+
+      // ЛОГИКА ЗЕРКАЛА ПО УМОЛЧАНИЮ ДЛЯ МОБИЛОК:
+      // - фронталка ('user'): зеркалим (mirror = true, scaleX(-1))
+      // - основная ('environment'): НЕ зеркалим (mirror = false, scaleX(1))
+      if (isMobile) {
+        state.mirror = (state.facing === 'user') ? true : false;
+      }
     } catch (e) {
       console.error('getUserMedia error', e);
       alert('Камера недоступна');
@@ -75,30 +82,25 @@
   let lastFrameTime = 0;
 
   function setUI() {
-    app.ui.width.value = state.widthChars;
-    app.ui.widthVal.textContent = state.widthChars;
-
-    app.ui.contrast.value = state.contrast;
-    app.ui.contrastVal.textContent = state.contrast.toFixed(2);
-
-    app.ui.gamma.value = state.gamma;
-    app.ui.gammaVal.textContent = state.gamma.toFixed(2);
-
-    app.ui.fps.value = state.fps;
-    app.ui.fpsVal.textContent = state.fps;
-
-    app.ui.fg.value = state.color;
-    app.ui.bg.value = state.background;
-
-    app.ui.charset.value = state.charset;
-    app.ui.invert.checked = state.invert;
+    if (app.ui.width)    { app.ui.width.value = state.widthChars; app.ui.widthVal.textContent = state.widthChars; }
+    if (app.ui.contrast) { app.ui.contrast.value = state.contrast; app.ui.contrastVal.textContent = state.contrast.toFixed(2); }
+    if (app.ui.gamma)    { app.ui.gamma.value = state.gamma; app.ui.gammaVal.textContent = state.gamma.toFixed(2); }
+    if (app.ui.fps)      { app.ui.fps.value = state.fps; app.ui.fpsVal.textContent = state.fps; }
+    if (app.ui.fg)       { app.ui.fg.value = state.color; }
+    if (app.ui.bg)       { app.ui.bg.value = state.background; }
+    if (app.ui.charset)  { app.ui.charset.value = state.charset; }
+    if (app.ui.invert)   { app.ui.invert.checked = state.invert; }
 
     app.out.style.color = state.color;
     app.out.style.backgroundColor = state.background;
     app.stage.style.backgroundColor = state.background;
+
+    // кнопка отзеркаливания видна только на мобилках
+    if (app.ui.mirror) {
+      app.ui.mirror.style.display = isMobile ? 'inline-block' : 'none';
+    }
   }
 
-  // Пересчёт h и подготовка offscreen размера
   function updateGridSize() {
     const v = app.vid;
     if (!v.videoWidth || !v.videoHeight) return { w: state.widthChars, h: 1 };
@@ -115,7 +117,7 @@
   }
 
   function measureCharAspect() {
-    measurePre.textContent = 'M\nM';
+    measurePre.textContent = 'M\\nM';
     measurePre.style.fontSize = app.out.style.fontSize || '16px';
     const rect = measurePre.getBoundingClientRect();
     const lineH = rect.height / 2;
@@ -127,7 +129,6 @@
   function loop(ts) {
     raf = requestAnimationFrame(loop);
 
-    // FPS-ограничитель
     const frameInterval = 1000 / state.fps;
     if (ts - lastFrameTime < frameInterval) return;
     lastFrameTime = ts;
@@ -137,15 +138,13 @@
 
     const { w, h } = updateGridSize();
 
-    // Подготовка трансформа для зеркала
-    // mirror = true ⇒ рисуем с scaleX(-1), чтобы получить НЕ-зеркальную картинку
+    // mirror = true ⇒ scaleX(-1)
     ctx.setTransform(state.mirror ? -1 : 1, 0, 0, 1, state.mirror ? w : 0, 0);
     ctx.drawImage(v, 0, 0, w, h);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     const data = ctx.getImageData(0, 0, w, h).data;
 
-    // Генерация ASCII
     const chars = state.charset;
     const n = chars.length - 1;
     const inv = state.invert ? -1 : 1;
@@ -171,7 +170,7 @@
         const idx = Math.round((Yc / 255) * n);
         line += chars[idx];
       }
-      out += line + '\n';
+      out += line + '\\n';
     }
 
     app.out.textContent = out;
@@ -187,7 +186,7 @@
     const stageW = app.stage.clientWidth;
     const stageH = app.stage.clientHeight;
 
-    measurePre.textContent = ('M'.repeat(cols) + '\n').repeat(rows);
+    measurePre.textContent = ('M'.repeat(cols) + '\\n').repeat(rows);
     const currentFS = parseFloat(getComputedStyle(app.out).fontSize) || 16;
     measurePre.style.fontSize = currentFS + 'px';
 
@@ -220,9 +219,7 @@
       if (app.stage.requestFullscreen) await app.stage.requestFullscreen();
       else if (app.stage.webkitRequestFullscreen) await app.stage.webkitRequestFullscreen();
       state.isFullscreen = true;
-    } catch(e) {
-      // игнорируем — пойдём фолбэком
-    }
+    } catch(e) {}
   }
 
   async function lockLandscapeIfPossible() {
@@ -230,11 +227,9 @@
       if (screen.orientation && screen.orientation.lock) {
         await screen.orientation.lock('landscape');
       } else {
-        // iOS / старые браузеры — фолбэк: дадим хотя бы чистый экран
         document.body.classList.add('body-fullscreen');
       }
     } catch(e) {
-      // если запретили — фолбэк
       document.body.classList.add('body-fullscreen');
     }
   }
@@ -250,11 +245,9 @@
 
   async function enterFullscreen() {
     if (isMobile) {
-      // мобилки: fullscreen + ландшафт
       await requestFull();
       await lockLandscapeIfPossible();
     } else {
-      // десктоп: чистый fullscreen
       await requestFull();
     }
     createExitButton();
@@ -280,7 +273,6 @@
     const active = inNativeFullscreen();
     state.isFullscreen = active;
     if (!active) {
-      // вышли из nat FS — подчистим фолбэк
       document.body.classList.remove('body-fullscreen');
       if (exitBtn) { exitBtn.remove(); exitBtn = null; }
     }
@@ -299,21 +291,26 @@
       }, 0);
     });
 
-    // Кнопка "Фронт/Тыл"
+    // Переключение камер
     app.ui.flip.addEventListener('click', async () => {
       if (isMobile) {
-        // Мобилки: реальный свитч камеры
+        // мобилки: реальный свитч камеры
         state.facing = state.facing === 'user' ? 'environment' : 'user';
         const s = app.vid.srcObject;
         if (s) s.getTracks().forEach(t => t.stop());
-        await startStream();
-        // В мобильном режиме оставляем текущее "правильное" отображение
-        state.mirror = true;
+        await startStream(); // в startStream выставится дефолтный mirror под камеру
       } else {
-        // Десктоп: просто зеркалим/раззеркаливаем
+        // десктоп: просто зеркалим/раззеркаливаем
         state.mirror = !state.mirror;
       }
     });
+
+    // Кнопка "отзеркалить" — есть только на мобилках
+    if (app.ui.mirror) {
+      app.ui.mirror.addEventListener('click', () => {
+        state.mirror = !state.mirror;
+      });
+    }
 
     // Полноэкранный режим
     if (app.ui.fs) {
@@ -359,7 +356,6 @@
       state.invert = e.target.checked;
     });
 
-    // Подгон при изменении окна/ориентации
     new ResizeObserver(() => {
       const { w, h } = updateGridSize();
       refitFont(w, h);
@@ -371,9 +367,6 @@
     setUI();
     bindUI();
     await startStream();
-
-    // Стартуем сразу с НЕ-зеркального вида (нормальная ориентация по горизонтали)
-    state.mirror = true;
 
     if (raf) cancelAnimationFrame(raf);
     raf = requestAnimationFrame(loop);
