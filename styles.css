@@ -136,10 +136,3 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 .fs-exit::after { content:"⤢"; font-size:18px; line-height:1; }
 
 .body-fullscreen .stage { width:100vw; height:100vh; }
-\n\n
-/* Показываем .only-mobile только на устройствах без hover и с грубым указателем (мобилки) */
-@media (hover: none) and (pointer: coarse) {
-  .only-mobile { display: inline-block !important; }
-}
-/* По умолчанию скрыта */
-.only-mobile { display: none; }
