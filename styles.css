@@ -3,9 +3,11 @@
 html,body{ height:100%; margin:0; }
 body.theme-dark{ background:#000; color:#fff; }
 
+/* mono UI + аккуратные контрастные кнопки */
 :root{
   --ui-bg:#151515;
   --ui-panel:#1b1b1b;
+  --ui-border:#ffffff;
   --ui-text:#ffffff;
 }
 
@@ -15,64 +17,91 @@ body.theme-dark{ background:#000; color:#fff; }
 .toolbar{
   display:flex; gap:8px; align-items:center;
   padding:10px; background:var(--ui-bg);
-  z-index:10;
+  border-bottom:1px solid var(--ui-border);
 }
 .btn{
   background:transparent; color:var(--ui-text);
-  padding:.55rem 1rem; cursor:pointer; border:none;
-  font-family:'Better VCR',sans-serif;
+  border:1px solid var(--ui-border);
+  padding:.55rem 1rem; border-radius:0; cursor:pointer;
 }
 
 /* ===== ПАНЕЛЬ ===== */
 .panel{
   display:flex; flex-wrap:wrap; gap:12px; padding:8px;
-  background:var(--ui-bg);
-  font-family:'Better VCR',sans-serif;
+  background:var(--ui-bg); border-bottom:1px solid var(--ui-border);
 }
 .panel[hidden]{ display:none !important; }
 .panel label{
   display:flex; gap:8px; align-items:center;
   background:var(--ui-panel);
-  padding:6px 8px;
-  border:none;
+  border:1px solid var(--ui-border);
+  padding:6px 8px; border-radius:0;
 }
 .panel input[type="range"]{ width:160px; }
 .panel output{ min-width:42px; text-align:right; }
+
+/* чекбокс компактный */
 .check{ display:flex; align-items:center; gap:8px; padding:6px 8px; }
 
 /* ===== СЦЕНА/ВЫВОД ===== */
 .stage{
   flex:1; min-height:0; display:grid; place-items:center; overflow:hidden;
-  background:#000;  /* синхронизируется с палитрой */
+  /* ВАЖНО: цвет сцены мы будем менять из JS (под цвет фона ASCII) */
+  background:#000;
 }
 
-/* монопринт + CJK-mono стек */
+/* Сам ASCII-блок */
 #out{
   margin:0;
   white-space:pre;
   user-select:none;
-  font-family:"Cascadia Mono","Menlo","Consolas","Noto Sans Mono CJK JP","MS Gothic",monospace !important;
+  font-family: ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
+  /* ВАЖНО: высота строки в «кадровых» единицах */
   line-height: 1ch;
+  /* Размер шрифта вычисляет JS (чтобы блок всегда влезал) */
   font-size: 16px;
   color:#8ac7ff;
   background:#000;
-  border:none;           /* убрана белая рамка */
+  border:1px solid var(--ui-border);
+  border-radius:0;
   max-width:100%;
   max-height:100%;
 }
 
-/* Fullscreen-профиль: скрываем UI, сцена на весь экран */
-body.fs .toolbar,
-body.fs .panel{ display:none !important; }
-body.fs .stage{ height:100vh; }
-
-/* мобильная кнопка зеркала */
-.mobile-only { display:none; }
-@media (max-width: 768px) {
-  .mobile-only { display:inline-block; }
-}
-
-/* безопасная зона для iOS */
+/* небольшая защита от «прыжков» при клавиатуре на мобилках */
 @supports (padding: env(safe-area-inset-bottom)){
   .wrap{ padding-bottom: env(safe-area-inset-bottom); }
+}
+
+/* === Фирменный шрифт для интерфейса === */
+body, .toolbar, .panel, .btn, label, output, select, option {
+  font-family: 'Better VCR', sans-serif;
+}
+
+/* ===== FULLSCREEN ===== */
+:fullscreen .toolbar,
+:fullscreen .panel { display: none !important; }
+
+/* когда мы сами прячем UI (например, iOS без настоящего fullscreen) */
+.body-fullscreen .toolbar,
+.body-fullscreen .panel { display: none !important; }
+
+.fs-exit {
+  position: fixed;
+  top: 10px; right: 10px;
+  width: 36px; height: 36px;
+  display:flex; align-items:center; justify-content:center;
+  border:1px solid var(--ui-border);
+  background: rgba(0,0,0,.6);
+  color: var(--ui-text);
+  cursor:pointer; z-index: 9999;
+  user-select: none;
+}
+
+/* простой «иконкой» будет символ ⤢ */
+.fs-exit::after { content: "⤢"; font-size: 18px; line-height: 1; }
+
+/* фолбэк-поворот сцены на мобилках, если lock() не доступен */
+.body-fullscreen .stage {
+  width: 100vw; height: 100vh;
 }
