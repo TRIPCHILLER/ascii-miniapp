@@ -1,8 +1,5 @@
 (() => {
-  // ============== УТИЛИТЫ ==============
   const $ = s => document.querySelector(s);
-  const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
-
   const app = {
     vid:  $('#vid'),
     out:  $('#out'),
@@ -19,20 +16,15 @@
       gammaVal: $('#gamma_val'),
       fps:      $('#fps'),
       fpsVal:   $('#fps_val'),
-      fg:       $('#fg'),
-      bg:       $('#bg'),
       charset:  $('#charset'),
       invert:   $('#invert'),
-      fs:       $('#fs'),
+      palette:  $('#palette'),
+      mirrorBtn:$('#mirrorBtn')
     }
   };
 
-  // Значения по умолчанию
-  // ВАЖНО: mirror = true означает "НЕ-зеркальная картинка" (мы инвертируем стандартный селфи-вид).
-  // Это даёт "оригинальное" восприятие, как ты просил — стартуем сразу с правильным горизонтальным отражением.
   const state = {
-    facing: 'user',         // какая камера для мобилок
-    mirror: true,           // режим рисования: true = отразить по X (НЕ-зеркало)
+    facing: 'user',
     widthChars: 160,
     contrast: 1.15,
     gamma: 1.20,
@@ -41,22 +33,30 @@
     background: '#000000',
     charset: '@%#*+=-:. ',
     invert: true,
-    isFullscreen: false,    // наш флаг
+    mirror: false
   };
 
-  // Вспомогательные канвасы
+  const palettes = {
+    macintosh:   { bg:"#333319", fg:"#e5ffff" },
+    zenith:      { bg:"#3f291e", fg:"#fdca55" },
+    ibm8503:     { bg:"#2e3037", fg:"#ebe5ce" },
+    commodore:   { bg:"#40318e", fg:"#88d7de" },
+    obra:        { bg:"#000b40", fg:"#ebe1cd" },
+    oldlcd:      { bg:"#000000", fg:"#ffffff" },
+    ibm5151:     { bg:"#25342f", fg:"#01eb5f" },
+    matrix:      { bg:"#000000", fg:"#00ff40" },
+  };
+
   const off = document.createElement('canvas');
   const ctx = off.getContext('2d', { willReadFrequently: true });
 
-  // Для авто-подгонки шрифта
   const measurePre = document.createElement('pre');
   measurePre.style.cssText = `
     position:absolute; left:-99999px; top:-99999px; margin:0;
-    white-space:pre; line-height:1ch; font-family: ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
+    white-space:pre; line-height:1ch; font-family: monospace !important;
   `;
   document.body.appendChild(measurePre);
 
-  // ============== КАМЕРА ==============
   async function startStream() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -70,26 +70,18 @@
     }
   }
 
-  // ============== РЕНДЕРИНГ ==============
   let raf = null;
   let lastFrameTime = 0;
 
   function setUI() {
     app.ui.width.value = state.widthChars;
     app.ui.widthVal.textContent = state.widthChars;
-
     app.ui.contrast.value = state.contrast;
     app.ui.contrastVal.textContent = state.contrast.toFixed(2);
-
     app.ui.gamma.value = state.gamma;
     app.ui.gammaVal.textContent = state.gamma.toFixed(2);
-
     app.ui.fps.value = state.fps;
     app.ui.fpsVal.textContent = state.fps;
-
-    app.ui.fg.value = state.color;
-    app.ui.bg.value = state.background;
-
     app.ui.charset.value = state.charset;
     app.ui.invert.checked = state.invert;
 
@@ -98,7 +90,6 @@
     app.stage.style.backgroundColor = state.background;
   }
 
-  // Пересчёт h и подготовка offscreen размера
   function updateGridSize() {
     const v = app.vid;
     if (!v.videoWidth || !v.videoHeight) return { w: state.widthChars, h: 1 };
@@ -120,14 +111,13 @@
     const rect = measurePre.getBoundingClientRect();
     const lineH = rect.height / 2;
     const chW = rect.width / 1;
-    const charRatio = lineH / chW; // H/W
-    return 1 / charRatio;          // W/H
+    const charRatio = lineH / chW;
+    return 1 / charRatio;
   }
 
   function loop(ts) {
     raf = requestAnimationFrame(loop);
 
-    // FPS-ограничитель
     const frameInterval = 1000 / state.fps;
     if (ts - lastFrameTime < frameInterval) return;
     lastFrameTime = ts;
@@ -137,20 +127,21 @@
 
     const { w, h } = updateGridSize();
 
-    // Подготовка трансформа для зеркала
-    // mirror = true ⇒ рисуем с scaleX(-1), чтобы получить НЕ-зеркальную картинку
-    ctx.setTransform(state.mirror ? -1 : 1, 0, 0, 1, state.mirror ? w : 0, 0);
-    ctx.drawImage(v, 0, 0, w, h);
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (state.facing === 'environment' || state.mirror) {
+      ctx.save();
+      ctx.scale(-1, 1);
+      ctx.drawImage(v, -w, 0, w, h);
+      ctx.restore();
+    } else {
+      ctx.drawImage(v, 0, 0, w, h);
+    }
 
-    const data = ctx.getImageData(0, 0, w, h).data;
+    let data = ctx.getImageData(0, 0, w, h).data;
 
-    // Генерация ASCII
     const chars = state.charset;
     const n = chars.length - 1;
     const inv = state.invert ? -1 : 1;
     const bias = state.invert ? 255 : 0;
-
     const gamma = state.gamma;
     const contrast = state.contrast;
 
@@ -178,7 +169,6 @@
     refitFont(w, h);
   }
 
-  // Подбор font-size
   let refitLock = false;
   function refitFont(cols, rows) {
     if (refitLock) return;
@@ -208,87 +198,7 @@
     refitLock = false;
   }
 
-  // ============== FULLSCREEN ==============
-  let exitBtn = null;
-
-  function inNativeFullscreen() {
-    return !!(document.fullscreenElement || document.webkitFullscreenElement);
-  }
-
-  async function requestFull() {
-    try {
-      if (app.stage.requestFullscreen) await app.stage.requestFullscreen();
-      else if (app.stage.webkitRequestFullscreen) await app.stage.webkitRequestFullscreen();
-      state.isFullscreen = true;
-    } catch(e) {
-      // игнорируем — пойдём фолбэком
-    }
-  }
-
-  async function lockLandscapeIfPossible() {
-    try {
-      if (screen.orientation && screen.orientation.lock) {
-        await screen.orientation.lock('landscape');
-      } else {
-        // iOS / старые браузеры — фолбэк: дадим хотя бы чистый экран
-        document.body.classList.add('body-fullscreen');
-      }
-    } catch(e) {
-      // если запретили — фолбэк
-      document.body.classList.add('body-fullscreen');
-    }
-  }
-
-  function createExitButton() {
-    if (exitBtn) return;
-    exitBtn = document.createElement('button');
-    exitBtn.className = 'fs-exit';
-    exitBtn.type = 'button';
-    exitBtn.addEventListener('click', exitFullscreen);
-    document.body.appendChild(exitBtn);
-  }
-
-  async function enterFullscreen() {
-    if (isMobile) {
-      // мобилки: fullscreen + ландшафт
-      await requestFull();
-      await lockLandscapeIfPossible();
-    } else {
-      // десктоп: чистый fullscreen
-      await requestFull();
-    }
-    createExitButton();
-  }
-
-  async function exitFullscreen() {
-    try {
-      if (inNativeFullscreen()) {
-        if (document.exitFullscreen) await document.exitFullscreen();
-        else if (document.webkitExitFullscreen) await document.webkitExitFullscreen();
-      }
-    } catch(e) {}
-    document.body.classList.remove('body-fullscreen');
-    state.isFullscreen = false;
-
-    if (screen.orientation && screen.orientation.unlock) {
-      try { screen.orientation.unlock(); } catch(e) {}
-    }
-    if (exitBtn) { exitBtn.remove(); exitBtn = null; }
-  }
-
-  document.addEventListener('fullscreenchange', () => {
-    const active = inNativeFullscreen();
-    state.isFullscreen = active;
-    if (!active) {
-      // вышли из nat FS — подчистим фолбэк
-      document.body.classList.remove('body-fullscreen');
-      if (exitBtn) { exitBtn.remove(); exitBtn = null; }
-    }
-  });
-
-  // ============== СВЯЗКА UI ==============
   function bindUI() {
-    // Показ/скрытие панели
     app.ui.toggle.addEventListener('click', () => {
       const hidden = app.ui.settings.hasAttribute('hidden');
       if (hidden) app.ui.settings.removeAttribute('hidden');
@@ -299,29 +209,12 @@
       }, 0);
     });
 
-    // Кнопка "Фронт/Тыл"
     app.ui.flip.addEventListener('click', async () => {
-      if (isMobile) {
-        // Мобилки: реальный свитч камеры
-        state.facing = state.facing === 'user' ? 'environment' : 'user';
-        const s = app.vid.srcObject;
-        if (s) s.getTracks().forEach(t => t.stop());
-        await startStream();
-        // В мобильном режиме оставляем текущее "правильное" отображение
-        state.mirror = true;
-      } else {
-        // Десктоп: просто зеркалим/раззеркаливаем
-        state.mirror = !state.mirror;
-      }
+      state.facing = state.facing === 'user' ? 'environment' : 'user';
+      const s = app.vid.srcObject;
+      if (s) s.getTracks().forEach(t => t.stop());
+      await startStream();
     });
-
-    // Полноэкранный режим
-    if (app.ui.fs) {
-      app.ui.fs.addEventListener('click', () => {
-        if (!state.isFullscreen) enterFullscreen();
-        else exitFullscreen();
-      });
-    }
 
     app.ui.width.addEventListener('input', e => {
       state.widthChars = +e.target.value;
@@ -332,6 +225,7 @@
       state.contrast = +e.target.value;
       app.ui.contrastVal.textContent = state.contrast.toFixed(2);
     });
+
     app.ui.gamma.addEventListener('input', e => {
       state.gamma = +e.target.value;
       app.ui.gammaVal.textContent = state.gamma.toFixed(2);
@@ -342,16 +236,6 @@
       app.ui.fpsVal.textContent = state.fps;
     });
 
-    app.ui.fg.addEventListener('input', e => {
-      state.color = e.target.value;
-      app.out.style.color = state.color;
-    });
-    app.ui.bg.addEventListener('input', e => {
-      state.background = e.target.value;
-      app.out.style.backgroundColor = state.background;
-      app.stage.style.backgroundColor = state.background;
-    });
-
     app.ui.charset.addEventListener('change', e => {
       state.charset = e.target.value;
     });
@@ -359,21 +243,31 @@
       state.invert = e.target.checked;
     });
 
-    // Подгон при изменении окна/ориентации
+    app.ui.palette.addEventListener('change', e => {
+      const p = palettes[e.target.value];
+      state.background = p.bg;
+      state.color = p.fg;
+      app.out.style.backgroundColor = p.bg;
+      app.stage.style.backgroundColor = p.bg;
+      app.out.style.color = p.fg;
+    });
+
+    if (app.ui.mirrorBtn) {
+      app.ui.mirrorBtn.addEventListener('click', () => {
+        state.mirror = !state.mirror;
+      });
+    }
+
     new ResizeObserver(() => {
       const { w, h } = updateGridSize();
       refitFont(w, h);
     }).observe(app.stage);
   }
 
-  // ============== СТАРТ ==============
   async function init() {
     setUI();
     bindUI();
     await startStream();
-
-    // Стартуем сразу с НЕ-зеркального вида (нормальная ориентация по горизонтали)
-    state.mirror = true;
 
     if (raf) cancelAnimationFrame(raf);
     raf = requestAnimationFrame(loop);
