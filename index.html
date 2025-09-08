@@ -5,20 +5,17 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>ASCII live · app</title>
   <link rel="stylesheet" href="https://fonts.cdnfonts.com/css/better-vcr" />
-  <link rel="stylesheet" href="styles.css?v=fit2" />
-
-  <!-- ЕДИНЫЙ источник раскладок -->
-  <script src="ramp.js" defer></script>
+  <link rel="stylesheet" href="styles.css?v=fit1" />
 </head>
 <body class="theme-dark">
   <div class="wrap" id="app">
 
-    <!-- Верхняя панель -->
-    <div class="toolbar">
-      <button class="btn" id="flip">Развернуть</button>
-      <button class="btn" id="toggle">Настройки</button>
-      <button class="btn ghost" id="fs" aria-label="Fullscreen">Fullscreen</button>
-    </div>
+<!-- Верхняя панель -->
+<div class="toolbar">
+  <button class="btn" id="flip">Развернуть</button>
+  <button class="btn" id="toggle">Настройки</button>
+  <button class="btn ghost" id="fs" aria-label="Fullscreen">Fullscreen</button>
+</div>
 
     <!-- Панель настроек (по умолчанию скрыта) -->
     <div class="panel" id="settings" hidden>
@@ -56,21 +53,25 @@
         <output id="fps_val"></output>
       </label>
 
-      <!-- НОВОЕ: выбор по ключам + поле для своего набора -->
       <label>
         <span>Набор:</span>
-        <select id="charset" title="ASCII ramp">
-          <option value="classic">Классический</option>
-          <option value="digits">Только цифры</option>
-          <option value="letters">Только буквы</option>
-          <option value="dots">Точки/тонкий</option>
-          <option value="blocks">Блоки ░▒▓█</option>
-          <option value="custom">Свой…</option>
+        <select id="charset">
+          <option value='@%#*+=-:. '>Классический</option>
+          <option value='0123456789'>Только цифры</option>
+          <option value='ABCDEFGHIJKLMNOPQRSTUVWXYZ'>Только буквы (A–Z)</option>
+          <option value='aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyYzZ'>
+  Все буквы (a–z, A–Z)
+</option>
+          <option value='アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン'>
+  カタカナ
+</option>
+<option value='あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん'>
+  ひらがな
+</option>
+          <option value='····•○◦ '>. · • ○</option>
+          <option value='░▒▓█'>Блоки ░▒▓█</option>
         </select>
-        <input id="charset_custom" type="text" placeholder="свой набор символов"
-               style="width:240px;display:none" />
       </label>
-
       <label class="check">
         <input id="invert" type="checkbox" />
         <span>Инверсия</span>
@@ -86,10 +87,6 @@
     <video id="vid" playsinline autoplay muted hidden></video>
   </div>
 
-  <!-- НОВОЕ: модульный запуск -->
-  <script type="module">
-    import { bootIndex } from './ascii.js';
-    bootIndex();
-  </script>
+  <script defer src="ascii.js?v=fit1"></script>
 </body>
 </html>
