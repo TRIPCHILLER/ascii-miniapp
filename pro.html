@@ -9,30 +9,30 @@
 <body class="theme-dark">
 <div class="wrap">
   <div class="toolbar" id="toolbar">
-    <button id="flip" class="btn">Фронт/Тыл</button>
-    <button id="fs"   class="btn ghost">Fullscreen</button>
-    <a class="btn ghost" href="index.html">Приложение</a>
+    <button id="flip" class="btn">РАЗВЕРНУТЬ</button>
+    <button id="fs"   class="btn ghost">FULLSCREEN</button>
+    <a class="btn ghost" href="index.html">ПРИЛОЖЕНИЕ</a>
   </div>
 
   <div class="panel">
-    <label>Ширина <input id="w" type="range" min="40" max="320" value="160"><span id="wv">160</span></label>
-    <label>Контраст <input id="contrast" type="range" min="50" max="220" value="115"><span id="cv">1.15</span></label>
-    <label>Гамма <input id="gamma" type="range" min="60" max="180" value="120"><span id="gv">1.20</span></label>
-    <label>Цвет <input id="fg" type="color" value="#8ac7ff"></label>
-    <label>Фон <input id="bg" type="color" value="#000000"></label>
+    <label>ШИРИНА <input id="w" type="range" min="40" max="320" value="160"><span id="wv">160</span></label>
+    <label>КОНТРАСТ <input id="contrast" type="range" min="50" max="220" value="115"><span id="cv">1.15</span></label>
+    <label>ГАММПА <input id="gamma" type="range" min="60" max="180" value="120"><span id="gv">1.20</span></label>
+    <label>ТЕКСТ <input id="fg" type="color" value="#8ac7ff"></label>
+    <label>ФОН <input id="bg" type="color" value="#000000"></label>
     <label>FPS <input id="fps" type="range" min="5" max="60" value="30"><span id="fpsv">30</span></label>
     <label>Набор
       <select id="preset">
-        <option value="classic">Классический</option>
-        <option value="digits">Только цифры</option>
-        <option value="letters">Только буквы</option>
-        <option value="dots">Точки/тонкий</option>
-        <option value="blocks">Блоки ░▒▓█</option>
-        <option value="custom">Свой…</option>
+        <option value="classic">CLASSIC</option>
+        <option value="digits">NUMBERS</option>
+        <option value="letters">LETTERS</option>
+        <option value="dots">Точки</option>
+        <option value="blocks">░▒▓█</option>
+        <option value="custom">CUSTOM</option>
       </select>
       <input id="ramp" type="text" placeholder="свой набор символов" style="width:240px;display:none">
     </label>
-    <label><input id="invert" type="checkbox" checked> Инверсия</label>
+    <label><input id="invert" type="checkbox" checked> ИНВЕРСИЯ</label>
   </div>
 
   <!-- фиксированная рамка вывода, забирает весь остаток окна -->
@@ -103,4 +103,5 @@ ui.flip.onclick = () => app.flip();
 wireFullscreen(ui.fs, ui.toolbar);
 </script>
 </body></html>
+
 
