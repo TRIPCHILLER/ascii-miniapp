@@ -12,38 +12,38 @@
 
 <!-- Верхняя панель -->
 <div class="toolbar">
-  <button class="btn" id="flip">Развернуть</button>
-  <button class="btn" id="toggle">Настройки</button>
-  <button class="btn ghost" id="fs" aria-label="Fullscreen">Fullscreen</button>
+  <button class="btn" id="flip">РАЗВЕРНУТЬ</button>
+  <button class="btn" id="toggle">НАСТРОЙКИ</button>
+  <button class="btn ghost" id="fs" aria-label="Fullscreen">FULLSCREEN</button>
 </div>
 
     <!-- Панель настроек (по умолчанию скрыта) -->
     <div class="panel" id="settings" hidden>
       <label>
-        <span>Ширина</span>
+        <span>РАЗМЕР</span>
         <input id="width" type="range" min="50" max="250" step="1" />
         <output id="width_val"></output>
       </label>
 
       <label>
-        <span>Контраст</span>
+        <span>КОНТРАСТ</span>
         <input id="contrast" type="range" min="0.4" max="2.2" step="0.01" />
         <output id="contrast_val"></output>
       </label>
 
       <label>
-        <span>Гамма</span>
+        <span>ГАММА</span>
         <input id="gamma" type="range" min="0.6" max="2.0" step="0.01" />
         <output id="gamma_val"></output>
       </label>
 
       <label>
-        <span>Цвет</span>
+        <span>ТЕКСТ</span>
         <input id="fg" type="color" />
       </label>
 
       <label>
-        <span>Фон</span>
+        <span>ФОН</span>
         <input id="bg" type="color" />
       </label>
 
@@ -54,13 +54,13 @@
       </label>
 
       <label>
-        <span>Набор:</span>
+        <span>НАБОР:</span>
         <select id="charset">
-          <option value='@%#*+=-:. '>Классический</option>
-          <option value='0123456789'>Только цифры</option>
-          <option value='ABCDEFGHIJKLMNOPQRSTUVWXYZ'>Только буквы (A–Z)</option>
+          <option value='@%#*+=-:. '>CLASSIC</option>
+          <option value='0123456789'>NUMBERS</option>
+          <option value='ABCDEFGHIJKLMNOPQRSTUVWXYZ'>LETTERS (A–Z)</option>
           <option value='aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyYzZ'>
-  Все буквы (a–z, A–Z)
+  MORE LETTERS (a–z, A–Z)
 </option>
           <option value='アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン'>
   カタカナ
@@ -69,12 +69,12 @@
   ひらがな
 </option>
           <option value='····•○◦ '>. · • ○</option>
-          <option value='░▒▓█'>Блоки ░▒▓█</option>
+          <option value='░▒▓█'>░▒▓█</option>
         </select>
       </label>
       <label class="check">
         <input id="invert" type="checkbox" />
-        <span>Инверсия</span>
+        <span>ИНВЕРСИЯ</span>
       </label>
     </div>
 
@@ -90,3 +90,4 @@
   <script defer src="ascii.js?v=fit1"></script>
 </body>
 </html>
+
