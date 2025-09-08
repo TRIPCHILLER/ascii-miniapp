@@ -63,7 +63,7 @@
     { id:'flowers',    name:'FLOWERS AND ASBESTOS', colors:['#c62b69', '#edf4ff'] },
     { id:'pepper1bit', name:'1BIT PEPPER',       colors:['#100101', '#ebb5b5'] },
     { id:'shapebit',   name:'SHAPE BIT',         colors:['#200955', '#ff0055'] },
-    { id:'sangre',     name:'SANGRE',            colors:['#120628', '#610e0e'] },
+    { id:'sangre',     name:'SANGRE',            colors:['#120628', '#ad1818'] },
     { id:'chasing',    name:'CHASING LIGHT',     colors:['#000000', '#ffff02'] },
     { id:'monsterbit', name:'MONSTER BIT',       colors:['#321632', '#cde9cd'] },
     { id:'gatoroboto', name:'GATO ROBOTO',       colors:['#2b0000', '#cc0e13'] },
@@ -490,4 +490,5 @@
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
