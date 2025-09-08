@@ -24,6 +24,7 @@
       charset:  $('#charset'),
       invert:   $('#invert'),
       fs:       $('#fs'),
+      style:    $('#stylePreset'),
     }
   };
 
@@ -43,6 +44,60 @@
     invert: true,
     isFullscreen: false,    // наш флаг
   };
+  // ===== Стили (палитры) =====
+  // Порядок: [тёмный, светлый]; тёмный идёт на ФОН, светлый на ТЕКСТ
+  const PRESETS = [
+    { id:'macintosh',  name:'MACINTOSH',         colors:['#333319', '#e5ffff'] },
+    { id:'zenith',     name:'ZENITH ZVM 1240',   colors:['#3f291e', '#fdca55'] },
+    { id:'ibm8503',    name:'IBM 8503',          colors:['#2e3037', '#ebe5ce'] },
+    { id:'commodore',  name:'COMMODORE 1084',    colors:['#40318e', '#88d7de'] },
+    { id:'obra',       name:'OBRA DINN',         colors:['#000b40', '#ebe1cd'] },
+    { id:'oldlcd',     name:'OLD LCD',           colors:['#000000', '#ffffff'] },
+    { id:'ibm5151',    name:'IBM 5151',          colors:['#25342f', '#01eb5f'] },
+    { id:'matrix',     name:'MATRIX',            colors:['#000000', '#00ff40'] },
+  ];
+  const CUSTOM_LABEL = 'пользовательский';
+  const norm = (hex)=> (hex||'').toLowerCase().replace('#','');
+  const toHex = v => v && v[0]==='#' ? v : ('#'+v);
+  const lum = (hex)=>{ // относительная яркость 0..1
+    const h = norm(hex);
+    if (h.length<6) return 0;
+    const r=parseInt(h.slice(0,2),16)/255, g=parseInt(h.slice(2,4),16)/255, b=parseInt(h.slice(4,6),16)/255;
+    const a=[r,g,b].map(c=> (c<=0.03928)? c/12.92 : Math.pow((c+0.055)/1.055,2.4));
+    return 0.2126*a[0] + 0.7152*a[1] + 0.0722*a[2];
+  };
+  // разложить пару на bg/text (тёмный/светлый)
+  function splitToBgText(pair){
+    const [c1,c2]=pair; return (lum(c1)<=lum(c2))? {bg:c1,text:c2}:{bg:c2,text:c1};
+  }
+  function detectPreset(textHex, bgHex){
+    const t=norm(textHex), b=norm(bgHex);
+    for(const p of PRESETS){
+      const {bg,text}=splitToBgText(p.colors);
+      if(norm(text)===t && norm(bg)===b) return p.id;
+    }
+    return 'custom';
+  }
+  function fillStyleSelect(){
+    if(!app.ui.style) return;
+    app.ui.style.innerHTML='';
+    const opt = new Option(CUSTOM_LABEL,'custom'); app.ui.style.append(opt);
+    PRESETS.forEach(p=> app.ui.style.append(new Option(p.name,p.id)));
+  }
+  function applyPreset(id){
+    if(!app.ui.style) return;
+    if(id==='custom'){ app.ui.style.value='custom'; return; }
+    const p = PRESETS.find(x=>x.id===id); if(!p){ app.ui.style.value='custom'; return; }
+    const {bg,text}=splitToBgText(p.colors);
+    // обновим state и UI как при ручном выборе цвета
+    state.color = toHex(text); state.background = toHex(bg);
+    app.ui.fg.value = state.color; app.ui.bg.value = state.background;
+    app.out.style.color = state.color;
+    app.out.style.backgroundColor = state.background;
+    app.stage.style.backgroundColor = state.background;
+    app.ui.style.value = id;
+  }
+
 
   // Вспомогательные канвасы
   const off = document.createElement('canvas');
@@ -96,6 +151,11 @@
     app.out.style.color = state.color;
     app.out.style.backgroundColor = state.background;
     app.stage.style.backgroundColor = state.background;
+
+    // обновим селект стиля
+    fillStyleSelect();
+    const matched = detectPreset(state.color, state.background);
+    if (app.ui.style) app.ui.style.value = matched === 'custom' ? 'custom' : matched;
   }
 
   // Пересчёт h и подготовка offscreen размера
@@ -369,14 +429,18 @@
       app.ui.fpsVal.textContent = state.fps;
     });
 
+    if(app.ui.style){ app.ui.style.addEventListener('change', e => { applyPreset(e.target.value); }); }
+
     app.ui.fg.addEventListener('input', e => {
       state.color = e.target.value;
       app.out.style.color = state.color;
+      if(app.ui.style){ const m = detectPreset(state.color, state.background); app.ui.style.value = (m==='custom'?'custom':m); }
     });
     app.ui.bg.addEventListener('input', e => {
       state.background = e.target.value;
       app.out.style.backgroundColor = state.background;
       app.stage.style.backgroundColor = state.background;
+      if(app.ui.style){ const m = detectPreset(state.color, state.background); app.ui.style.value = (m==='custom'?'custom':m); }
     });
 
     app.ui.charset.addEventListener('change', e => {
@@ -395,6 +459,7 @@
 
   // ============== СТАРТ ==============
   async function init() {
+    fillStyleSelect();
     setUI();
     bindUI();
     await startStream();
