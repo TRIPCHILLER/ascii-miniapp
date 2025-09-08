@@ -15,13 +15,13 @@
   </div>
 
   <div class="panel">
-    <label>ШИРИНА <input id="w" type="range" min="40" max="320" value="160"><span id="wv">160</span></label>
+    <label>РАЗМЕР <input id="w" type="range" min="40" max="320" value="160"><span id="wv">160</span></label>
     <label>КОНТРАСТ <input id="contrast" type="range" min="50" max="220" value="115"><span id="cv">1.15</span></label>
-    <label>ГАММПА <input id="gamma" type="range" min="60" max="180" value="120"><span id="gv">1.20</span></label>
+    <label>ГАММА <input id="gamma" type="range" min="60" max="180" value="120"><span id="gv">1.20</span></label>
     <label>ТЕКСТ <input id="fg" type="color" value="#8ac7ff"></label>
     <label>ФОН <input id="bg" type="color" value="#000000"></label>
     <label>FPS <input id="fps" type="range" min="5" max="60" value="30"><span id="fpsv">30</span></label>
-    <label>Набор
+    <label>НАБОР:
       <select id="preset">
         <option value="classic">CLASSIC</option>
         <option value="digits">NUMBERS</option>
@@ -103,5 +103,6 @@ ui.flip.onclick = () => app.flip();
 wireFullscreen(ui.fs, ui.toolbar);
 </script>
 </body></html>
+
 
 
