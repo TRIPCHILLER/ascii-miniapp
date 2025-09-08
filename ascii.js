@@ -29,7 +29,7 @@
 
   // Значения по умолчанию
   // ВАЖНО: mirror = true означает "НЕ-зеркальная картинка" (мы инвертируем стандартный селфи-вид).
-  // Это даёт "оригинальное" восприятие, как ты просил — стартуем сразу с правильным горизонтальным отражением.
+  // Это даёт "оригинальное" восприятие — стартуем сразу с правильным горизонтальным отражением.
   const state = {
     facing: 'user',         // какая камера для мобилок
     mirror: true,           // режим рисования: true = отразить по X (НЕ-зеркало)
@@ -208,9 +208,8 @@
     refitLock = false;
   }
 
-  // ============== FULLSCREEN ==============
-  let exitBtn = null;
-
+  // ============== FULLSCREEN (tap-to-exit) ==============
+  // Кросс-браузерные хелперы:
   function inNativeFullscreen() {
     return !!(document.fullscreenElement || document.webkitFullscreenElement);
   }
@@ -239,16 +238,39 @@
     }
   }
 
-  function createExitButton() {
-    if (exitBtn) return;
-    exitBtn = document.createElement('button');
-    exitBtn.className = 'fs-exit';
-    exitBtn.type = 'button';
-    exitBtn.addEventListener('click', exitFullscreen);
-    document.body.appendChild(exitBtn);
+  // >>> Новая логика: выход по ТАПУ на сцену
+  let fsTapHandler = null;
+  let fsEnteredAt = 0;
+
+  function enableTapToExit() {
+    disableTapToExit(); // защита от дубля
+
+    fsTapHandler = (e) => {
+      // защита от случайного мгновенного выхода тем же тапом
+      if (Date.now() - fsEnteredAt < 300) return;
+
+      // игнорим явные интерактивные элементы (если будут поверх)
+      const t = e.target;
+      const tag = (t.tagName || '').toLowerCase();
+      if (['button','a','input','select','textarea','label'].includes(tag)) return;
+
+      exitFullscreen();
+    };
+
+    app.stage.addEventListener('click', fsTapHandler, { passive: true });
+    app.stage.addEventListener('touchend', fsTapHandler, { passive: true });
+  }
+
+  function disableTapToExit() {
+    if (!fsTapHandler) return;
+    app.stage.removeEventListener('click', fsTapHandler);
+    app.stage.removeEventListener('touchend', fsTapHandler);
+    fsTapHandler = null;
   }
 
   async function enterFullscreen() {
+    fsEnteredAt = Date.now();
+
     if (isMobile) {
       // мобилки: fullscreen + ландшафт
       await requestFull();
@@ -257,7 +279,9 @@
       // десктоп: чистый fullscreen
       await requestFull();
     }
-    createExitButton();
+
+    // включаем выход по тапу
+    enableTapToExit();
   }
 
   async function exitFullscreen() {
@@ -270,19 +294,22 @@
     document.body.classList.remove('body-fullscreen');
     state.isFullscreen = false;
 
+    // снимаем блокировку ориентации, если была
     if (screen.orientation && screen.orientation.unlock) {
       try { screen.orientation.unlock(); } catch(e) {}
     }
-    if (exitBtn) { exitBtn.remove(); exitBtn = null; }
+
+    // выключаем обработчик тапа
+    disableTapToExit();
   }
 
+  // Системный выход из nat Fullscreen (жест «назад» и т.п.)
   document.addEventListener('fullscreenchange', () => {
     const active = inNativeFullscreen();
     state.isFullscreen = active;
     if (!active) {
-      // вышли из nat FS — подчистим фолбэк
       document.body.classList.remove('body-fullscreen');
-      if (exitBtn) { exitBtn.remove(); exitBtn = null; }
+      disableTapToExit();
     }
   });
 
@@ -315,11 +342,11 @@
       }
     });
 
-    // Полноэкранный режим
+    // Полноэкранный режим (вход по кнопке, выход — ТОЛЬКО по ТАПУ на сцену)
     if (app.ui.fs) {
       app.ui.fs.addEventListener('click', () => {
         if (!state.isFullscreen) enterFullscreen();
-        else exitFullscreen();
+        else exitFullscreen(); // на десктопе оставим тож возможность выходить кнопкой
       });
     }
 
