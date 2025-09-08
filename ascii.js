@@ -34,8 +34,8 @@
   const state = {
     facing: 'user',         // какая камера для мобилок
     mirror: true,           // режим рисования: true = отразить по X (НЕ-зеркало)
-    widthChars: 160,
-    contrast: 1.15,
+    widthChars: 100,
+    contrast: 1.50,
     gamma: 1.20,
     fps: 30,
     color: '#8ac7ff',
@@ -490,5 +490,6 @@
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
