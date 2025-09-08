@@ -70,7 +70,7 @@
     { id:'paperback',  name:'PAPERBACK',         colors:['#382b26', '#b8c2b9'] },
     { id:'macpaint',   name:'MAC PAINT',         colors:['#051b2c', '#8bc8fe'] },
   ];
-  const CUSTOM_LABEL = 'пользовательский';
+  const CUSTOM_LABEL = 'ПОЛЬЗОВАТЕЛЬСКИЙ';
   const norm = (hex)=> (hex||'').toLowerCase().replace('#','');
   const toHex = v => v && v[0]==='#' ? v : ('#'+v);
   const lum = (hex)=>{ // относительная яркость 0..1
@@ -490,6 +490,7 @@
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
