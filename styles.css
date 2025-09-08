@@ -136,3 +136,29 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 .fs-exit::after { content:"⤢"; font-size:18px; line-height:1; }
 
 .body-fullscreen .stage { width:100vw; height:100vh; }
+
+/* === Fullscreen fallback / Чистый экран на мобилках без системного FS === */
+.body-fullscreen {
+  overflow: hidden;
+}
+
+.body-fullscreen .wrap#app {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background: #000; /* чтобы не просвечивало */
+  z-index: 9999;
+}
+
+.body-fullscreen #stage {
+  width: 100%;
+  height: 100%;
+  touch-action: manipulation; /* приятнее на тапах */
+}
+
+/* На всякий случай: скрыть любые пережитки иконок выхода, если где-то остались */
+.fs-exit,
+#fs-exit {
+  display: none !important;
+}
