@@ -45,7 +45,7 @@
     isFullscreen: false,    // наш флаг
   };
   // ===== Стили (палитры) =====
-  // Порядок: [тёмный, светлый]; тёмный идёт на ФОН, светлый на ТЕКСТ
+  // Храним пары как [тёмный, светлый]; тёмный -> ФОН, светлый -> ТЕКСТ
   const PRESETS = [
     { id:'macintosh',  name:'MACINTOSH',         colors:['#333319', '#e5ffff'] },
     { id:'zenith',     name:'ZENITH ZVM 1240',   colors:['#3f291e', '#fdca55'] },
@@ -55,33 +55,40 @@
     { id:'oldlcd',     name:'OLD LCD',           colors:['#000000', '#ffffff'] },
     { id:'ibm5151',    name:'IBM 5151',          colors:['#25342f', '#01eb5f'] },
     { id:'matrix',     name:'MATRIX',            colors:['#000000', '#00ff40'] },
+
+    { id:'casio',      name:'CASIO BASIC',       colors:['#000000', '#83b07e'] },
+    { id:'funkyjam',   name:'FUNKY JAM',         colors:['#920244', '#fec28c'] },
+    { id:'cornsole',   name:'CORNSOLE',          colors:['#6495ed', '#fff8dc'] },
+    { id:'postapoc',   name:'POSTAPOCALYPTIC SUNSET', colors:['#1d0f44', '#f44e38'] },
+    { id:'laughcry',   name:'POP LAUGH CRY',     colors:['#452f47', '#d7bcad'] },
+    { id:'flowers',    name:'FLOWERS AND ASBESTOS', colors:['#c62b69', '#edf4ff'] },
+    { id:'pepper1bit', name:'1BIT PEPPER',       colors:['#100101', '#ebb5b5'] },
+    { id:'shapebit',   name:'SHAPE BIT',         colors:['#200955', '#ff0055'] },
+    { id:'sangre',     name:'SANGRE',            colors:['#120628', '#610e0e'] },
+    { id:'chasing',    name:'CHASING LIGHT',     colors:['#000000', '#ffff02'] },
+    { id:'monsterbit', name:'MONSTER BIT',       colors:['#321632', '#cde9cd'] },
+    { id:'gatoroboto', name:'GATO ROBOTO',       colors:['#2b0000', '#cc0e13'] },
+    { id:'paperback',  name:'PAPERBACK',         colors:['#382b26', '#b8c2b9'] },
+    { id:'macpaint',   name:'MAC PAINT',         colors:['#051b2c', '#8bc8fe'] },
   ];
   const CUSTOM_LABEL = 'пользовательский';
   const norm = (hex)=> (hex||'').toLowerCase().replace('#','');
   const toHex = v => v && v[0]==='#' ? v : ('#'+v);
-  const lum = (hex)=>{ // относительная яркость 0..1
-    const h = norm(hex);
-    if (h.length<6) return 0;
-    const r=parseInt(h.slice(0,2),16)/255, g=parseInt(h.slice(2,4),16)/255, b=parseInt(h.slice(4,6),16)/255;
+  const lum = (hex)=>{ const h=norm(hex); if(h.length<6) return 0;
+    const r=parseInt(h[0:2],16)/255, g=parseInt(h[2:4],16)/255, b=parseInt(h[4:6],16)/255;
     const a=[r,g,b].map(c=> (c<=0.03928)? c/12.92 : Math.pow((c+0.055)/1.055,2.4));
     return 0.2126*a[0] + 0.7152*a[1] + 0.0722*a[2];
   };
-  // разложить пару на bg/text (тёмный/светлый)
-  function splitToBgText(pair){
-    const [c1,c2]=pair; return (lum(c1)<=lum(c2))? {bg:c1,text:c2}:{bg:c2,text:c1};
-  }
+  function splitToBgText(pair){ const [c1,c2]=pair; return (lum(c1)<=lum(c2))? {bg:c1,text:c2}:{bg:c2,text:c1}; }
   function detectPreset(textHex, bgHex){
     const t=norm(textHex), b=norm(bgHex);
-    for(const p of PRESETS){
-      const {bg,text}=splitToBgText(p.colors);
-      if(norm(text)===t && norm(bg)===b) return p.id;
-    }
+    for(const p of PRESETS){ const {bg,text}=splitToBgText(p.colors); if(norm(text)===t && norm(bg)===b) return p.id; }
     return 'custom';
   }
   function fillStyleSelect(){
     if(!app.ui.style) return;
     app.ui.style.innerHTML='';
-    const opt = new Option(CUSTOM_LABEL,'custom'); app.ui.style.append(opt);
+    app.ui.style.append(new Option(CUSTOM_LABEL,'custom'));
     PRESETS.forEach(p=> app.ui.style.append(new Option(p.name,p.id)));
   }
   function applyPreset(id){
@@ -89,7 +96,6 @@
     if(id==='custom'){ app.ui.style.value='custom'; return; }
     const p = PRESETS.find(x=>x.id===id); if(!p){ app.ui.style.value='custom'; return; }
     const {bg,text}=splitToBgText(p.colors);
-    // обновим state и UI как при ручном выборе цвета
     state.color = toHex(text); state.background = toHex(bg);
     app.ui.fg.value = state.color; app.ui.bg.value = state.background;
     app.out.style.color = state.color;
