@@ -1,154 +1,158 @@
-// ascii.js — общий модуль для index.html и pro.html
-// Экспортируемые сущности:
-//   - AsciiApp: класс движка
-//   - wireFullscreen(buttonEl, stageEl): фуллскрин с выходом по тапу
-//   - bootIndex(): стартовый код для index.html
+(() => {
+  // ============== УТИЛИТЫ ==============
+  const $ = s => document.querySelector(s);
+  const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
 
-const isMobileUA = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
+  const app = {
+    vid:  $('#vid'),
+    out:  $('#out'),
+    stage:$('#stage'),
+    ui: {
+      flip:     $('#flip'),
+      toggle:   $('#toggle'),
+      settings: $('#settings'),
+      width:    $('#width'),
+      widthVal: $('#width_val'),
+      contrast: $('#contrast'),
+      contrastVal: $('#contrast_val'),
+      gamma:    $('#gamma'),
+      gammaVal: $('#gamma_val'),
+      fps:      $('#fps'),
+      fpsVal:   $('#fps_val'),
+      fg:       $('#fg'),
+      bg:       $('#bg'),
+      charset:  $('#charset'),
+      invert:   $('#invert'),
+      fs:       $('#fs'),
+    }
+  };
 
-export class AsciiApp {
-  constructor(outEl, opts = {}) {
-    this.out = outEl;
-    this.stage = opts.stageEl || outEl.closest('.stage') || document.body;
-    this.video = opts.videoEl || document.getElementById('vid') || this._ensureVideo();
+  // Значения по умолчанию
+  // ВАЖНО: mirror = true означает "НЕ-зеркальная картинка" (мы инвертируем стандартный селфи-вид).
+  // Это даёт "оригинальное" восприятие — стартуем сразу с правильным горизонтальным отражением.
+  const state = {
+    facing: 'user',         // какая камера для мобилок
+    mirror: true,           // режим рисования: true = отразить по X (НЕ-зеркало)
+    widthChars: 160,
+    contrast: 1.15,
+    gamma: 1.20,
+    fps: 30,
+    color: '#8ac7ff',
+    background: '#000000',
+    charset: '@%#*+=-:. ',
+    invert: true,
+    isFullscreen: false,    // наш флаг
+  };
 
-    // дефолты
-    this.state = {
-      facing: 'user',
-      mirror: true,            // рисуем отзеркаленно на канвас, чтобы получить НЕ-зеркальную картинку
-      widthChars: 160,
-      contrast: 1.15,
-      gamma: 1.20,
-      fps: 30,
-      color: '#8ac7ff',
-      background: '#000000',
-      ramp: (window.ASCII_RAMPS?.get?.('classic')) || "@%#*+=-:.",
-      invert: true
-    };
+  // Вспомогательные канвасы
+  const off = document.createElement('canvas');
+  const ctx = off.getContext('2d', { willReadFrequently: true });
 
-    // подложки
-    this.off = document.createElement('canvas');
-    this.ctx = this.off.getContext('2d', { willReadFrequently: true });
+  // Для авто-подгонки шрифта
+  const measurePre = document.createElement('pre');
+  measurePre.style.cssText = `
+    position:absolute; left:-99999px; top:-99999px; margin:0;
+    white-space:pre; line-height:1ch; font-family: ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
+  `;
+  document.body.appendChild(measurePre);
 
-    this.measurePre = document.createElement('pre');
-    this.measurePre.style.cssText = `
-      position:absolute; left:-99999px; top:-99999px; margin:0;
-      white-space:pre; line-height:1ch;
-      font-family: ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
-    `;
-    document.body.appendChild(this.measurePre);
-
-    this.raf = null;
-    this.lastFrameTime = 0;
-    this._resizeObs = new ResizeObserver(() => this._refitNow());
-    this._resizeObs.observe(this.stage);
-
-    // применим цвета
-    this.out.style.color = this.state.color;
-    this.out.style.backgroundColor = this.state.background;
-    this.stage.style.backgroundColor = this.state.background;
-  }
-
-  _ensureVideo() {
-    const v = document.createElement('video');
-    v.autoplay = true;
-    v.playsInline = true;
-    v.muted = true;
-    v.hidden = true;
-    document.body.appendChild(v);
-    return v;
-  }
-
-  setOptions(o = {}) {
-    const s = this.state;
-    if (o.widthChars != null) s.widthChars = +o.widthChars;
-    if (o.contrast != null)   s.contrast   = +o.contrast;
-    if (o.gamma != null)      s.gamma      = +o.gamma;
-    if (o.fps != null)        s.fps        = +o.fps;
-    if (o.color)              { s.color = o.color; this.out.style.color = s.color; }
-    if (o.background)         { s.background = o.background; this.out.style.backgroundColor = s.background; this.stage.style.backgroundColor = s.background; }
-    if (o.ramp)               s.ramp = String(o.ramp);
-    if (o.invert != null)     s.invert = !!o.invert;
-  }
-
-  async start() {
+  // ============== КАМЕРА ==============
+  async function startStream() {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: this.state.facing } });
-      this.video.srcObject = stream;
-      await this.video.play();
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: state.facing }
+      });
+      app.vid.srcObject = stream;
+      await app.vid.play();
     } catch (e) {
       console.error('getUserMedia error', e);
-      throw e;
-    }
-
-    if (this.raf) cancelAnimationFrame(this.raf);
-    const loop = (ts) => {
-      this.raf = requestAnimationFrame(loop);
-      const interval = 1000 / this.state.fps;
-      if (ts - this.lastFrameTime < interval) return;
-      this.lastFrameTime = ts;
-      this._renderFrame();
-    };
-    this.raf = requestAnimationFrame(loop);
-    this._refitNow();
-  }
-
-  async flip() {
-    if (isMobileUA) {
-      // на мобилке меняем камеру
-      this.state.facing = this.state.facing === 'user' ? 'environment' : 'user';
-      const s = this.video.srcObject;
-      if (s) s.getTracks().forEach(t => t.stop());
-      await this.start();
-      this.state.mirror = true;  // оставляем «правильный» вид
-    } else {
-      // на десктопе — просто зеркалим/раззеркаливаем
-      this.state.mirror = !this.state.mirror;
+      alert('Камера недоступна');
     }
   }
 
-  _measureCharAspect() {
-    this.measurePre.textContent = 'M\nM';
-    this.measurePre.style.fontSize = getComputedStyle(this.out).fontSize || '16px';
-    const rect = this.measurePre.getBoundingClientRect();
+  // ============== РЕНДЕРИНГ ==============
+  let raf = null;
+  let lastFrameTime = 0;
+
+  function setUI() {
+    app.ui.width.value = state.widthChars;
+    app.ui.widthVal.textContent = state.widthChars;
+
+    app.ui.contrast.value = state.contrast;
+    app.ui.contrastVal.textContent = state.contrast.toFixed(2);
+
+    app.ui.gamma.value = state.gamma;
+    app.ui.gammaVal.textContent = state.gamma.toFixed(2);
+
+    app.ui.fps.value = state.fps;
+    app.ui.fpsVal.textContent = state.fps;
+
+    app.ui.fg.value = state.color;
+    app.ui.bg.value = state.background;
+
+    app.ui.charset.value = state.charset;
+    app.ui.invert.checked = state.invert;
+
+    app.out.style.color = state.color;
+    app.out.style.backgroundColor = state.background;
+    app.stage.style.backgroundColor = state.background;
+  }
+
+  // Пересчёт h и подготовка offscreen размера
+  function updateGridSize() {
+    const v = app.vid;
+    if (!v.videoWidth || !v.videoHeight) return { w: state.widthChars, h: 1 };
+
+    const ratio = measureCharAspect();
+    const aspect = (v.videoHeight / v.videoWidth) / ratio;
+
+    const w = Math.max(1, Math.round(state.widthChars));
+    const h = Math.max(1, Math.round(w * aspect));
+
+    off.width = w;
+    off.height = h;
+    return { w, h };
+  }
+
+  function measureCharAspect() {
+    measurePre.textContent = 'M\nM';
+    measurePre.style.fontSize = app.out.style.fontSize || '16px';
+    const rect = measurePre.getBoundingClientRect();
     const lineH = rect.height / 2;
-    const chW = rect.width;
+    const chW = rect.width / 1;
     const charRatio = lineH / chW; // H/W
     return 1 / charRatio;          // W/H
   }
 
-  _gridSize() {
-    const v = this.video;
-    if (!v.videoWidth || !v.videoHeight) return { w: this.state.widthChars, h: 1 };
-    const ratio = this._measureCharAspect();
-    const aspect = (v.videoHeight / v.videoWidth) / ratio;
-    const w = Math.max(1, Math.round(this.state.widthChars));
-    const h = Math.max(1, Math.round(w * aspect));
-    this.off.width = w;
-    this.off.height = h;
-    return { w, h };
-  }
+  function loop(ts) {
+    raf = requestAnimationFrame(loop);
 
-  _renderFrame() {
-    const v = this.video;
+    // FPS-ограничитель
+    const frameInterval = 1000 / state.fps;
+    if (ts - lastFrameTime < frameInterval) return;
+    lastFrameTime = ts;
+
+    const v = app.vid;
     if (!v.videoWidth || !v.videoHeight) return;
 
-    const { w, h } = this._gridSize();
+    const { w, h } = updateGridSize();
 
-    // трансформа для зеркала
-    this.ctx.setTransform(this.state.mirror ? -1 : 1, 0, 0, 1, this.state.mirror ? w : 0, 0);
-    this.ctx.drawImage(v, 0, 0, w, h);
-    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+    // Подготовка трансформа для зеркала
+    // mirror = true ⇒ рисуем с scaleX(-1), чтобы получить НЕ-зеркальную картинку
+    ctx.setTransform(state.mirror ? -1 : 1, 0, 0, 1, state.mirror ? w : 0, 0);
+    ctx.drawImage(v, 0, 0, w, h);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-    const data = this.ctx.getImageData(0, 0, w, h).data;
+    const data = ctx.getImageData(0, 0, w, h).data;
 
-    const chars = this.state.ramp;
+    // Генерация ASCII
+    const chars = state.charset;
     const n = chars.length - 1;
-    const inv = this.state.invert ? -1 : 1;
-    const bias = this.state.invert ? 255 : 0;
+    const inv = state.invert ? -1 : 1;
+    const bias = state.invert ? 255 : 0;
 
-    const gamma = this.state.gamma;
-    const contrast = this.state.contrast;
+    const gamma = state.gamma;
+    const contrast = state.contrast;
 
     let out = '';
     let i = 0;
@@ -157,10 +161,12 @@ export class AsciiApp {
       for (let x = 0; x < w; x++, i += 4) {
         const r = data[i], g = data[i+1], b = data[i+2];
         let Y = 0.2126*r + 0.7152*g + 0.0722*b;
+
         let v01 = Y / 255;
         v01 = ((v01 - 0.5) * contrast) + 0.5;
         v01 = Math.min(1, Math.max(0, v01));
         v01 = Math.pow(v01, 1 / gamma);
+
         const Yc = Math.max(0, Math.min(255, (bias + inv * (v01 * 255))));
         const idx = Math.round((Yc / 255) * n);
         line += chars[idx];
@@ -168,193 +174,240 @@ export class AsciiApp {
       out += line + '\n';
     }
 
-    this.out.textContent = out;
+    app.out.textContent = out;
+    refitFont(w, h);
   }
 
-  _refitNow() {
-    // подбор font-size под размер сцены
-    const { w, h } = this._gridSize();
-    const stageW = this.stage.clientWidth;
-    const stageH = this.stage.clientHeight;
+  // Подбор font-size
+  let refitLock = false;
+  function refitFont(cols, rows) {
+    if (refitLock) return;
+    refitLock = true;
 
-    this.measurePre.textContent = ('M'.repeat(w) + '\n').repeat(h);
-    const currentFS = parseFloat(getComputedStyle(this.out).fontSize) || 16;
-    this.measurePre.style.fontSize = currentFS + 'px';
+    const stageW = app.stage.clientWidth;
+    const stageH = app.stage.clientHeight;
 
-    let r = this.measurePre.getBoundingClientRect();
-    const k1 = Math.min(stageW / r.width, stageH / r.height);
-    let newFS = Math.max(6, Math.floor(currentFS * k1));
-    this.out.style.fontSize = newFS + 'px';
+    measurePre.textContent = ('M'.repeat(cols) + '\n').repeat(rows);
+    const currentFS = parseFloat(getComputedStyle(app.out).fontSize) || 16;
+    measurePre.style.fontSize = currentFS + 'px';
 
-    this.measurePre.style.fontSize = newFS + 'px';
-    r = this.measurePre.getBoundingClientRect();
-    const k2 = Math.min(stageW / r.width, stageH / r.height);
-    newFS = Math.max(6, Math.floor(newFS * k2));
-    this.out.style.fontSize = newFS + 'px';
+    let mRect = measurePre.getBoundingClientRect();
+    const kW = stageW / mRect.width;
+    const kH = stageH / mRect.height;
+    const k = Math.min(kW, kH);
+
+    const newFS = Math.max(6, Math.floor(currentFS * k));
+    app.out.style.fontSize = newFS + 'px';
+
+    measurePre.style.fontSize = newFS + 'px';
+    mRect = measurePre.getBoundingClientRect();
+    const k2 = Math.min(stageW / mRect.width, stageH / mRect.height);
+    const finalFS = Math.max(6, Math.floor(newFS * k2));
+    app.out.style.fontSize = finalFS + 'px';
+
+    refitLock = false;
   }
-}
 
-export function wireFullscreen(buttonEl, stageEl) {
-  const stage = stageEl || document.querySelector('.stage') || document.body;
+  // ============== FULLSCREEN (tap-to-exit) ==============
+  // Кросс-браузерные хелперы:
+  function inNativeFullscreen() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+  }
 
-  const inNative = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
-  const reqFull = async () => {
+  async function requestFull() {
     try {
-      if (stage.requestFullscreen) await stage.requestFullscreen();
-      else if (stage.webkitRequestFullscreen) await stage.webkitRequestFullscreen();
-    } catch (e) {}
-  };
-  const exitFull = async () => {
-    try {
-      if (document.exitFullscreen) await document.exitFullscreen();
-      else if (document.webkitExitFullscreen) await document.webkitExitFullscreen();
-    } catch (e) {}
-  };
-
-  let fsTapHandler = null;
-  let enteredAt = 0;
-
-  const enableTapToExit = () => {
-    disableTapToExit();
-    fsTapHandler = (e) => {
-      if (Date.now() - enteredAt < 300) return; // защита от двойного тапа
-      const tag = (e.target.tagName || '').toLowerCase();
-      if (['button','a','input','select','textarea','label'].includes(tag)) return;
-      exitFull();
-    };
-    stage.addEventListener('click', fsTapHandler, { passive: true });
-    stage.addEventListener('touchend', fsTapHandler, { passive: true });
-  };
-  const disableTapToExit = () => {
-    if (!fsTapHandler) return;
-    stage.removeEventListener('click', fsTapHandler);
-    stage.removeEventListener('touchend', fsTapHandler);
-    fsTapHandler = null;
-  };
-
-  const enter = async () => {
-    enteredAt = Date.now();
-    await reqFull();
-    enableTapToExit();
-  };
-
-  const exit = async () => {
-    await exitFull();
-    disableTapToExit();
-  };
-
-  if (buttonEl) {
-    buttonEl.addEventListener('click', () => {
-      if (!inNative()) enter();
-      else exit();
-    });
-  }
-
-  document.addEventListener('fullscreenchange', () => {
-    if (!inNative()) disableTapToExit();
-  });
-}
-
-// === Автоподготовка index.html ===
-export function bootIndex() {
-  const $ = (s) => document.querySelector(s);
-  const ui = {
-    out: $('#out'),
-    stage: $('#stage'),
-    vid: $('#vid'),
-    flip: $('#flip'),
-    toggle: $('#toggle'),
-    settings: $('#settings'),
-    width: $('#width'),
-    widthVal: $('#width_val'),
-    contrast: $('#contrast'),
-    contrastVal: $('#contrast_val'),
-    gamma: $('#gamma'),
-    gammaVal: $('#gamma_val'),
-    fps: $('#fps'),
-    fpsVal: $('#fps_val'),
-    fg: $('#fg'),
-    bg: $('#bg'),
-    charset: $('#charset'),
-    charsetCustom: $('#charset_custom'),
-    invert: $('#invert'),
-    fs: $('#fs')
-  };
-
-  const app = new AsciiApp(ui.out, { stageEl: ui.stage, videoEl: ui.vid });
-
-  // начальные значения
-  ui.width.value = app.state.widthChars;
-  ui.widthVal.textContent = app.state.widthChars;
-  ui.contrast.value = app.state.contrast;
-  ui.contrastVal.textContent = app.state.contrast.toFixed(2);
-  ui.gamma.value = app.state.gamma;
-  ui.gammaVal.textContent = app.state.gamma.toFixed(2);
-  ui.fps.value = app.state.fps;
-  ui.fpsVal.textContent = app.state.fps;
-  ui.fg.value = app.state.color;
-  ui.bg.value = app.state.background;
-  ui.invert.checked = app.state.invert;
-
-  // charset: стартуем с 'classic'
-  ui.charset.value = 'classic';
-  if (ui.charsetCustom) ui.charsetCustom.style.display = 'none';
-  app.state.ramp = (window.ASCII_RAMPS?.get?.('classic')) || app.state.ramp;
-
-  // биндинги
-  ui.toggle.addEventListener('click', () => {
-    const hidden = ui.settings.hasAttribute('hidden');
-    if (hidden) ui.settings.removeAttribute('hidden');
-    else ui.settings.setAttribute('hidden', '');
-  });
-
-  ui.flip.addEventListener('click', () => app.flip());
-
-  if (ui.fs) wireFullscreen(ui.fs, ui.stage);
-
-  ui.width.addEventListener('input', e => {
-    app.setOptions({ widthChars: +e.target.value });
-    ui.widthVal.textContent = e.target.value;
-  });
-
-  ui.contrast.addEventListener('input', e => {
-    const v = +e.target.value;
-    app.setOptions({ contrast: v });
-    ui.contrastVal.textContent = v.toFixed(2);
-  });
-
-  ui.gamma.addEventListener('input', e => {
-    const v = +e.target.value;
-    app.setOptions({ gamma: v });
-    ui.gammaVal.textContent = v.toFixed(2);
-  });
-
-  ui.fps.addEventListener('input', e => {
-    const v = +e.target.value;
-    app.setOptions({ fps: v });
-    ui.fpsVal.textContent = v;
-  });
-
-  ui.fg.addEventListener('input', e => app.setOptions({ color: e.target.value }));
-  ui.bg.addEventListener('input', e => app.setOptions({ background: e.target.value }));
-
-  function updateCharsetFromUI() {
-    const key = ui.charset.value;
-    if (key === 'custom') {
-      if (ui.charsetCustom) ui.charsetCustom.style.display = 'inline-block';
-      const custom = (ui.charsetCustom && ui.charsetCustom.value) ? ui.charsetCustom.value : ' .:-=+*#%@';
-      app.setOptions({ ramp: custom });
-    } else {
-      if (ui.charsetCustom) ui.charsetCustom.style.display = 'none';
-      const ramp = (window.ASCII_RAMPS && window.ASCII_RAMPS.get(key)) || key;
-      app.setOptions({ ramp });
+      if (app.stage.requestFullscreen) await app.stage.requestFullscreen();
+      else if (app.stage.webkitRequestFullscreen) await app.stage.webkitRequestFullscreen();
+      state.isFullscreen = true;
+    } catch(e) {
+      // игнорируем — пойдём фолбэком
     }
   }
-  ui.charset.addEventListener('change', updateCharsetFromUI);
-  if (ui.charsetCustom) ui.charsetCustom.addEventListener('input', updateCharsetFromUI);
 
-  ui.invert.addEventListener('change', e => app.setOptions({ invert: e.target.checked }));
+  async function lockLandscapeIfPossible() {
+    try {
+      if (screen.orientation && screen.orientation.lock) {
+        await screen.orientation.lock('landscape');
+      } else {
+        // iOS / старые браузеры — фолбэк: дадим хотя бы чистый экран
+        document.body.classList.add('body-fullscreen');
+      }
+    } catch(e) {
+      // если запретили — фолбэк
+      document.body.classList.add('body-fullscreen');
+    }
+  }
 
-  // поехали
-  app.start().catch(e => alert('Камера недоступна: ' + e.message));
-}
+  // >>> Новая логика: выход по ТАПУ на сцену
+  let fsTapHandler = null;
+  let fsEnteredAt = 0;
+
+  function enableTapToExit() {
+    disableTapToExit(); // защита от дубля
+
+    fsTapHandler = (e) => {
+      // защита от случайного мгновенного выхода тем же тапом
+      if (Date.now() - fsEnteredAt < 300) return;
+
+      // игнорим явные интерактивные элементы (если будут поверх)
+      const t = e.target;
+      const tag = (t.tagName || '').toLowerCase();
+      if (['button','a','input','select','textarea','label'].includes(tag)) return;
+
+      exitFullscreen();
+    };
+
+    app.stage.addEventListener('click', fsTapHandler, { passive: true });
+    app.stage.addEventListener('touchend', fsTapHandler, { passive: true });
+  }
+
+  function disableTapToExit() {
+    if (!fsTapHandler) return;
+    app.stage.removeEventListener('click', fsTapHandler);
+    app.stage.removeEventListener('touchend', fsTapHandler);
+    fsTapHandler = null;
+  }
+
+  async function enterFullscreen() {
+    fsEnteredAt = Date.now();
+
+    if (isMobile) {
+      // мобилки: fullscreen + ландшафт
+      await requestFull();
+      await lockLandscapeIfPossible();
+    } else {
+      // десктоп: чистый fullscreen
+      await requestFull();
+    }
+
+    // включаем выход по тапу
+    enableTapToExit();
+  }
+
+  async function exitFullscreen() {
+    try {
+      if (inNativeFullscreen()) {
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else if (document.webkitExitFullscreen) await document.webkitExitFullscreen();
+      }
+    } catch(e) {}
+    document.body.classList.remove('body-fullscreen');
+    state.isFullscreen = false;
+
+    // снимаем блокировку ориентации, если была
+    if (screen.orientation && screen.orientation.unlock) {
+      try { screen.orientation.unlock(); } catch(e) {}
+    }
+
+    // выключаем обработчик тапа
+    disableTapToExit();
+  }
+
+  // Системный выход из nat Fullscreen (жест «назад» и т.п.)
+  document.addEventListener('fullscreenchange', () => {
+    const active = inNativeFullscreen();
+    state.isFullscreen = active;
+    if (!active) {
+      document.body.classList.remove('body-fullscreen');
+      disableTapToExit();
+    }
+  });
+
+  // ============== СВЯЗКА UI ==============
+  function bindUI() {
+    // Показ/скрытие панели
+    app.ui.toggle.addEventListener('click', () => {
+      const hidden = app.ui.settings.hasAttribute('hidden');
+      if (hidden) app.ui.settings.removeAttribute('hidden');
+      else app.ui.settings.setAttribute('hidden', '');
+      setTimeout(() => {
+        const { w, h } = updateGridSize();
+        refitFont(w, h);
+      }, 0);
+    });
+
+    // Кнопка "Фронт/Тыл"
+    app.ui.flip.addEventListener('click', async () => {
+      if (isMobile) {
+        // Мобилки: реальный свитч камеры
+        state.facing = state.facing === 'user' ? 'environment' : 'user';
+        const s = app.vid.srcObject;
+        if (s) s.getTracks().forEach(t => t.stop());
+        await startStream();
+        // В мобильном режиме оставляем текущее "правильное" отображение
+        state.mirror = true;
+      } else {
+        // Десктоп: просто зеркалим/раззеркаливаем
+        state.mirror = !state.mirror;
+      }
+    });
+
+    // Полноэкранный режим (вход по кнопке, выход — ТОЛЬКО по ТАПУ на сцену)
+    if (app.ui.fs) {
+      app.ui.fs.addEventListener('click', () => {
+        if (!state.isFullscreen) enterFullscreen();
+        else exitFullscreen(); // на десктопе оставим тож возможность выходить кнопкой
+      });
+    }
+
+    app.ui.width.addEventListener('input', e => {
+      state.widthChars = +e.target.value;
+      app.ui.widthVal.textContent = state.widthChars;
+    });
+
+    app.ui.contrast.addEventListener('input', e => {
+      state.contrast = +e.target.value;
+      app.ui.contrastVal.textContent = state.contrast.toFixed(2);
+    });
+    app.ui.gamma.addEventListener('input', e => {
+      state.gamma = +e.target.value;
+      app.ui.gammaVal.textContent = state.gamma.toFixed(2);
+    });
+
+    app.ui.fps.addEventListener('input', e => {
+      state.fps = +e.target.value;
+      app.ui.fpsVal.textContent = state.fps;
+    });
+
+    app.ui.fg.addEventListener('input', e => {
+      state.color = e.target.value;
+      app.out.style.color = state.color;
+    });
+    app.ui.bg.addEventListener('input', e => {
+      state.background = e.target.value;
+      app.out.style.backgroundColor = state.background;
+      app.stage.style.backgroundColor = state.background;
+    });
+
+    app.ui.charset.addEventListener('change', e => {
+      state.charset = e.target.value;
+    });
+    app.ui.invert.addEventListener('change', e => {
+      state.invert = e.target.checked;
+    });
+
+    // Подгон при изменении окна/ориентации
+    new ResizeObserver(() => {
+      const { w, h } = updateGridSize();
+      refitFont(w, h);
+    }).observe(app.stage);
+  }
+
+  // ============== СТАРТ ==============
+  async function init() {
+    setUI();
+    bindUI();
+    await startStream();
+
+    // Стартуем сразу с НЕ-зеркального вида (нормальная ориентация по горизонтали)
+    state.mirror = true;
+
+    if (raf) cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(loop);
+
+    const { w, h } = updateGridSize();
+    refitFont(w, h);
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
+})();
