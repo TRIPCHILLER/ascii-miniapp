@@ -14,9 +14,10 @@ html, body, .wrap { overflow-x: hidden; }
 .wrap{ display:flex; flex-direction:column; height:100%; }
 
 /* ===== ТУЛБАР ===== */
-.toolbar{
+.toolbar {
   display:flex; gap:8px; align-items:center;
-  padding:10px; background:var(--ui-bg);
+  padding:10px;
+  background:#000;   /* ← фиксированный чёрный */
 }
 
 /* ===== КНОПКИ — полностью прозрачные ===== */
@@ -240,3 +241,4 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 @media (max-width: 360px){
   .panel .row.colors{ flex-direction: column; }
 }
+
