@@ -4,8 +4,8 @@ html,body{ height:100%; margin:0; }
 body.theme-dark{ background:#000; color:#fff; }
 
 :root{
-  --ui-bg:#151515;
-  --ui-panel:#1b1b1b;
+  --ui-bg:#151515;     /* тулбар/фон панели */
+  --ui-panel:#1b1b1b;  /* карточки внутри панели */
   --ui-text:#ffffff;
 }
 
@@ -17,10 +17,11 @@ body.theme-dark{ background:#000; color:#fff; }
   padding:10px; background:var(--ui-bg);
 }
 
-/* ===== КНОПКИ ===== */
+/* ===== КНОПКИ — полностью прозрачные ===== */
 button, .btn, input[type="button"], input[type="submit"]{
   appearance:none; -webkit-appearance:none; -moz-appearance:none;
   background:transparent !important;
+  background-image:none !important;
   color:var(--ui-text);
   border:0 !important; outline:none !important; box-shadow:none !important;
   padding:.55rem 1rem; border-radius:0; cursor:pointer;
@@ -32,9 +33,6 @@ button:focus, .btn:focus{
   background:transparent !important;
   border:0 !important; outline:none !important; box-shadow:none !important;
 }
-
-.btn-primary{ background:#1f6aff !important; color:#fff !important; }
-.btn-ghost{ border:1px solid rgba(255,255,255,.15) !important; color:#aab7ff !important; }
 
 /* ===== ПАНЕЛЬ ===== */
 .panel{
@@ -66,23 +64,52 @@ button:focus, .btn:focus{
   border-radius:0; max-width:100%; max-height:100%;
 }
 
-/* ===== RANGE ===== */
+/* ===== RANGE (ползунки) — белый тонкий трек, квадратный белый бегунок ===== */
 input[type="range"]{
-  appearance:none; background:transparent; height:18px; margin:0; padding:0;
+  appearance:none; -webkit-appearance:none; -moz-appearance:none;
+  background:transparent; height:18px;
+  margin:0; padding:0;
 }
-input[type="range"]::-webkit-slider-runnable-track{ height:2px; background:#fff; border:none; }
+/* WebKit */
+input[type="range"]::-webkit-slider-runnable-track{
+  height:2px; background:#fff; border:none; box-shadow:none;
+}
 input[type="range"]::-webkit-slider-thumb{
-  -webkit-appearance:none; width:16px; height:16px; background:#fff; border:none; border-radius:0; margin-top:-7px;
+  -webkit-appearance:none;
+  width:16px; height:16px; background:#fff;
+  border:none; border-radius:0; margin-top:-7px; box-shadow:none;
 }
-input[type="range"]::-moz-range-track{ height:2px; background:#fff; border:none; }
-input[type="range"]::-moz-range-thumb{ width:16px; height:16px; background:#fff; border:none; border-radius:0; }
+/* Firefox */
+input[type="range"]::-moz-range-track{
+  height:2px; background:#fff; border:none;
+}
+input[type="range"]::-moz-range-thumb{
+  width:16px; height:16px; background:#fff;
+  border:none; border-radius:0; box-shadow:none;
+}
+/* MS Edge (old) */
+input[type="range"]::-ms-track{
+  height:2px; background:transparent; border-color:transparent; color:transparent;
+}
+input[type="range"]::-ms-fill-lower,
+input[type="range"]::-ms-fill-upper{
+  background:#fff; border:none;
+}
+input[type="range"]::-ms-thumb{
+  width:16px; height:16px; background:#fff;
+  border:none; border-radius:0; margin-top:0; box-shadow:none;
+}
+
+/* ===== SELECT/INPUT — без рамок/заливок, белый текст ===== */
 input, select, textarea{
-  appearance:none; background:transparent; color:var(--ui-text);
+  appearance:none; -webkit-appearance:none; -moz-appearance:none;
+  background:transparent; color:var(--ui-text);
   border:0 !important; outline:none !important; box-shadow:none !important;
 }
 select{ background:transparent; color:var(--ui-text); }
 option{ background:var(--ui-panel); color:var(--ui-text); }
 
+/* небольшая защита от «прыжков» при клавиатуре на мобилках */
 @supports (padding: env(safe-area-inset-bottom)){
   .wrap{ padding-bottom: env(safe-area-inset-bottom); }
 }
@@ -93,30 +120,45 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 }
 
 /* ===== FULLSCREEN ===== */
-:fullscreen .toolbar, :fullscreen .panel { display:none !important; }
-.body-fullscreen .toolbar, .body-fullscreen .panel { display:none !important; }
+:fullscreen .toolbar,
+:fullscreen .panel { display:none !important; }
 
-.fs-exit { display:none !important; }
-.body-fullscreen { overflow:hidden; }
-.body-fullscreen .wrap#app { position:fixed; inset:0; width:100vw; height:100vh; background:#000; z-index:9999; }
-.body-fullscreen #stage { width:100%; height:100%; touch-action:manipulation; }
+.body-fullscreen .toolbar,
+.body-fullscreen .panel { display:none !important; }
 
-/* ===== Custom Charset Panel ===== */
-.ascii-custom[hidden]{ display:none !important; }
-.ascii-custom{ margin-top:.5rem; display:grid; gap:.5rem; }
-.ascii-custom__label{ opacity:.85; font-size:.9rem; }
-.ascii-custom__row{ display:flex; gap:.5rem; align-items:center; }
-.ascii-input{
-  width:100%; padding:.5rem .6rem; border:1px solid rgba(255,255,255,.2);
-  background:rgba(255,255,255,.04); color:#dfe9ff; border-radius:.5rem;
-  font-family:"Better VCR", ui-monospace, Menlo, Consolas, monospace;
+.fs-exit {
+  position:fixed; top:10px; right:10px; width:36px; height:36px;
+  display:flex; align-items:center; justify-content:center;
+  background:rgba(0,0,0,.6);
+  color:var(--ui-text);
+  cursor:pointer; z-index:9999; user-select:none;
+}
+.fs-exit::after { content:"⤢"; font-size:18px; line-height:1; }
+
+.body-fullscreen .stage { width:100vw; height:100vh; }
+
+/* === Fullscreen fallback / Чистый экран на мобилках без системного FS === */
+.body-fullscreen {
+  overflow: hidden;
 }
 
-/* Ровная моносетка (на всякий случай ещё раз) */
-.ascii-surface{
-  white-space:pre;
-  font-family:"Better VCR", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-  font-kerning:none; font-variant-ligatures:none;
-  letter-spacing:0; line-height:1;
-  -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+.body-fullscreen .wrap#app {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background: #000; /* чтобы не просвечивало */
+  z-index: 9999;
+}
+
+.body-fullscreen #stage {
+  width: 100%;
+  height: 100%;
+  touch-action: manipulation; /* приятнее на тапах */
+}
+
+/* На всякий случай: скрыть любые пережитки иконок выхода, если где-то остались */
+.fs-exit,
+#fs-exit {
+  display: none !important;
 }
