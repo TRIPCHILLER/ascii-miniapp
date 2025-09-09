@@ -395,15 +395,6 @@ function updateMirrorForFacing() {
 }
   // ============== СВЯЗКА UI ==============
   function bindUI() {
-    // Подгоняем ширину селекта "НАБОР" под текст текущего пункта
-function fitSelectWidth(sel) {
-  try {
-    const txt = sel.options[sel.selectedIndex]?.textContent || '';
-    // запас на стрелку и паддинги, ограничим диапазон, чтобы не прыгало
-        const ch = Math.min(Math.max(txt.length + 3, 8), 26);
-    sel.style.width = ch + 'ch';
-  } catch(_) {}
-}
     // Показ/скрытие панели
     app.ui.toggle.addEventListener('click', () => {
       const hidden = app.ui.settings.hasAttribute('hidden');
@@ -476,7 +467,6 @@ app.ui.charset.addEventListener('change', e => {
     app.ui.customCharset.style.display = 'none';
     state.charset = e.target.value;
   }
-    fitSelectWidth(app.ui.charset);
 });
 
 // реагируем на ввод своих символов
@@ -502,8 +492,6 @@ app.ui.invert.addEventListener('change', e => {
       const { w, h } = updateGridSize();
       refitFont(w, h);
     }).observe(app.stage);
-      // Первый подгон ширины сразу при загрузке
-  fitSelectWidth(app.ui.charset);
   }
 
   // ============== СТАРТ ==============
@@ -522,14 +510,3 @@ app.ui.invert.addEventListener('change', e => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
-
-
-
-
-
-
-
-
-
-
-
