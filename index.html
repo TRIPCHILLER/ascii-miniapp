@@ -3,19 +3,19 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>ASCII VISOR· app</title>
+  <title>ASCII live · app</title>
   <link rel="stylesheet" href="https://fonts.cdnfonts.com/css/better-vcr" />
-  <link rel="stylesheet" href="styles.css?v=fit1" />
+  <link rel="stylesheet" href="styles.css?v=fit2" />
 </head>
 <body class="theme-dark">
   <div class="wrap" id="app">
 
-<!-- Верхняя панель -->
-<div class="toolbar">
-  <button class="btn" id="flip">РАЗВЕРНУТЬ</button>
-  <button class="btn" id="toggle">НАСТРОЙКИ</button>
-  <button class="btn ghost" id="fs" aria-label="Fullscreen">FULLSCREEN</button>
-</div>
+    <!-- Верхняя панель -->
+    <div class="toolbar">
+      <button class="btn" id="flip">РАЗВЕРНУТЬ</button>
+      <button class="btn" id="toggle">НАСТРОЙКИ</button>
+      <button class="btn ghost" id="fs" aria-label="Fullscreen">FULLSCREEN</button>
+    </div>
 
     <!-- Панель настроек (по умолчанию скрыта) -->
     <div class="panel" id="settings" hidden>
@@ -38,17 +38,17 @@
       </label>
 
       <label>
-        <span>ТЕКСТ:</span>
+        <span>ТЕКСТ</span>
         <input id="fg" type="color" />
       </label>
 
       <label>
-        <span>ФОН:</span>
+        <span>ФОН</span>
         <input id="bg" type="color" />
       </label>
 
       <label>
-        <span>СТИЛЬ:</span>
+        <span>СТИЛЬ</span>
         <select id="stylePreset"></select>
       </label>
 
@@ -61,22 +61,35 @@
       <label>
         <span>НАБОР:</span>
         <select id="charset">
-          <option value='@%#*+=-:. '>CLASSIC</option>
-          <option value='0123456789'>NUMBERS</option>
-          <option value='ABCDEFGHIJKLMNOPQRSTUVWXYZ'>LETTERS (A–Z)</option>
-          <option value='aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyYzZ'>
-  MORE LETTERS (a–z, A–Z)
-</option>
-          <option value='アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン'>
-  カタカナ
-</option>
-<option value='あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん'>
-  ひらがな
-</option>
-          <option value='····•○◦ '>. · • ○</option>
-          <option value='░▒▓█'>░▒▓█</option>
+          <option value='classic'>CLASSIC</option>
+          <option value='numbers'>NUMBERS</option>
+          <option value='letters_lower'>LETTERS (a–z)</option>
+          <option value='letters_upper'>LETTERS (A–Z)</option>
+          <option value='dots_ascii'>DOTS (ASCII)</option>
+          <option value='blocks'>░▒▓█</option>
+          <option value='custom'>CUSTOM</option>
         </select>
       </label>
+
+      <!-- Панель кастомного набора -->
+      <div class="ascii-custom" id="asciiCustom" hidden>
+        <label for="customChars" class="ascii-custom__label">Свой набор символов</label>
+        <div class="ascii-custom__row">
+          <input id="customChars"
+                 class="ascii-input"
+                 type="text"
+                 inputmode="text"
+                 autocomplete="off"
+                 spellcheck="false"
+                 placeholder="Например:  ·.:;!il1tfL#MW@" />
+          <button id="applyCustom" class="btn btn-primary">Применить</button>
+          <button id="resetCustom" class="btn btn-ghost" title="Сбросить на Classic">Сброс</button>
+        </div>
+        <small class="ascii-help">
+          Совет: добавь пробел в начале для «чёрного». Дубликаты убираются автоматически. Юникод можно.
+        </small>
+      </div>
+
       <label class="check">
         <input id="invert" type="checkbox" />
         <span>ИНВЕРСИЯ</span>
@@ -85,16 +98,14 @@
 
     <!-- Сцена вывода -->
     <div class="stage" id="stage">
-      <pre id="out"></pre>
+      <pre id="out" class="ascii-surface"></pre>
     </div>
 
     <!-- Скрытое видео (источник камеры) -->
     <video id="vid" playsinline autoplay muted hidden></video>
   </div>
 
-  <script defer src="ascii.js?v=fit1"></script>
+  <!-- важное: теперь это ES-модуль -->
+  <script type="module" src="ascii.js?v=fit2"></script>
 </body>
 </html>
-
-
-
