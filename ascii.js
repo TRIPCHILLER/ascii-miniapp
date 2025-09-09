@@ -69,7 +69,7 @@
     { id:'gatoroboto', name:'GATO ROBOTO',       colors:['#2b0000', '#cc0e13'] },
     { id:'paperback',  name:'PAPERBACK',         colors:['#382b26', '#b8c2b9'] },
   ];
-  const CUSTOM_LABEL = 'пользовательский';
+  const CUSTOM_LABEL = 'ПОЛЬЗОВАТЕЛЬСКИЙ';
   const norm = (hex)=> (hex||'').toLowerCase().replace('#','');
   const toHex = v => v && v[0]==='#' ? v : ('#'+v);
   const lum = (hex)=>{ // относительная яркость 0..1
@@ -491,6 +491,7 @@ app.ui.invert.addEventListener('change', e => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
