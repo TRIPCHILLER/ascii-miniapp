@@ -132,6 +132,7 @@
       });
       app.vid.srcObject = stream;
       await app.vid.play();
+      updateMirrorForFacing();
     } catch (e) {
       console.error('getUserMedia error', e);
       alert('Камера недоступна');
@@ -387,7 +388,10 @@ if (lbl) lbl.textContent = state.invert ? 'ИНВЕРСИЯ: ВКЛ' : 'ИНВЕ
       disableTapToExit();
     }
   });
-
+function updateMirrorForFacing() {
+  // фронталка = зеркалим, тыловая = не зеркалим
+  state.mirror = (state.facing === 'user');
+}
   // ============== СВЯЗКА UI ==============
   function bindUI() {
     // Показ/скрытие панели
@@ -402,20 +406,16 @@ if (lbl) lbl.textContent = state.invert ? 'ИНВЕРСИЯ: ВКЛ' : 'ИНВЕ
     });
 
     // Кнопка "Фронт/Тыл"
-    app.ui.flip.addEventListener('click', async () => {
-      if (isMobile) {
-        // Мобилки: реальный свитч камеры
-        state.facing = state.facing === 'user' ? 'environment' : 'user';
-        const s = app.vid.srcObject;
-        if (s) s.getTracks().forEach(t => t.stop());
-        await startStream();
-        // В мобильном режиме оставляем текущее "правильное" отображение
-        state.mirror = true;
-      } else {
-        // Десктоп: просто зеркалим/раззеркаливаем
-        state.mirror = !state.mirror;
-      }
-    });
+app.ui.flip.addEventListener('click', async () => {
+  if (isMobile) {
+    state.facing = (state.facing === 'user') ? 'environment' : 'user';
+    const s = app.vid.srcObject;
+    if (s) s.getTracks().forEach(t => t.stop());
+    await startStream(); // внутри вызовется updateMirrorForFacing()
+  } else {
+    state.mirror = !state.mirror; // на ПК по-прежнему просто зеркалим
+  }
+});
 
     // Полноэкранный режим (вход по кнопке, выход — ТОЛЬКО по ТАПУ на сцену)
     if (app.ui.fs) {
@@ -482,9 +482,6 @@ app.ui.invert.addEventListener('change', e => {
     bindUI();
     await startStream();
 
-    // Стартуем сразу с НЕ-зеркального вида (нормальная ориентация по горизонтали)
-    state.mirror = true;
-
     if (raf) cancelAnimationFrame(raf);
     raf = requestAnimationFrame(loop);
 
@@ -494,6 +491,7 @@ app.ui.invert.addEventListener('change', e => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
