@@ -54,15 +54,21 @@ button:focus, .btn:focus{
 /* отдельная строка для ТЕКСТ/ФОН */
 .panel .row.colors{
   display:flex;
-  gap:6px;
+  flex-wrap: nowrap;     /* держим ТЕКСТ и ФОН в одной строке */
+  justify-content:flex-start;
+  align-items:center;
+  gap:6px;               /* можно 4px, если нужно плотнее */
   width:100%;
 }
+
 .panel .row.colors .color{
-  flex:1 1 0;
+  flex: 0 0 auto;        /* не растягиваем блоки на всю ширину */
   display:flex;
   align-items:center;
-  gap:4px;
+  gap:4px;               /* расстояние между словом и квадратиком */
+  flex-wrap: nowrap;     /* внутри label не переносим на новую строку */
 }
+
 
 /* компактный чекбокс — показываем только текст, без квадратика */
 .check{
@@ -233,14 +239,15 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   }
 
   /* ряд цветов чуть плотнее */
-  .panel .row.colors{ gap:4px; }
-  .panel .row.colors .color{ gap:2px; }
+  .panel .row.colors{ flex-wrap: nowrap; gap:4px; }
+  .panel .row.colors .color{ flex:0 0 auto; gap:2px; }
 }
 
 /* очень узкие экраны — можно сложить цвета в столбик (по желанию) */
 @media (max-width: 360px){
   .panel .row.colors{ flex-direction: column; }
 }
+
 
 
 
