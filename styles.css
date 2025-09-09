@@ -48,8 +48,17 @@ button:focus, .btn:focus{
 .panel input[type="range"]{ width:160px; }
 .panel output{ min-width:42px; text-align:right; }
 
-/* компактный чекбокс */
-.check{ display:flex; align-items:center; gap:8px; padding:6px 8px; }
+/* компактный чекбокс — показываем только текст, без квадратика */
+.check{
+  display:flex;
+  align-items:center;
+  /* gap убираем, т.к. остаётся только текст */
+  padding:6px 8px;
+  cursor:pointer;
+}
+.check input[type="checkbox"]{
+  display:none;        /* полностью убираем из потока, клики по label всё равно работают */
+}
 
 /* ===== СЦЕНА/ВЫВОД ===== */
 .stage{
@@ -169,5 +178,6 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 #fs-exit {
   display: none !important;
 }
+
 
 
