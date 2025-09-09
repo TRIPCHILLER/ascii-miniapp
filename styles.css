@@ -213,40 +213,27 @@ body, .toolbar, .panel, .btn, label, output, select, option {
     font-size: 14px;
   }
 
-  /* Кнопки: меньше отступы; тулбар переносится на 2 строки при нехватке места */
+  /* Кнопки и панель */
   .toolbar { gap: 6px; padding: 6px; flex-wrap: wrap; }
   .btn { padding: .4rem .6rem; }
-
-  /* Панель настроек компактнее */
   .panel { gap: 8px; padding: 6px; }
   .panel label { gap: 6px; padding: 4px 6px; }
 
-  /* Более компактные слайдеры */
+  /* Слайдеры компактнее */
   .panel input[type="range"] { width: 140px; height: 14px; }
   input[type="range"]::-webkit-slider-thumb { width: 12px; height: 12px; margin-top: -5px; }
   input[type="range"]::-moz-range-thumb     { width: 12px; height: 12px; }
 
-  /* Селекты/инпуты не раздувают ширину экрана */
+  /* Селекты/инпуты */
   select { max-width: 58vw; }
+  #charset_custom { width:100% !important; max-width:62vw; }
 
-  /* Поле «свои символы»: всегда влезает в экран */
-  #charset_custom {
-    width: 100% !important;     /* занимает всю строку внутри label */
-    max-width: 62vw;            /* но не шире 62% экрана */
-  }
-
-  /* ряд цветов чуть плотнее */
-@media (max-width: 600px) {
-  .panel .row.colors{ flex-wrap: wrap; gap:4px; width:auto; }
-  .panel .row.colors .color{ flex:0 0 auto; gap:2px; white-space:nowrap; }
+  /* Ряд цветов — компактно и без переполнения */
+  .panel .row.colors { flex-wrap: wrap; gap:4px; width:auto; }
+  .panel .row.colors .color { flex:0 0 auto; gap:2px; white-space:nowrap; }
 }
 
 /* очень узкие экраны — можно сложить цвета в столбик (по желанию) */
 @media (max-width: 360px){
   .panel .row.colors{ flex-direction: column; }
 }
-
-
-
-
-
