@@ -34,8 +34,8 @@
   const state = {
     facing: 'user',         // какая камера для мобилок
     mirror: true,           // режим рисования: true = отразить по X (НЕ-зеркало)
-    widthChars: 160,
-    contrast: 1.15,
+    widthChars: 100,
+    contrast: 1.50,
     gamma: 1.20,
     fps: 30,
     color: '#8ac7ff',
@@ -47,28 +47,27 @@
   // ===== Стили (палитры) =====
   // Порядок: [тёмный, светлый]; тёмный идёт на ФОН, светлый на ТЕКСТ
   const PRESETS = [
+    { id:'oldlcd',     name:'OLD LCD',           colors:['#000000', '#ffffff'] },
     { id:'macintosh',  name:'MACINTOSH',         colors:['#333319', '#e5ffff'] },
+    { id:'macpaint',   name:'MAC PAINT',         colors:['#051b2c', '#8bc8fe'] },
     { id:'zenith',     name:'ZENITH ZVM 1240',   colors:['#3f291e', '#fdca55'] },
+    { id:'obra',       name:'OBRA DINN',         colors:['#000b40', '#ebe1cd'] },
     { id:'ibm8503',    name:'IBM 8503',          colors:['#2e3037', '#ebe5ce'] },
     { id:'commodore',  name:'COMMODORE 1084',    colors:['#40318e', '#88d7de'] },
-    { id:'obra',       name:'OBRA DINN',         colors:['#000b40', '#ebe1cd'] },
-    { id:'oldlcd',     name:'OLD LCD',           colors:['#000000', '#ffffff'] },
     { id:'ibm5151',    name:'IBM 5151',          colors:['#25342f', '#01eb5f'] },
     { id:'matrix',     name:'MATRIX',            colors:['#000000', '#00ff40'] },
-    { id:'casio',      name:'CASIO BASIC',       colors:['#000000', '#83b07e'] },
+    { id:'casio',      name:'CASIO',             colors:['#000000', '#83b07e'] },
     { id:'funkyjam',   name:'FUNKY JAM',         colors:['#920244', '#fec28c'] },
     { id:'cornsole',   name:'CORNSOLE',          colors:['#6495ed', '#fff8dc'] },
-    { id:'postapoc',   name:'POSTAPOCALYPTIC SUNSET', colors:['#1d0f44', '#f44e38'] },
+    { id:'postapoc',   name:'POSTAPOC SUNSET',   colors:['#1d0f44', '#f44e38'] },
     { id:'laughcry',   name:'POP LAUGH CRY',     colors:['#452f47', '#d7bcad'] },
     { id:'flowers',    name:'FLOWERS AND ASBESTOS', colors:['#c62b69', '#edf4ff'] },
     { id:'pepper1bit', name:'1BIT PEPPER',       colors:['#100101', '#ebb5b5'] },
     { id:'shapebit',   name:'SHAPE BIT',         colors:['#200955', '#ff0055'] },
-    { id:'sangre',     name:'SANGRE',            colors:['#120628', '#ad1818'] },
     { id:'chasing',    name:'CHASING LIGHT',     colors:['#000000', '#ffff02'] },
     { id:'monsterbit', name:'MONSTER BIT',       colors:['#321632', '#cde9cd'] },
     { id:'gatoroboto', name:'GATO ROBOTO',       colors:['#2b0000', '#cc0e13'] },
     { id:'paperback',  name:'PAPERBACK',         colors:['#382b26', '#b8c2b9'] },
-    { id:'macpaint',   name:'MAC PAINT',         colors:['#051b2c', '#8bc8fe'] },
   ];
   const CUSTOM_LABEL = 'пользовательский';
   const norm = (hex)=> (hex||'').toLowerCase().replace('#','');
@@ -495,6 +494,7 @@ app.ui.invert.addEventListener('change', e => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
