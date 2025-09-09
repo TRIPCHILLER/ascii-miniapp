@@ -2,7 +2,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>ASCII live · pro</title>
-<link rel="stylesheet" href="styles.css?v=16">
+<link rel="stylesheet" href="styles.css?v=15">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="consent.js" defer></script>
 </head>
@@ -26,7 +26,7 @@
         <option value="classic">CLASSIC</option>
         <option value="digits">NUMBERS</option>
         <option value="letters">LETTERS</option>
-        <option value="dots">DOTS (ASCII)</option>
+        <option value="dots">Точки</option>
         <option value="blocks">░▒▓█</option>
         <option value="custom">CUSTOM</option>
       </select>
@@ -35,7 +35,8 @@
     <label><input id="invert" type="checkbox" checked> ИНВЕРСИЯ</label>
   </div>
 
-  <div class="stage"><pre id="out" class="ascii-surface"></pre></div>
+  <!-- фиксированная рамка вывода, забирает весь остаток окна -->
+  <div class="stage"><pre id="out"></pre></div>
 </div>
 
 <div class="modal" id="consent" hidden>
@@ -47,48 +48,36 @@
 </div>
 
 <script type="module">
-import { AsciiApp, wireFullscreen, buildRamp } from './ascii.js';
+import { AsciiApp, wireFullscreen } from './ascii.js';
 if (window.Telegram?.WebApp) { Telegram.WebApp.ready(); Telegram.WebApp.expand(); }
 
 const $ = id => document.getElementById(id);
 const ui = { out:$('out'), flip:$('flip'), fs:$('fs'), toolbar:$('toolbar') };
 const app = new AsciiApp(ui.out);
 
-function presetCandidates(name){
+function presetRamp(name){
   switch(name){
-    case 'digits':  return ' 1234567890';
-    case 'letters': return ' iljtfrxnuvczsyoeapdhgbqkmwILJTFRXNVCAZSEYOAPDHGBQKMW';
-    case 'dots':    return " .`:-*+ox%#@";
+    case 'digits':  return ' 00112233445566778899';
+    case 'letters': return '  iIl1tTjfJrRvxXcCuUnNzZmwWQO';
+    case 'dots':    return " .'`^,:;-_~";
     case 'blocks':  return ' ░▒▓█';
     case 'classic':
-    default:        return " .'`\",:;Il!i><~+_-?][}{1)(|\\/*tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
+    default:        return " .'`\",:;Il!i~+_-?][}{1tfjrxnuvczXYUJCLQ0089@#";
   }
 }
-async function rampFor(name, customRaw){
-  if (name === 'custom') {
-    const cand = normalize(customRaw || '');
-    return await buildRamp({ candidates:cand, fontFamily:app.fontFamily, fontSize:app.fontSize, filterWidth:true }) || cand;
-  }
-  const cand = presetCandidates(name);
-  return await buildRamp({ candidates:cand, fontFamily:app.fontFamily, fontSize:app.fontSize, filterWidth:true }) || cand;
-}
-function normalize(raw){
-  const stripped = (raw||'').replace(/\r?\n/g,'');
-  const unique = Array.from(new Set(Array.from(stripped)));
-  if (!unique.includes(' ')) unique.unshift(' ');
-  return unique.filter(ch => ch >= ' ' && ch !== '\t').join('');
-}
-async function apply(){
+function apply(){
   $('wv').textContent = $('w').value;
   $('cv').textContent = (+$('contrast').value/100).toFixed(2);
   $('gv').textContent = (+$('gamma').value/100).toFixed(2);
   $('fpsv').textContent = $('fps').value;
 
-  if ($('preset').value === 'custom') $('ramp').style.display = 'inline-block';
-  else $('ramp').style.display = 'none';
-
-  const ramp = await rampFor($('preset').value, $('ramp').value);
-
+  let ramp = presetRamp($('preset').value);
+  if ($('preset').value === 'custom'){
+    $('ramp').style.display = 'inline-block';
+    ramp = $('ramp').value || ramp;
+  } else {
+    $('ramp').style.display = 'none';
+  }
   app.setOptions({
     widthChars:+$('w').value,
     contrast:+$('contrast').value/100,
@@ -114,3 +103,6 @@ ui.flip.onclick = () => app.flip();
 wireFullscreen(ui.fs, ui.toolbar);
 </script>
 </body></html>
+
+
+
