@@ -48,11 +48,6 @@ button:focus, .btn:focus{
   background:transparent;
   padding:6px 8px; border-radius:0;
 }
-/* label, внутри которого находится селект НАБОР, не растягиваем */
-.panel label:has(#charset){
-  flex: 0 0 auto;
-}
-
 .panel input[type="range"]{ width:160px; }
 .panel output{ min-width:42px; text-align:right; }
 
@@ -142,19 +137,6 @@ input[type="color"]::-webkit-color-swatch { border:none; }
 input[type="color"]::-moz-color-swatch { border:none; }
 
 select{ background:transparent; color:var(--ui-text); }
-/* Селект "НАБОР": не растягиваем флексом, ширина по содержимому */
-.panel label > select {
-  flex: 0 0 auto;                 /* не растягивать */
-  width: auto;                    /* базово — авто */
-}
-@supports (width: fit-content) {
-  .panel label > select { width: fit-content; }  /* где поддерживается — по содержимому */
-}
-
-/* На мобиле всё равно держим разумный предел */
-@media (max-width: 600px){
-  .panel label > select { max-width: 58vw; }
-}
 option{ background:var(--ui-panel); color:var(--ui-text); }
 
 /* небольшая защита от «прыжков» при клавиатуре на мобилках */
@@ -259,6 +241,4 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 @media (max-width: 360px){
   .panel .row.colors{ flex-direction: column; }
 }
-
-
 
