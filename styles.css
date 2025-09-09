@@ -2,6 +2,8 @@
 * { box-sizing: border-box; }
 html,body{ height:100%; margin:0; }
 body.theme-dark{ background:#000; color:#fff; }
+html, body, .wrap { overflow-x: hidden; }
+.panel label { flex-wrap: wrap; }
 
 :root{
   --ui-bg:#151515;     /* тулбар/фон панели */
@@ -127,6 +129,13 @@ option{ background:var(--ui-panel); color:var(--ui-text); }
 @supports (padding: env(safe-area-inset-bottom)){
   .wrap{ padding-bottom: env(safe-area-inset-bottom); }
 }
+/* Поле пользовательского набора символов:
+   базовая (десктопная) ширина + ограничение, чтобы не вылезало за экран */
+#charset_custom {
+  width: 260px;           /* как было на десктопе */
+  max-width: 60vw;        /* но не шире 60% экрана */
+  display: none;          /* показываем/прячем через JS */
+}
 
 /* === Шрифт интерфейса === */
 body, .toolbar, .panel, .btn, label, output, select, option {
@@ -179,5 +188,32 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   display: none !important;
 }
 
+/* ===== Мобильный компакт-вид ===== */
+@media (max-width: 600px) {
+  /* Меньше шрифт по всему UI */
+  body, .toolbar, .panel, .btn, label, output, select, option {
+    font-size: 14px;
+  }
 
+  /* Кнопки: меньше отступы; тулбар переносится на 2 строки при нехватке места */
+  .toolbar { gap: 6px; padding: 6px; flex-wrap: wrap; }
+  .btn { padding: .4rem .6rem; }
 
+  /* Панель настроек компактнее */
+  .panel { gap: 8px; padding: 6px; }
+  .panel label { gap: 6px; padding: 4px 6px; }
+
+  /* Более компактные слайдеры */
+  .panel input[type="range"] { width: 140px; height: 14px; }
+  input[type="range"]::-webkit-slider-thumb { width: 12px; height: 12px; margin-top: -5px; }
+  input[type="range"]::-moz-range-thumb     { width: 12px; height: 12px; }
+
+  /* Селекты/инпуты не раздувают ширину экрана */
+  select { max-width: 58vw; }
+
+  /* Поле «свои символы»: всегда влезает в экран */
+  #charset_custom {
+    width: 100% !important;     /* занимает всю строку внутри label */
+    max-width: 62vw;            /* но не шире 62% экрана */
+  }
+}
