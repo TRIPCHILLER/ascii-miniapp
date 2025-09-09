@@ -400,7 +400,7 @@ function fitSelectWidth(sel) {
   try {
     const txt = sel.options[sel.selectedIndex]?.textContent || '';
     // запас на стрелку и паддинги, ограничим диапазон, чтобы не прыгало
-    const ch = Math.min(Math.max(txt.length + 4, 10), 30);
+        const ch = Math.min(Math.max(txt.length + 3, 8), 26);
     sel.style.width = ch + 'ch';
   } catch(_) {}
 }
@@ -522,6 +522,7 @@ app.ui.invert.addEventListener('change', e => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
