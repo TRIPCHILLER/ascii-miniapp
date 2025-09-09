@@ -161,6 +161,8 @@
 
     app.ui.charset.value = state.charset;
     app.ui.invert.checked = state.invert;
+const lbl = document.getElementById('invert_label');
+if (lbl) lbl.textContent = state.invert ? 'ИНВЕРСИЯ: ВКЛ' : 'ИНВЕРСИЯ: ВЫКЛ';
 
     app.out.style.color = state.color;
     app.out.style.backgroundColor = state.background;
@@ -493,6 +495,7 @@ app.ui.invert.addEventListener('change', e => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
