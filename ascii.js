@@ -473,6 +473,12 @@ app.ui.charset.addEventListener('change', e => {
 app.ui.customCharset.addEventListener('input', e => {
   state.charset = e.target.value || ' .:-=+*#%@';
 });
+// --- Синхронизация видимости при загрузке и первом показе панели ---
+function syncCustomField() {
+  const isCustom = app.ui.charset.value === 'CUSTOM';
+  app.ui.customCharset.style.display = isCustom ? 'inline-block' : 'none';
+}
+syncCustomField(); // дергаем один раз при биндинге
 
 app.ui.invert.addEventListener('change', e => {
   state.invert = e.target.checked;
@@ -504,6 +510,7 @@ app.ui.invert.addEventListener('change', e => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
