@@ -22,6 +22,7 @@
       fg:       $('#fg'),
       bg:       $('#bg'),
       charset:  $('#charset'),
+      customCharset: $('#charset_custom'),
       invert:   $('#invert'),
       fs:       $('#fs'),
       style:    $('#stylePreset'),
@@ -458,9 +459,21 @@ app.ui.flip.addEventListener('click', async () => {
       if(app.ui.style){ const m = detectPreset(state.color, state.background); app.ui.style.value = (m==='custom'?'custom':m); }
     });
 
-    app.ui.charset.addEventListener('change', e => {
-      state.charset = e.target.value;
-    });
+app.ui.charset.addEventListener('change', e => {
+  if (e.target.value === 'CUSTOM') {
+    app.ui.customCharset.style.display = 'inline-block';
+    state.charset = app.ui.customCharset.value || ' .:-=+*#%@';
+  } else {
+    app.ui.customCharset.style.display = 'none';
+    state.charset = e.target.value;
+  }
+});
+
+// реагируем на ввод своих символов
+app.ui.customCharset.addEventListener('input', e => {
+  state.charset = e.target.value || ' .:-=+*#%@';
+});
+
 app.ui.invert.addEventListener('change', e => {
   state.invert = e.target.checked;
   const lbl = document.getElementById('invert_label');
@@ -491,6 +504,7 @@ app.ui.invert.addEventListener('change', e => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
