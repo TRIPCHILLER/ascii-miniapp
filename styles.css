@@ -50,6 +50,19 @@ button:focus, .btn:focus{
 .panel input[type="range"]{ width:160px; }
 .panel output{ min-width:42px; text-align:right; }
 
+/* отдельная строка для ТЕКСТ/ФОН */
+.panel .row.colors{
+  display:flex;
+  gap:12px;
+  width:100%;
+}
+.panel .row.colors .color{
+  flex:1 1 0;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
 /* компактный чекбокс — показываем только текст, без квадратика */
 .check{
   display:flex;
@@ -129,6 +142,7 @@ option{ background:var(--ui-panel); color:var(--ui-text); }
 @supports (padding: env(safe-area-inset-bottom)){
   .wrap{ padding-bottom: env(safe-area-inset-bottom); }
 }
+
 /* Поле пользовательского набора символов:
    базовая (десктопная) ширина + ограничение, чтобы не вылезало за экран */
 #charset_custom {
@@ -216,4 +230,13 @@ body, .toolbar, .panel, .btn, label, output, select, option {
     width: 100% !important;     /* занимает всю строку внутри label */
     max-width: 62vw;            /* но не шире 62% экрана */
   }
+
+  /* ряд цветов чуть плотнее */
+  .panel .row.colors{ gap:8px; }
+  .panel .row.colors .color{ gap:6px; }
+}
+
+/* очень узкие экраны — можно сложить цвета в столбик (по желанию) */
+@media (max-width: 360px){
+  .panel .row.colors{ flex-direction: column; }
 }
