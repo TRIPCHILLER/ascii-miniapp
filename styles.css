@@ -233,13 +233,14 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   }
 
   /* ряд цветов чуть плотнее */
-  .panel .row.colors{ gap:8px; }
-  .panel .row.colors .color{ gap:6px; }
+  .panel .row.colors{ gap:4px; }
+  .panel .row.colors .color{ gap:2px; }
 }
 
 /* очень узкие экраны — можно сложить цвета в столбик (по желанию) */
 @media (max-width: 360px){
   .panel .row.colors{ flex-direction: column; }
 }
+
 
 
