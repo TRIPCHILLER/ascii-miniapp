@@ -42,7 +42,7 @@ button:focus, .btn:focus{
 .panel[hidden]{ display:none !important; }
 .panel label{
   display:flex; gap:8px; align-items:center;
-  background:var(--ui-panel);
+  background:transparent;
   padding:6px 8px; border-radius:0;
 }
 .panel input[type="range"]{ width:160px; }
@@ -162,3 +162,4 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 #fs-exit {
   display: none !important;
 }
+
