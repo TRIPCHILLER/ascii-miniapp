@@ -51,24 +51,21 @@ button:focus, .btn:focus{
 .panel input[type="range"]{ width:160px; }
 .panel output{ min-width:42px; text-align:right; }
 
-/* отдельная строка для ТЕКСТ/ФОН */
 .panel .row.colors{
   display:flex;
-  flex-wrap: nowrap;     /* держим ТЕКСТ и ФОН в одной строке */
-  justify-content:flex-start;
+  flex-wrap: wrap;     /* можно переносить на следующую строку */
+  gap:6px;             /* небольшой зазор между ТЕКСТ и ФОН */
+  width:auto;          /* не занимать всю строку насильно */
   align-items:center;
-  gap:6px;               /* можно 4px, если нужно плотнее */
-  width:100%;
 }
 
 .panel .row.colors .color{
-  flex: 0 0 auto;        /* не растягиваем блоки на всю ширину */
+  flex:0 0 auto;       /* не растягивать плашки */
   display:flex;
   align-items:center;
-  gap:4px;               /* расстояние между словом и квадратиком */
-  flex-wrap: nowrap;     /* внутри label не переносим на новую строку */
+  gap:4px;             /* расстояние между словом и квадратом */
+  white-space:nowrap;  /* внутри плашки текст+квадрат не рвём */
 }
-
 
 /* компактный чекбокс — показываем только текст, без квадратика */
 .check{
@@ -239,14 +236,16 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   }
 
   /* ряд цветов чуть плотнее */
-  .panel .row.colors{ flex-wrap: nowrap; gap:4px; }
-  .panel .row.colors .color{ flex:0 0 auto; gap:2px; }
+@media (max-width: 600px) {
+  .panel .row.colors{ flex-wrap: wrap; gap:4px; width:auto; }
+  .panel .row.colors .color{ flex:0 0 auto; gap:2px; white-space:nowrap; }
 }
 
 /* очень узкие экраны — можно сложить цвета в столбик (по желанию) */
 @media (max-width: 360px){
   .panel .row.colors{ flex-direction: column; }
 }
+
 
 
 
