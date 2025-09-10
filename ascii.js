@@ -221,7 +221,16 @@ if (lbl) lbl.textContent = state.invert ? 'ИНВЕРСИЯ: ВКЛ' : 'ИНВЕ
     ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     const data = ctx.getImageData(0, 0, w, h).data;
+// Генерация ASCII (юникод-безопасно + поддержка пустого набора)
+const chars = Array.from(state.charset || '');
+const n = chars.length - 1;
 
+if (n < 0) {
+  // набор пустой → очищаем экран и выходим из функции loop
+  app.out.textContent = '';
+  refitFont(1, 1);
+  return;   // ← важно, именно return из loop!
+}
 // Генерация ASCII (юникод-безопасно + поддержка пустого набора)
 const chars = Array.from(state.charset || '');
 const n = chars.length - 1;
@@ -518,6 +527,7 @@ app.ui.invert.addEventListener('change', e => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
