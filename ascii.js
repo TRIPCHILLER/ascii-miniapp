@@ -291,6 +291,29 @@ for (let y = 0; y < h; y++) {
 
     refitLock = false;
   }
+  // === Вписывание ASCII-блока внутрь stage ===
+  function fitAsciiToViewport(){
+    const out = app.out;
+    const stage = app.stage;
+    if (!out || !stage) return;
+
+    // сброс масштаба
+    out.style.transform = 'translate(-50%, -50%) scale(1)';
+
+    // реальные размеры ascii-блока
+    const w = out.scrollWidth;
+    const h = out.scrollHeight;
+
+    // доступные размеры
+    const W = stage.clientWidth;
+    const H = stage.clientHeight;
+
+    // коэффициент "contain"
+    const S = Math.min(W / w, H / h);
+
+    // применяем
+    out.style.transform = `translate(-50%, -50%) scale(${S})`;
+  }
 
   // ============== FULLSCREEN (tap-to-exit) ==============
   // Кросс-браузерные хелперы:
@@ -517,6 +540,7 @@ app.ui.invert.addEventListener('change', e => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
