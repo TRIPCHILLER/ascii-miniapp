@@ -222,34 +222,42 @@ if (lbl) lbl.textContent = state.invert ? 'ИНВЕРСИЯ: ВКЛ' : 'ИНВЕ
 
     const data = ctx.getImageData(0, 0, w, h).data;
 
-    // Генерация ASCII
-    const chars = state.charset;
-    const n = chars.length - 1;
-    const inv = state.invert ? -1 : 1;
-    const bias = state.invert ? 255 : 0;
+// Генерация ASCII (юникод-безопасно + поддержка пустого набора)
+const chars = Array.from(state.charset || '');
+const n = chars.length - 1;
 
-    const gamma = state.gamma;
-    const contrast = state.contrast;
+// если набор пуст — ничего не рисуем (экран пустой) и выходим из кадра
+if (n < 0) {
+  app.out.textContent = '';
+  refitFont(1, 1);
+  return;
+}
 
-    let out = '';
-    let i = 0;
-    for (let y = 0; y < h; y++) {
-      let line = '';
-      for (let x = 0; x < w; x++, i += 4) {
-        const r = data[i], g = data[i+1], b = data[i+2];
-        let Y = 0.2126*r + 0.7152*g + 0.0722*b;
+const inv = state.invert ? -1 : 1;
+const bias = state.invert ? 255 : 0;
+const gamma = state.gamma;
+const contrast = state.contrast;
 
-        let v01 = Y / 255;
-        v01 = ((v01 - 0.5) * contrast) + 0.5;
-        v01 = Math.min(1, Math.max(0, v01));
-        v01 = Math.pow(v01, 1 / gamma);
+let out = '';
+let i = 0;
+for (let y = 0; y < h; y++) {
+  let line = '';
+  for (let x = 0; x < w; x++, i += 4) {
+    const r = data[i], g = data[i+1], b = data[i+2];
 
-        const Yc = Math.max(0, Math.min(255, (bias + inv * (v01 * 255))));
-        const idx = Math.round((Yc / 255) * n);
-        line += chars[idx];
-      }
-      out += line + '\n';
-    }
+    // яркость → контраст → гамма
+    let Y = 0.2126*r + 0.7152*g + 0.0722*b;
+    let v01 = Y / 255;
+    v01 = ((v01 - 0.5) * contrast) + 0.5;
+    v01 = Math.min(1, Math.max(0, v01));
+    v01 = Math.pow(v01, 1 / gamma);
+
+    const Yc = Math.max(0, Math.min(255, (bias + inv * (v01 * 255))));
+    const idx = Math.round((Yc / 255) * n);
+    line += chars[idx];
+  }
+  out += line + '\n';
+}
 
     app.out.textContent = out;
     refitFont(w, h);
@@ -462,7 +470,7 @@ app.ui.flip.addEventListener('click', async () => {
 app.ui.charset.addEventListener('change', e => {
   if (e.target.value === 'CUSTOM') {
     app.ui.customCharset.style.display = 'inline-block';
-    state.charset = app.ui.customCharset.value || ' ';
+    state.charset = app.ui.customCharset.value || '';
   } else {
     app.ui.customCharset.style.display = 'none';
     state.charset = e.target.value;
@@ -471,7 +479,7 @@ app.ui.charset.addEventListener('change', e => {
 
 // реагируем на ввод своих символов
 app.ui.customCharset.addEventListener('input', e => {
-  state.charset = e.target.value || ' ';
+  state.charset = e.target.value || '';
 });
 // --- Синхронизация видимости при загрузке и первом показе панели ---
 function syncCustomField() {
@@ -510,6 +518,7 @@ app.ui.invert.addEventListener('change', e => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
