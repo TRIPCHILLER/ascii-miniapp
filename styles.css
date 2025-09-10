@@ -81,15 +81,20 @@ button:focus, .btn:focus{
 
 /* ===== СЦЕНА/ВЫВОД ===== */
 .stage{
-  flex:1; min-height:0; display:grid; place-items:center; overflow:hidden;
-  background:#000;
+  flex:1; min-height:0; position:relative;
+  background:#000; overflow:hidden;
 }
+
 #out{
+  position:absolute;
+  top:50%; left:50%;
+  transform:translate(-50%,-50%) scale(1);
+  transform-origin:center center;
   margin:0; white-space:pre; user-select:none;
   font-family: ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
-  line-height:1ch; font-size:16px;
+  line-height:1ch;
+  font-size:16px;
   color:#8ac7ff; background:#000;
-  border-radius:0; max-width:100%; max-height:100%;
 }
 
 /* ===== RANGE (ползунки) — белый тонкий трек, квадратный белый бегунок ===== */
@@ -237,3 +242,4 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 @media (max-width: 360px){
   .panel .row.colors{ flex-direction: column; }
 }
+
