@@ -462,7 +462,7 @@ app.ui.flip.addEventListener('click', async () => {
 app.ui.charset.addEventListener('change', e => {
   if (e.target.value === 'CUSTOM') {
     app.ui.customCharset.style.display = 'inline-block';
-    state.charset = app.ui.customCharset.value || '';
+    state.charset = app.ui.customCharset.value || ' ';
   } else {
     app.ui.customCharset.style.display = 'none';
     state.charset = e.target.value;
@@ -471,7 +471,7 @@ app.ui.charset.addEventListener('change', e => {
 
 // реагируем на ввод своих символов
 app.ui.customCharset.addEventListener('input', e => {
-  state.charset = e.target.value || '';
+  state.charset = e.target.value || ' ';
 });
 // --- Синхронизация видимости при загрузке и первом показе панели ---
 function syncCustomField() {
@@ -510,5 +510,6 @@ app.ui.invert.addEventListener('change', e => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
