@@ -433,6 +433,7 @@ function updateMirrorForFacing() {
       setTimeout(() => {
         const { w, h } = updateGridSize();
         refitFont(w, h);
+        fitAsciiToViewport();
       }, 0);
     });
 
@@ -540,6 +541,7 @@ app.ui.invert.addEventListener('change', e => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
