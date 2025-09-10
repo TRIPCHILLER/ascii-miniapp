@@ -231,16 +231,6 @@ if (n < 0) {
   refitFont(1, 1);
   return;   // ← важно, именно return из loop!
 }
-// Генерация ASCII (юникод-безопасно + поддержка пустого набора)
-const chars = Array.from(state.charset || '');
-const n = chars.length - 1;
-
-// если набор пуст — ничего не рисуем (экран пустой) и выходим из кадра
-if (n < 0) {
-  app.out.textContent = '';
-  refitFont(1, 1);
-  return;
-}
 
 const inv = state.invert ? -1 : 1;
 const bias = state.invert ? 255 : 0;
@@ -527,6 +517,7 @@ app.ui.invert.addEventListener('change', e => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
