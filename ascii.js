@@ -35,7 +35,7 @@
   const state = {
     facing: 'user',         // какая камера для мобилок
     mirror: true,           // режим рисования: true = отразить по X (НЕ-зеркало)
-    widthChars: 100,
+    widthChars: 75,
     contrast: 1.50,
     gamma: 1.20,
     fps: 30,
@@ -541,6 +541,7 @@ app.ui.invert.addEventListener('change', e => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
