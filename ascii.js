@@ -29,9 +29,15 @@
     }
   };
 
-  // Значения по умолчанию
-  // ВАЖНО: mirror = true означает "НЕ-зеркальная картинка" (мы инвертируем стандартный селфи-вид).
-  // Это даёт "оригинальное" восприятие — стартуем сразу с правильным горизонтальным отражением.
+  // ==== FONT STACKS (добавлено) ====
+const FONT_STACK_MAIN =
+  `"JetBrains Mono","Fira Mono","Cascadia Mono","Menlo","Consolas","DejaVu Sans Mono","Courier New",monospace`;
+
+const FONT_STACK_CJK =
+  // моноширинные CJK + фолбэки
+  `"MS Gothic","IPAGothic","Osaka-Mono","Noto Sans Mono CJK JP","Noto Sans Mono CJK SC","Noto Sans Mono CJK TC","Yu Gothic UI Mono","Monaco",monospace`;
+// ==== /FONT STACKS ====
+    // Значения по умолчанию
   const state = {
     facing: 'user',         // какая камера для мобилок
     mirror: true,           // режим рисования: true = отразить по X (НЕ-зеркало)
@@ -122,20 +128,27 @@ function isFullscreenLike() {
   const off = document.createElement('canvas');
   const ctx = off.getContext('2d', { willReadFrequently: true });
 
-  // Для авто-подгонки шрифта
-  const measurePre = document.createElement('pre');
+  // ==== measurePre + applyFontStack (замена) ====
+const measurePre = document.createElement('pre');
 measurePre.style.cssText = `
   position:absolute; left:-99999px; top:-99999px; margin:0;
   white-space:pre;
-  line-height:1;              /* как у #out */
-  letter-spacing:0;           /* как у #out */
+  line-height:1;
+  letter-spacing:0;
   font-variant-ligatures:none;
   -webkit-font-smoothing:antialiased;
-  font-family:
-    "JetBrains Mono","Fira Mono","Cascadia Mono","Menlo",
-    "Consolas","DejaVu Sans Mono","Courier New",monospace;  /* как у #out */
 `;
-  document.body.appendChild(measurePre);
+
+// единая функция — применяем стек и к выводу, и к измерителю
+function applyFontStack(stack) {
+  if (app.out) app.out.style.fontFamily = stack;
+  measurePre.style.fontFamily = stack;
+}
+
+document.body.appendChild(measurePre);
+// по умолчанию — основной моно стек
+applyFontStack(FONT_STACK_MAIN);
+// ==== /measurePre + applyFontStack ====
   // === измеряем "плотность" символа ===
 function measureCharDensity(ch) {
   const size = 32; // канвас 32x32
@@ -640,21 +653,27 @@ app.ui.flip.addEventListener('click', async () => {
 
 app.ui.charset.addEventListener('change', e => {
   const val = e.target.value;
+
   if (val === 'CUSTOM') {
     app.ui.customCharset.style.display = 'inline-block';
+    applyFontStack(FONT_STACK_MAIN); // кастом всегда в MAIN
     state.charset = autoSortCharset(app.ui.customCharset.value || '');
+    return;
+  }
+
+  app.ui.customCharset.style.display = 'none';
+
+  // индексы из твоего index.html: 4 = カタカナ, 5 = ひらがな
+  const idx = app.ui.charset.selectedIndex;
+  const isCJK = (idx === 4 || idx === 5);
+
+  if (isCJK) {
+    applyFontStack(FONT_STACK_CJK); // CJK-моно стек
+    state.charset = val;            // без сортировки!
   } else {
-    app.ui.customCharset.style.display = 'none';
-    
-    // --- исключение для катаканы/хираганы ---
-    const idx = app.ui.charset.selectedIndex;
-    if (idx === 4 || idx === 5) {
-    // 4 = カタカナ, 5 = ひらがな
-    state.charset = val; // без сортировки
-    } else {
-    state.charset = autoSortCharset(val);
-    }
-    }
+    applyFontStack(FONT_STACK_MAIN);      // обратно на MAIN
+    state.charset = autoSortCharset(val); // сортируем набор
+  }
 });
 
 // реагируем на ввод своих символов
@@ -688,10 +707,10 @@ app.ui.invert.addEventListener('change', e => {
     fillStyleSelect();
     setUI();
     // гарантируем старт без инверсии
-state.invert = false;
-if (app.ui.invert) app.ui.invert.checked = false;
-const lbl = document.getElementById('invert_label');
-if (lbl) lbl.textContent = 'ИНВЕРСИЯ: ВЫКЛ';
+    state.invert = false;
+    if (app.ui.invert) app.ui.invert.checked = false;
+    const lbl = document.getElementById('invert_label');
+    if (lbl) lbl.textContent = 'ИНВЕРСИЯ: ВЫКЛ';
     bindUI();
     attachDoubleTapEnter();
     await startStream();
@@ -706,28 +725,21 @@ if (lbl) lbl.textContent = 'ИНВЕРСИЯ: ВЫКЛ';
   document.addEventListener('DOMContentLoaded', init);
 })();
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+// --- Автосортировка стартового набора (кроме катаканы/хираганы) ---
+(() => {
+  // какой option выбран сейчас в селекте
+  const idx = app.ui.charset ? app.ui.charset.selectedIndex : -1;
+  // 4 = カタカナ, 5 = ひらがな (как в твоём index.html)
+  const isCJK = (idx === 4 || idx === 5);
+  if (!isCJK) {
+    state.charset = autoSortCharset(state.charset || '');
+  }
+})();
+// ==== стартовый выбор стека под текущий набор ====
+(() => {
+  if (!app.ui.charset) return;
+  const idx = app.ui.charset.selectedIndex;
+  const isCJK = (idx === 4 || idx === 5);
+  applyFontStack(isCJK ? FONT_STACK_CJK : FONT_STACK_MAIN);
+})();
+// ==== /стартовый выбор стека ====
