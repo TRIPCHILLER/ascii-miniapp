@@ -86,37 +86,27 @@ button:focus, .btn:focus{
 }
 /* предотвращает системный double-tap zoom и делает тапы «сухими» */
 #stage { touch-action: manipulation; }
- #out{
-   position:absolute;
-   top:50%; left:50%;
-   transform:translate(-50%,-50%) scale(1);
-   transform-origin:center center;
-   margin:0;
-   user-select:none;
+#out{
+  position:absolute;
+  top:50%; left:50%;
+  transform:translate(-50%,-50%) scale(1);
+  transform-origin:center center;
+  margin:0;
+  user-select:none;
 
--  /* Ключевые обновления для Unicode */
--  font-family:
--    "JetBrains Mono", "Fira Mono", "Cascadia Mono", "Menlo",
--    "Consolas", "DejaVu Sans Mono", "Courier New", monospace;
--  font-variant-ligatures: none;
--  -webkit-font-smoothing: antialiased;
--  white-space: pre;
--  letter-spacing: 0;
--  line-height: 1;
-+  /* Плотный «ретро» набор */
-+  font-family: "Cica Web","JetBrains Mono","Fira Mono","Cascadia Mono","Menlo",
-+               "Consolas","DejaVu Sans Mono","Courier New",monospace;
-+  font-weight: 700;
-+  font-variant-ligatures: none;
-+  -webkit-font-smoothing: none;
-+  white-space: pre;
-+  letter-spacing: -0.02em;   /* слегка плотнее по горизонтали */
-+  line-height: 0.95;         /* чуть ближе строки вертикально */
+  font-family: "Cica Web","JetBrains Mono","Fira Mono","Cascadia Mono","Menlo",
+               "Consolas","DejaVu Sans Mono","Courier New",monospace;
+  font-weight: 700;
+  font-variant-ligatures: none;
+  -webkit-font-smoothing: none;
+  white-space: pre;
+  letter-spacing: -0.02em;
+  line-height: 0.95;
 
-   font-size:16px;
-   color:#8ac7ff;
-   background:#000;
- }
+  font-size:16px;
+  color:#8ac7ff;
+  background:#000;
+}
 
 /* ===== RANGE (ползунки) — белый тонкий трек, квадратный белый бегунок ===== */
 input[type="range"]{
@@ -270,6 +260,7 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 @media (max-width: 360px){
   .panel .row.colors{ flex-direction: column; }
 }
+
 
 
 
