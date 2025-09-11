@@ -118,7 +118,6 @@ function isFullscreenLike() {
     app.ui.style.value = id;
   }
 
-
   // Вспомогательные канвасы
   const off = document.createElement('canvas');
   const ctx = off.getContext('2d', { willReadFrequently: true });
@@ -130,6 +129,20 @@ function isFullscreenLike() {
     white-space:pre; line-height:1ch; font-family: ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
   `;
   document.body.appendChild(measurePre);
+  // ---- измерение пропорции символа (W/H) ----
+function measureCharAspect() {
+  // берём текущий font-size из #out (куда печатаем ASCII)
+  const fs = parseFloat(getComputedStyle(app.out).fontSize) || 16;
+  measurePre.style.fontSize = fs + 'px';
+  // одна большая буква, чтобы померить ширину/высоту глифа
+  measurePre.textContent = 'M';
+  const r = measurePre.getBoundingClientRect();
+
+  // W/H; подстрахуемся от нулей
+  const w = Math.max(1, r.width);
+  const h = Math.max(1, r.height);
+  return w / h;
+}
 
   // ============== КАМЕРА ==============
   async function startStream() {
@@ -579,6 +592,7 @@ app.ui.invert.addEventListener('change', e => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
