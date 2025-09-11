@@ -661,30 +661,39 @@ app.ui.flip.addEventListener('click', async () => {
       if(app.ui.style){ const m = detectPreset(state.color, state.background); app.ui.style.value = (m==='custom'?'custom':m); }
     });
 
-app.ui.charset.addEventListener('change', e => {
-  const val = e.target.value;
+  app.ui.charset.addEventListener('change', e => {
+  let val = e.target.value;
 
   if (val === 'CUSTOM') {
     app.ui.customCharset.style.display = 'inline-block';
-    applyFontStack(FONT_STACK_MAIN); // кастом всегда в MAIN
+    applyFontStack(FONT_STACK_MAIN);
     state.charset = autoSortCharset(app.ui.customCharset.value || '');
     return;
   }
 
   app.ui.customCharset.style.display = 'none';
 
-  // индексы из твоего index.html: 4 = カタカナ, 5 = ひらがな
-  const idx = app.ui.charset.selectedIndex;
-  const isCJK = (idx === 4 || idx === 5);
+  // Надёжное определение CJK по самому набору
+  const isCJK = /[ァ-ヿぁ-ゟ一-龥]/.test(val);
+  applyFontStack(isCJK ? FONT_STACK_CJK : FONT_STACK_MAIN);
 
-  if (isCJK) {
-    applyFontStack(FONT_STACK_CJK); // CJK-моно стек
-    state.charset = val;            // без сортировки!
-    forcedAspect = 1.0;  
-  } else {
-    applyFontStack(FONT_STACK_MAIN);      // обратно на MAIN
-    state.charset = autoSortCharset(val); // сортируем набор
-    forcedAspect = null;                  // <<< вернулись к авто-замеру
+  // Сортируем и CJK, чтобы порядок шёл от «тёмного» к «светлому»
+  state.charset = autoSortCharset(val);
+
+  // Оставим квадратные пропорции для CJK (можно отключить)
+  forcedAspect = isCJK ? 1.0 : null;
+
+  // (опционально) поддержка data-invert на <option>
+  const sel = app.ui.charset.selectedOptions?.[0];
+  const invPref = sel?.dataset?.invert; // 'on' | 'off' | 'toggle'
+  if (invPref) {
+    if (invPref === 'on') state.invert = true;
+    else if (invPref === 'off') state.invert = false;
+    else if (invPref === 'toggle') state.invert = !state.invert;
+
+    if (app.ui.invert) app.ui.invert.checked = state.invert;
+    const lbl = document.getElementById('invert_label');
+    if (lbl) lbl.textContent = state.invert ? 'ИНВЕРСИЯ: ВКЛ' : 'ИНВЕРСИЯ: ВЫКЛ';
   }
 });
 
@@ -750,6 +759,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
