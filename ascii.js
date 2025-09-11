@@ -45,6 +45,12 @@
     invert: true,
     isFullscreen: false,    // наш флаг
   };
+  // === helpers ===
+function isFullscreenLike() {
+  return state.isFullscreen
+      || document.body.classList.contains('body-fullscreen')
+      || !!(document.fullscreenElement || document.webkitFullscreenElement);
+}
   // ===== Стили (палитры) =====
   // Порядок: [тёмный, светлый]; тёмный идёт на ФОН, светлый на ТЕКСТ
   const PRESETS = [
@@ -180,7 +186,7 @@ if (lbl) lbl.textContent = state.invert ? 'ИНВЕРСИЯ: ВКЛ' : 'ИНВЕ
   const v = app.vid;
   if (!v.videoWidth || !v.videoHeight) return { w: state.widthChars, h: 1 };
 
-  const isFsLike = state.isFullscreen || document.body.classList.contains('body-fullscreen');
+  const isFsLike = isFullscreenLike();
 
   // соотношение символа (W/H) → используем для правильного отношения столбцов/строк
   const ratioCharWOverH = measureCharAspect();   // W/H
@@ -217,7 +223,7 @@ if (lbl) lbl.textContent = state.invert ? 'ИНВЕРСИЯ: ВКЛ' : 'ИНВЕ
     // Подготовка трансформа для зеркала
     // mirror = true ⇒ рисуем с scaleX(-1), чтобы получить НЕ-зеркальную картинку
 // --- FULLSCREEN cover-crop под 16:9 ---
-const isFsLike = state.isFullscreen || document.body.classList.contains('body-fullscreen');
+const isFsLike = isFullscreenLike();
 
 // Источник (реальные размеры видео)
 const vw = v.videoWidth;
@@ -573,6 +579,7 @@ app.ui.invert.addEventListener('change', e => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
