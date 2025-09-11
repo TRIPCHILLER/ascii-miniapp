@@ -171,7 +171,14 @@ option{ background:var(--ui-panel); color:var(--ui-text); }
   max-width: 60vw;        /* но не шире 60% экрана */
   display: none;          /* показываем/прячем через JS */
 }
-
+/* === Шрифт для CJK (Cica) === */
+@font-face {
+    font-family: "Cica Web";
+    src: url("./assets/Cica-Regular.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
 /* === Шрифт интерфейса === */
 body, .toolbar, .panel, .btn, label, output, select, option {
   font-family: 'Better VCR', sans-serif;
@@ -254,6 +261,7 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 @media (max-width: 360px){
   .panel .row.colors{ flex-direction: column; }
 }
+
 
 
 
