@@ -398,8 +398,12 @@ for (let y = 0; y < h; y++) {
   out += line + '\n';
 }
 
-app.out.textContent = out;
-    refitFont(w, h);
+    app.out.textContent = out;
+
+    if (w !== lastW || h !== lastH) {
+      refitFont(w, h);
+      lastW = w; lastH = h;
+    }
   }
 
   // Подбор font-size
@@ -781,6 +785,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
