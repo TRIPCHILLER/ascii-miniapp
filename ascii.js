@@ -30,10 +30,8 @@
   };
 
   // ==== FONT STACKS (добавлено) ====
--const FONT_STACK_MAIN =
--  `"JetBrains Mono","Fira Mono","Cascadia Mono","Menlo","Consolas","DejaVu Sans Mono","Courier New",monospace`;
-+const FONT_STACK_MAIN =
-+  `"Cica Web","JetBrains Mono","Fira Mono","Cascadia Mono","Menlo","Consolas","DejaVu Sans Mono","Courier New",monospace`;
+const FONT_STACK_MAIN =
+  `"Cica Web","JetBrains Mono","Fira Mono","Cascadia Mono","Menlo","Consolas","DejaVu Sans Mono","Courier New",monospace`;
 
 const FONT_STACK_CJK =
   // реальные моно/приближённые моно CJK + безопасные фолбэки
@@ -132,29 +130,28 @@ function isFullscreenLike() {
   const ctx = off.getContext('2d', { willReadFrequently: true });
 
   // ==== measurePre + applyFontStack (замена) ====
- const measurePre = document.createElement('pre');
- measurePre.style.cssText = `
-   position:absolute; left:-99999px; top:-99999px; margin:0;
-   white-space:pre;
-   line-height:1;
-   letter-spacing:0;
-   font-variant-ligatures:none;
--  -webkit-font-smoothing:antialiased;
-+  font-weight:700;
-+  -webkit-font-smoothing:none;
- `;
+const measurePre = document.createElement('pre');
+measurePre.style.cssText = `
+  position:absolute; left:-99999px; top:-99999px; margin:0;
+  white-space:pre;
+  line-height:1;
+  letter-spacing:0;
+  font-variant-ligatures:none;
+  font-weight:700;
+  -webkit-font-smoothing:none;
+`;
 
 // единая функция — применяем стек и к выводу, и к измерителю
- function applyFontStack(stack) {
--  if (app.out) app.out.style.fontFamily = stack;
-+  if (app.out) {
-+    app.out.style.fontFamily = stack;
-+    app.out.style.fontWeight = '700';
-+    app.out.style.webkitFontSmoothing = 'none';
-+  }
-   measurePre.style.fontFamily = stack;
-+  measurePre.style.fontWeight = '700';
- }
+function applyFontStack(stack) {
+  if (app.out) {
+    app.out.style.fontFamily = stack;
+    app.out.style.fontWeight = '700';
+    app.out.style.webkitFontSmoothing = 'none';
+  }
+  measurePre.style.fontFamily = stack;
+  measurePre.style.fontWeight = '700';
+}
+
 
 document.body.appendChild(measurePre);
 // по умолчанию — основной моно стек
@@ -754,6 +751,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
