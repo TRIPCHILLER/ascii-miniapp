@@ -34,8 +34,8 @@ const FONT_STACK_MAIN =
   `"JetBrains Mono","Fira Mono","Cascadia Mono","Menlo","Consolas","DejaVu Sans Mono","Courier New",monospace`;
 
 const FONT_STACK_CJK =
-  // моноширинные CJK + фолбэки
-  `"MS Gothic","IPAGothic","Osaka-Mono","Noto Sans Mono CJK JP","Noto Sans Mono CJK SC","Noto Sans Mono CJK TC","Yu Gothic UI Mono","Monaco",monospace`;
+  // реальные моно/приближённые моно CJK + безопасные фолбэки
+  `"Cica","Migu 1M","Noto Sans Mono","Noto Sans JP","MS Gothic","IPAGothic","Yu Gothic UI","Monaco",monospace`;
 // ==== /FONT STACKS ====
     // Значения по умолчанию
   const state = {
@@ -159,7 +159,8 @@ function measureCharDensity(ch) {
   c.fillStyle = '#000';
   c.fillRect(0, 0, size, size);
   c.fillStyle = '#fff';
-  c.font = `${size}px monospace`;
+  const outFF = getComputedStyle(app.out).fontFamily || 'monospace';
+  c.font = `${size}px ${outFF}`;
   c.textBaseline = 'top';
   c.fillText(ch, 0, 0);
   const data = c.getImageData(0, 0, size, size).data;
@@ -705,41 +706,36 @@ app.ui.invert.addEventListener('change', e => {
   // ============== СТАРТ ==============
   async function init() {
     fillStyleSelect();
-    setUI();
-    // гарантируем старт без инверсии
-    state.invert = false;
-    if (app.ui.invert) app.ui.invert.checked = false;
-    const lbl = document.getElementById('invert_label');
-    if (lbl) lbl.textContent = 'ИНВЕРСИЯ: ВЫКЛ';
-    bindUI();
-    attachDoubleTapEnter();
-    await startStream();
+setUI();
 
-    if (raf) cancelAnimationFrame(raf);
-    raf = requestAnimationFrame(loop);
+// 1) Жёстко фиксируем отсутствие инверсии до первого кадра
+state.invert = false;
+if (app.ui.invert) app.ui.invert.checked = false;
+{
+  const lbl = document.getElementById('invert_label');
+  if (lbl) lbl.textContent = 'ИНВЕРСИЯ: ВЫКЛ';
+}
 
-    const { w, h } = updateGridSize();
-    refitFont(w, h);
+bindUI();
+attachDoubleTapEnter();
+
+// 2) Принудительно применяем шрифтовой стек под стартовый режим символов,
+//    чтобы исключить "ложный" первый кадр с некорректным стеком.
+if (app.ui.charset) {
+  // дёрнем обработчик, он сам решит: CJK → CJK стек без сортировки,
+  // не CJK → основной стек + авто-сорт.
+  app.ui.charset.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+await startStream();
+
+// 3) Только теперь стартуем цикл рендера
+if (raf) cancelAnimationFrame(raf);
+raf = requestAnimationFrame(loop);
+
+const { w, h } = updateGridSize();
+refitFont(w, h);
   }
 
   document.addEventListener('DOMContentLoaded', init);
 })();
-
-// --- Автосортировка стартового набора (кроме катаканы/хираганы) ---
-(() => {
-  // какой option выбран сейчас в селекте
-  const idx = app.ui.charset ? app.ui.charset.selectedIndex : -1;
-  // 4 = カタカナ, 5 = ひらがな (как в твоём index.html)
-  const isCJK = (idx === 4 || idx === 5);
-  if (!isCJK) {
-    state.charset = autoSortCharset(state.charset || '');
-  }
-})();
-// ==== стартовый выбор стека под текущий набор ====
-(() => {
-  if (!app.ui.charset) return;
-  const idx = app.ui.charset.selectedIndex;
-  const isCJK = (idx === 4 || idx === 5);
-  applyFontStack(isCJK ? FONT_STACK_CJK : FONT_STACK_MAIN);
-})();
-// ==== /стартовый выбор стека ====
