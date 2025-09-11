@@ -51,6 +51,7 @@ const FONT_STACK_CJK =
     invert: false,
     isFullscreen: false,    // наш флаг
   };
+  let forcedAspect = null;
   // === helpers ===
 function isFullscreenLike() {
   return state.isFullscreen
@@ -180,7 +181,9 @@ function autoSortCharset(str) {
 }
   // ---- измерение пропорции символа (W/H) ----
 function measureCharAspect() {
-  // берём текущий font-size из #out (куда печатаем ASCII)
+  if (typeof forcedAspect === 'number' && isFinite(forcedAspect) && forcedAspect > 0) {
+    return forcedAspect;
+  }
   const fs = parseFloat(getComputedStyle(app.out).fontSize) || 16;
   measurePre.style.fontSize = fs + 'px';
   // одна большая буква, чтобы померить ширину/высоту глифа
@@ -671,9 +674,11 @@ app.ui.charset.addEventListener('change', e => {
   if (isCJK) {
     applyFontStack(FONT_STACK_CJK); // CJK-моно стек
     state.charset = val;            // без сортировки!
+    forcedAspect = 1.0;  
   } else {
     applyFontStack(FONT_STACK_MAIN);      // обратно на MAIN
     state.charset = autoSortCharset(val); // сортируем набор
+    forcedAspect = null;                  // <<< вернулись к авто-замеру
   }
 });
 
@@ -739,3 +744,4 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
