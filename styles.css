@@ -100,7 +100,6 @@ button:focus, .btn:focus{
     "Consolas", "DejaVu Sans Mono", "Courier New", monospace;
   font-variant-ligatures: none;
   -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeSpeed;
   white-space: pre;
   letter-spacing: 0;
   line-height: 1;
@@ -255,6 +254,7 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 @media (max-width: 360px){
   .panel .row.colors{ flex-direction: column; }
 }
+
 
 
 
