@@ -136,7 +136,6 @@ measurePre.style.cssText = `
   line-height:1;
   letter-spacing:0;
   font-variant-ligatures:none;
-  font-weight:700;
   -webkit-font-smoothing:none;
 `;
 
@@ -144,11 +143,13 @@ measurePre.style.cssText = `
 function applyFontStack(stack) {
   if (app.out) {
     app.out.style.fontFamily = stack;
-    app.out.style.fontWeight = '700';
+    app.out.style.fontWeight = '400';       // убрали faux bold
     app.out.style.webkitFontSmoothing = 'none';
+    app.out.style.letterSpacing = '0';
+    app.out.style.lineHeight = '1';
   }
   measurePre.style.fontFamily = stack;
-  measurePre.style.fontWeight = '700';
+  measurePre.style.fontWeight = '400';
 }
 
 
@@ -761,6 +762,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
