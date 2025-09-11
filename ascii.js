@@ -143,15 +143,26 @@ measurePre.style.cssText = `
 function applyFontStack(stack) {
   if (app.out) {
     app.out.style.fontFamily = stack;
-    app.out.style.fontWeight = '400';       // убрали faux bold
-    app.out.style.webkitFontSmoothing = 'none';
+    app.out.style.fontWeight = '400';
+    app.out.style.fontStyle = 'normal';
+    app.out.style.fontSynthesis = 'none';           // ← запрет faux-bold/italic
+    app.out.style.fontKerning = 'none';             // ← кернинг OFF
+    app.out.style.fontVariantLigatures = 'none';    // ← лигатуры OFF
     app.out.style.letterSpacing = '0';
     app.out.style.lineHeight = '1';
+    app.out.style.webkitFontSmoothing = 'none';
+    app.out.style.textRendering = 'optimizeSpeed';
   }
   measurePre.style.fontFamily = stack;
   measurePre.style.fontWeight = '400';
+  measurePre.style.fontStyle = 'normal';
+  measurePre.style.fontSynthesis = 'none';
+  measurePre.style.fontKerning = 'none';
+  measurePre.style.fontVariantLigatures = 'none';
+  measurePre.style.letterSpacing = '0';
+  measurePre.style.lineHeight = '1';
+  measurePre.style.textRendering = 'optimizeSpeed';
 }
-
 
 document.body.appendChild(measurePre);
 // по умолчанию — основной моно стек
@@ -785,6 +796,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
