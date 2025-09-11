@@ -35,7 +35,7 @@
   const state = {
     facing: 'user',         // какая камера для мобилок
     mirror: true,           // режим рисования: true = отразить по X (НЕ-зеркало)
-    widthChars: 75,
+    widthChars: isMobile ? 75 : 150,
     contrast: 1.50,
     gamma: 1.20,
     fps: 30,
@@ -164,8 +164,20 @@ function measureCharAspect() {
   let lastFrameTime = 0;
 
   function setUI() {
+    // разные пределы для мобилы и ПК
+const WIDTH_MIN   = isMobile ? 50  : 100;
+const WIDTH_MAX   = isMobile ? 100 : 175;
+const WIDTH_START = isMobile ? 75  : 150;
+
+    // применяем лимиты и старт
+    app.ui.width.min  = WIDTH_MIN;
+    app.ui.width.max  = WIDTH_MAX;
+
+    // синхронизируем state и UI на старте
+    state.widthChars = WIDTH_START;
     app.ui.width.value = state.widthChars;
     app.ui.widthVal.textContent = state.widthChars;
+
 
     app.ui.contrast.value = state.contrast;
     app.ui.contrastVal.textContent = state.contrast.toFixed(2);
@@ -643,6 +655,7 @@ app.ui.invert.addEventListener('change', e => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
