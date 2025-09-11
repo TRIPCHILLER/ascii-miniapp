@@ -34,7 +34,7 @@ const FONT_STACK_MAIN = `"BetterVCR", monospace`;
 
 const FONT_STACK_CJK =
   // реальные моно/приближённые моно CJK + безопасные фолбэки
-  `"Cica Web","Cica", monospace`;
+  `"Cica Web","Cica","Noto Sans Mono","Noto Sans JP","MS Gothic","IPAGothic","Yu Gothic UI","Monaco",monospace`;
 // ==== /FONT STACKS ====
     // Значения по умолчанию
   const state = {
@@ -136,6 +136,7 @@ measurePre.style.cssText = `
   line-height:1;
   letter-spacing:0;
   font-variant-ligatures:none;
+  font-weight:700;
   -webkit-font-smoothing:none;
 `;
 
@@ -143,26 +144,13 @@ measurePre.style.cssText = `
 function applyFontStack(stack) {
   if (app.out) {
     app.out.style.fontFamily = stack;
-    app.out.style.fontWeight = '400';
-    app.out.style.fontStyle = 'normal';
-    app.out.style.fontSynthesis = 'none';           // ← запрет faux-bold/italic
-    app.out.style.fontKerning = 'none';             // ← кернинг OFF
-    app.out.style.fontVariantLigatures = 'none';    // ← лигатуры OFF
-    app.out.style.letterSpacing = '0';
-    app.out.style.lineHeight = '1';
+    app.out.style.fontWeight = '700';
     app.out.style.webkitFontSmoothing = 'none';
-    app.out.style.textRendering = 'optimizeSpeed';
   }
   measurePre.style.fontFamily = stack;
-  measurePre.style.fontWeight = '400';
-  measurePre.style.fontStyle = 'normal';
-  measurePre.style.fontSynthesis = 'none';
-  measurePre.style.fontKerning = 'none';
-  measurePre.style.fontVariantLigatures = 'none';
-  measurePre.style.letterSpacing = '0';
-  measurePre.style.lineHeight = '1';
-  measurePre.style.textRendering = 'optimizeSpeed';
+  measurePre.style.fontWeight = '700';
 }
+
 
 document.body.appendChild(measurePre);
 // по умолчанию — основной моно стек
@@ -231,7 +219,6 @@ function measureCharAspect() {
 
   // ============== РЕНДЕРИНГ ==============
   let raf = null;
-  let lastW = 0, lastH = 0;
   let lastFrameTime = 0;
 
   function setUI() {
@@ -353,68 +340,46 @@ ctx.drawImage(v, sx, sy, sw, sh, 0, 0, w, h);
 // Сброс трансформа
 ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-const data = ctx.getImageData(0, 0, w, h).data;
-
-// Юникод-безопасно
+    const data = ctx.getImageData(0, 0, w, h).data;
+// Генерация ASCII (юникод-безопасно + поддержка пустого набора)
 const chars = Array.from(state.charset || '');
 const n = chars.length - 1;
 
 if (n < 0) {
+  // набор пустой → очищаем экран и выходим из функции loop
   app.out.textContent = '';
   refitFont(1, 1);
-  return;
+  return;   // ← важно, именно return из loop!
 }
 
-// --- сглаживание и стабильная индексация ---
+const inv = state.invert ? -1 : 1;
+const bias = state.invert ? 255 : 0;
 const gamma = state.gamma;
 const contrast = state.contrast;
 
 let out = '';
 let i = 0;
-const pxCount = w * h;
-
-// лёгкое временное сглаживание, чтобы не дёргало на порогах
-if (!window.__prevV01 || window.__prevV01.length !== pxCount) {
-  window.__prevV01 = new Float32Array(pxCount);
-  window.__prevV01.fill(0);
-}
-const prev = window.__prevV01;
-const SMOOTH = 0.2; // 0..1 (0 — выкл)
-
 for (let y = 0; y < h; y++) {
   let line = '';
   for (let x = 0; x < w; x++, i += 4) {
-    const p = (i >> 2);          // индекс пикселя
     const r = data[i], g = data[i+1], b = data[i+2];
 
-    // Яркость 0..1 → контраст → гамма
-    let v01 = (0.2126*r + 0.7152*g + 0.0722*b) / 255;
+    // яркость → контраст → гамма
+    let Y = 0.2126*r + 0.7152*g + 0.0722*b;
+    let v01 = Y / 255;
     v01 = ((v01 - 0.5) * contrast) + 0.5;
-    if (v01 < 0) v01 = 0; else if (v01 > 1) v01 = 1;
+    v01 = Math.min(1, Math.max(0, v01));
     v01 = Math.pow(v01, 1 / gamma);
 
-    // Немного усредняем с прошлым кадром
-    v01 = SMOOTH * v01 + (1 - SMOOTH) * prev[p];
-    prev[p] = v01;
-
-    // Инверсия
-    const t = state.invert ? (1 - v01) : v01;
-
-    // Индекс без подбрасываний: floor + насыщение
-    let idx = (t * (n + 1)) | 0; // Math.floor
-    if (idx > n) idx = n;
-
+    const Yc = Math.max(0, Math.min(255, (bias + inv * (v01 * 255))));
+    const idx = Math.round((Yc / 255) * n);
     line += chars[idx];
   }
   out += line + '\n';
 }
 
     app.out.textContent = out;
-
-    if (w !== lastW || h !== lastH) {
-      refitFont(w, h);
-      lastW = w; lastH = h;
-    }
+    refitFont(w, h);
   }
 
   // Подбор font-size
@@ -696,41 +661,30 @@ app.ui.flip.addEventListener('click', async () => {
       if(app.ui.style){ const m = detectPreset(state.color, state.background); app.ui.style.value = (m==='custom'?'custom':m); }
     });
 
-  app.ui.charset.addEventListener('change', e => {
-  let val = e.target.value;
+app.ui.charset.addEventListener('change', e => {
+  const val = e.target.value;
 
   if (val === 'CUSTOM') {
     app.ui.customCharset.style.display = 'inline-block';
-    applyFontStack(FONT_STACK_MAIN);
+    applyFontStack(FONT_STACK_MAIN); // кастом всегда в MAIN
     state.charset = autoSortCharset(app.ui.customCharset.value || '');
     return;
   }
 
   app.ui.customCharset.style.display = 'none';
 
-  // Определяем CJK по самому содержимому, а не по индексу
-  const isCJK = /[ァ-ヿぁ-ゟ一-龥]/.test(val);
+  // индексы из твоего index.html: 4 = カタカナ, 5 = ひらがな
+  const idx = app.ui.charset.selectedIndex;
+  const isCJK = (idx === 4 || idx === 5);
 
-  // Выбираем стек шрифтов
-  applyFontStack(isCJK ? FONT_STACK_CJK : FONT_STACK_MAIN);
-
-  // ВАЖНО: сортируем наборы и для CJK, чтобы порядок был от «тёмного» к «светлому»
-  state.charset = autoSortCharset(val);
-
-  // Для CJK можно удержать квадратные пропорции глифа (1:1)
-  forcedAspect = isCJK ? 1.0 : null;
-
-  // Поддержка data-invert на <option> (если добавишь в index.html)
-  const sel = app.ui.charset.selectedOptions?.[0];
-  const invPref = sel?.dataset?.invert; // 'on' | 'off' | 'toggle'
-  if (invPref) {
-    if (invPref === 'on') state.invert = true;
-    else if (invPref === 'off') state.invert = false;
-    else if (invPref === 'toggle') state.invert = !state.invert;
-
-    if (app.ui.invert) app.ui.invert.checked = state.invert;
-    const lbl = document.getElementById('invert_label');
-    if (lbl) lbl.textContent = state.invert ? 'ИНВЕРСИЯ: ВКЛ' : 'ИНВЕРСИЯ: ВЫКЛ';
+  if (isCJK) {
+    applyFontStack(FONT_STACK_CJK); // CJK-моно стек
+    state.charset = val;            // без сортировки!
+    forcedAspect = 1.0;  
+  } else {
+    applyFontStack(FONT_STACK_MAIN);      // обратно на MAIN
+    state.charset = autoSortCharset(val); // сортируем набор
+    forcedAspect = null;                  // <<< вернулись к авто-замеру
   }
 });
 
@@ -796,13 +750,6 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
-
-
-
-
-
-
-
 
 
 
