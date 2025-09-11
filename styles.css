@@ -91,11 +91,22 @@ button:focus, .btn:focus{
   top:50%; left:50%;
   transform:translate(-50%,-50%) scale(1);
   transform-origin:center center;
-  margin:0; white-space:pre; user-select:none;
-  font-family: ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
-  line-height:1ch;
+  margin:0;
+  user-select:none;
+
+  /* Ключевые обновления для Unicode */
+  font-family:
+    "JetBrains Mono", "Fira Mono", "Cascadia Mono", "Menlo",
+    "Consolas", "DejaVu Sans Mono", "Courier New", monospace;
+  font-variant-ligatures: none;
+  -webkit-font-smoothing: antialiased;
+  white-space: pre;
+  letter-spacing: 0;
+  line-height: 1;
+
   font-size:16px;
-  color:#8ac7ff; background:#000;
+  color:#8ac7ff;
+  background:#000;
 }
 
 /* ===== RANGE (ползунки) — белый тонкий трек, квадратный белый бегунок ===== */
@@ -243,5 +254,6 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 @media (max-width: 360px){
   .panel .row.colors{ flex-direction: column; }
 }
+
 
 
