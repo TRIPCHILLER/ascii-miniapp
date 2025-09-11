@@ -42,7 +42,7 @@
     color: '#8ac7ff',
     background: '#000000',
     charset: '@%#*+=-:. ',
-    invert: true,
+    invert: false,
     isFullscreen: false,    // наш флаг
   };
   // === helpers ===
@@ -691,6 +691,7 @@ app.ui.invert.addEventListener('change', e => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
