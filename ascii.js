@@ -129,6 +129,34 @@ function isFullscreenLike() {
     white-space:pre; line-height:1ch; font-family: ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
   `;
   document.body.appendChild(measurePre);
+  // === измеряем "плотность" символа ===
+function measureCharDensity(ch) {
+  const size = 32; // канвас 32x32
+  const cvs = document.createElement('canvas');
+  cvs.width = size;
+  cvs.height = size;
+  const c = cvs.getContext('2d');
+  c.fillStyle = '#000';
+  c.fillRect(0, 0, size, size);
+  c.fillStyle = '#fff';
+  c.font = `${size}px monospace`;
+  c.textBaseline = 'top';
+  c.fillText(ch, 0, 0);
+  const data = c.getImageData(0, 0, size, size).data;
+  let sum = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    sum += data[i] + data[i+1] + data[i+2];
+  }
+  return sum / (size * size * 3); // 0..255
+}
+
+// === авто-сортировка набора ===
+function autoSortCharset(str) {
+  const chars = Array.from(new Set(str.split(''))); // уникальные символы
+  const withDensity = chars.map(ch => ({ ch, d: measureCharDensity(ch) }));
+  withDensity.sort((a,b) => a.d - b.d); // от тёмных к светлым
+  return withDensity.map(x => x.ch).join('');
+}
   // ---- измерение пропорции символа (W/H) ----
 function measureCharAspect() {
   // берём текущий font-size из #out (куда печатаем ASCII)
@@ -606,17 +634,18 @@ app.ui.flip.addEventListener('click', async () => {
 app.ui.charset.addEventListener('change', e => {
   if (e.target.value === 'CUSTOM') {
     app.ui.customCharset.style.display = 'inline-block';
-    state.charset = app.ui.customCharset.value || '';
+    state.charset = autoSortCharset(app.ui.customCharset.value || '');
   } else {
     app.ui.customCharset.style.display = 'none';
-    state.charset = e.target.value;
+    state.charset = autoSortCharset(e.target.value);
   }
 });
 
 // реагируем на ввод своих символов
 app.ui.customCharset.addEventListener('input', e => {
-  state.charset = e.target.value || '';
+  state.charset = autoSortCharset(e.target.value || '');
 });
+    
 // --- Синхронизация видимости при загрузке и первом показе панели ---
 function syncCustomField() {
   const isCustom = app.ui.charset.value === 'CUSTOM';
@@ -655,6 +684,7 @@ app.ui.invert.addEventListener('change', e => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
