@@ -124,10 +124,17 @@ function isFullscreenLike() {
 
   // Для авто-подгонки шрифта
   const measurePre = document.createElement('pre');
-  measurePre.style.cssText = `
-    position:absolute; left:-99999px; top:-99999px; margin:0;
-    white-space:pre; line-height:1ch; font-family: ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
-  `;
+measurePre.style.cssText = `
+  position:absolute; left:-99999px; top:-99999px; margin:0;
+  white-space:pre;
+  line-height:1;              /* как у #out */
+  letter-spacing:0;           /* как у #out */
+  font-variant-ligatures:none;
+  -webkit-font-smoothing:antialiased;
+  font-family:
+    "JetBrains Mono","Fira Mono","Cascadia Mono","Menlo",
+    "Consolas","DejaVu Sans Mono","Courier New",monospace;  /* как у #out */
+`;
   document.body.appendChild(measurePre);
   // === измеряем "плотность" символа ===
 function measureCharDensity(ch) {
@@ -684,6 +691,7 @@ app.ui.invert.addEventListener('change', e => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
