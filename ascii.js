@@ -42,8 +42,8 @@ const FONT_STACK_CJK =
     mirror: true,           // режим рисования: true = отразить по X (НЕ-зеркало)
     widthChars: isMobile ? 75 : 150,
     contrast: 1.50,
-    gamma: 1.20,
-    fps: 30,
+    gamma: 0.70,
+    fps: 60,
     color: '#8ac7ff',
     background: '#000000',
     charset: '@%#*+=-:. ',
@@ -750,6 +750,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
