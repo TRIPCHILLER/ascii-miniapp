@@ -208,9 +208,10 @@ if (lbl) lbl.textContent = state.invert ? 'ИНВЕРСИЯ: ВКЛ' : 'ИНВЕ
   // Базовый аспект источника как H/W:
   let sourceHOverW = v.videoHeight / v.videoWidth;
 
-  // В полноэкранном режиме принудительно берём 9/16 (H/W),
-  // чтобы сетка честно соответствовала целевому кадру 16:9.
-  if (isFsLike) sourceHOverW = 16 / 9;
+  // В FS: на мобиле хотим портрет (9:16 → H/W = 16/9), на ПК — ландшафт (16:9 → H/W = 9/16)
+  if (isFsLike) {
+  sourceHOverW = isMobile ? (16/9) : (9/16);
+}
 
   const w = Math.max(1, Math.round(state.widthChars));
   const h = Math.max(1, Math.round(w * (sourceHOverW / (1 / ratioCharWOverH))));
@@ -242,8 +243,8 @@ const isFsLike = isFullscreenLike();
 const vw = v.videoWidth;
 const vh = v.videoHeight;
 
-// Целевой аспект для fullscreen: 16:9 (высота/ширина нужна для расчёта сетки, а тут — ширина/высота)
-const targetWH = 9 / 16;     // ширина / высота
+// В FS: на мобиле — 9/16 (портрет), на ПК — 16/9 (ландшафт)
+const targetWH = isMobile ? (9/16) : (16/9);
 
 let sx = 0, sy = 0, sw = vw, sh = vh;
 
@@ -643,6 +644,7 @@ app.ui.invert.addEventListener('change', e => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
