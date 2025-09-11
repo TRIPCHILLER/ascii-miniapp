@@ -34,7 +34,7 @@ const FONT_STACK_MAIN = `"BetterVCR", monospace`;
 
 const FONT_STACK_CJK =
   // реальные моно/приближённые моно CJK + безопасные фолбэки
-  `"Cica Web","Cica","MS Gothic","IPAGothic","Yu Gothic UI","Monaco",monospace`;
+  `"Cica Web","Cica", monospace`;
 // ==== /FONT STACKS ====
     // Значения по умолчанию
   const state = {
@@ -785,6 +785,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
