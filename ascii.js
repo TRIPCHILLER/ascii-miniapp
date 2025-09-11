@@ -673,17 +673,19 @@ app.ui.flip.addEventListener('click', async () => {
 
   app.ui.customCharset.style.display = 'none';
 
-  // Надёжное определение CJK по самому набору
+  // Определяем CJK по самому содержимому, а не по индексу
   const isCJK = /[ァ-ヿぁ-ゟ一-龥]/.test(val);
+
+  // Выбираем стек шрифтов
   applyFontStack(isCJK ? FONT_STACK_CJK : FONT_STACK_MAIN);
 
-  // Сортируем и CJK, чтобы порядок шёл от «тёмного» к «светлому»
+  // ВАЖНО: сортируем наборы и для CJK, чтобы порядок был от «тёмного» к «светлому»
   state.charset = autoSortCharset(val);
 
-  // Оставим квадратные пропорции для CJK (можно отключить)
+  // Для CJK можно удержать квадратные пропорции глифа (1:1)
   forcedAspect = isCJK ? 1.0 : null;
 
-  // (опционально) поддержка data-invert на <option>
+  // Поддержка data-invert на <option> (если добавишь в index.html)
   const sel = app.ui.charset.selectedOptions?.[0];
   const invPref = sel?.dataset?.invert; // 'on' | 'off' | 'toggle'
   if (invPref) {
@@ -759,6 +761,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
