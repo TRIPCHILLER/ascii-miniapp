@@ -84,7 +84,8 @@ button:focus, .btn:focus{
   flex:1; min-height:0; position:relative;
   background:#000; overflow:hidden;
 }
-
+/* предотвращает системный double-tap zoom и делает тапы «сухими» */
+#stage { touch-action: manipulation; }
 #out{
   position:absolute;
   top:50%; left:50%;
@@ -242,4 +243,5 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 @media (max-width: 360px){
   .panel .row.colors{ flex-direction: column; }
 }
+
 
