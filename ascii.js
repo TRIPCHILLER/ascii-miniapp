@@ -244,7 +244,6 @@ const vh = v.videoHeight;
 
 // Целевой аспект для fullscreen: 16:9 (высота/ширина нужна для расчёта сетки, а тут — ширина/высота)
 const targetWH = 16 / 9;     // ширина / высота
-const targetHW = 9 / 16;     // высота / ширина
 
 let sx = 0, sy = 0, sw = vw, sh = vh;
 
@@ -592,6 +591,7 @@ app.ui.invert.addEventListener('change', e => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
