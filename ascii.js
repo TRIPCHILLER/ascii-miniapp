@@ -328,16 +328,24 @@ for (let y = 0; y < h; y++) {
     let mRect = measurePre.getBoundingClientRect();
     const kW = stageW / mRect.width;
     const kH = stageH / mRect.height;
-    const k = isFullscreenLike() ? Math.max(kW, kH) : Math.min(kW, kH);
+    const fs = isFullscreenLike();
+    const k  = fs
+    ? (isMobile ? Math.max(kW, kH) : Math.min(kW, kH)) // FS: мобилки cover, десктоп contain
+    : Math.min(kW, kH);                                 // вне FS всегда contain
+
 
     const newFS = Math.max(6, Math.floor(currentFS * k));
     app.out.style.fontSize = newFS + 'px';
 
     measurePre.style.fontSize = newFS + 'px';
     mRect = measurePre.getBoundingClientRect();
-    const k2 = isFullscreenLike()
-  ? Math.max(stageW / mRect.width, stageH / mRect.height)
-  : Math.min(stageW / mRect.width, stageH / mRect.height);
+    const k2 = fs
+    ? (isMobile
+    ? Math.max(stageW / mRect.width, stageH / mRect.height) // мобилки cover
+    : Math.min(stageW / mRect.width, stageH / mRect.height) // десктоп contain (без перезума)
+    )
+    : Math.min(stageW / mRect.width, stageH / mRect.height);
+
     const finalFS = Math.max(6, Math.floor(newFS * k2));
     app.out.style.fontSize = finalFS + 'px';
 
@@ -635,6 +643,7 @@ app.ui.invert.addEventListener('change', e => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
