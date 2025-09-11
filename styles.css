@@ -100,8 +100,8 @@ button:focus, .btn:focus{
   font-variant-ligatures: none;
   -webkit-font-smoothing: none;
   white-space: pre;
-  letter-spacing: -0.02em;
-  line-height: 0.95;
+  letter-spacing: 0em;
+  line-height: 1;
 
   font-size:16px;
   color:#8ac7ff;
@@ -260,6 +260,7 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 @media (max-width: 360px){
   .panel .row.colors{ flex-direction: column; }
 }
+
 
 
 
