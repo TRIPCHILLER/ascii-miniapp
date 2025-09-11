@@ -475,6 +475,47 @@ function updateMirrorForFacing() {
   // фронталка = зеркалим, тыловая = не зеркалим
   state.mirror = (state.facing === 'user');
 }
+    // --- DOUBLE-TAP / DOUBLE-CLICK: вход в fullscreen ---
+  let lastTapTs = 0;
+  let singleTapTimer = null;
+  const DOUBLE_TAP_WINDOW = 300; // мс
+  const SINGLE_TAP_DELAY  = 250; // мс — чтобы одиночный не «съедал» двойной
+
+  function onStagePointerUp(e) {
+    const now = Date.now();
+    const isDouble = now - lastTapTs < DOUBLE_TAP_WINDOW;
+    lastTapTs = now;
+
+    // На iOS отключаем системный дабл-тап-зум
+    if (e.pointerType === 'touch') e.preventDefault?.();
+
+    clearTimeout(singleTapTimer);
+
+    if (!state.isFullscreen) {
+      if (isDouble) {
+        // Двойной тап -> войти в fullscreen
+        enterFullscreen();
+      } else {
+        // Одиночный тап в НЕ fullscreen игнорируем (ничего не делаем)
+        // (выход по одиночному уже реализован в enableTapToExit() и активен только в fullscreen)
+      }
+    } else {
+      // Мы уже в fullscreen: одиночный тап закрывает (эта логика уже есть в fsTapHandler),
+      // но перестрахуемся и ничего тут не делаем, чтобы не конфликтовать.
+    }
+  }
+
+  function attachDoubleTapEnter() {
+    if (!app.stage) return;
+    // Универсально: pointerup покроет мышь/тач/стилус
+    app.stage.addEventListener('pointerup', onStagePointerUp, { passive: true });
+
+    // Для десктопа добавим приятный бонус — двойной клик мышью
+    app.stage.addEventListener('dblclick', (e) => {
+      e.preventDefault?.();
+      if (!state.isFullscreen) enterFullscreen();
+    });
+  }
   // ============== СВЯЗКА UI ==============
   function bindUI() {
     // Показ/скрытие панели
@@ -582,6 +623,7 @@ app.ui.invert.addEventListener('change', e => {
     fillStyleSelect();
     setUI();
     bindUI();
+    attachDoubleTapEnter();
     await startStream();
 
     if (raf) cancelAnimationFrame(raf);
@@ -593,6 +635,7 @@ app.ui.invert.addEventListener('change', e => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
