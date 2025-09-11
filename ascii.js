@@ -210,7 +210,7 @@ if (lbl) lbl.textContent = state.invert ? 'ИНВЕРСИЯ: ВКЛ' : 'ИНВЕ
 
   // В полноэкранном режиме принудительно берём 9/16 (H/W),
   // чтобы сетка честно соответствовала целевому кадру 16:9.
-  if (isFsLike) sourceHOverW = 16 / 9;
+  if (isFsLike) sourceHOverW = 9 / 16;
 
   const w = Math.max(1, Math.round(state.widthChars));
   const h = Math.max(1, Math.round(w * (sourceHOverW / (1 / ratioCharWOverH))));
@@ -591,6 +591,7 @@ app.ui.invert.addEventListener('change', e => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
