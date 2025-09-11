@@ -645,13 +645,16 @@ app.ui.charset.addEventListener('change', e => {
     state.charset = autoSortCharset(app.ui.customCharset.value || '');
   } else {
     app.ui.customCharset.style.display = 'none';
+    
     // --- исключение для катаканы/хираганы ---
-    if (val.includes('アイウエオ') || val.includes('あいうえお')) {
-      state.charset = val; // оставляем порядок как есть
+    const idx = app.ui.charset.selectedIndex;
+    if (idx === 4 || idx === 5) {
+    // 4 = カタカナ, 5 = ひらがな
+    state.charset = val; // без сортировки
     } else {
-      state.charset = autoSortCharset(val);
+    state.charset = autoSortCharset(val);
     }
-  }
+    }
 });
 
 // реагируем на ввод своих символов
@@ -684,6 +687,11 @@ app.ui.invert.addEventListener('change', e => {
   async function init() {
     fillStyleSelect();
     setUI();
+    // гарантируем старт без инверсии
+state.invert = false;
+if (app.ui.invert) app.ui.invert.checked = false;
+const lbl = document.getElementById('invert_label');
+if (lbl) lbl.textContent = 'ИНВЕРСИЯ: ВЫКЛ';
     bindUI();
     attachDoubleTapEnter();
     await startStream();
@@ -697,6 +705,7 @@ app.ui.invert.addEventListener('change', e => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
