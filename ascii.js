@@ -34,7 +34,7 @@ const FONT_STACK_MAIN = `"BetterVCR", monospace`;
 
 const FONT_STACK_CJK =
   // реальные моно/приближённые моно CJK + безопасные фолбэки
-  `"Cica Web","Cica","Noto Sans Mono","Noto Sans JP","MS Gothic","IPAGothic","Yu Gothic UI","Monaco",monospace`;
+  `"Cica Web","Cica","MS Gothic","IPAGothic","Yu Gothic UI","Monaco",monospace`;
 // ==== /FONT STACKS ====
     // Значения по умолчанию
   const state = {
@@ -220,6 +220,7 @@ function measureCharAspect() {
 
   // ============== РЕНДЕРИНГ ==============
   let raf = null;
+  let lastW = 0, lastH = 0;
   let lastFrameTime = 0;
 
   function setUI() {
@@ -341,45 +342,63 @@ ctx.drawImage(v, sx, sy, sw, sh, 0, 0, w, h);
 // Сброс трансформа
 ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-    const data = ctx.getImageData(0, 0, w, h).data;
-// Генерация ASCII (юникод-безопасно + поддержка пустого набора)
+const data = ctx.getImageData(0, 0, w, h).data;
+
+// Юникод-безопасно
 const chars = Array.from(state.charset || '');
 const n = chars.length - 1;
 
 if (n < 0) {
-  // набор пустой → очищаем экран и выходим из функции loop
   app.out.textContent = '';
   refitFont(1, 1);
-  return;   // ← важно, именно return из loop!
+  return;
 }
 
-const inv = state.invert ? -1 : 1;
-const bias = state.invert ? 255 : 0;
+// --- сглаживание и стабильная индексация ---
 const gamma = state.gamma;
 const contrast = state.contrast;
 
 let out = '';
 let i = 0;
+const pxCount = w * h;
+
+// лёгкое временное сглаживание, чтобы не дёргало на порогах
+if (!window.__prevV01 || window.__prevV01.length !== pxCount) {
+  window.__prevV01 = new Float32Array(pxCount);
+  window.__prevV01.fill(0);
+}
+const prev = window.__prevV01;
+const SMOOTH = 0.2; // 0..1 (0 — выкл)
+
 for (let y = 0; y < h; y++) {
   let line = '';
   for (let x = 0; x < w; x++, i += 4) {
+    const p = (i >> 2);          // индекс пикселя
     const r = data[i], g = data[i+1], b = data[i+2];
 
-    // яркость → контраст → гамма
-    let Y = 0.2126*r + 0.7152*g + 0.0722*b;
-    let v01 = Y / 255;
+    // Яркость 0..1 → контраст → гамма
+    let v01 = (0.2126*r + 0.7152*g + 0.0722*b) / 255;
     v01 = ((v01 - 0.5) * contrast) + 0.5;
-    v01 = Math.min(1, Math.max(0, v01));
+    if (v01 < 0) v01 = 0; else if (v01 > 1) v01 = 1;
     v01 = Math.pow(v01, 1 / gamma);
 
-    const Yc = Math.max(0, Math.min(255, (bias + inv * (v01 * 255))));
-    const idx = Math.round((Yc / 255) * n);
+    // Немного усредняем с прошлым кадром
+    v01 = SMOOTH * v01 + (1 - SMOOTH) * prev[p];
+    prev[p] = v01;
+
+    // Инверсия
+    const t = state.invert ? (1 - v01) : v01;
+
+    // Индекс без подбрасываний: floor + насыщение
+    let idx = (t * (n + 1)) | 0; // Math.floor
+    if (idx > n) idx = n;
+
     line += chars[idx];
   }
   out += line + '\n';
 }
 
-    app.out.textContent = out;
+app.out.textContent = out;
     refitFont(w, h);
   }
 
@@ -762,6 +781,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
