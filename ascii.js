@@ -639,12 +639,18 @@ app.ui.flip.addEventListener('click', async () => {
     });
 
 app.ui.charset.addEventListener('change', e => {
-  if (e.target.value === 'CUSTOM') {
+  const val = e.target.value;
+  if (val === 'CUSTOM') {
     app.ui.customCharset.style.display = 'inline-block';
     state.charset = autoSortCharset(app.ui.customCharset.value || '');
   } else {
     app.ui.customCharset.style.display = 'none';
-    state.charset = autoSortCharset(e.target.value);
+    // --- исключение для катаканы/хираганы ---
+    if (val.includes('アイウエオ') || val.includes('あいうえお')) {
+      state.charset = val; // оставляем порядок как есть
+    } else {
+      state.charset = autoSortCharset(val);
+    }
   }
 });
 
@@ -691,6 +697,7 @@ app.ui.invert.addEventListener('change', e => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
