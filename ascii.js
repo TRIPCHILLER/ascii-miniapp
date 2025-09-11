@@ -177,29 +177,29 @@ if (lbl) lbl.textContent = state.invert ? 'ИНВЕРСИЯ: ВКЛ' : 'ИНВЕ
 
   // Пересчёт h и подготовка offscreen размера
   function updateGridSize() {
-    const v = app.vid;
-    if (!v.videoWidth || !v.videoHeight) return { w: state.widthChars, h: 1 };
+  const v = app.vid;
+  if (!v.videoWidth || !v.videoHeight) return { w: state.widthChars, h: 1 };
 
-    const ratio = measureCharAspect();
-    const aspect = (v.videoHeight / v.videoWidth) / ratio;
+  const isFsLike = state.isFullscreen || document.body.classList.contains('body-fullscreen');
 
-    const w = Math.max(1, Math.round(state.widthChars));
-    const h = Math.max(1, Math.round(w * aspect));
+  // соотношение символа (W/H) → используем для правильного отношения столбцов/строк
+  const ratioCharWOverH = measureCharAspect();   // W/H
+  // нам нужна H/W, поэтому инверсия ниже в формулах
 
-    off.width = w;
-    off.height = h;
-    return { w, h };
-  }
+  // Базовый аспект источника как H/W:
+  let sourceHOverW = v.videoHeight / v.videoWidth;
 
-  function measureCharAspect() {
-    measurePre.textContent = 'M\nM';
-    measurePre.style.fontSize = app.out.style.fontSize || '16px';
-    const rect = measurePre.getBoundingClientRect();
-    const lineH = rect.height / 2;
-    const chW = rect.width / 1;
-    const charRatio = lineH / chW; // H/W
-    return 1 / charRatio;          // W/H
-  }
+  // В полноэкранном режиме принудительно берём 9/16 (H/W),
+  // чтобы сетка честно соответствовала целевому кадру 16:9.
+  if (isFsLike) sourceHOverW = 9 / 16;
+
+  const w = Math.max(1, Math.round(state.widthChars));
+  const h = Math.max(1, Math.round(w * (sourceHOverW / (1 / ratioCharWOverH))));
+
+  off.width = w;
+  off.height = h;
+  return { w, h };
+}
 
   function loop(ts) {
     raf = requestAnimationFrame(loop);
@@ -216,9 +216,41 @@ if (lbl) lbl.textContent = state.invert ? 'ИНВЕРСИЯ: ВКЛ' : 'ИНВЕ
 
     // Подготовка трансформа для зеркала
     // mirror = true ⇒ рисуем с scaleX(-1), чтобы получить НЕ-зеркальную картинку
-    ctx.setTransform(state.mirror ? -1 : 1, 0, 0, 1, state.mirror ? w : 0, 0);
-    ctx.drawImage(v, 0, 0, w, h);
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+// --- FULLSCREEN cover-crop под 16:9 ---
+const isFsLike = state.isFullscreen || document.body.classList.contains('body-fullscreen');
+
+// Источник (реальные размеры видео)
+const vw = v.videoWidth;
+const vh = v.videoHeight;
+
+// Целевой аспект для fullscreen: 16:9 (высота/ширина нужна для расчёта сетки, а тут — ширина/высота)
+const targetWH = 16 / 9;     // ширина / высота
+const targetHW = 9 / 16;     // высота / ширина
+
+let sx = 0, sy = 0, sw = vw, sh = vh;
+
+if (isFsLike) {
+  const srcWH = vw / vh;
+
+  if (srcWH > targetWH) {
+    // Источник шире 16:9 → режем бока
+    sw = Math.round(vh * targetWH);
+    sx = Math.round((vw - sw) / 2);
+  } else if (srcWH < targetWH) {
+    // Источник уже 16:9 → режем сверху/снизу
+    sh = Math.round(vw / targetWH);
+    sy = Math.round((vh - sh) / 2);
+  }
+}
+
+// Подготовка трансформа для зеркала (как было)
+ctx.setTransform(state.mirror ? -1 : 1, 0, 0, 1, state.mirror ? w : 0, 0);
+
+// Рисуем уже с кропом, масштабируем на целевую сетку w×h
+ctx.drawImage(v, sx, sy, sw, sh, 0, 0, w, h);
+
+// Сброс трансформа
+ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     const data = ctx.getImageData(0, 0, w, h).data;
 // Генерация ASCII (юникод-безопасно + поддержка пустого набора)
@@ -541,6 +573,7 @@ app.ui.invert.addEventListener('change', e => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
