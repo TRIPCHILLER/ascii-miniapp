@@ -208,9 +208,10 @@ if (lbl) lbl.textContent = state.invert ? 'ИНВЕРСИЯ: ВКЛ' : 'ИНВЕ
   // Базовый аспект источника как H/W:
   let sourceHOverW = v.videoHeight / v.videoWidth;
 
-  // В FS: на мобиле хотим портрет (9:16 → H/W = 16/9), на ПК — ландшафт (16:9 → H/W = 9/16)
-  if (isFsLike) {
-  sourceHOverW = isMobile ? (16/9) : (9/16);
+// В FS: ТОЛЬКО на мобиле принудительно 9:16 (портрет).
+// На ПК оставляем нативное соотношение источника.
+if (isFsLike && isMobile) {
+  sourceHOverW = 16/9;
 }
 
   const w = Math.max(1, Math.round(state.widthChars));
@@ -238,25 +239,23 @@ if (lbl) lbl.textContent = state.invert ? 'ИНВЕРСИЯ: ВКЛ' : 'ИНВЕ
     // mirror = true ⇒ рисуем с scaleX(-1), чтобы получить НЕ-зеркальную картинку
 // --- FULLSCREEN cover-crop под 16:9 ---
 const isFsLike = isFullscreenLike();
-
-// Источник (реальные размеры видео)
 const vw = v.videoWidth;
 const vh = v.videoHeight;
 
-// В FS: на мобиле — 9/16 (портрет), на ПК — 16/9 (ландшафт)
-const targetWH = isMobile ? (9/16) : (16/9);
-
 let sx = 0, sy = 0, sw = vw, sh = vh;
 
-if (isFsLike) {
+// В FS кропим ТОЛЬКО на мобиле под вертикаль 9:16.
+// На ПК в FS — без кропа (letterbox/pillarbox по contain).
+if (isFsLike && isMobile) {
+  const targetWH = 9/16; // W/H
   const srcWH = vw / vh;
 
   if (srcWH > targetWH) {
-    // Источник шире 16:9 → режем бока
+    // Источник шире 9:16 → режем бока
     sw = Math.round(vh * targetWH);
     sx = Math.round((vw - sw) / 2);
   } else if (srcWH < targetWH) {
-    // Источник уже 16:9 → режем сверху/снизу
+    // Источник уже 9:16 → режем сверху/снизу
     sh = Math.round(vw / targetWH);
     sy = Math.round((vh - sh) / 2);
   }
@@ -644,6 +643,7 @@ app.ui.invert.addEventListener('change', e => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
