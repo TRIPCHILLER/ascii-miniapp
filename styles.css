@@ -96,7 +96,7 @@ button:focus, .btn:focus{
 
   font-family: "Cica Web","JetBrains Mono","Fira Mono","Cascadia Mono","Menlo",
                "Consolas","DejaVu Sans Mono","Courier New",monospace;
-  font-weight: 700;
+  font-weight: 400;
   font-variant-ligatures: none;
   -webkit-font-smoothing: none;
   white-space: pre;
@@ -275,6 +275,7 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 @media (max-width: 360px){
   .panel .row.colors{ flex-direction: column; }
 }
+
 
 
 
