@@ -30,11 +30,11 @@
   };
 
   // ==== FONT STACKS (добавлено) ====
-const FONT_STACK_MAIN = `"BetterVCR", monospace`;
+const FONT_STACK_MAIN = `"BetterVCR",monospace`;
 
 const FONT_STACK_CJK =
   // реальные моно/приближённые моно CJK + безопасные фолбэки
-  `"Cica Web","Cica","Noto Sans Mono","Noto Sans JP","MS Gothic","IPAGothic","Yu Gothic UI","Monaco",monospace`;
+  `"Cica Web","Cica","Noto Sans Mono","MS Gothic","IPAGothic","Yu Gothic UI","Monaco",monospace`;
 // ==== /FONT STACKS ====
     // Значения по умолчанию
   const state = {
@@ -750,6 +750,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
