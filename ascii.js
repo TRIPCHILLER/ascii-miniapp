@@ -30,7 +30,7 @@
   };
 
   // ==== FONT STACKS (добавлено) ====
-const FONT_STACK_MAIN = `"BlockBlueprint",monospace`;
+const FONT_STACK_MAIN = `"BetterVCR",monospace`;
 
 const FONT_STACK_CJK =
   // реальные моно/приближённые моно CJK + безопасные фолбэки
@@ -750,6 +750,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
