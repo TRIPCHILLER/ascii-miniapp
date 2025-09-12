@@ -186,8 +186,8 @@ option{ background:var(--ui-panel); color:var(--ui-text); }
   font-display: swap;
 }
 @font-face{
-  font-family: "basis33.regular";
-  src: url("./assets/basis33.regular.woff2") format("woff2");
+  font-family: "BlockBlueprint";
+  src: url("./assets/BlockBlueprint.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -275,6 +275,7 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 @media (max-width: 360px){
   .panel .row.colors{ flex-direction: column; }
 }
+
 
 
 
