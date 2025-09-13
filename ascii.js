@@ -37,6 +37,19 @@ const FONT_STACK_CJK =
   `"Cica Web","MS Gothic","IPAGothic","Osaka-Mono","VL Gothic",monospace`;
 // ==== /FONT STACKS ====
     // Значения по умолчанию
+  // ===== Ordered dithering (8×8 Bayer) =====
+const BAYER8 = [
+   0,48,12,60,  3,51,15,63,
+  32,16,44,28, 35,19,47,31,
+   8,56, 4,52, 11,59, 7,55,
+  40,24,36,20, 43,27,39,23,
+   2,50,14,62,  1,49,13,61,
+  34,18,46,30, 33,17,45,29,
+  10,58, 6,54,  9,57, 5,53,
+  42,26,38,22, 41,25,37,21
+];
+let DITHER_ENABLED = true;
+// =========================================
   const state = {
     facing: 'user',         // какая камера для мобилок
     mirror: true,           // режим рисования: true = отразить по X (НЕ-зеркало)
@@ -372,8 +385,22 @@ for (let y = 0; y < h; y++) {
     v01 = Math.pow(v01, 1 / gamma);
 
     const Yc = Math.max(0, Math.min(255, (bias + inv * (v01 * 255))));
-    const idx = Math.round((Yc / 255) * n);
-    line += chars[idx];
+    // u — непрерывный индекс 0..n
+const u = (Yc / 255) * n;
+let i0 = u | 0;        // floor
+let idx = i0;
+
+if (DITHER_ENABLED) {
+  const frac = u - i0; // 0..1
+  const thr  = BAYER8[(y & 7) * 8 + (x & 7)] / 64; // 0..1
+  if (frac > thr) idx = i0 + 1;
+}
+
+if (idx < 0) idx = 0;
+else if (idx > n) idx = n;
+
+line += chars[idx];
+
   }
   out += line + '\n';
 }
@@ -750,6 +777,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
