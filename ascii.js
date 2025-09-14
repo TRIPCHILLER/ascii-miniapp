@@ -140,9 +140,7 @@ function isFullscreenLike() {
   // Вспомогательные канвасы
   const off = document.createElement('canvas');
   const ctx = off.getContext('2d', { willReadFrequently: true });
-// отдельный канвас для замеров плотности символов (не трогаем off/ctx)
-const densCanvas = document.createElement('canvas');
-const dc = densCanvas.getContext('2d', { willReadFrequently: true });
+
   // ==== measurePre + applyFontStack (замена) ====
 const measurePre = document.createElement('pre');
 measurePre.style.cssText = `
@@ -155,25 +153,17 @@ measurePre.style.cssText = `
   -webkit-font-smoothing:none;
 `;
 
-// флаг: сейчас ли активен CJK-стек
-let IS_CJK_STACK = false;
-
 // единая функция — применяем стек и к выводу, и к измерителю
-function applyFontStack(stack, weight) {
-  // если не передали явно — для CJK берём 400, иначе 700
-  const isCJK = (stack === FONT_STACK_CJK);
-  const w = weight || (isCJK ? '400' : '700');
-
-  IS_CJK_STACK = isCJK;
-
+function applyFontStack(stack) {
   if (app.out) {
     app.out.style.fontFamily = stack;
-    app.out.style.fontWeight = w;
+    app.out.style.fontWeight = '700';
     app.out.style.webkitFontSmoothing = 'none';
   }
   measurePre.style.fontFamily = stack;
-  measurePre.style.fontWeight = w;
+  measurePre.style.fontWeight = '700';
 }
+
 
 document.body.appendChild(measurePre);
 // по умолчанию — основной моно стек
@@ -181,39 +171,24 @@ applyFontStack(FONT_STACK_MAIN);
 // ==== /measurePre + applyFontStack ====
   // === измеряем "плотность" символа ===
 function measureCharDensity(ch) {
-  // читаем текущий шрифт И вес так же, как рендерит app.out
-  const cs    = getComputedStyle(app.out);
-  const outFF = cs.fontFamily || 'monospace';
-  const outFW = cs.fontWeight || '400';
-
-  // быстрый выход из кэша
-  const cacheKey = ch + '|' + outFF + '|' + outFW;
-  if (densityCache.has(cacheKey)) return densityCache.get(cacheKey);
-
-  // аккуратная отрисовка на канвасе с паддингом (без среза глифа)
-  const size = 64;
-  const pad  = 16;
-
-  dc.canvas.width  = size + pad * 2;
-dc.canvas.height = size + pad * 2;
-
-dc.save();
-dc.font = `${outFW} ${size}px ${outFF}`;
-dc.textBaseline = 'top';
-dc.textAlign    = 'left';
-dc.fillStyle    = '#ffffff';
-dc.globalCompositeOperation = 'source-over';
-
-dc.clearRect(0, 0, dc.canvas.width, dc.canvas.height);
-dc.fillText(ch, pad, pad);
-
-const img = dc.getImageData(0, 0, dc.canvas.width, dc.canvas.height).data;
-// ...
-dc.restore();
-
-
-  densityCache.set(cacheKey, density);
-  return density;
+  const size = 32; // канвас 32x32
+  const cvs = document.createElement('canvas');
+  cvs.width = size;
+  cvs.height = size;
+  const c = cvs.getContext('2d');
+  c.fillStyle = '#000';
+  c.fillRect(0, 0, size, size);
+  c.fillStyle = '#fff';
+  const outFF = getComputedStyle(app.out).fontFamily || 'monospace';
+  c.font = `${size}px ${outFF}`;
+  c.textBaseline = 'top';
+  c.fillText(ch, 0, 0);
+  const data = c.getImageData(0, 0, size, size).data;
+  let sum = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    sum += data[i] + data[i+1] + data[i+2];
+  }
+  return sum / (size * size * 3); // 0..255
 }
 
 // === авто-сортировка набора ===
@@ -236,15 +211,10 @@ const DARK_LOCK_COUNT = 3;    // ← можно менять на 2/3/4 по в�
 let bins = [];
 let palette = [];
 let paletteTimer = null;
-// кэш плотностей и таймер отложенной пересортировки
-const densityCache = new Map(); // key: ch|family|weight -> number
-let resortTimer = null;
 
 // массив фиксированных символов, привязанных к индексам бинов:
 // fixedByBin[0] = (самый тёмный символ), fixedByBin[1] = (второй по тёмности), ...
 let fixedByBin = new Array(K_BINS).fill(null);
-  // сколько самых светлых ступеней тоже фиксируем «самыми жирными» глифами
-const BRIGHT_LOCK_COUNT = 3; // 1–2 ступени обычно достаточно
 
 function computeDensities(charsStr) {
   const seen = new Set();
@@ -281,9 +251,7 @@ function buildBinsFromChars(charsStr, K = K_BINS) {
       if (right < K && bins[right].length) { picked = bins[right]; break; }
       left--; right++;
     }
-    bins[i] = picked
-  ? picked.slice(0, Math.min(3, picked.length))
-  : [IS_CJK_STACK ? '\u3000' : (dens[0]?.ch || ' ')];
+    bins[i] = picked ? picked.slice(0, Math.min(3, picked.length)) : [' '];
   }
   return bins;
 }
@@ -302,57 +270,30 @@ function pickPalette(_bins, fixedByBinArr = []) {
 }
 
 function updateBinsForCurrentCharset() {
+  // включаем «умное сужение» только для длинных наборов
   if (state.charset && state.charset.length > K_BINS) {
-    // 1) плотности (тёмные -> светлые), без дублей
-    const densSorted = computeDensities(state.charset);
+    // 1) тёмные → светлые, без дублей
+    const densSorted = computeDensities(state.charset); // [{ch, d}, ...] отсортированы
+    const lockN = Math.min(DARK_LOCK_COUNT, K_BINS, densSorted.length);
 
-    // 2) фиксируем первые DARK_LOCK_COUNT тёмных, НО:
-    //    бин[0] = ВСЕГДА ПРОБЕЛ (фон пустой), даже если ' ' нет в наборе
+    // 2) фиксируем первые N самых тёмных символов по индексам биновой шкалы
     fixedByBin = new Array(K_BINS).fill(null);
-
-    let lockDarkN = Math.min(DARK_LOCK_COUNT, K_BINS);
-    if (lockDarkN < 1) lockDarkN = 1; // минимум 1 бин — это фон
-
-    // бин 0 — фон: в CJK берём полноширинный пробел (U+3000), иначе обычный
-const darkBlank = IS_CJK_STACK ? '\u3000' : ' ';
-fixedByBin[0] = darkBlank;
-
-    // оставшиеся тёмные бин(ы) берём из набора, пропуская пробел
-    let bi = 1; // следующий бин после фона
-    for (let i = 0; i < densSorted.length && bi < lockDarkN; i++) {
-    const ch = densSorted[i].ch;
-    if (ch === ' ' || ch === '\u3000') continue;
-    fixedByBin[bi++] = ch;
+    for (let i = 0; i < lockN; i++) {
+      fixedByBin[i] = densSorted[i].ch; // i=0 — самый тёмный символ, и т.д.
     }
 
-    // 3) фиксируем верхние BRIGHT_LOCK_COUNT бинов самыми плотными глифами (белыми)
-    const lockBrightN = Math.min(BRIGHT_LOCK_COUNT, K_BINS - lockDarkN);
-    let j = 0;
-    for (let k = K_BINS - 1; k >= K_BINS - lockBrightN; k--) {
-      // берём с конца densSorted, пропуская пробел
-      while (j < densSorted.length) {
-  const ch = densSorted[densSorted.length - 1 - j].ch;
-  j++;
-  if (ch !== ' ' && ch !== '\u3000') { fixedByBin[k] = ch; break; }
-}
-      // если вдруг не нашли — дубль последнего доступного
-      if (!fixedByBin[k]) fixedByBin[k] = densSorted[densSorted.length - 1]?.ch || '█';
-    }
-
-    // 4) строим бины и первичную палитру
+    // 3) строим бины и первичную палитру с учётом фиксов
     bins = buildBinsFromChars(state.charset, K_BINS);
     palette = pickPalette(bins, fixedByBin);
 
-    // 5) ротация: крутим ТОЛЬКО середину (без тёмных и без ярких фиксов)
+    // 4) ротация похожих символов ТОЛЬКО в нефиксированных бинах
     if (paletteTimer) clearInterval(paletteTimer);
-    const startFree = lockDarkN;
-    const endFree = K_BINS - lockBrightN - 1;
-
     paletteTimer = setInterval(() => {
-      if (!bins || !bins.length || startFree > endFree) return;
+      if (!bins || !bins.length) return;
 
-      for (let z = 0; z < CHANGES_PER_TICK; z++) {
-        const bi = Math.floor(Math.random() * (endFree - startFree + 1)) + startFree;
+      for (let k = 0; k < CHANGES_PER_TICK; k++) {
+        // выбираем случайный бин, НО сдвигаем старт на lockN (фиксированные не трогаем)
+        const bi = Math.floor(Math.random() * (K_BINS - lockN)) + lockN;
         const bucket = bins[bi];
         if (!bucket || !bucket.length) continue;
 
@@ -365,37 +306,14 @@ fixedByBin[0] = darkBlank;
     }, PALETTE_INTERVAL);
 
   } else {
-    // короткие наборы — всё по-старому
+    // короткие наборы — без редьюса/ротации
     bins = [];
     palette = [];
     if (paletteTimer) { clearInterval(paletteTimer); paletteTimer = null; }
     fixedByBin = new Array(K_BINS).fill(null);
   }
 }
-// === повторная пересортировка после загрузки web-шрифтов ===
-function resortAfterFonts(expectedVal) {
-  if (resortTimer) clearTimeout(resortTimer);
 
-  const run = () => {
-    // набор уже сменился — выходим
-    if (app.ui.charset.value !== expectedVal) return;
-
-    // CJK не сортируем (его показываем как есть)
-    if (/[\u30A0-\u30FF\u3040-\u309F]/.test(expectedVal)) return;
-
-    const sorted = autoSortCharset(expectedVal);
-    if (sorted !== state.charset) {
-      state.charset = sorted;
-      updateBinsForCurrentCharset();
-    }
-  };
-
-  // ждём fonts.ready и ставим небольшой фолбэк-таймер
-  if (document.fonts && document.fonts.ready) {
-    document.fonts.ready.then(run);
-  }
-  resortTimer = setTimeout(run, 200);
-}
   // ---- измерение пропорции символа (W/H) ----
 function measureCharAspect() {
   if (typeof forcedAspect === 'number' && isFinite(forcedAspect) && forcedAspect > 0) {
@@ -404,7 +322,7 @@ function measureCharAspect() {
   const fs = parseFloat(getComputedStyle(app.out).fontSize) || 16;
   measurePre.style.fontSize = fs + 'px';
   // одна большая буква, чтобы померить ширину/высоту глифа
-  measurePre.textContent = IS_CJK_STACK ? 'ロ' : 'M';
+  measurePre.textContent = 'M';
   const r = measurePre.getBoundingClientRect();
 
   // W/H; подстрахуемся от нулей
@@ -622,7 +540,7 @@ if (palette && palette.length === K_BINS) {
     const stageW = app.stage.clientWidth;
     const stageH = app.stage.clientHeight;
 
-    measurePre.textContent = ((IS_CJK_STACK ? 'ロ' : 'M').repeat(cols) + '\n').repeat(rows);
+    measurePre.textContent = ('M'.repeat(cols) + '\n').repeat(rows);
     const currentFS = parseFloat(getComputedStyle(app.out).fontSize) || 16;
     measurePre.style.fontSize = currentFS + 'px';
 
@@ -900,36 +818,32 @@ if (val === 'CUSTOM') {
   applyFontStack(FONT_STACK_MAIN); // кастом всегда в MAIN
   state.charset = autoSortCharset(app.ui.customCharset.value || '');
   updateBinsForCurrentCharset(); // <<< ДОБАВЛЕНО
-  resortAfterFonts(val);
   return;
 }
 
 
   app.ui.customCharset.style.display = 'none';
 
-  // детектим по наличию ката/хираганы в значении
-const isCJK = /[\u30A0-\u30FF\u3040-\u309F]/.test(val);
+  // индексы из твоего index.html: 4 = カタカナ, 5 = ひらがな
+  const idx = app.ui.charset.selectedIndex;
+  const isCJK = (idx === 4 || idx === 5);
 
   if (isCJK) {
-  applyFontStack(FONT_STACK_CJK, '400'); // строго Regular
-  state.charset = val;                   // без сортировки!
-  forcedAspect = null;                   // аспект считаем по 'ロ'
-} else {
-  applyFontStack(FONT_STACK_MAIN, '700');
-  state.charset = autoSortCharset(val);
-  forcedAspect = null;
-}
-
+    applyFontStack(FONT_STACK_CJK); // CJK-моно стек
+    state.charset = val;            // без сортировки!
+    forcedAspect = 1.0;  
+  } else {
+    applyFontStack(FONT_STACK_MAIN);      // обратно на MAIN
+    state.charset = autoSortCharset(val); // сортируем набор
+    forcedAspect = null;                  // <<< вернулись к авто-замеру
+  }
   updateBinsForCurrentCharset(); // <<< ДОБАВЛЕНО
-  resortAfterFonts(val);
 });
 
 // реагируем на ввод своих символов
 app.ui.customCharset.addEventListener('input', e => {
-  const v = e.target.value || '';
-  state.charset = autoSortCharset(v);
-  updateBinsForCurrentCharset();
-  resortAfterFonts(v);
+  state.charset = autoSortCharset(e.target.value || '');
+  updateBinsForCurrentCharset(); // <<< ДОБАВЛЕНО
 });
     
 // --- Синхронизация видимости при загрузке и первом показе панели ---
@@ -989,31 +903,5 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
