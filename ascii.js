@@ -198,6 +198,122 @@ function autoSortCharset(str) {
   withDensity.sort((a,b) => a.d - b.d); // от тёмных к светлым
   return withDensity.map(x => x.ch).join('');
 }
+  // === Bin-reduce (умное сужение до K ступеней) ===
+const K_BINS = 10;
+
+// быстрее и плавнее
+let PALETTE_INTERVAL = 320;   // мс — темп смены похожих символов
+const CHANGES_PER_TICK = 1;   // меняем ровно 1 бин за тик
+
+// фиксируем первые N самых тёмных (по измеренной плотности)
+const DARK_LOCK_COUNT = 3;    // ← можно менять на 2/3/4 по вкусу
+
+let bins = [];
+let palette = [];
+let paletteTimer = null;
+
+// массив фиксированных символов, привязанных к индексам бинов:
+// fixedByBin[0] = (самый тёмный символ), fixedByBin[1] = (второй по тёмности), ...
+let fixedByBin = new Array(K_BINS).fill(null);
+
+function computeDensities(charsStr) {
+  const seen = new Set();
+  const arr = [];
+  for (const ch of Array.from(charsStr || '')) {
+    if (seen.has(ch)) continue;
+    seen.add(ch);
+    arr.push({ ch, d: measureCharDensity(ch) });
+  }
+  // от тёмных к светлым
+  arr.sort((a, b) => a.d - b.d);
+  return arr;
+}
+
+function buildBinsFromChars(charsStr, K = K_BINS) {
+  const dens = computeDensities(charsStr);
+  if (dens.length === 0) return Array.from({ length: K }, () => []);
+  const min = dens[0].d;
+  const max = dens[dens.length - 1].d;
+  const span = Math.max(1e-6, (max - min));
+  const bins = Array.from({ length: K }, () => []);
+  for (const it of dens) {
+    let bi = Math.floor(((it.d - min) / span) * K);
+    if (bi >= K) bi = K - 1;
+    if (bi < 0) bi = 0;
+    bins[bi].push(it.ch);
+  }
+  // если какой-то бин пуст — подтягиваем ближайший
+  for (let i = 0; i < K; i++) {
+    if (bins[i].length) continue;
+    let left = i - 1, right = i + 1, picked = null;
+    while (left >= 0 || right < K) {
+      if (left >= 0 && bins[left].length) { picked = bins[left]; break; }
+      if (right < K && bins[right].length) { picked = bins[right]; break; }
+      left--; right++;
+    }
+    bins[i] = picked ? picked.slice(0, Math.min(3, picked.length)) : [' '];
+  }
+  return bins;
+}
+
+function pickPalette(_bins, fixedByBinArr = []) {
+  const fixedChars = fixedByBinArr.filter(Boolean);
+  return _bins.map((bucket, i) => {
+    // если для этого бина задан фикс — используем его
+    if (fixedByBinArr[i]) return fixedByBinArr[i];
+    if (!bucket || bucket.length === 0) return ' ';
+    // из остальных избегаем фиксированных символов
+    const pool = bucket.filter(ch => !fixedChars.includes(ch));
+    const src = pool.length ? pool : bucket;
+    return src[Math.floor(Math.random() * src.length)];
+  });
+}
+
+function updateBinsForCurrentCharset() {
+  // включаем «умное сужение» только для длинных наборов
+  if (state.charset && state.charset.length > K_BINS) {
+    // 1) тёмные → светлые, без дублей
+    const densSorted = computeDensities(state.charset); // [{ch, d}, ...] отсортированы
+    const lockN = Math.min(DARK_LOCK_COUNT, K_BINS, densSorted.length);
+
+    // 2) фиксируем первые N самых тёмных символов по индексам биновой шкалы
+    fixedByBin = new Array(K_BINS).fill(null);
+    for (let i = 0; i < lockN; i++) {
+      fixedByBin[i] = densSorted[i].ch; // i=0 — самый тёмный символ, и т.д.
+    }
+
+    // 3) строим бины и первичную палитру с учётом фиксов
+    bins = buildBinsFromChars(state.charset, K_BINS);
+    palette = pickPalette(bins, fixedByBin);
+
+    // 4) ротация похожих символов ТОЛЬКО в нефиксированных бинах
+    if (paletteTimer) clearInterval(paletteTimer);
+    paletteTimer = setInterval(() => {
+      if (!bins || !bins.length) return;
+
+      for (let k = 0; k < CHANGES_PER_TICK; k++) {
+        // выбираем случайный бин, НО сдвигаем старт на lockN (фиксированные не трогаем)
+        const bi = Math.floor(Math.random() * (K_BINS - lockN)) + lockN;
+        const bucket = bins[bi];
+        if (!bucket || !bucket.length) continue;
+
+        const fixedChars = fixedByBin.filter(Boolean);
+        let pool = bucket.filter(ch => !fixedChars.includes(ch));
+        if (!pool.length) pool = bucket;
+
+        palette[bi] = pool[Math.floor(Math.random() * pool.length)];
+      }
+    }, PALETTE_INTERVAL);
+
+  } else {
+    // короткие наборы — без редьюса/ротации
+    bins = [];
+    palette = [];
+    if (paletteTimer) { clearInterval(paletteTimer); paletteTimer = null; }
+    fixedByBin = new Array(K_BINS).fill(null);
+  }
+}
+
   // ---- измерение пропорции символа (W/H) ----
 function measureCharAspect() {
   if (typeof forcedAspect === 'number' && isFinite(forcedAspect) && forcedAspect > 0) {
@@ -399,7 +515,13 @@ if (DITHER_ENABLED) {
 if (idx < 0) idx = 0;
 else if (idx > n) idx = n;
 
-line += chars[idx];
+if (palette && palette.length === K_BINS) {
+  let bi = Math.round((Yc / 255) * (K_BINS - 1));
+  if (bi < 0) bi = 0; else if (bi >= K_BINS) bi = K_BINS - 1;
+  line += palette[bi] || ' ';
+} else {
+  line += chars[idx];
+}
 
   }
   out += line + '\n';
@@ -691,12 +813,14 @@ app.ui.flip.addEventListener('click', async () => {
 app.ui.charset.addEventListener('change', e => {
   const val = e.target.value;
 
-  if (val === 'CUSTOM') {
-    app.ui.customCharset.style.display = 'inline-block';
-    applyFontStack(FONT_STACK_MAIN); // кастом всегда в MAIN
-    state.charset = autoSortCharset(app.ui.customCharset.value || '');
-    return;
-  }
+if (val === 'CUSTOM') {
+  app.ui.customCharset.style.display = 'inline-block';
+  applyFontStack(FONT_STACK_MAIN); // кастом всегда в MAIN
+  state.charset = autoSortCharset(app.ui.customCharset.value || '');
+  updateBinsForCurrentCharset(); // <<< ДОБАВЛЕНО
+  return;
+}
+
 
   app.ui.customCharset.style.display = 'none';
 
@@ -713,11 +837,13 @@ app.ui.charset.addEventListener('change', e => {
     state.charset = autoSortCharset(val); // сортируем набор
     forcedAspect = null;                  // <<< вернулись к авто-замеру
   }
+  updateBinsForCurrentCharset(); // <<< ДОБАВЛЕНО
 });
 
 // реагируем на ввод своих символов
 app.ui.customCharset.addEventListener('input', e => {
   state.charset = autoSortCharset(e.target.value || '');
+  updateBinsForCurrentCharset(); // <<< ДОБАВЛЕНО
 });
     
 // --- Синхронизация видимости при загрузке и первом показе панели ---
@@ -777,5 +903,3 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
-
-
