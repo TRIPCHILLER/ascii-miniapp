@@ -200,10 +200,17 @@ function autoSortCharset(str) {
 }
   // === Bin-reduce (умное сужение до K ступеней) ===
 const K_BINS = 10;
-const PALETTE_INTERVAL = 1000; // мс; если нужно — вынесем в UI
-let bins = [];        // массив из K массивов символов
-let palette = [];     // текущий представитель по каждому бину
+// быстрее в ~2.2 раза
+let PALETTE_INTERVAL = 450;   // мс — темп смены похожих символов
+const CHANGES_PER_TICK = 1;   // меняем РОВНО 1 бин за тик (без «искр»)
+
+let bins = [];        
+let palette = [];     
 let paletteTimer = null;
+
+// Лочим самые тёмные ступени (фоновые символы)
+let LOCK_DARK_BINS = 0;       // 0..2 в зависимости от наличия ' ' и '.'
+let FIXED_DARK = [];          // например [' ', '.']
 
 function computeDensities(charsStr) {
   const seen = new Set();
@@ -245,36 +252,64 @@ function buildBinsFromChars(charsStr, K = K_BINS) {
   return bins;
 }
 
-function pickPalette(_bins) {
-  return _bins.map(bucket => {
+function pickPalette(_bins, fixed = []) {
+  return _bins.map((bucket, i) => {
+    // если бин залочен — берём фиксированный символ
+    if (i < fixed.length && fixed[i]) return fixed[i];
     if (!bucket || bucket.length === 0) return ' ';
-    return bucket[Math.floor(Math.random() * bucket.length)];
+    // из остальных выбираем любой, но избегаем фиксированных
+    const pool = bucket.filter(ch => !fixed.includes(ch));
+    const src = pool.length ? pool : bucket;
+    return src[Math.floor(Math.random() * src.length)];
   });
 }
 
 function updateBinsForCurrentCharset() {
   if (state.charset && state.charset.length > K_BINS) {
+    // 1) Считаем плотности и узнаём, есть ли ' ' и '.'
+    const densSorted = computeDensities(state.charset); // тёмные -> светлые
+    const hasSpace = densSorted.some(o => o.ch === ' ');
+    const hasDot   = densSorted.some(o => o.ch === '.');
+
+    // 2) Фиксируем тёмные ступени (0 — пробел, 1 — точка)
+    FIXED_DARK = [];
+    if (hasSpace) FIXED_DARK.push(' ');
+    if (hasDot)   FIXED_DARK.push('.');
+    LOCK_DARK_BINS = FIXED_DARK.length; // 0..2
+
+    // 3) Строим бины и первичную палитру (с учётом фиксации)
     bins = buildBinsFromChars(state.charset, K_BINS);
-    palette = pickPalette(bins);
+    palette = pickPalette(bins, FIXED_DARK);
+
+    // 4) Перезапускаем таймер ротации (пропуская залоченные бины)
     if (paletteTimer) clearInterval(paletteTimer);
-    // мягкая ротация: меняем 1–2 бина раз в интервал
     paletteTimer = setInterval(() => {
       if (!bins || !bins.length) return;
-      const changes = Math.max(1, Math.floor(K_BINS * 0.15));
-      for (let k = 0; k < changes; k++) {
-        const bi = Math.floor(Math.random() * K_BINS);
-        const b = bins[bi];
-        if (b && b.length) {
-          palette[bi] = b[Math.floor(Math.random() * b.length)];
-        }
+
+      for (let k = 0; k < CHANGES_PER_TICK; k++) {
+        // ротируем только бины >= LOCK_DARK_BINS
+        let bi = Math.floor(Math.random() * (K_BINS - LOCK_DARK_BINS)) + LOCK_DARK_BINS;
+        const bucket = bins[bi];
+        if (!bucket || !bucket.length) continue;
+
+        // не подставляем фиксированные тёмные символы в другие бины
+        let pool = bucket.filter(ch => !FIXED_DARK.includes(ch));
+        if (!pool.length) pool = bucket;
+
+        palette[bi] = pool[Math.floor(Math.random() * pool.length)];
       }
     }, PALETTE_INTERVAL);
+
   } else {
+    // Короткие наборы — всё по-старому, без редьюса и без ротации
     bins = [];
     palette = [];
     if (paletteTimer) { clearInterval(paletteTimer); paletteTimer = null; }
+    LOCK_DARK_BINS = 0;
+    FIXED_DARK = [];
   }
 }
+
   // ---- измерение пропорции символа (W/H) ----
 function measureCharAspect() {
   if (typeof forcedAspect === 'number' && isFinite(forcedAspect) && forcedAspect > 0) {
@@ -864,6 +899,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
