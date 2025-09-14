@@ -263,7 +263,9 @@ function buildBinsFromChars(charsStr, K = K_BINS) {
       if (right < K && bins[right].length) { picked = bins[right]; break; }
       left--; right++;
     }
-    bins[i] = picked ? picked.slice(0, Math.min(3, picked.length)) : [' '];
+    bins[i] = picked
+  ? picked.slice(0, Math.min(3, picked.length))
+  : [IS_CJK_STACK ? '\u3000' : (dens[0]?.ch || ' ')];
   }
   return bins;
 }
@@ -311,10 +313,10 @@ fixedByBin[0] = darkBlank;
     for (let k = K_BINS - 1; k >= K_BINS - lockBrightN; k--) {
       // берём с конца densSorted, пропуская пробел
       while (j < densSorted.length) {
-        const ch = densSorted[densSorted.length - 1 - j].ch;
-        j++;
-        if (ch !== ' ') { fixedByBin[k] = ch; break; }
-      }
+  const ch = densSorted[densSorted.length - 1 - j].ch;
+  j++;
+  if (ch !== ' ' && ch !== '\u3000') { fixedByBin[k] = ch; break; }
+}
       // если вдруг не нашли — дубль последнего доступного
       if (!fixedByBin[k]) fixedByBin[k] = densSorted[densSorted.length - 1]?.ch || '█';
     }
@@ -942,6 +944,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
