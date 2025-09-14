@@ -198,6 +198,83 @@ function autoSortCharset(str) {
   withDensity.sort((a,b) => a.d - b.d); // от тёмных к светлым
   return withDensity.map(x => x.ch).join('');
 }
+  // === Bin-reduce (умное сужение до K ступеней) ===
+const K_BINS = 10;
+const PALETTE_INTERVAL = 1000; // мс; если нужно — вынесем в UI
+let bins = [];        // массив из K массивов символов
+let palette = [];     // текущий представитель по каждому бину
+let paletteTimer = null;
+
+function computeDensities(charsStr) {
+  const seen = new Set();
+  const arr = [];
+  for (const ch of Array.from(charsStr || '')) {
+    if (seen.has(ch)) continue;
+    seen.add(ch);
+    arr.push({ ch, d: measureCharDensity(ch) });
+  }
+  // от тёмных к светлым
+  arr.sort((a, b) => a.d - b.d);
+  return arr;
+}
+
+function buildBinsFromChars(charsStr, K = K_BINS) {
+  const dens = computeDensities(charsStr);
+  if (dens.length === 0) return Array.from({ length: K }, () => []);
+  const min = dens[0].d;
+  const max = dens[dens.length - 1].d;
+  const span = Math.max(1e-6, (max - min));
+  const bins = Array.from({ length: K }, () => []);
+  for (const it of dens) {
+    let bi = Math.floor(((it.d - min) / span) * K);
+    if (bi >= K) bi = K - 1;
+    if (bi < 0) bi = 0;
+    bins[bi].push(it.ch);
+  }
+  // если какой-то бин пуст — подтягиваем ближайший
+  for (let i = 0; i < K; i++) {
+    if (bins[i].length) continue;
+    let left = i - 1, right = i + 1, picked = null;
+    while (left >= 0 || right < K) {
+      if (left >= 0 && bins[left].length) { picked = bins[left]; break; }
+      if (right < K && bins[right].length) { picked = bins[right]; break; }
+      left--; right++;
+    }
+    bins[i] = picked ? picked.slice(0, Math.min(3, picked.length)) : [' '];
+  }
+  return bins;
+}
+
+function pickPalette(_bins) {
+  return _bins.map(bucket => {
+    if (!bucket || bucket.length === 0) return ' ';
+    return bucket[Math.floor(Math.random() * bucket.length)];
+  });
+}
+
+function updateBinsForCurrentCharset() {
+  if (state.charset && state.charset.length > K_BINS) {
+    bins = buildBinsFromChars(state.charset, K_BINS);
+    palette = pickPalette(bins);
+    if (paletteTimer) clearInterval(paletteTimer);
+    // мягкая ротация: меняем 1–2 бина раз в интервал
+    paletteTimer = setInterval(() => {
+      if (!bins || !bins.length) return;
+      const changes = Math.max(1, Math.floor(K_BINS * 0.15));
+      for (let k = 0; k < changes; k++) {
+        const bi = Math.floor(Math.random() * K_BINS);
+        const b = bins[bi];
+        if (b && b.length) {
+          palette[bi] = b[Math.floor(Math.random() * b.length)];
+        }
+      }
+    }, PALETTE_INTERVAL);
+  } else {
+    bins = [];
+    palette = [];
+    if (paletteTimer) { clearInterval(paletteTimer); paletteTimer = null; }
+  }
+}
   // ---- измерение пропорции символа (W/H) ----
 function measureCharAspect() {
   if (typeof forcedAspect === 'number' && isFinite(forcedAspect) && forcedAspect > 0) {
@@ -399,7 +476,13 @@ if (DITHER_ENABLED) {
 if (idx < 0) idx = 0;
 else if (idx > n) idx = n;
 
-line += chars[idx];
+if (palette && palette.length === K_BINS) {
+  let bi = Math.round((Yc / 255) * (K_BINS - 1));
+  if (bi < 0) bi = 0; else if (bi >= K_BINS) bi = K_BINS - 1;
+  line += palette[bi] || ' ';
+} else {
+  line += chars[idx];
+}
 
   }
   out += line + '\n';
@@ -691,12 +774,14 @@ app.ui.flip.addEventListener('click', async () => {
 app.ui.charset.addEventListener('change', e => {
   const val = e.target.value;
 
-  if (val === 'CUSTOM') {
-    app.ui.customCharset.style.display = 'inline-block';
-    applyFontStack(FONT_STACK_MAIN); // кастом всегда в MAIN
-    state.charset = autoSortCharset(app.ui.customCharset.value || '');
-    return;
-  }
+if (val === 'CUSTOM') {
+  app.ui.customCharset.style.display = 'inline-block';
+  applyFontStack(FONT_STACK_MAIN); // кастом всегда в MAIN
+  state.charset = autoSortCharset(app.ui.customCharset.value || '');
+  updateBinsForCurrentCharset(); // <<< ДОБАВЛЕНО
+  return;
+}
+
 
   app.ui.customCharset.style.display = 'none';
 
@@ -713,11 +798,13 @@ app.ui.charset.addEventListener('change', e => {
     state.charset = autoSortCharset(val); // сортируем набор
     forcedAspect = null;                  // <<< вернулись к авто-замеру
   }
+  updateBinsForCurrentCharset(); // <<< ДОБАВЛЕНО
 });
 
 // реагируем на ввод своих символов
 app.ui.customCharset.addEventListener('input', e => {
   state.charset = autoSortCharset(e.target.value || '');
+  updateBinsForCurrentCharset(); // <<< ДОБАВЛЕНО
 });
     
 // --- Синхронизация видимости при загрузке и первом показе панели ---
@@ -777,6 +864,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
