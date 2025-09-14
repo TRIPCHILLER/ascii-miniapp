@@ -140,7 +140,9 @@ function isFullscreenLike() {
   // Вспомогательные канвасы
   const off = document.createElement('canvas');
   const ctx = off.getContext('2d', { willReadFrequently: true });
-
+// отдельный канвас для замеров плотности символов (не трогаем off/ctx)
+const densCanvas = document.createElement('canvas');
+const dc = densCanvas.getContext('2d', { willReadFrequently: true });
   // ==== measurePre + applyFontStack (замена) ====
 const measurePre = document.createElement('pre');
 measurePre.style.cssText = `
@@ -215,9 +217,6 @@ function measureCharDensity(ch) {
 
   densityCache.set(cacheKey, density);
   return density;
-}
-
-  return sum / (size * size * 3); // 0..255
 }
 
 // === авто-сортировка набора ===
@@ -925,6 +924,7 @@ const isCJK = /[\u30A0-\u30FF\u3040-\u309F]/.test(val);
 }
 
   updateBinsForCurrentCharset(); // <<< ДОБАВЛЕНО
+  resortAfterFonts(val);
 });
 
 // реагируем на ввод своих символов
@@ -992,6 +992,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
