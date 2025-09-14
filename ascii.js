@@ -187,8 +187,10 @@ function measureCharDensity(ch) {
   c.fillStyle = '#000';
   c.fillRect(0, 0, size, size);
   c.fillStyle = '#fff';
-  const outFF = getComputedStyle(app.out).fontFamily || 'monospace';
-  c.font = `${size}px ${outFF}`;
+  const cs   = getComputedStyle(app.out);
+  const outFF = cs.fontFamily || 'monospace';
+  const outFW = cs.fontWeight || '400';
+  c.font = `${outFW} ${size}px ${outFF}`;
   c.textBaseline = 'top';
   c.fillText(ch, 0, 0);
   const data = c.getImageData(0, 0, size, size).data;
@@ -548,7 +550,7 @@ if (palette && palette.length === K_BINS) {
     const stageW = app.stage.clientWidth;
     const stageH = app.stage.clientHeight;
 
-    measurePre.textContent = ('M'.repeat(cols) + '\n').repeat(rows);
+    measurePre.textContent = ((IS_CJK_STACK ? 'ロ' : 'M').repeat(cols) + '\n').repeat(rows);
     const currentFS = parseFloat(getComputedStyle(app.out).fontSize) || 16;
     measurePre.style.fontSize = currentFS + 'px';
 
@@ -832,9 +834,8 @@ if (val === 'CUSTOM') {
 
   app.ui.customCharset.style.display = 'none';
 
-  // индексы из твоего index.html: 4 = カタカナ, 5 = ひらがな
-  const idx = app.ui.charset.selectedIndex;
-  const isCJK = (idx === 4 || idx === 5);
+  // детектим по наличию ката/хираганы в значении
+const isCJK = /[\u30A0-\u30FF\u3040-\u309F]/.test(val);
 
   if (isCJK) {
   applyFontStack(FONT_STACK_CJK, '400'); // строго Regular
@@ -912,6 +913,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
