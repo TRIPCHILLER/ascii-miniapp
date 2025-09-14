@@ -153,17 +153,25 @@ measurePre.style.cssText = `
   -webkit-font-smoothing:none;
 `;
 
+// флаг: сейчас ли активен CJK-стек
+let IS_CJK_STACK = false;
+
 // единая функция — применяем стек и к выводу, и к измерителю
-function applyFontStack(stack) {
+function applyFontStack(stack, weight) {
+  // если не передали явно — для CJK берём 400, иначе 700
+  const isCJK = (stack === FONT_STACK_CJK);
+  const w = weight || (isCJK ? '400' : '700');
+
+  IS_CJK_STACK = isCJK;
+
   if (app.out) {
     app.out.style.fontFamily = stack;
-    app.out.style.fontWeight = '700';
+    app.out.style.fontWeight = w;
     app.out.style.webkitFontSmoothing = 'none';
   }
   measurePre.style.fontFamily = stack;
-  measurePre.style.fontWeight = '700';
+  measurePre.style.fontWeight = w;
 }
-
 
 document.body.appendChild(measurePre);
 // по умолчанию — основной моно стек
@@ -322,7 +330,7 @@ function measureCharAspect() {
   const fs = parseFloat(getComputedStyle(app.out).fontSize) || 16;
   measurePre.style.fontSize = fs + 'px';
   // одна большая буква, чтобы померить ширину/высоту глифа
-  measurePre.textContent = 'M';
+  measurePre.textContent = IS_CJK_STACK ? 'ロ' : 'M';
   const r = measurePre.getBoundingClientRect();
 
   // W/H; подстрахуемся от нулей
@@ -829,14 +837,15 @@ if (val === 'CUSTOM') {
   const isCJK = (idx === 4 || idx === 5);
 
   if (isCJK) {
-    applyFontStack(FONT_STACK_CJK); // CJK-моно стек
-    state.charset = val;            // без сортировки!
-    forcedAspect = 1.0;  
-  } else {
-    applyFontStack(FONT_STACK_MAIN);      // обратно на MAIN
-    state.charset = autoSortCharset(val); // сортируем набор
-    forcedAspect = null;                  // <<< вернулись к авто-замеру
-  }
+  applyFontStack(FONT_STACK_CJK, '400'); // строго Regular
+  state.charset = val;                   // без сортировки!
+  forcedAspect = null;                   // аспект считаем по 'ロ'
+} else {
+  applyFontStack(FONT_STACK_MAIN, '700');
+  state.charset = autoSortCharset(val);
+  forcedAspect = null;
+}
+
   updateBinsForCurrentCharset(); // <<< ДОБАВЛЕНО
 });
 
@@ -903,6 +912,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
