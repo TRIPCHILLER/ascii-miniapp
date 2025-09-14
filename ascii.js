@@ -236,7 +236,7 @@ function measureCharAspect() {
 
   function setUI() {
     // разные пределы для мобилы и ПК
-const WIDTH_MIN   = isMobile ? 50  : 100;
+const WIDTH_MIN   = isMobile ? 50  : 125;
 const WIDTH_MAX   = isMobile ? 100 : 175;
 const WIDTH_START = isMobile ? 75  : 150;
 
@@ -777,6 +777,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
