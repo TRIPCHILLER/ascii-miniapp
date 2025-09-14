@@ -194,26 +194,23 @@ function measureCharDensity(ch) {
   const size = 64;
   const pad  = 16;
 
-  c.canvas.width  = size + pad * 2;
-  c.canvas.height = size + pad * 2;
+  dc.canvas.width  = size + pad * 2;
+dc.canvas.height = size + pad * 2;
 
-  c.save();
-  c.font = `${outFW} ${size}px ${outFF}`;
-  c.textBaseline = 'top';
-  c.textAlign    = 'left';
-  c.fillStyle    = '#ffffff';
-  c.globalCompositeOperation = 'source-over';
+dc.save();
+dc.font = `${outFW} ${size}px ${outFF}`;
+dc.textBaseline = 'top';
+dc.textAlign    = 'left';
+dc.fillStyle    = '#ffffff';
+dc.globalCompositeOperation = 'source-over';
 
-  c.clearRect(0, 0, c.canvas.width, c.canvas.height);
-  c.fillText(ch, pad, pad);
+dc.clearRect(0, 0, dc.canvas.width, dc.canvas.height);
+dc.fillText(ch, pad, pad);
 
-  // считаем плотность по альфе
-  const img = c.getImageData(0, 0, c.canvas.width, c.canvas.height).data;
-  let sum = 0;
-  for (let i = 3; i < img.length; i += 4) sum += img[i];
-  const density = sum / (255 * (c.canvas.width * c.canvas.height));
+const img = dc.getImageData(0, 0, dc.canvas.width, dc.canvas.height).data;
+// ...
+dc.restore();
 
-  c.restore();
 
   densityCache.set(cacheKey, density);
   return density;
@@ -992,6 +989,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
