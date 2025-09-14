@@ -225,6 +225,8 @@ let paletteTimer = null;
 // массив фиксированных символов, привязанных к индексам бинов:
 // fixedByBin[0] = (самый тёмный символ), fixedByBin[1] = (второй по тёмности), ...
 let fixedByBin = new Array(K_BINS).fill(null);
+  // сколько самых светлых ступеней тоже фиксируем «самыми жирными» глифами
+const BRIGHT_LOCK_COUNT = 3; // 1–2 ступени обычно достаточно
 
 function computeDensities(charsStr) {
   const seen = new Set();
@@ -280,30 +282,57 @@ function pickPalette(_bins, fixedByBinArr = []) {
 }
 
 function updateBinsForCurrentCharset() {
-  // включаем «умное сужение» только для длинных наборов
   if (state.charset && state.charset.length > K_BINS) {
-    // 1) тёмные → светлые, без дублей
-    const densSorted = computeDensities(state.charset); // [{ch, d}, ...] отсортированы
-    const lockN = Math.min(DARK_LOCK_COUNT, K_BINS, densSorted.length);
+    // 1) плотности (тёмные -> светлые), без дублей
+    const densSorted = computeDensities(state.charset);
 
-    // 2) фиксируем первые N самых тёмных символов по индексам биновой шкалы
+    // 2) фиксируем первые DARK_LOCK_COUNT тёмных, НО:
+    //    бин[0] = ВСЕГДА ПРОБЕЛ (фон пустой), даже если ' ' нет в наборе
     fixedByBin = new Array(K_BINS).fill(null);
-    for (let i = 0; i < lockN; i++) {
-      fixedByBin[i] = densSorted[i].ch; // i=0 — самый тёмный символ, и т.д.
+
+    let lockDarkN = Math.min(DARK_LOCK_COUNT, K_BINS);
+    if (lockDarkN < 1) lockDarkN = 1; // минимум 1 бин — это фон
+
+    // бин 0 — фон: в CJK берём полноширинный пробел (U+3000), иначе обычный
+const darkBlank = IS_CJK_STACK ? '\u3000' : ' ';
+fixedByBin[0] = darkBlank;
+
+    // оставшиеся тёмные бин(ы) берём из набора, пропуская пробел
+    let bi = 1; // следующий бин после фона
+    for (let i = 0; i < densSorted.length && bi < lockDarkN; i++) {
+    const ch = densSorted[i].ch;
+    if (ch === ' ' || ch === '\u3000') continue;
+    fixedByBin[bi++] = ch;
     }
 
-    // 3) строим бины и первичную палитру с учётом фиксов
+    // 3) фиксируем верхние BRIGHT_LOCK_COUNT бинов самыми плотными глифами (белыми)
+    const lockBrightN = Math.min(BRIGHT_LOCK_COUNT, K_BINS - lockDarkN);
+    let j = 0;
+    for (let k = K_BINS - 1; k >= K_BINS - lockBrightN; k--) {
+      // берём с конца densSorted, пропуская пробел
+      while (j < densSorted.length) {
+        const ch = densSorted[densSorted.length - 1 - j].ch;
+        j++;
+        if (ch !== ' ') { fixedByBin[k] = ch; break; }
+      }
+      // если вдруг не нашли — дубль последнего доступного
+      if (!fixedByBin[k]) fixedByBin[k] = densSorted[densSorted.length - 1]?.ch || '█';
+    }
+
+    // 4) строим бины и первичную палитру
     bins = buildBinsFromChars(state.charset, K_BINS);
     palette = pickPalette(bins, fixedByBin);
 
-    // 4) ротация похожих символов ТОЛЬКО в нефиксированных бинах
+    // 5) ротация: крутим ТОЛЬКО середину (без тёмных и без ярких фиксов)
     if (paletteTimer) clearInterval(paletteTimer);
-    paletteTimer = setInterval(() => {
-      if (!bins || !bins.length) return;
+    const startFree = lockDarkN;
+    const endFree = K_BINS - lockBrightN - 1;
 
-      for (let k = 0; k < CHANGES_PER_TICK; k++) {
-        // выбираем случайный бин, НО сдвигаем старт на lockN (фиксированные не трогаем)
-        const bi = Math.floor(Math.random() * (K_BINS - lockN)) + lockN;
+    paletteTimer = setInterval(() => {
+      if (!bins || !bins.length || startFree > endFree) return;
+
+      for (let z = 0; z < CHANGES_PER_TICK; z++) {
+        const bi = Math.floor(Math.random() * (endFree - startFree + 1)) + startFree;
         const bucket = bins[bi];
         if (!bucket || !bucket.length) continue;
 
@@ -316,7 +345,7 @@ function updateBinsForCurrentCharset() {
     }, PALETTE_INTERVAL);
 
   } else {
-    // короткие наборы — без редьюса/ротации
+    // короткие наборы — всё по-старому
     bins = [];
     palette = [];
     if (paletteTimer) { clearInterval(paletteTimer); paletteTimer = null; }
@@ -913,6 +942,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
