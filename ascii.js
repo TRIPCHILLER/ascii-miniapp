@@ -179,25 +179,44 @@ applyFontStack(FONT_STACK_MAIN);
 // ==== /measurePre + applyFontStack ====
   // === измеряем "плотность" символа ===
 function measureCharDensity(ch) {
-  const size = 32; // канвас 32x32
-  const cvs = document.createElement('canvas');
-  cvs.width = size;
-  cvs.height = size;
-  const c = cvs.getContext('2d');
-  c.fillStyle = '#000';
-  c.fillRect(0, 0, size, size);
-  c.fillStyle = '#fff';
-  const cs   = getComputedStyle(app.out);
+  // читаем текущий шрифт И вес так же, как рендерит app.out
+  const cs    = getComputedStyle(app.out);
   const outFF = cs.fontFamily || 'monospace';
   const outFW = cs.fontWeight || '400';
+
+  // быстрый выход из кэша
+  const cacheKey = ch + '|' + outFF + '|' + outFW;
+  if (densityCache.has(cacheKey)) return densityCache.get(cacheKey);
+
+  // аккуратная отрисовка на канвасе с паддингом (без среза глифа)
+  const size = 64;
+  const pad  = 16;
+
+  c.canvas.width  = size + pad * 2;
+  c.canvas.height = size + pad * 2;
+
+  c.save();
   c.font = `${outFW} ${size}px ${outFF}`;
   c.textBaseline = 'top';
-  c.fillText(ch, 0, 0);
-  const data = c.getImageData(0, 0, size, size).data;
+  c.textAlign    = 'left';
+  c.fillStyle    = '#ffffff';
+  c.globalCompositeOperation = 'source-over';
+
+  c.clearRect(0, 0, c.canvas.width, c.canvas.height);
+  c.fillText(ch, pad, pad);
+
+  // считаем плотность по альфе
+  const img = c.getImageData(0, 0, c.canvas.width, c.canvas.height).data;
   let sum = 0;
-  for (let i = 0; i < data.length; i += 4) {
-    sum += data[i] + data[i+1] + data[i+2];
-  }
+  for (let i = 3; i < img.length; i += 4) sum += img[i];
+  const density = sum / (255 * (c.canvas.width * c.canvas.height));
+
+  c.restore();
+
+  densityCache.set(cacheKey, density);
+  return density;
+}
+
   return sum / (size * size * 3); // 0..255
 }
 
@@ -221,6 +240,9 @@ const DARK_LOCK_COUNT = 3;    // ← можно менять на 2/3/4 по в�
 let bins = [];
 let palette = [];
 let paletteTimer = null;
+// кэш плотностей и таймер отложенной пересортировки
+const densityCache = new Map(); // key: ch|family|weight -> number
+let resortTimer = null;
 
 // массив фиксированных символов, привязанных к индексам бинов:
 // fixedByBin[0] = (самый тёмный символ), fixedByBin[1] = (второй по тёмности), ...
@@ -354,7 +376,30 @@ fixedByBin[0] = darkBlank;
     fixedByBin = new Array(K_BINS).fill(null);
   }
 }
+// === повторная пересортировка после загрузки web-шрифтов ===
+function resortAfterFonts(expectedVal) {
+  if (resortTimer) clearTimeout(resortTimer);
 
+  const run = () => {
+    // набор уже сменился — выходим
+    if (app.ui.charset.value !== expectedVal) return;
+
+    // CJK не сортируем (его показываем как есть)
+    if (/[\u30A0-\u30FF\u3040-\u309F]/.test(expectedVal)) return;
+
+    const sorted = autoSortCharset(expectedVal);
+    if (sorted !== state.charset) {
+      state.charset = sorted;
+      updateBinsForCurrentCharset();
+    }
+  };
+
+  // ждём fonts.ready и ставим небольшой фолбэк-таймер
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(run);
+  }
+  resortTimer = setTimeout(run, 200);
+}
   // ---- измерение пропорции символа (W/H) ----
 function measureCharAspect() {
   if (typeof forcedAspect === 'number' && isFinite(forcedAspect) && forcedAspect > 0) {
@@ -859,6 +904,7 @@ if (val === 'CUSTOM') {
   applyFontStack(FONT_STACK_MAIN); // кастом всегда в MAIN
   state.charset = autoSortCharset(app.ui.customCharset.value || '');
   updateBinsForCurrentCharset(); // <<< ДОБАВЛЕНО
+  resortAfterFonts(val);
   return;
 }
 
@@ -883,8 +929,10 @@ const isCJK = /[\u30A0-\u30FF\u3040-\u309F]/.test(val);
 
 // реагируем на ввод своих символов
 app.ui.customCharset.addEventListener('input', e => {
-  state.charset = autoSortCharset(e.target.value || '');
-  updateBinsForCurrentCharset(); // <<< ДОБАВЛЕНО
+  const v = e.target.value || '';
+  state.charset = autoSortCharset(v);
+  updateBinsForCurrentCharset();
+  resortAfterFonts(v);
 });
     
 // --- Синхронизация видимости при загрузке и первом показе панели ---
@@ -944,6 +992,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
