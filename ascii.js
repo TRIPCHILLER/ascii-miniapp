@@ -297,7 +297,12 @@ function updateBinsForCurrentCharset() {
 try {
   const hasCJK = CJK_RE.test(state.charset || '');
   if (hasCJK) {
-    const FW_SPACE = '\u3000';
+  let FW_SPACE = '\u3000'; // default fullwidth space
+// fallback для Telegram-клиента
+  if (navigator.userAgent.includes('Telegram')) {
+  FW_SPACE = '\u2003'; // EM SPACE (широкий, обычно пустой в TG)
+}
+
     // Убедимся, что он в наборе (на случай ручных изменений)
     if (!(state.charset || '').includes(FW_SPACE)) {
       state.charset = FW_SPACE + state.charset;
@@ -977,6 +982,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
