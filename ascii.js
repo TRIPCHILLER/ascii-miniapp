@@ -199,11 +199,13 @@ function autoSortCharset(str) {
   return withDensity.map(x => x.ch).join('');
 }
   // === Bin-reduce (умное сужение до K ступеней) ===
-const K_BINS = 10;
+let K_BINS = 10;
 
 // быстрее и плавнее
 let PALETTE_INTERVAL = 320;   // мс — темп смены похожих символов
 const CHANGES_PER_TICK = 1;   // меняем ровно 1 бин за тик
+  
+let ROTATE_PALETTE = true; 
 
 // фиксируем первые N самых тёмных (по измеренной плотности)
 let DARK_LOCK_COUNT = 3;    // ← можно менять на 2/3/4 по вкусу
@@ -288,22 +290,26 @@ function updateBinsForCurrentCharset() {
 
     // 4) ротация похожих символов ТОЛЬКО в нефиксированных бинах
     if (paletteTimer) clearInterval(paletteTimer);
-    paletteTimer = setInterval(() => {
-      if (!bins || !bins.length) return;
+paletteTimer = null;
 
-      for (let k = 0; k < CHANGES_PER_TICK; k++) {
-        // выбираем случайный бин, НО сдвигаем старт на lockN (фиксированные не трогаем)
-        const bi = Math.floor(Math.random() * (K_BINS - lockN)) + lockN;
-        const bucket = bins[bi];
-        if (!bucket || !bucket.length) continue;
+if (ROTATE_PALETTE) {
+  paletteTimer = setInterval(() => {
+    if (!bins || !bins.length) return;
 
-        const fixedChars = fixedByBin.filter(Boolean);
-        let pool = bucket.filter(ch => !fixedChars.includes(ch));
-        if (!pool.length) pool = bucket;
+    const lockN = Math.min(DARK_LOCK_COUNT, K_BINS);
+    for (let k = 0; k < CHANGES_PER_TICK; k++) {
+      const bi = Math.floor(Math.random() * (K_BINS - lockN)) + lockN;
+      const bucket = bins[bi];
+      if (!bucket || !bucket.length) continue;
 
-        palette[bi] = pool[Math.floor(Math.random() * pool.length)];
-      }
-    }, PALETTE_INTERVAL);
+      const fixedChars = fixedByBin.filter(Boolean);
+      let pool = bucket.filter(ch => !fixedChars.includes(ch));
+      if (!pool.length) pool = bucket;
+
+      palette[bi] = pool[Math.floor(Math.random() * pool.length)];
+    }
+  }, PALETTE_INTERVAL);
+}
 
   } else {
     // короткие наборы — без редьюса/ротации
@@ -828,32 +834,38 @@ const idx = app.ui.charset.selectedIndex;
 const isPresetKatakana = (idx === 4);
 
 if (isPresetKatakana) {
-  // === РЕЖИМ КАНЫ (делаем как ручной ввод, +фикс для полутонов) ===
-  applyFontStack(FONT_STACK_MAIN); // тот же стек, что и в ручном
+  // 1) МОНОШИРИННЫЙ CJK СТЕК, чтобы не было фолбэков разной ширины
+  applyFontStack(FONT_STACK_CJK);  // <= ИМЕННО CJK стек
+  // полезно дополнительно:
+  app.out.style.fontVariantEastAsian = 'full-width';
+  measurePre.style.fontVariantEastAsian = 'full-width';
+
+  // 2) Пайплайн как у ручного ввода: без принудительного аспекта, с автосортировкой
   forcedAspect = null;
 
-  // 1) Обогащаем набор «промежуточными» символами (дают хорошие полутона)
-  const enrich = 'ー・。、「」『』（）［］〔〕〈〉《》ァィゥェォッャュョヮヴヵヶ';
-  // гарантируем один пробел в начале = фон
+  const enrich = 'ー・。、「」『』（）［］〔〕〈〉《》ァィゥェォッャュョヮヴヵヶ＝…․·';
   const withSpace = (' ' + (val + enrich).replaceAll(' ', '')).trim();
-
-  // 2) Сортируем по плотности, как в ручном вводе
   state.charset = autoSortCharset(withSpace);
 
-  // 3) Смягчаем редьюс под кану и убираем полосы дизеринга
-  DARK_LOCK_COUNT = 1;     // было 3 — для каны лучше 1
-  DITHER_ENABLED  = false; // Bayer 8×8 даёт «полосатость» на штрихах
+  // 3) Больше ступеней, мягче полутона; без дизеринга и БЕЗ ротации
+  K_BINS = 12;
+  DARK_LOCK_COUNT = 1;
+  DITHER_ENABLED  = false;
+  ROTATE_PALETTE  = false;  // <= ключ к устранению «дребезга»
 } else {
-  // === Все прочие пресеты — как раньше ===
+  // всё как раньше
   applyFontStack(FONT_STACK_MAIN);
   forcedAspect = null;
   state.charset = autoSortCharset(val);
-  DARK_LOCK_COUNT = 3;     // вернуть дефолт
-  DITHER_ENABLED  = true;  // вернуть дизеринг
+
+  // дефолты для НЕ-CJK
+  K_BINS = 10;
+  DARK_LOCK_COUNT = 3;
+  DITHER_ENABLED  = true;
+  ROTATE_PALETTE  = true;
 }
 
 updateBinsForCurrentCharset();
-
 
 });
 
