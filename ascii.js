@@ -894,7 +894,7 @@ if (isPresetKatakana) {
 app.out.style.fontWeight = '700';       // просим жирный
 app.out.style.fontSynthesis = 'weight'; // позволяем синтезировать жирный, если его нет
 // деликатный псевдо-жир (±0.6px по оси X):
-app.out.style.textShadow = '0.6px 0 currentColor';
+app.out.style.textShadow = '0.5px 0 currentColor';
 // чтобы измерение шло с тем же весом — поднимем и у measurePre:
 measurePre.style.fontWeight = '700';
   forcedAspect = null;
@@ -1002,6 +1002,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
