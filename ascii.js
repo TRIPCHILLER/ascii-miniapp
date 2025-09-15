@@ -384,6 +384,8 @@ function measureCharAspect() {
   }
 
   // ============== РЕНДЕРИНГ ==============
+  let lastFitCols = 0, lastFitRows = 0;
+  let lastStageW = 0, lastStageH = 0;
   let raf = null;
   let lastFrameTime = 0;
 
@@ -570,13 +572,22 @@ if (palette && palette.length === K_BINS) {
 }
 
     app.out.textContent = out;
-    refitFont(w, h);
+    // рефитим только если изменились сетка или реальный размер контейнера
+const stageW = app.stage.clientWidth;
+const stageH = app.stage.clientHeight;
+const stageChanged = Math.abs(stageW - lastStageW) > 1 || Math.abs(stageH - lastStageH) > 1;
+if (w !== lastFitCols || h !== lastFitRows || stageChanged) {
+  refitFont(w, h);
+  lastFitCols = w; lastFitRows = h;
+  lastStageW = stageW; lastStageH = stageH;
+}
   }
 
   // Подбор font-size
   let refitLock = false;
   function refitFont(cols, rows) {
     if (refitLock) return;
+    const EPS = 0.75; // px — мёртвая зона, чтоб не «дышало»
     refitLock = true;
 
     const stageW = app.stage.clientWidth;
@@ -596,20 +607,26 @@ if (palette && palette.length === K_BINS) {
     : Math.min(kW, kH);                                 // вне FS всегда contain
 
 
-    const newFS = Math.max(6, Math.floor(currentFS * k));
-    app.out.style.fontSize = newFS + 'px';
+    // первый проход — вниз с небольшим bias, чтобы не перелетать
+const newFS = Math.max(6, Math.floor(currentFS * k * 0.985));
 
-    measurePre.style.fontSize = newFS + 'px';
-    mRect = measurePre.getBoundingClientRect();
-    const k2 = fs
-    ? (isMobile
-    ? Math.max(stageW / mRect.width, stageH / mRect.height) // мобилки cover
-    : Math.min(stageW / mRect.width, stageH / mRect.height) // десктоп contain (без перезума)
-    )
-    : Math.min(stageW / mRect.width, stageH / mRect.height);
+measurePre.style.fontSize = newFS + 'px';
+mRect = measurePre.getBoundingClientRect();
 
-    const finalFS = Math.max(6, Math.floor(newFS * k2));
-    app.out.style.fontSize = finalFS + 'px';
+const kW2 = stageW / mRect.width;
+const kH2 = stageH / mRect.height;
+const k2  = fs
+  ? (isMobile ? Math.max(kW2, kH2) : Math.min(kW2, kH2))
+  : Math.min(kW2, kH2);
+
+// второй проход — тоже с bias вниз
+const targetFS = Math.max(6, Math.floor(newFS * k2 * 0.985));
+
+// гистерезис: если изменение меньше EPS — не трогаем размер
+const prevFS = parseFloat(getComputedStyle(app.out).fontSize) || 16;
+const finalFS = (Math.abs(targetFS - prevFS) < EPS) ? prevFS : targetFS;
+
+app.out.style.fontSize = finalFS + 'px';
 
     refitLock = false;
   }
@@ -960,11 +977,17 @@ app.ui.invert.addEventListener('change', e => {
   }
 });
     // Подгон при изменении окна/ориентации
-    new ResizeObserver(() => {
-      const { w, h } = updateGridSize();
-      refitFont(w, h);
-    }).observe(app.stage);
-  }
+    let roTimer = null;
+new ResizeObserver(() => {
+  clearTimeout(roTimer);
+  roTimer = setTimeout(() => {
+    const { w, h } = updateGridSize();
+    refitFont(w, h);
+    // сбросим маркеры, чтобы цикл не «думал», будто всё прежнее
+    lastFitCols = 0; lastFitRows = 0;
+    lastStageW = 0; lastStageH = 0;
+  }, 50);
+}).observe(app.stage);
 
   // ============== СТАРТ ==============
   async function init() {
@@ -1002,6 +1025,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
