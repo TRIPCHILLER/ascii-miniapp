@@ -297,11 +297,7 @@ function updateBinsForCurrentCharset() {
 try {
   const hasCJK = CJK_RE.test(state.charset || '');
   if (hasCJK) {
-  let FW_SPACE = '\u3000'; // default fullwidth space
-// fallback для Telegram-клиента
-  if (navigator.userAgent.includes('Telegram')) {
-  FW_SPACE = '\u2003'; // EM SPACE (широкий, обычно пустой в TG)
-}
+  const FW_SPACE = pickDarkGlyph();
 
     // Убедимся, что он в наборе (на случай ручных изменений)
     if (!(state.charset || '').includes(FW_SPACE)) {
@@ -856,7 +852,24 @@ app.ui.flip.addEventListener('click', async () => {
       app.stage.style.backgroundColor = state.background;
       if(app.ui.style){ const m = detectPreset(state.color, state.background); app.ui.style.value = (m==='custom'?'custom':m); }
     });
-
+// Выбираем реально «чёрный» символ под текущий стек шрифтов
+function pickDarkGlyph() {
+  const candidates = [
+    '\u3000', // IDEOGRAPHIC SPACE (fullwidth space)
+    '\u2800', // BRAILLE PATTERN BLANK — часто пустой и не коллапсится
+    '\u2003', // EM SPACE
+    '\u205F', // MEDIUM MATHEMATICAL SPACE
+    ' '       // обычный пробел — крайний фолбэк
+  ];
+  let best = ' ';
+  let bestD = Infinity;
+  for (const ch of candidates) {
+    const d = measureCharDensity(ch); // 0..255, чем меньше — тем «чернее»
+    if (d < bestD) { bestD = d; best = ch; }
+  }
+  // если по какой-то причине «пустоты» нет — всё равно возьмём наименее плотный
+  return best;
+}
 app.ui.charset.addEventListener('change', e => {
   const val = e.target.value;
 
@@ -880,7 +893,7 @@ if (isPresetKatakana) {
   forcedAspect = null;
 
   // Абсолютно тёмный символ для CJK — fullwidth space
-  const FW_SPACE = '\u3000';
+  const FW_SPACE = pickDarkGlyph();
 
   // Мини-набор «обогащения» (без редких скобок, чтобы не ловить tofu)
   const enrichSafe = 'ー・。、。「」ァィゥェォッャュョヴヶ＝…';
@@ -982,6 +995,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
