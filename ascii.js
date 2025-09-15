@@ -154,20 +154,28 @@ measurePre.style.cssText = `
 `;
 
 // единая функция — применяем стек и к выводу, и к измерителю
-function applyFontStack(stack) {
+function applyFontStack(stack, weight = '700', eastAsianFullWidth = false) {
   if (app.out) {
     app.out.style.fontFamily = stack;
-    app.out.style.fontWeight = '700';
+    app.out.style.fontWeight = weight;
+    app.out.style.fontSynthesis = 'none';        // не синтезировать bold/italic
+    app.out.style.fontKerning = 'none';
+    app.out.style.fontVariantLigatures = 'none';
+    app.out.style.fontVariantEastAsian = eastAsianFullWidth ? 'full-width' : 'normal';
+    app.out.style.letterSpacing = '0';
     app.out.style.webkitFontSmoothing = 'none';
   }
   measurePre.style.fontFamily = stack;
-  measurePre.style.fontWeight = '700';
+  measurePre.style.fontWeight = weight;
+  measurePre.style.fontSynthesis = 'none';
+  measurePre.style.fontKerning = 'none';
+  measurePre.style.fontVariantLigatures = 'none';
+  measurePre.style.fontVariantEastAsian = eastAsianFullWidth ? 'full-width' : 'normal';
 }
-
 
 document.body.appendChild(measurePre);
 // по умолчанию — основной моно стек
-applyFontStack(FONT_STACK_MAIN);
+applyFontStack(FONT_STACK_MAIN, '700', false);
 // ==== /measurePre + applyFontStack ====
   // === измеряем "плотность" символа ===
 function measureCharDensity(ch) {
@@ -831,40 +839,35 @@ app.ui.customCharset.style.display = 'none';
 
 // индекс «カタカナ» в твоём <select> — 4 (см. index.html)
 const idx = app.ui.charset.selectedIndex;
-const isPresetKatakana = (idx === 4);
+const isPresetKatakana = (idx === 4); // «カタカナ» в твоём select
 
 if (isPresetKatakana) {
-  // 1) МОНОШИРИННЫЙ CJK СТЕК, чтобы не было фолбэков разной ширины
-  applyFontStack(FONT_STACK_CJK);  // <= ИМЕННО CJK стек
-  // полезно дополнительно:
-  app.out.style.fontVariantEastAsian = 'full-width';
-  measurePre.style.fontVariantEastAsian = 'full-width';
-
-  // 2) Пайплайн как у ручного ввода: без принудительного аспекта, с автосортировкой
+  // Моно CJK + обычный вес → без фолбэков и синтеза
+  applyFontStack(FONT_STACK_CJK, '400', true); // ВАЖНО: '400' и full-width
   forcedAspect = null;
 
-  const enrich = 'ー・。、「」『』（）［］〔〕〈〉《》ァィゥェォッャュョヮヴヵヶ＝…․·';
-  const withSpace = (' ' + (val + enrich).replaceAll(' ', '')).trim();
+  // Мини-набор «обогащения» БЕЗ редких скобок (чтобы не ловить tofu)
+  const enrichSafe = 'ー・。、。「」ァィゥェォッャュョヴヶ＝…';
+  const withSpace = (' ' + (val + enrichSafe).replaceAll(' ', '')).trim();
+
   state.charset = autoSortCharset(withSpace);
 
-  // 3) Больше ступеней, мягче полутона; без дизеринга и БЕЗ ротации
+  // Плавные полутона и никакой "дребезг" (из-за подмены символов):
   K_BINS = 12;
   DARK_LOCK_COUNT = 1;
   DITHER_ENABLED  = false;
-  ROTATE_PALETTE  = false;  // <= ключ к устранению «дребезга»
+  ROTATE_PALETTE  = false;
 } else {
-  // всё как раньше
-  applyFontStack(FONT_STACK_MAIN);
+  // все остальные пресеты — как раньше
+  applyFontStack(FONT_STACK_MAIN, '700', false);
   forcedAspect = null;
   state.charset = autoSortCharset(val);
 
-  // дефолты для НЕ-CJK
   K_BINS = 10;
   DARK_LOCK_COUNT = 3;
   DITHER_ENABLED  = true;
   ROTATE_PALETTE  = true;
 }
-
 updateBinsForCurrentCharset();
 
 });
@@ -932,5 +935,6 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
