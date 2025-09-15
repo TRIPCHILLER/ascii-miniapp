@@ -869,24 +869,7 @@ app.ui.flip.addEventListener('click', async () => {
       app.stage.style.backgroundColor = state.background;
       if(app.ui.style){ const m = detectPreset(state.color, state.background); app.ui.style.value = (m==='custom'?'custom':m); }
     });
-// Выбираем реально «чёрный» символ под текущий стек шрифтов
-function pickDarkGlyph() {
-  const candidates = [
-    '\u3000', // IDEOGRAPHIC SPACE (fullwidth space)
-    '\u2800', // BRAILLE PATTERN BLANK — часто пустой и не коллапсится
-    '\u2003', // EM SPACE
-    '\u205F', // MEDIUM MATHEMATICAL SPACE
-    ' '       // обычный пробел — крайний фолбэк
-  ];
-  let best = ' ';
-  let bestD = Infinity;
-  for (const ch of candidates) {
-    const d = measureCharDensity(ch); // 0..255, чем меньше — тем «чернее»
-    if (d < bestD) { bestD = d; best = ch; }
-  }
-  // если по какой-то причине «пустоты» нет — всё равно возьмём наименее плотный
-  return best;
-}
+
 app.ui.charset.addEventListener('change', e => {
   const val = e.target.value;
 
@@ -894,6 +877,16 @@ if (val === 'CUSTOM') {
   app.ui.customCharset.style.display = 'inline-block';
   applyFontStack(FONT_STACK_MAIN); // кастом всегда в MAIN
   state.charset = autoSortCharset(app.ui.customCharset.value || '');
+  // ГЛОБАЛЬНО (вне bindUI)
+function pickDarkGlyph() {
+  const candidates = ['\u3000','\u2800','\u2003','\u205F',' '];
+  let best = ' ', bestD = Infinity;
+  for (const ch of candidates) {
+    const d = measureCharDensity(ch); // 0..255
+    if (d < bestD) { bestD = d; best = ch; }
+  }
+  return best;
+}
   updateBinsForCurrentCharset(); // <<< ДОБАВЛЕНО
   return;
 }
@@ -1025,6 +1018,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
