@@ -821,23 +821,37 @@ if (val === 'CUSTOM') {
   return;
 }
 
+app.ui.customCharset.style.display = 'none';
 
-  app.ui.customCharset.style.display = 'none';
+// ВАЖНО: пресет «カタカナ» сейчас стоит 4-м пунктом в <select> (index.html).
+// Если позже добавишь ещё CJK-пресеты, расширь условие.
+const idx = app.ui.charset.selectedIndex;
+const isPresetKatakana = (idx === 4);
 
-  // индексы из твоего index.html: 4 = カタカナ, 5 = ひらがな
-  const idx = app.ui.charset.selectedIndex;
-  const isCJK = (idx === 4 || idx === 5);
+if (isPresetKatakana) {
+  // ===== Ведём себя ТОЧНО как ручной ввод =====
+  applyFontStack(FONT_STACK_MAIN); // тот же стек, что и у ручного ввода
+  forcedAspect = null;             // авто-аспект, как у ручного ввода
 
-  if (isCJK) {
-    applyFontStack(FONT_STACK_CJK); // CJK-моно стек
-    state.charset = val;            // без сортировки!
-    forcedAspect = 1.0;  
-  } else {
-    applyFontStack(FONT_STACK_MAIN);      // обратно на MAIN
-    state.charset = autoSortCharset(val); // сортируем набор
-    forcedAspect = null;                  // <<< вернулись к авто-замеру
-  }
-  updateBinsForCurrentCharset(); // <<< ДОБАВЛЕНО
+  // гарантируем наличие ПРОБЕЛА как «пустого» символа (фон)
+  // (если пробелов нет — добавим один; если есть — оставим один)
+  const withSpace = (' ' + (val || '').replaceAll(' ', '')).trim();
+
+  // сортировка по плотности, как у ручного ввода → «насыщенный» градиент
+  state.charset = autoSortCharset(withSpace);
+
+  // никакой фиксации бинов и спец-логики для CJK
+  fixedByBin = new Array(K_BINS).fill(null);
+} else {
+  // все НЕ-CJK пресеты — как и раньше (ручной сценарий)
+  applyFontStack(FONT_STACK_MAIN);
+  forcedAspect = null;
+  state.charset = autoSortCharset(val);
+  fixedByBin = new Array(K_BINS).fill(null);
+}
+
+updateBinsForCurrentCharset();
+
 });
 
 // реагируем на ввод своих символов
@@ -903,3 +917,4 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
