@@ -62,6 +62,8 @@ let DITHER_ENABLED = true;
     charset: '@%#*+=-:. ',
     invert: false,
     isFullscreen: false,    // наш флаг
+    blackPoint: 0.06,   // 0..1 — общий дефолт
+    whitePoint: 0.98,   // 0..1 — общий дефолт
   };
   let forcedAspect = null;
   // === helpers ===
@@ -291,6 +293,18 @@ function updateBinsForCurrentCharset() {
     for (let i = 0; i < lockN; i++) {
       fixedByBin[i] = densSorted[i].ch; // i=0 — самый тёмный символ, и т.д.
     }
+// Если набор содержит CJK — принудительно фиксируем самый тёмный символ как fullwidth space
+try {
+  const hasCJK = CJK_RE.test(state.charset || '');
+  if (hasCJK) {
+    const FW_SPACE = '\u3000';
+    // Убедимся, что он в наборе (на случай ручных изменений)
+    if (!(state.charset || '').includes(FW_SPACE)) {
+      state.charset = FW_SPACE + state.charset;
+    }
+    fixedByBin[0] = FW_SPACE; // бин 0 — абсолютная «чернота»
+  }
+} catch(e){}
 
     // 3) строим бины и первичную палитру с учётом фиксов
     bins = buildBinsFromChars(state.charset, K_BINS);
@@ -521,6 +535,11 @@ for (let y = 0; y < h; y++) {
     v01 = ((v01 - 0.5) * contrast) + 0.5;
     v01 = Math.min(1, Math.max(0, v01));
     v01 = Math.pow(v01, 1 / gamma);
+// Black/White clip для повышения «плотности» картинки
+    const bp = state.blackPoint;
+    const wp = state.whitePoint;
+    v01 = (v01 - bp) / Math.max(1e-6, (wp - bp));
+    v01 = Math.min(1, Math.max(0, v01));
 
     const Yc = Math.max(0, Math.min(255, (bias + inv * (v01 * 255))));
     // u — непрерывный индекс 0..n
@@ -851,22 +870,36 @@ const idx = app.ui.charset.selectedIndex;
 const isPresetKatakana = (idx === 4); // «カタカナ» в твоём select
 
 if (isPresetKatakana) {
-  // Моно CJK + обычный вес → без фолбэков и синтеза
-  applyFontStack(FONT_STACK_CJK, '400', true); // ВАЖНО: '400' и full-width
+  // Моно CJK + full-width
+  applyFontStack(FONT_STACK_CJK, '400', true);
   forcedAspect = null;
 
-  // Мини-набор «обогащения» БЕЗ редких скобок (чтобы не ловить tofu)
+  // Абсолютно тёмный символ для CJK — fullwidth space
+  const FW_SPACE = '\u3000';
+
+  // Мини-набор «обогащения» (без редких скобок, чтобы не ловить tofu)
   const enrichSafe = 'ー・。、。「」ァィゥェォッャュョヴヶ＝…';
-  const withSpace = (' ' + (val + enrichSafe).replaceAll(' ', '')).trim();
+
+  // ВАЖНО: fullwidth space идёт первым, затем исходный набор и обогащение
+  const withSpace = (FW_SPACE + (val + enrichSafe).replaceAll(' ', ''));
 
   state.charset = autoSortCharset(withSpace);
 
-  // Плавные полутона и никакой "дребезг" (из-за подмены символов):
-  K_BINS = 12;
-  DARK_LOCK_COUNT = 1;
-  DITHER_ENABLED  = false;
+  // Профайл под CJK: чуть больше ступеней, фиксируем 2 самых тёмных
+  K_BINS = 14;
+  DARK_LOCK_COUNT = 2;
+
+  // Дизеринг снова включаем — он даёт как раз тот «панч» в полутонах
+  DITHER_ENABLED  = true;
+
+  // Ротацию схожих символов выключаем, чтобы картинка не «дрожала»
   ROTATE_PALETTE  = false;
-} else {
+
+  // Более «жирный» клип для усиления контраста
+  state.blackPoint = 0.10;  // поднимаем чёрную точку
+  state.whitePoint = 0.92;  // слегка опускаем белую
+}
+else {
   // все остальные пресеты — как раньше
   applyFontStack(FONT_STACK_MAIN, '700', false);
   forcedAspect = null;
@@ -944,6 +977,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
