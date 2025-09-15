@@ -327,7 +327,14 @@ if (ROTATE_PALETTE) {
     fixedByBin = new Array(K_BINS).fill(null);
   }
 }
+// === CJK helpers (ставим прямо над measureCharAspect) ===
+const CJK_RE = /[\u3000-\u303F\u3040-\u30FF\u31F0-\u31FF\u3400-\u9FFF\uF900-\uFAFF]/;
 
+function measureSampleChar() {
+  // state может быть ещё не инициализирован в момент загрузки файла — подстрахуемся:
+  const charset = (typeof state !== 'undefined' && state && state.charset) ? state.charset : '';
+  return CJK_RE.test(charset) ? '田' : 'M';
+}
   // ---- измерение пропорции символа (W/H) ----
 function measureCharAspect() {
   if (typeof forcedAspect === 'number' && isFinite(forcedAspect) && forcedAspect > 0) {
@@ -335,14 +342,15 @@ function measureCharAspect() {
   }
   const fs = parseFloat(getComputedStyle(app.out).fontSize) || 16;
   measurePre.style.fontSize = fs + 'px';
-  // одна большая буква, чтобы померить ширину/высоту глифа
-  measurePre.textContent = 'M';
-  const r = measurePre.getBoundingClientRect();
 
-  // W/H; подстрахуемся от нулей
-  const w = Math.max(1, r.width);
-  const h = Math.max(1, r.height);
-  return w / h;
+  const CH = measureSampleChar(); // 'M' или '田'
+  const N  = 32;                  // мерим среднюю ширину по 32 символам
+  measurePre.textContent = CH.repeat(N);
+
+  const r = measurePre.getBoundingClientRect();
+  const charW = Math.max(1, r.width / N);
+  const charH = Math.max(1, r.height);
+  return charW / charH; // W/H
 }
 
   // ============== КАМЕРА ==============
@@ -554,7 +562,8 @@ if (palette && palette.length === K_BINS) {
     const stageW = app.stage.clientWidth;
     const stageH = app.stage.clientHeight;
 
-    measurePre.textContent = ('M'.repeat(cols) + '\n').repeat(rows);
+    const CH = measureSampleChar();
+    measurePre.textContent = (CH.repeat(cols) + '\n').repeat(rows);
     const currentFS = parseFloat(getComputedStyle(app.out).fontSize) || 16;
     measurePre.style.fontSize = currentFS + 'px';
 
@@ -935,6 +944,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
