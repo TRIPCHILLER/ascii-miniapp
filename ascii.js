@@ -48,8 +48,6 @@ const BAYER8 = [
   10,58, 6,54,  9,57, 5,53,
   42,26,38,22, 41,25,37,21
 ];
-  const FALLBACK_ASCII = '@%#*+=-:. ';
-
 let DITHER_ENABLED = true;
 // =========================================
   const state = {
@@ -202,24 +200,7 @@ function measureCharDensity(ch) {
   }
   return sum / (size * size * 3); // 0..255
 }
-// Выбираем реально «чёрный» символ под текущий стек шрифтов
-function pickDarkGlyph() {
-  const candidates = [
-    '\u3000', // IDEOGRAPHIC SPACE (fullwidth space)
-    '\u2800', // BRAILLE PATTERN BLANK — часто пустой и не коллапсится
-    '\u2003', // EM SPACE
-    '\u205F', // MEDIUM MATHEMATICAL SPACE
-    ' '       // обычный пробел — крайний фолбэк
-  ];
-  let best = ' ';
-  let bestD = Infinity;
-  for (const ch of candidates) {
-    const d = measureCharDensity(ch); // 0..255, чем меньше — тем «чернее»
-    if (d < bestD) { bestD = d; best = ch; }
-  }
-  // если по какой-то причине «пустоты» нет — всё равно возьмём наименее плотный
-  return best;
-}
+
 // === авто-сортировка набора ===
 function autoSortCharset(str) {
   const chars = Array.from(new Set(str.split(''))); // уникальные символы
@@ -403,8 +384,6 @@ function measureCharAspect() {
   }
 
   // ============== РЕНДЕРИНГ ==============
-  let lastFitCols = 0, lastFitRows = 0;
-  let lastStageW = 0, lastStageH = 0;
   let raf = null;
   let lastFrameTime = 0;
 
@@ -436,6 +415,7 @@ const WIDTH_START = isMobile ? 75  : 150;
     app.ui.fg.value = state.color;
     app.ui.bg.value = state.background;
 
+    app.ui.charset.value = state.charset;
     app.ui.invert.checked = state.invert;
 const lbl = document.getElementById('invert_label');
 if (lbl) lbl.textContent = state.invert ? 'ИНВЕРСИЯ: ВКЛ' : 'ИНВЕРСИЯ: ВЫКЛ';
@@ -526,9 +506,8 @@ ctx.drawImage(v, sx, sy, sw, sh, 0, 0, w, h);
 // Сброс трансформа
 ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-const data = ctx.getImageData(0, 0, w, h).data;
+    const data = ctx.getImageData(0, 0, w, h).data;
 // Генерация ASCII (юникод-безопасно + поддержка пустого набора)
-const chars = Array.from((state.charset && state.charset.length) ? state.charset : FALLBACK_ASCII);
 const chars = Array.from(state.charset || '');
 const n = chars.length - 1;
 
@@ -591,22 +570,13 @@ if (palette && palette.length === K_BINS) {
 }
 
     app.out.textContent = out;
-    // рефитим только если изменились сетка или реальный размер контейнера
-const stageW = app.stage.clientWidth;
-const stageH = app.stage.clientHeight;
-const stageChanged = Math.abs(stageW - lastStageW) > 1 || Math.abs(stageH - lastStageH) > 1;
-if (w !== lastFitCols || h !== lastFitRows || stageChanged) {
-  refitFont(w, h);
-  lastFitCols = w; lastFitRows = h;
-  lastStageW = stageW; lastStageH = stageH;
-}
+    refitFont(w, h);
   }
 
   // Подбор font-size
   let refitLock = false;
   function refitFont(cols, rows) {
     if (refitLock) return;
-    const EPS = 0.75; // px — мёртвая зона, чтоб не «дышало»
     refitLock = true;
 
     const stageW = app.stage.clientWidth;
@@ -626,26 +596,20 @@ if (w !== lastFitCols || h !== lastFitRows || stageChanged) {
     : Math.min(kW, kH);                                 // вне FS всегда contain
 
 
-    // первый проход — вниз с небольшим bias, чтобы не перелетать
-const newFS = Math.max(6, Math.floor(currentFS * k * 0.985));
+    const newFS = Math.max(6, Math.floor(currentFS * k));
+    app.out.style.fontSize = newFS + 'px';
 
-measurePre.style.fontSize = newFS + 'px';
-mRect = measurePre.getBoundingClientRect();
+    measurePre.style.fontSize = newFS + 'px';
+    mRect = measurePre.getBoundingClientRect();
+    const k2 = fs
+    ? (isMobile
+    ? Math.max(stageW / mRect.width, stageH / mRect.height) // мобилки cover
+    : Math.min(stageW / mRect.width, stageH / mRect.height) // десктоп contain (без перезума)
+    )
+    : Math.min(stageW / mRect.width, stageH / mRect.height);
 
-const kW2 = stageW / mRect.width;
-const kH2 = stageH / mRect.height;
-const k2  = fs
-  ? (isMobile ? Math.max(kW2, kH2) : Math.min(kW2, kH2))
-  : Math.min(kW2, kH2);
-
-// второй проход — тоже с bias вниз
-const targetFS = Math.max(6, Math.floor(newFS * k2 * 0.985));
-
-// гистерезис: если изменение меньше EPS — не трогаем размер
-const prevFS = parseFloat(getComputedStyle(app.out).fontSize) || 16;
-const finalFS = (Math.abs(targetFS - prevFS) < EPS) ? prevFS : targetFS;
-
-app.out.style.fontSize = finalFS + 'px';
+    const finalFS = Math.max(6, Math.floor(newFS * k2));
+    app.out.style.fontSize = finalFS + 'px';
 
     refitLock = false;
   }
@@ -888,68 +852,98 @@ app.ui.flip.addEventListener('click', async () => {
       app.stage.style.backgroundColor = state.background;
       if(app.ui.style){ const m = detectPreset(state.color, state.background); app.ui.style.value = (m==='custom'?'custom':m); }
     });
-
+// Выбираем реально «чёрный» символ под текущий стек шрифтов
+function pickDarkGlyph() {
+  const candidates = [
+    '\u3000', // IDEOGRAPHIC SPACE (fullwidth space)
+    '\u2800', // BRAILLE PATTERN BLANK — часто пустой и не коллапсится
+    '\u2003', // EM SPACE
+    '\u205F', // MEDIUM MATHEMATICAL SPACE
+    ' '       // обычный пробел — крайний фолбэк
+  ];
+  let best = ' ';
+  let bestD = Infinity;
+  for (const ch of candidates) {
+    const d = measureCharDensity(ch); // 0..255, чем меньше — тем «чернее»
+    if (d < bestD) { bestD = d; best = ch; }
+  }
+  // если по какой-то причине «пустоты» нет — всё равно возьмём наименее плотный
+  return best;
+}
 app.ui.charset.addEventListener('change', e => {
-  // 1) всегда выбираем РЕАЛЬНЫЙ пункт с непустым value и не 'CUSTOM'
-  const sel = e.target;
-  let idx = sel.selectedIndex;
+  const val = e.target.value;
 
-  if (idx < 0 || !sel.options[idx] || !sel.options[idx].value) {
-    const opts = Array.from(sel.options);
-    const firstValid = opts.findIndex(o => o && o.value && o.value !== 'CUSTOM');
-    idx = (firstValid >= 0) ? firstValid : 0;
-    sel.selectedIndex = idx;
-  }
+if (val === 'CUSTOM') {
+  app.ui.customCharset.style.display = 'inline-block';
+  applyFontStack(FONT_STACK_MAIN); // кастом всегда в MAIN
+  state.charset = autoSortCharset(app.ui.customCharset.value || '');
+  updateBinsForCurrentCharset(); // <<< ДОБАВЛЕНО
+  return;
+}
 
-  // 2) теперь читаем корректный value
-  const val = sel.options[idx].value || '';
+app.ui.customCharset.style.display = 'none';
 
-  // 3) если всё равно пусто — жёсткий фолбэк на ASCII
-  const FALLBACK_ASCII = '@%#*+=-:. ';
-  const effectiveVal = val.trim() || FALLBACK_ASCII;
+// индекс «カタカナ» в твоём <select> — 4 (см. index.html)
+const idx = app.ui.charset.selectedIndex;
+const isPresetKatakana = (idx === 4); // «カタカナ» в твоём select
 
-  // далее используем effectiveVal вместо val
-  if (effectiveVal === 'CUSTOM') {
-    app.ui.customCharset.style.display = 'inline-block';
-    applyFontStack(FONT_STACK_MAIN);
-    state.charset = autoSortCharset(app.ui.customCharset.value || '');
-    updateBinsForCurrentCharset();
-    return;
-  }
+if (isPresetKatakana) {
+  // Моно CJK + full-width
+  applyFontStack(FONT_STACK_CJK, '400', true);
+  // усиливаем штрихи в CJK
+app.out.style.fontWeight = '700';       // просим жирный
+app.out.style.fontSynthesis = 'weight'; // позволяем синтезировать жирный, если его нет
+// деликатный псевдо-жир (±0.6px по оси X):
+app.out.style.textShadow = '0.5px 0 currentColor';
+// чтобы измерение шло с тем же весом — поднимем и у measurePre:
+measurePre.style.fontWeight = '700';
+  forcedAspect = null;
 
-  app.ui.customCharset.style.display = 'none';
+  // Абсолютно тёмный символ для CJK — fullwidth space
+  const FW_SPACE = pickDarkGlyph();
 
-  // индекс «カタカナ» считаем по sel.selectedIndex
-  const isPresetKatakana = (sel.selectedIndex === 4);
+  // Мини-набор «обогащения» (без редких скобок, чтобы не ловить tofu)
+  const enrichSafe = 'ー・。、。「」ァィゥェォッャュョヴヶ＝…';
 
-  if (isPresetKatakana) {
-    applyFontStack(FONT_STACK_CJK, '400', true);
-    app.out.style.fontWeight = '700';
-    app.out.style.fontSynthesis = 'weight';
-    app.out.style.textShadow = '0.5px 0 currentColor';
-    measurePre.style.fontWeight = '700';
-    forcedAspect = null;
+  // ВАЖНО: fullwidth space идёт первым, затем исходный набор и обогащение
+  const withSpace = (FW_SPACE + (val + enrichSafe).replaceAll(' ', ''));
 
-    const FW_SPACE = pickDarkGlyph();
-    const enrichSafe = 'ー・。、。「」ァィゥェォッャュョヴヶ＝…';
-    const withSpace = (FW_SPACE + (effectiveVal + enrichSafe).replaceAll(' ', ''));
-    state.charset = autoSortCharset(withSpace);
+  state.charset = autoSortCharset(withSpace);
 
-    K_BINS = 14; DARK_LOCK_COUNT = 2;
-    DITHER_ENABLED = true; ROTATE_PALETTE = false;
-    state.blackPoint = 0.10; state.whitePoint = 0.92;
-  } else {
-    applyFontStack(FONT_STACK_MAIN, '700', false);
-    forcedAspect = null;
-    state.charset = autoSortCharset(effectiveVal);
+  // Профайл под CJK: чуть больше ступеней, фиксируем 2 самых тёмных
+  K_BINS = 14;
+  DARK_LOCK_COUNT = 2;
 
-    K_BINS = 10; DARK_LOCK_COUNT = 3;
-    DITHER_ENABLED = true; ROTATE_PALETTE = true;
-  }
+  // Дизеринг снова включаем — он даёт как раз тот «панч» в полутонах
+  DITHER_ENABLED  = true;
 
-  updateBinsForCurrentCharset();
+  // Ротацию схожих символов выключаем, чтобы картинка не «дрожала»
+  ROTATE_PALETTE  = false;
+
+  // Более «жирный» клип для усиления контраста
+  state.blackPoint = 0.10;  // поднимаем чёрную точку
+  state.whitePoint = 0.92;  // слегка опускаем белую
+}
+else {
+  // все остальные пресеты — как раньше
+  applyFontStack(FONT_STACK_MAIN, '700', false);
+  forcedAspect = null;
+  state.charset = autoSortCharset(val);
+
+  K_BINS = 10;
+  DARK_LOCK_COUNT = 3;
+  DITHER_ENABLED  = true;
+  ROTATE_PALETTE  = true;
+}
+updateBinsForCurrentCharset();
+
 });
 
+// реагируем на ввод своих символов
+app.ui.customCharset.addEventListener('input', e => {
+  state.charset = autoSortCharset(e.target.value || '');
+  updateBinsForCurrentCharset(); // <<< ДОБАВЛЕНО
+});
     
 // --- Синхронизация видимости при загрузке и первом показе панели ---
 function syncCustomField() {
@@ -966,31 +960,16 @@ app.ui.invert.addEventListener('change', e => {
   }
 });
     // Подгон при изменении окна/ориентации
-    let roTimer = null;
-new ResizeObserver(() => {
-  clearTimeout(roTimer);
-  roTimer = setTimeout(() => {
-    const { w, h } = updateGridSize();
-    refitFont(w, h);
-    // сбросим маркеры, чтобы цикл не «думал», будто всё прежнее
-    lastFitCols = 0; lastFitRows = 0;
-    lastStageW = 0; lastStageH = 0;
-  }, 50);
-}).observe(app.stage);
+    new ResizeObserver(() => {
+      const { w, h } = updateGridSize();
+      refitFont(w, h);
+    }).observe(app.stage);
+  }
 
   // ============== СТАРТ ==============
   async function init() {
     fillStyleSelect();
 setUI();
-if (app.ui.charset) {
-  const sel = app.ui.charset;
-  if (sel.selectedIndex < 0 || !sel.options[sel.selectedIndex]?.value) {
-    const opts = Array.from(sel.options);
-    const firstValid = opts.findIndex(o => o && o.value && o.value !== 'CUSTOM');
-    sel.selectedIndex = (firstValid >= 0) ? firstValid : 0;
-  }
-  sel.dispatchEvent(new Event('change', { bubbles: true }));
-}
 
 // 1) Жёстко фиксируем отсутствие инверсии до первого кадра
 state.invert = false;
@@ -1008,9 +987,6 @@ attachDoubleTapEnter();
 if (app.ui.charset) {
   // дёрнем обработчик, он сам решит: CJK → CJK стек без сортировки,
   // не CJK → основной стек + авто-сорт.
-  if (app.ui.charset && app.ui.charset.selectedIndex < 0) {
-  app.ui.charset.selectedIndex = 0; // дефолт к первому option
-}
   app.ui.charset.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
@@ -1026,7 +1002,4 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
-
-
-
 
