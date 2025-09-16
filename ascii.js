@@ -434,7 +434,6 @@ const WIDTH_START = isMobile ? 75  : 150;
     app.ui.fg.value = state.color;
     app.ui.bg.value = state.background;
 
-    app.ui.charset.value = state.charset;
     app.ui.invert.checked = state.invert;
 const lbl = document.getElementById('invert_label');
 if (lbl) lbl.textContent = state.invert ? 'ИНВЕРСИЯ: ВКЛ' : 'ИНВЕРСИЯ: ВЫКЛ';
@@ -899,6 +898,18 @@ if (val === 'CUSTOM') {
 }
 
 app.ui.customCharset.style.display = 'none';
+if (app.ui.charset.selectedIndex < 0) {
+  // безопасный дефолт: основной стек + стандартный ASCII-набор
+  applyFontStack(FONT_STACK_MAIN, '700', false);
+  forcedAspect = null;
+  state.charset = autoSortCharset('@%#*+=-:. ');
+  K_BINS = 10;
+  DARK_LOCK_COUNT = 3;
+  DITHER_ENABLED = true;
+  ROTATE_PALETTE = true;
+  updateBinsForCurrentCharset();
+  return; // выходим — всё настроили
+}
 
 // индекс «カタカナ» в твоём <select> — 4 (см. index.html)
 const idx = app.ui.charset.selectedIndex;
@@ -993,7 +1004,9 @@ new ResizeObserver(() => {
   async function init() {
     fillStyleSelect();
 setUI();
-
+if (app.ui.charset && app.ui.charset.selectedIndex < 0) {
+  app.ui.charset.selectedIndex = 0; // выбрать первый пресет по умолчанию
+}
 // 1) Жёстко фиксируем отсутствие инверсии до первого кадра
 state.invert = false;
 if (app.ui.invert) app.ui.invert.checked = false;
@@ -1025,6 +1038,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
