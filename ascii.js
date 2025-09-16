@@ -890,13 +890,6 @@ const isPresetKatakana = (idx === 4); // «カタカナ» в твоём select
 if (isPresetKatakana) {
   // Моно CJK + full-width
   applyFontStack(FONT_STACK_CJK, '400', true);
-  // усиливаем штрихи в CJK
-app.out.style.fontWeight = '700';       // просим жирный
-app.out.style.fontSynthesis = 'weight'; // позволяем синтезировать жирный, если его нет
-// деликатный псевдо-жир (±0.6px по оси X):
-app.out.style.textShadow = '0.5px 0 currentColor';
-// чтобы измерение шло с тем же весом — поднимем и у measurePre:
-measurePre.style.fontWeight = '700';
   forcedAspect = null;
 
   // Абсолютно тёмный символ для CJK — fullwidth space
@@ -1002,4 +995,5 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
