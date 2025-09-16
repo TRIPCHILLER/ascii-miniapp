@@ -887,8 +887,8 @@ app.ui.flip.addEventListener('click', async () => {
     });
 
 app.ui.charset.addEventListener('change', e => {
+  if (e.target.selectedIndex < 0) e.target.selectedIndex = 0; // дефолт к первому пункту
   const val = e.target.value;
-if (e.target.selectedIndex < 0) e.target.selectedIndex = 0; // дефолт к первому пункту
 if (val === 'CUSTOM') {
   app.ui.customCharset.style.display = 'inline-block';
   applyFontStack(FONT_STACK_MAIN); // кастом всегда в MAIN
@@ -1009,6 +1009,9 @@ attachDoubleTapEnter();
 if (app.ui.charset) {
   // дёрнем обработчик, он сам решит: CJK → CJK стек без сортировки,
   // не CJK → основной стек + авто-сорт.
+  if (app.ui.charset && app.ui.charset.selectedIndex < 0) {
+  app.ui.charset.selectedIndex = 0; // дефолт к первому option
+}
   app.ui.charset.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
@@ -1024,5 +1027,6 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
