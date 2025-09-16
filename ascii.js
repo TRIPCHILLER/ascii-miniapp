@@ -200,7 +200,24 @@ function measureCharDensity(ch) {
   }
   return sum / (size * size * 3); // 0..255
 }
-
+// Выбираем реально «чёрный» символ под текущий стек шрифтов
+function pickDarkGlyph() {
+  const candidates = [
+    '\u3000', // IDEOGRAPHIC SPACE (fullwidth space)
+    '\u2800', // BRAILLE PATTERN BLANK — часто пустой и не коллапсится
+    '\u2003', // EM SPACE
+    '\u205F', // MEDIUM MATHEMATICAL SPACE
+    ' '       // обычный пробел — крайний фолбэк
+  ];
+  let best = ' ';
+  let bestD = Infinity;
+  for (const ch of candidates) {
+    const d = measureCharDensity(ch); // 0..255, чем меньше — тем «чернее»
+    if (d < bestD) { bestD = d; best = ch; }
+  }
+  // если по какой-то причине «пустоты» нет — всё равно возьмём наименее плотный
+  return best;
+}
 // === авто-сортировка набора ===
 function autoSortCharset(str) {
   const chars = Array.from(new Set(str.split(''))); // уникальные символы
@@ -384,6 +401,8 @@ function measureCharAspect() {
   }
 
   // ============== РЕНДЕРИНГ ==============
+  let lastFitCols = 0, lastFitRows = 0;
+  let lastStageW = 0, lastStageH = 0;
   let raf = null;
   let lastFrameTime = 0;
 
@@ -415,7 +434,6 @@ const WIDTH_START = isMobile ? 75  : 150;
     app.ui.fg.value = state.color;
     app.ui.bg.value = state.background;
 
-    app.ui.charset.value = state.charset;
     app.ui.invert.checked = state.invert;
 const lbl = document.getElementById('invert_label');
 if (lbl) lbl.textContent = state.invert ? 'ИНВЕРСИЯ: ВКЛ' : 'ИНВЕРСИЯ: ВЫКЛ';
@@ -570,13 +588,22 @@ if (palette && palette.length === K_BINS) {
 }
 
     app.out.textContent = out;
-    refitFont(w, h);
+    // рефитим только если изменились сетка или реальный размер контейнера
+const stageW = app.stage.clientWidth;
+const stageH = app.stage.clientHeight;
+const stageChanged = Math.abs(stageW - lastStageW) > 1 || Math.abs(stageH - lastStageH) > 1;
+if (w !== lastFitCols || h !== lastFitRows || stageChanged) {
+  refitFont(w, h);
+  lastFitCols = w; lastFitRows = h;
+  lastStageW = stageW; lastStageH = stageH;
+}
   }
 
   // Подбор font-size
   let refitLock = false;
   function refitFont(cols, rows) {
     if (refitLock) return;
+    const EPS = 0.75; // px — мёртвая зона, чтоб не «дышало»
     refitLock = true;
 
     const stageW = app.stage.clientWidth;
@@ -596,20 +623,26 @@ if (palette && palette.length === K_BINS) {
     : Math.min(kW, kH);                                 // вне FS всегда contain
 
 
-    const newFS = Math.max(6, Math.floor(currentFS * k));
-    app.out.style.fontSize = newFS + 'px';
+    // первый проход — вниз с небольшим bias, чтобы не перелетать
+const newFS = Math.max(6, Math.floor(currentFS * k * 0.985));
 
-    measurePre.style.fontSize = newFS + 'px';
-    mRect = measurePre.getBoundingClientRect();
-    const k2 = fs
-    ? (isMobile
-    ? Math.max(stageW / mRect.width, stageH / mRect.height) // мобилки cover
-    : Math.min(stageW / mRect.width, stageH / mRect.height) // десктоп contain (без перезума)
-    )
-    : Math.min(stageW / mRect.width, stageH / mRect.height);
+measurePre.style.fontSize = newFS + 'px';
+mRect = measurePre.getBoundingClientRect();
 
-    const finalFS = Math.max(6, Math.floor(newFS * k2));
-    app.out.style.fontSize = finalFS + 'px';
+const kW2 = stageW / mRect.width;
+const kH2 = stageH / mRect.height;
+const k2  = fs
+  ? (isMobile ? Math.max(kW2, kH2) : Math.min(kW2, kH2))
+  : Math.min(kW2, kH2);
+
+// второй проход — тоже с bias вниз
+const targetFS = Math.max(6, Math.floor(newFS * k2 * 0.985));
+
+// гистерезис: если изменение меньше EPS — не трогаем размер
+const prevFS = parseFloat(getComputedStyle(app.out).fontSize) || 16;
+const finalFS = (Math.abs(targetFS - prevFS) < EPS) ? prevFS : targetFS;
+
+app.out.style.fontSize = finalFS + 'px';
 
     refitLock = false;
   }
@@ -852,27 +885,10 @@ app.ui.flip.addEventListener('click', async () => {
       app.stage.style.backgroundColor = state.background;
       if(app.ui.style){ const m = detectPreset(state.color, state.background); app.ui.style.value = (m==='custom'?'custom':m); }
     });
-// Выбираем реально «чёрный» символ под текущий стек шрифтов
-function pickDarkGlyph() {
-  const candidates = [
-    '\u3000', // IDEOGRAPHIC SPACE (fullwidth space)
-    '\u2800', // BRAILLE PATTERN BLANK — часто пустой и не коллапсится
-    '\u2003', // EM SPACE
-    '\u205F', // MEDIUM MATHEMATICAL SPACE
-    ' '       // обычный пробел — крайний фолбэк
-  ];
-  let best = ' ';
-  let bestD = Infinity;
-  for (const ch of candidates) {
-    const d = measureCharDensity(ch); // 0..255, чем меньше — тем «чернее»
-    if (d < bestD) { bestD = d; best = ch; }
-  }
-  // если по какой-то причине «пустоты» нет — всё равно возьмём наименее плотный
-  return best;
-}
+
 app.ui.charset.addEventListener('change', e => {
   const val = e.target.value;
-
+if (e.target.selectedIndex < 0) e.target.selectedIndex = 0; // дефолт к первому пункту
 if (val === 'CUSTOM') {
   app.ui.customCharset.style.display = 'inline-block';
   applyFontStack(FONT_STACK_MAIN); // кастом всегда в MAIN
@@ -960,11 +976,17 @@ app.ui.invert.addEventListener('change', e => {
   }
 });
     // Подгон при изменении окна/ориентации
-    new ResizeObserver(() => {
-      const { w, h } = updateGridSize();
-      refitFont(w, h);
-    }).observe(app.stage);
-  }
+    let roTimer = null;
+new ResizeObserver(() => {
+  clearTimeout(roTimer);
+  roTimer = setTimeout(() => {
+    const { w, h } = updateGridSize();
+    refitFont(w, h);
+    // сбросим маркеры, чтобы цикл не «думал», будто всё прежнее
+    lastFitCols = 0; lastFitRows = 0;
+    lastStageW = 0; lastStageH = 0;
+  }, 50);
+}).observe(app.stage);
 
   // ============== СТАРТ ==============
   async function init() {
