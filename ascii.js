@@ -48,6 +48,8 @@ const BAYER8 = [
   10,58, 6,54,  9,57, 5,53,
   42,26,38,22, 41,25,37,21
 ];
+  const FALLBACK_ASCII = '@%#*+=-:. ';
+
 let DITHER_ENABLED = true;
 // =========================================
   const state = {
@@ -524,8 +526,9 @@ ctx.drawImage(v, sx, sy, sw, sh, 0, 0, w, h);
 // Сброс трансформа
 ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-    const data = ctx.getImageData(0, 0, w, h).data;
+const data = ctx.getImageData(0, 0, w, h).data;
 // Генерация ASCII (юникод-безопасно + поддержка пустого набора)
+const chars = Array.from((state.charset && state.charset.length) ? state.charset : FALLBACK_ASCII);
 const chars = Array.from(state.charset || '');
 const n = chars.length - 1;
 
@@ -887,79 +890,66 @@ app.ui.flip.addEventListener('click', async () => {
     });
 
 app.ui.charset.addEventListener('change', e => {
-  if (e.target.selectedIndex < 0) e.target.selectedIndex = 0; // дефолт к первому пункту
-  const val = e.target.value;
-if (val === 'CUSTOM') {
-  app.ui.customCharset.style.display = 'inline-block';
-  applyFontStack(FONT_STACK_MAIN); // кастом всегда в MAIN
-  state.charset = autoSortCharset(app.ui.customCharset.value || '');
-  updateBinsForCurrentCharset(); // <<< ДОБАВЛЕНО
-  return;
-}
+  // 1) всегда выбираем РЕАЛЬНЫЙ пункт с непустым value и не 'CUSTOM'
+  const sel = e.target;
+  let idx = sel.selectedIndex;
 
-app.ui.customCharset.style.display = 'none';
+  if (idx < 0 || !sel.options[idx] || !sel.options[idx].value) {
+    const opts = Array.from(sel.options);
+    const firstValid = opts.findIndex(o => o && o.value && o.value !== 'CUSTOM');
+    idx = (firstValid >= 0) ? firstValid : 0;
+    sel.selectedIndex = idx;
+  }
 
-// индекс «カタカナ» в твоём <select> — 4 (см. index.html)
-const idx = app.ui.charset.selectedIndex;
-const isPresetKatakana = (idx === 4); // «カタカナ» в твоём select
+  // 2) теперь читаем корректный value
+  const val = sel.options[idx].value || '';
 
-if (isPresetKatakana) {
-  // Моно CJK + full-width
-  applyFontStack(FONT_STACK_CJK, '400', true);
-  // усиливаем штрихи в CJK
-app.out.style.fontWeight = '700';       // просим жирный
-app.out.style.fontSynthesis = 'weight'; // позволяем синтезировать жирный, если его нет
-// деликатный псевдо-жир (±0.6px по оси X):
-app.out.style.textShadow = '0.5px 0 currentColor';
-// чтобы измерение шло с тем же весом — поднимем и у measurePre:
-measurePre.style.fontWeight = '700';
-  forcedAspect = null;
+  // 3) если всё равно пусто — жёсткий фолбэк на ASCII
+  const FALLBACK_ASCII = '@%#*+=-:. ';
+  const effectiveVal = val.trim() || FALLBACK_ASCII;
 
-  // Абсолютно тёмный символ для CJK — fullwidth space
-  const FW_SPACE = pickDarkGlyph();
+  // далее используем effectiveVal вместо val
+  if (effectiveVal === 'CUSTOM') {
+    app.ui.customCharset.style.display = 'inline-block';
+    applyFontStack(FONT_STACK_MAIN);
+    state.charset = autoSortCharset(app.ui.customCharset.value || '');
+    updateBinsForCurrentCharset();
+    return;
+  }
 
-  // Мини-набор «обогащения» (без редких скобок, чтобы не ловить tofu)
-  const enrichSafe = 'ー・。、。「」ァィゥェォッャュョヴヶ＝…';
+  app.ui.customCharset.style.display = 'none';
 
-  // ВАЖНО: fullwidth space идёт первым, затем исходный набор и обогащение
-  const withSpace = (FW_SPACE + (val + enrichSafe).replaceAll(' ', ''));
+  // индекс «カタカナ» считаем по sel.selectedIndex
+  const isPresetKatakana = (sel.selectedIndex === 4);
 
-  state.charset = autoSortCharset(withSpace);
+  if (isPresetKatakana) {
+    applyFontStack(FONT_STACK_CJK, '400', true);
+    app.out.style.fontWeight = '700';
+    app.out.style.fontSynthesis = 'weight';
+    app.out.style.textShadow = '0.5px 0 currentColor';
+    measurePre.style.fontWeight = '700';
+    forcedAspect = null;
 
-  // Профайл под CJK: чуть больше ступеней, фиксируем 2 самых тёмных
-  K_BINS = 14;
-  DARK_LOCK_COUNT = 2;
+    const FW_SPACE = pickDarkGlyph();
+    const enrichSafe = 'ー・。、。「」ァィゥェォッャュョヴヶ＝…';
+    const withSpace = (FW_SPACE + (effectiveVal + enrichSafe).replaceAll(' ', ''));
+    state.charset = autoSortCharset(withSpace);
 
-  // Дизеринг снова включаем — он даёт как раз тот «панч» в полутонах
-  DITHER_ENABLED  = true;
+    K_BINS = 14; DARK_LOCK_COUNT = 2;
+    DITHER_ENABLED = true; ROTATE_PALETTE = false;
+    state.blackPoint = 0.10; state.whitePoint = 0.92;
+  } else {
+    applyFontStack(FONT_STACK_MAIN, '700', false);
+    forcedAspect = null;
+    state.charset = autoSortCharset(effectiveVal);
 
-  // Ротацию схожих символов выключаем, чтобы картинка не «дрожала»
-  ROTATE_PALETTE  = false;
+    K_BINS = 10; DARK_LOCK_COUNT = 3;
+    DITHER_ENABLED = true; ROTATE_PALETTE = true;
+  }
 
-  // Более «жирный» клип для усиления контраста
-  state.blackPoint = 0.10;  // поднимаем чёрную точку
-  state.whitePoint = 0.92;  // слегка опускаем белую
-}
-else {
-  // все остальные пресеты — как раньше
-  applyFontStack(FONT_STACK_MAIN, '700', false);
-  forcedAspect = null;
-  state.charset = autoSortCharset(val);
-
-  K_BINS = 10;
-  DARK_LOCK_COUNT = 3;
-  DITHER_ENABLED  = true;
-  ROTATE_PALETTE  = true;
-}
-updateBinsForCurrentCharset();
-
+  updateBinsForCurrentCharset();
 });
 
-// реагируем на ввод своих символов
-app.ui.customCharset.addEventListener('input', e => {
-  state.charset = autoSortCharset(e.target.value || '');
-  updateBinsForCurrentCharset(); // <<< ДОБАВЛЕНО
-});
     
 // --- Синхронизация видимости при загрузке и первом показе панели ---
 function syncCustomField() {
@@ -992,6 +982,15 @@ new ResizeObserver(() => {
   async function init() {
     fillStyleSelect();
 setUI();
+if (app.ui.charset) {
+  const sel = app.ui.charset;
+  if (sel.selectedIndex < 0 || !sel.options[sel.selectedIndex]?.value) {
+    const opts = Array.from(sel.options);
+    const firstValid = opts.findIndex(o => o && o.value && o.value !== 'CUSTOM');
+    sel.selectedIndex = (firstValid >= 0) ? firstValid : 0;
+  }
+  sel.dispatchEvent(new Event('change', { bubbles: true }));
+}
 
 // 1) Жёстко фиксируем отсутствие инверсии до первого кадра
 state.invert = false;
@@ -1027,6 +1026,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
