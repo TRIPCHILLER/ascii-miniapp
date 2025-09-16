@@ -200,7 +200,24 @@ function measureCharDensity(ch) {
   }
   return sum / (size * size * 3); // 0..255
 }
-
+// Выбираем реально «чёрный» символ под текущий стек шрифтов
+function pickDarkGlyph() {
+  const candidates = [
+    '\u3000', // IDEOGRAPHIC SPACE (fullwidth space)
+    '\u2800', // BRAILLE PATTERN BLANK — часто пустой и не коллапсится
+    '\u2003', // EM SPACE
+    '\u205F', // MEDIUM MATHEMATICAL SPACE
+    ' '       // обычный пробел — крайний фолбэк
+  ];
+  let best = ' ';
+  let bestD = Infinity;
+  for (const ch of candidates) {
+    const d = measureCharDensity(ch); // 0..255, чем меньше — тем «чернее»
+    if (d < bestD) { bestD = d; best = ch; }
+  }
+  // если по какой-то причине «пустоты» нет — всё равно возьмём наименее плотный
+  return best;
+}
 // === авто-сортировка набора ===
 function autoSortCharset(str) {
   const chars = Array.from(new Set(str.split(''))); // уникальные символы
@@ -869,24 +886,7 @@ app.ui.flip.addEventListener('click', async () => {
       app.stage.style.backgroundColor = state.background;
       if(app.ui.style){ const m = detectPreset(state.color, state.background); app.ui.style.value = (m==='custom'?'custom':m); }
     });
-// Выбираем реально «чёрный» символ под текущий стек шрифтов
-function pickDarkGlyph() {
-  const candidates = [
-    '\u3000', // IDEOGRAPHIC SPACE (fullwidth space)
-    '\u2800', // BRAILLE PATTERN BLANK — часто пустой и не коллапсится
-    '\u2003', // EM SPACE
-    '\u205F', // MEDIUM MATHEMATICAL SPACE
-    ' '       // обычный пробел — крайний фолбэк
-  ];
-  let best = ' ';
-  let bestD = Infinity;
-  for (const ch of candidates) {
-    const d = measureCharDensity(ch); // 0..255, чем меньше — тем «чернее»
-    if (d < bestD) { bestD = d; best = ch; }
-  }
-  // если по какой-то причине «пустоты» нет — всё равно возьмём наименее плотный
-  return best;
-}
+
 app.ui.charset.addEventListener('change', e => {
   const val = e.target.value;
 
@@ -1025,5 +1025,6 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
