@@ -471,17 +471,12 @@ function updateGridSize() {
     sourceHOverW = 16/9;
   }
 
-  off.width = w;
-  off.height = h;
-  state.lastGrid = { w, h };
-  return { w, h };
-}
-
   const w = Math.max(1, Math.round(state.widthChars));
   const h = Math.max(1, Math.round(w * (sourceHOverW / (1 / ratioCharWOverH))));
 
   off.width = w;
   off.height = h;
+  state.lastGrid = { w, h };
   return { w, h };
 }
 
@@ -500,7 +495,6 @@ function updateGridSize() {
 
     // Подготовка трансформа для зеркала
     // mirror = true ⇒ рисуем с scaleX(-1), чтобы получить НЕ-зеркальную картинку
-// --- FULLSCREEN cover-crop под 16:9 ---
 // --- FULLSCREEN cover-crop под 16:9 (только для LIVE на мобиле) ---
 const isFsLike = isFullscreenLike();
 
@@ -1192,6 +1186,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
