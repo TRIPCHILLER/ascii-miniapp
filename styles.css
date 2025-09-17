@@ -301,3 +301,15 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   opacity: 0;
   pointer-events: none;
 }
+
+/* тулбары — без жестового зума/скролла */
+.toolbar,
+.modebar,
+.panel {
+  touch-action: manipulation;
+}
+
+/* сцена берёт все жесты (на ней будет свой пинч-зум) */
+#stage {
+  touch-action: none;  /* важно: чтобы Pointer Events пришли нам */
+}
