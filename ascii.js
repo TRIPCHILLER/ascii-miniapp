@@ -473,7 +473,9 @@ function maybeRefit(w, h) {
 let prevLuma = null;            // буфер яркости прошлого кадра
 let SMOOTH_A = 1;               // 1 = сглаживание выкл (по умолчанию)
 let IS_CJK_MODE = false;        // флаг "сейчас катакана"
-
+// --- grid lock for katakana ---
+let kataLockW = -1;
+let kataLockH = -1;
 // ==== /font-refit guard ====
   function loop(ts) {
     raf = requestAnimationFrame(loop);
@@ -486,7 +488,19 @@ let IS_CJK_MODE = false;        // флаг "сейчас катакана"
     const v = app.vid;
     if (!v.videoWidth || !v.videoHeight) return;
 
-    const { w, h } = updateGridSize();
+    const grid = updateGridSize();
+    let w = grid.w, h = grid.h;
+
+// фиксируем сетку в катакане, чтобы не «дышала»
+if (IS_CJK_MODE) {
+  if (kataLockW < 0 || kataLockH < 0) {
+    kataLockW = w;
+    kataLockH = h;
+  }
+  w = kataLockW;
+  h = kataLockH;
+}
+
 // init/resize temporal buffer
 if (!prevLuma || prevLuma.length !== w*h) {
   prevLuma = new Float32Array(w*h);
@@ -602,9 +616,9 @@ if (palette && palette.length === K_BINS) {
 }
 
   app.out.textContent = out;
-  maybeRefit(w, h);
-
-  }
+if (!IS_CJK_MODE) {
+  maybeRefit(w, h);     // в катакане не рефитим каждый кадр
+}
 
   // Подбор font-size
   let refitLock = false;
@@ -925,7 +939,7 @@ if (isPresetKatakana) {
   applyFontStack(FONT_STACK_CJK, '400', true);
   IS_CJK_MODE = true;
   SMOOTH_A = 0.28;         // можно 0.22..0.35
-  DITHER_ENABLED = true;   // оставим дизеринг, но без ротации
+  DITHER_ENABLED = false;   // оставим дизеринг, но без ротации
   forcedAspect = null;
 
   // Жёсткий, безопасный full-width набор (Cica поддерживает):
@@ -963,6 +977,11 @@ else {
   DARK_LOCK_COUNT = 3;
   DITHER_ENABLED  = true;
   ROTATE_PALETTE  = true;
+  IS_CJK_MODE = false;
+SMOOTH_A = 1;
+DITHER_ENABLED = true;
+kataLockW = -1;
+kataLockH = -1;
 }
 updateBinsForCurrentCharset();
 
@@ -1031,6 +1050,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
