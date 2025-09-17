@@ -292,7 +292,7 @@ function updateBinsForCurrentCharset() {
 try {
   const hasCJK = CJK_RE.test(state.charset || '');
   if (hasCJK) {
-  const FW_SPACE = ' ';
+  const FW_SPACE = '\u3000'; // IDEOGRAPHIC SPACE (fullwidth)
 
     // Убедимся, что он в наборе (на случай ручных изменений)
     if (!(state.charset || '').includes(FW_SPACE)) {
@@ -903,7 +903,7 @@ if (isPresetKatakana) {
   forcedAspect = null;
 
   // Абсолютно тёмный символ для CJK — fullwidth space
-  const FW_SPACE = ' ';
+  const FW_SPACE = '\u3000'; // fullwidth space
 
   // Мини-набор «обогащения» (без редких скобок, чтобы не ловить tofu)
   const enrichSafe = 'ー・。、。「」ァィゥェォッャュョヴヶ＝…';
@@ -1005,6 +1005,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
