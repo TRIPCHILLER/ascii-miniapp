@@ -400,6 +400,12 @@ function currentSource(){
         video: { facingMode: state.facing }
       });
       app.vid.srcObject = stream;
+          // как только камера сообщит размеры — прячем плейсхолдер и даём циклу источник
+    app.vid.onloadedmetadata = () => {
+      if (app.vid.videoWidth > 0 && app.vid.videoHeight > 0) {
+        app.ui.placeholder.hidden = true;
+      }
+    };
       await app.vid.play();
       app.ui.placeholder.hidden = true;
       updateMirrorForFacing();
@@ -1027,6 +1033,9 @@ app.ui.filePhoto.addEventListener('change', e=>{
     state.imageEl = img;
     state.mirror = false;
     app.ui.placeholder.hidden = true;
+        // обновим размеры сетки и шрифт сразу после загрузки фото
+    const { w, h } = updateGridSize();
+    refitFont(w, h);
   };
   img.src = URL.createObjectURL(f);
 });
@@ -1039,6 +1048,14 @@ app.ui.fileVideo.addEventListener('change', async e=>{
   app.vid.src = URL.createObjectURL(f);
   app.vid.muted = true;
   app.vid.playsInline = true;
+    app.vid.onloadedmetadata = () => {
+    if (app.vid.videoWidth > 0 && app.vid.videoHeight > 0) {
+      app.ui.placeholder.hidden = true;
+      // лёгкий пинок вёрстке после появления размеров
+      const { w, h } = updateGridSize();
+      refitFont(w, h);
+    }
+  };
   try { await app.vid.play(); } catch(e){}
   state.mirror = false;
   app.ui.placeholder.hidden = true;
@@ -1193,6 +1210,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
