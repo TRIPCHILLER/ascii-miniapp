@@ -281,10 +281,14 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 .btn.active{ text-decoration: underline; }
 
 /* ===== ПЛЕЙСХОЛДЕР ДЛЯ ФОТО/ВИДЕО ===== */
+#out { z-index: 1; }  
 #placeholder{
   position:absolute; inset:0;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
   gap:8px; color:#cfe6ff; text-align:center;
+  z-index: 0;                     /* плейсхолдер под ASCII */
+  pointer-events: none;           /* чтобы не перехватывал события */
 }
 #placeholder .ph-ico{ font-size:48px; opacity:.7; }
+
 
