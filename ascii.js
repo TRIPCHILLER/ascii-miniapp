@@ -574,6 +574,40 @@ for (let y = 0; y < h; y++) {
 
   for (let x = 0; x < w; x++, i += 4) {
     // твои вычисления яркости (оставь как есть)
+        // 1) читаем пиксель
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+
+    // 2) линейная яркость (Rec.709)
+    let Y = 0.2126 * r + 0.7152 * g + 0.0722 * b; // 0..255
+
+    // 3) контраст вокруг среднего (128)
+    Y = 128 + (Y - 128) * contrast;
+
+    // 4) гамма-коррекция
+    Y = 255 * Math.pow(Math.max(0, Math.min(1, Y / 255)), 1 / gamma);
+
+    // 5) клип по чёрной/белой точкам
+    const bp = Math.max(0, Math.min(1, state.blackPoint));
+    const wp = Math.max(0, Math.min(1, state.whitePoint));
+    const span = Math.max(1e-6, wp - bp);
+    let Yn = (Y / 255 - bp) / span;          // 0..1
+    Yn = Math.max(0, Math.min(1, Yn));
+    let Yc = Yn * 255;                        // 0..255
+
+    // 6) инверсия (если включена)
+    if (state.invert) Yc = 255 - Yc;
+
+    // 7) упорядоченный дизеринг (Bayer 8×8)
+    if (DITHER_ENABLED) {
+      const t = BAYER8[(y & 7) * 8 + (x & 7)]; // 0..63
+      // центрируем около 0 и слегка усиливаем
+      Yc += (t - 31.5) * 2.0;
+    }
+
+    // 8) финальный клип
+    if (Yc < 0) Yc = 0; else if (Yc > 255) Yc = 255;
     let bi = Math.round((Yc / 255) * (K_BINS - 1));
     if (bi < 0) bi = 0; else if (bi >= K_BINS) bi = K_BINS - 1;
     const ch = palette[bi] || ' ';
@@ -1022,6 +1056,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
