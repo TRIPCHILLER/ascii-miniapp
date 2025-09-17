@@ -86,6 +86,7 @@ let DITHER_ENABLED = true;
     recorder: null,
     recordChunks: [],
     lastGrid: { w:0, h:0 }, // запоминаем сетку для экспорта
+    viewScale: 1,           // доп. масштаб ASCII внутри #stage
   };
   function updateHud(extra=''){
   const v = app.vid;
@@ -816,7 +817,7 @@ function downloadBlob(blob, filename){
     const S = Math.min(W / w, H / h);
 
     // применяем
-    out.style.transform = `translate(-50%, -50%) scale(${S})`;
+    out.style.transform = `translate(-50%, -50%) scale(${S * state.viewScale})`;
   }
 
   // ============== FULLSCREEN (tap-to-exit) ==============
@@ -1037,6 +1038,50 @@ if (newMode === 'photo') {
         fitAsciiToViewport();
       }, 0);
     });
+// --- ПИНЧ-ЗУМ ТОЛЬКО ДЛЯ СЦЕНЫ ---
+(function enableStagePinchZoom(){
+  const el = app.stage;
+  const pts = new Map();
+  let active = false;
+  let d0 = 0, s0 = 1;
+
+  const getDist = () => {
+    const a = Array.from(pts.values());
+    if (a.length < 2) return 0;
+    const dx = a[0].x - a[1].x, dy = a[0].y - a[1].y;
+    return Math.hypot(dx, dy);
+  };
+
+  el.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'touch') e.preventDefault?.();
+    el.setPointerCapture?.(e.pointerId);
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.size === 2) {
+      active = true;
+      d0 = getDist() || 1;
+      s0 = state.viewScale;
+    }
+  }, { passive:false });
+
+  el.addEventListener('pointermove', e => {
+    if (!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (active && pts.size === 2) {
+      const d = getDist() || 1;
+      const ratio = d / d0;
+      state.viewScale = Math.max(0.5, Math.min(3, s0 * ratio));
+      fitAsciiToViewport();
+    }
+  }, { passive:false });
+
+  const up = e => {
+    pts.delete(e.pointerId);
+    if (pts.size < 2) active = false;
+  };
+  el.addEventListener('pointerup', up);
+  el.addEventListener('pointercancel', up);
+  el.addEventListener('pointerleave', up);
+})();
 
     // Кнопка "Фронт/Тыл"
 app.ui.flip.addEventListener('click', async () => {
@@ -1315,6 +1360,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
