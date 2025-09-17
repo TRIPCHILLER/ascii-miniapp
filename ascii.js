@@ -295,7 +295,7 @@ function updateBinsForCurrentCharset() {
 try {
   const hasCJK = CJK_RE.test(state.charset || '');
   if (hasCJK) {
-  const FW_SPACE = pickDarkGlyph();
+  const FW_SPACE = ' ';
 
     // Убедимся, что он в наборе (на случай ручных изменений)
     if (!(state.charset || '').includes(FW_SPACE)) {
@@ -525,10 +525,9 @@ const chars = Array.from(state.charset || '');
 const n = chars.length - 1;
 
 if (n < 0) {
-  // набор пустой → очищаем экран и выходим из функции loop
   app.out.textContent = '';
-  refitFont(1, 1);
-  return;   // ← важно, именно return из loop!
+  maybeRefit(1, 1);
+  return;
 }
 
 const inv = state.invert ? -1 : 1;
@@ -582,8 +581,9 @@ if (palette && palette.length === K_BINS) {
   out += line + '\n';
 }
 
-    app.out.textContent = out;
-    refitFont(w, h);
+  app.out.textContent = out;
+  maybeRefit(w, h);
+
   }
 
   // Подбор font-size
@@ -906,7 +906,7 @@ if (isPresetKatakana) {
   forcedAspect = null;
 
   // Абсолютно тёмный символ для CJK — fullwidth space
-  const FW_SPACE = pickDarkGlyph();
+  const FW_SPACE = ' ';
 
   // Мини-набор «обогащения» (без редких скобок, чтобы не ловить tofu)
   const enrichSafe = 'ー・。、。「」ァィゥェォッャュョヴヶ＝…';
@@ -1008,4 +1008,5 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
