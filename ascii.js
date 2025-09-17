@@ -889,7 +889,7 @@ const isPresetKatakana = (idx === 4); // «カタカナ» в твоём select
 
 if (isPresetKatakana) {
   // Моно CJK + full-width
-  applyFontStack(FONT_STACK_CJK, '500', true);
+  applyFontStack(FONT_STACK_CJK, '400', true);
   forcedAspect = null;
 
   // Абсолютно тёмный символ для CJK — fullwidth space
@@ -995,5 +995,4 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
-
 
