@@ -471,9 +471,6 @@ function updateGridSize() {
     sourceHOverW = 16/9;
   }
 
-  const w = Math.max(1, Math.round(state.widthChars));
-  const h = Math.max(1, Math.round(w * (sourceHOverW / (1 / ratioCharWOverH))));
-
   off.width = w;
   off.height = h;
   state.lastGrid = { w, h };
@@ -589,7 +586,114 @@ if (palette && palette.length === K_BINS) {
   renderAsciiToCanvas(app.out.textContent || '', state.lastGrid.w, state.lastGrid.h);
 }
   }
+// ---------- EXPORT HELPERS (PNG/VIDEO) ----------
 
+// Рендер готового ASCII-текста в canvas для экспорта
+function renderAsciiToCanvas(text, cols, rows, scale = 2){
+  const cvs = app.ui.render;
+  const c = cvs.getContext('2d');
+  const cs = getComputedStyle(app.out);
+  const fsPx = parseFloat(cs.fontSize) || 16;
+  const ff = cs.fontFamily || 'monospace';
+  const lh = (parseFloat(cs.lineHeight)||1) * fsPx;
+
+  // ширина «M» как шаг по X
+  c.font = `${fsPx}px ${ff}`;
+  const m = c.measureText('M');
+  const stepX = Math.ceil(m.width);
+  const stepY = Math.ceil(lh);
+
+  const W = stepX * cols * scale;
+  const H = stepY * rows * scale;
+
+  cvs.width = Math.max(2, W);
+  cvs.height = Math.max(2, H);
+
+  // фон/текст из текущих настроек
+  c.fillStyle = state.background;
+  c.fillRect(0,0,W,H);
+  c.fillStyle = state.color;
+  c.font = `${fsPx*scale}px ${ff}`;
+  c.textBaseline = 'top';
+
+  const lines = text.split('\n');
+  for (let y=0; y<rows && y<lines.length; y++){
+    c.fillText(lines[y], 0, y*stepY*scale);
+  }
+}
+
+// PNG (режим ФОТО)
+function savePNG(){
+  const grid = state.lastGrid;
+  const text = app.out.textContent || '';
+  if (!text.trim()) { alert('Нечего сохранять'); return; }
+  renderAsciiToCanvas(text, grid.w, grid.h, 2);
+  app.ui.render.toBlob(blob=>{
+    if(!blob) return;
+    downloadBlob(blob, 'ascii.png');
+  }, 'image/png');
+}
+
+// Пытаемся дать MP4, иначе WebM
+function pickMime(){
+  const mp4 = 'video/mp4;codecs=h264';
+  const webm9 = 'video/webm;codecs=vp9';
+  const webm8 = 'video/webm;codecs=vp8';
+  if (window.MediaRecorder?.isTypeSupported?.(mp4)) return mp4;
+  if (window.MediaRecorder?.isTypeSupported?.(webm9)) return webm9;
+  if (window.MediaRecorder?.isTypeSupported?.(webm8)) return webm8;
+  return '';
+}
+
+// Видео (режим ВИДЕО)
+function saveVideo(){
+  if (state.mode!=='video') { alert('Видео-экспорт доступен только в режиме ВИДЕО'); return; }
+  const mime = pickMime();
+  if (!mime) { alert('Запись видео не поддерживается на этом устройстве.'); return; }
+
+  const fps = Math.max(5, Math.min(60, state.fps));
+  const stream = app.ui.render.captureStream(fps);
+  state.recordChunks = [];
+
+  try {
+    state.recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 4_000_000 });
+  } catch(e) {
+    alert('MediaRecorder недоступен: ' + (e.message||e));
+    return;
+  }
+
+  state.recorder.ondataavailable = e => { if (e.data && e.data.size) state.recordChunks.push(e.data); };
+  state.recorder.onstop = () => {
+    const blob = new Blob(state.recordChunks, { type: mime });
+    downloadBlob(blob, mime.includes('mp4') ? 'ascii.mp4' : 'ascii.webm');
+    state.isRecording = false;
+  };
+
+  try { app.vid.currentTime = 0; } catch(e){}
+  app.vid.play?.();
+
+  state.isRecording = true;
+  state.recorder.start(200);
+
+  const onEnded = () => {
+    try { state.recorder.stop(); } catch(e){}
+    app.vid.removeEventListener('ended', onEnded);
+  };
+  app.vid.addEventListener('ended', onEnded, { once:true });
+}
+
+// Универсальное скачивание/открытие
+function downloadBlob(blob, filename){
+  const url = URL.createObjectURL(blob);
+  if (window.Telegram?.WebApp) {
+    window.open(url, '_blank'); // в TG WebApp чаще срабатывает
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.rel='noopener';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 3000);
+}
   // Подбор font-size
   let refitLock = false;
   function refitFont(cols, rows) {
@@ -869,6 +973,82 @@ app.ui.flip.addEventListener('click', async () => {
       app.stage.style.backgroundColor = state.background;
       if(app.ui.style){ const m = detectPreset(state.color, state.background); app.ui.style.value = (m==='custom'?'custom':m); }
     });
+    // ----- РЕЖИМЫ LIVE / PHOTO / VIDEO -----
+
+function stopStream(){
+  const s = app.vid?.srcObject;
+  if (s) { s.getTracks().forEach(t=>t.stop()); app.vid.srcObject = null; }
+  try { app.vid.pause?.(); } catch(e){}
+  app.vid.removeAttribute('src');
+}
+
+async function setMode(newMode){
+  state.mode = newMode;
+
+  // Кнопки сверху: FS только для LIVE, СОХРАНИТЬ для фото/видео
+  if (app.ui.fs)   app.ui.fs.hidden   = (newMode!=='live');
+  if (app.ui.save) app.ui.save.hidden = (newMode==='live');
+
+  // Подсветка кнопок снизу
+  app.ui.modeLive.classList.toggle('active',  newMode==='live');
+  app.ui.modePhoto.classList.toggle('active', newMode==='photo');
+  app.ui.modeVideo.classList.toggle('active', newMode==='video');
+
+  // Плейсхолдер (дискета) — пока ничего не выбрано
+  const needPH = (newMode==='photo' && !state.imageEl) ||
+                 (newMode==='video' && !(app.vid && app.vid.src && app.vid.src!==''));
+  app.ui.placeholder.hidden = !needPH;
+
+  if (newMode === 'live') {
+    stopStream();
+    await startStream(); // твоя же функция
+    updateMirrorForFacing?.();
+  } else if (newMode === 'photo') {
+    stopStream();
+    if (!state.imageEl) app.ui.filePhoto.click();
+  } else if (newMode === 'video') {
+    stopStream();
+    if (!(app.vid && app.vid.src)) app.ui.fileVideo.click();
+  }
+}
+
+// --- Кнопки режимов внизу ---
+app.ui.modeLive.addEventListener('click',  ()=> setMode('live'));
+app.ui.modePhoto.addEventListener('click', ()=> setMode('photo'));
+app.ui.modeVideo.addEventListener('click', ()=> setMode('video'));
+
+// --- Выбор фото из галереи ---
+app.ui.filePhoto.addEventListener('change', e=>{
+  const f = e.target.files?.[0];
+  if (!f) return;
+  const img = new Image();
+  img.onload = () => {
+    state.imageEl = img;
+    state.mirror = false;
+    app.ui.placeholder.hidden = true;
+  };
+  img.src = URL.createObjectURL(f);
+});
+
+// --- Выбор видео из галереи ---
+app.ui.fileVideo.addEventListener('change', async e=>{
+  const f = e.target.files?.[0];
+  if (!f) return;
+  stopStream();
+  app.vid.src = URL.createObjectURL(f);
+  app.vid.muted = true;
+  app.vid.playsInline = true;
+  try { await app.vid.play(); } catch(e){}
+  state.mirror = false;
+  app.ui.placeholder.hidden = true;
+});
+
+// --- Кнопка СОХРАНИТЬ ---
+app.ui.save.addEventListener('click', ()=>{
+  if (state.mode === 'photo') savePNG();
+  else if (state.mode === 'video') saveVideo();
+});
+
 // Выбираем реально «чёрный» символ под текущий стек шрифтов
 function pickDarkGlyph() {
   const candidates = [
@@ -1001,7 +1181,7 @@ if (app.ui.charset) {
 }
 
 await startStream();
-
+setMode('live');
 // 3) Только теперь стартуем цикл рендера
 if (raf) cancelAnimationFrame(raf);
 raf = requestAnimationFrame(loop);
@@ -1012,5 +1192,6 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
