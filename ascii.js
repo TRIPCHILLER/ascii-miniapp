@@ -189,10 +189,16 @@ function measureCharDensity(ch) {
   c.fillStyle = '#000';
   c.fillRect(0, 0, size, size);
   c.fillStyle = '#fff';
-  const outFF = getComputedStyle(app.out).fontFamily || 'monospace';
-  c.font = `${size}px ${outFF}`;
+
+  const cs    = getComputedStyle(app.out);
+  const outFF = cs.fontFamily || 'monospace';
+  const outFW = cs.fontWeight || '400';
+  // меряем с тем же весом, что и вывод
+  c.font = `${outFW} ${size}px ${outFF}`;
   c.textBaseline = 'top';
+
   c.fillText(ch, 0, 0);
+
   const data = c.getImageData(0, 0, size, size).data;
   let sum = 0;
   for (let i = 0; i < data.length; i += 4) {
@@ -889,7 +895,7 @@ const isPresetKatakana = (idx === 4); // «カタカナ» в твоём select
 
 if (isPresetKatakana) {
   // Моно CJK + full-width
-  applyFontStack(FONT_STACK_CJK, '400', true);
+  applyFontStack(FONT_STACK_CJK, '700', true);
   forcedAspect = null;
 
   // Абсолютно тёмный символ для CJK — fullwidth space
@@ -995,4 +1001,5 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
