@@ -44,6 +44,7 @@ button:focus, .btn:focus{
   background:var(--ui-bg);
 }
 .panel[hidden]{ display:none !important; }
+[hidden] { display: none !important; }
 .panel label{
   display:flex; gap:8px; align-items:center;
   background:transparent;
@@ -195,10 +196,13 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 
 /* ===== FULLSCREEN ===== */
 :fullscreen .toolbar,
-:fullscreen .panel { display:none !important; }
+:fullscreen .panel,
+:fullscreen .modebar { display:none !important; }
 
 .body-fullscreen .toolbar,
-.body-fullscreen .panel { display:none !important; }
+.body-fullscreen .panel,
+.body-fullscreen .modebar { display:none !important; }
+
 
 .fs-exit {
   position:fixed; top:10px; right:10px; width:36px; height:36px;
@@ -283,3 +287,4 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   gap:8px; color:#cfe6ff; text-align:center;
 }
 #placeholder .ph-ico{ font-size:48px; opacity:.7; }
+
