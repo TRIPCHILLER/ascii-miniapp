@@ -983,7 +983,6 @@ DITHER_ENABLED = true;
 kataLockW = -1;
 kataLockH = -1;
 }
-updateBinsForCurrentCharset();
 
 });
 
@@ -1050,6 +1049,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
