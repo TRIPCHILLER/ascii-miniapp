@@ -291,4 +291,13 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 }
 #placeholder .ph-ico{ font-size:48px; opacity:.7; }
 
-
+/* Видео-источник должен быть «видим» для браузера, но вне экрана */
+.capture-src{
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  left: -99999px;
+  top: -99999px;
+  opacity: 0;
+  pointer-events: none;
+}
