@@ -676,8 +676,9 @@ function savePNG(){
   if (!text.trim()) { alert('Нечего сохранять'); return; }
   renderAsciiToCanvas(text, grid.w, grid.h, 2);
   app.ui.render.toBlob(blob=>{
-    if(!blob) return;
+    if(!blob) { alert('Не удалось сгенерировать PNG'); return; }
     downloadBlob(blob, 'ascii.png');
+    hudSet('PNG: сохранено/отправлено');
   }, 'image/png');
 }
 
@@ -714,6 +715,7 @@ function saveVideo(){
     const blob = new Blob(state.recordChunks, { type: mime });
     downloadBlob(blob, mime.includes('mp4') ? 'ascii.mp4' : 'ascii.webm');
     state.isRecording = false;
+    hudSet('VIDEO: сохранено/отправлено');
   };
 
   try { app.vid.currentTime = 0; } catch(e){}
@@ -975,6 +977,20 @@ function updateMirrorForFacing() {
 
 async function setMode(newMode){
   state.mode = newMode;
+// Если ушли из PHOTO — сбросить выбранную картинку
+if (newMode !== 'photo') {
+  state.imageEl = null;
+}
+
+// Если ушли из VIDEO — сбросить файл-источник (но НЕ камеру)
+if (newMode !== 'video') {
+  try {
+    if (app.vid && !app.vid.srcObject) {
+      app.vid.pause?.();
+      app.vid.removeAttribute('src');
+    }
+  } catch(e){}
+}
 
   if (app.ui.fs)   app.ui.fs.hidden   = (newMode!=='live');
   if (app.ui.save) app.ui.save.hidden = (newMode==='live');
@@ -989,11 +1005,15 @@ async function setMode(newMode){
     await startStream();
     updateMirrorForFacing?.();
     return;
+    state.viewScale = 1;
+fitAsciiToViewport();
   }
 
-  const needPH = (newMode==='photo' && !state.imageEl) ||
-                 (newMode==='video' && !(app.vid && app.vid.src && app.vid.src!=='')); 
-  app.ui.placeholder.hidden = !needPH;
+if (newMode === 'photo') {
+  if (!state.imageEl) app.ui.filePhoto.click();
+} else if (newMode === 'video') {
+  if (!(app.vid && app.vid.src)) app.ui.fileVideo.click();
+}
 
   stopStream();
 
@@ -1141,8 +1161,17 @@ app.ui.fileVideo.addEventListener('change', async (e) => {
 
 // --- Кнопка СОХРАНИТЬ ---
 app.ui.save.addEventListener('click', ()=>{
-  if (state.mode === 'photo') savePNG();
-  else if (state.mode === 'video') saveVideo();
+  if (state.mode === 'photo') {
+    hudSet('PNG: экспорт…');
+    savePNG();
+  } else if (state.mode === 'video') {
+    if (!app.vid || (!app.vid.src && !app.vid.srcObject)) {
+      alert('Нет выбранного видео.');
+      return;
+    }
+    hudSet('VIDEO: запись… (дождитесь окончания)');
+    saveVideo();
+  }
 });
 
 // Выбираем реально «чёрный» символ под текущий стек шрифтов
@@ -1286,6 +1315,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
