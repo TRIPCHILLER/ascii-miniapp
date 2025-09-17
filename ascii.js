@@ -2,6 +2,14 @@
   // ============== УТИЛИТЫ ==============
   const $ = s => document.querySelector(s);
   const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
+// ==== TEMP HUD ====
+const hud = document.createElement('div');
+hud.style.cssText = 'position:fixed;left:6px;bottom:6px;z-index:99999;background:rgba(0,0,0,.6);color:#0f0;font:12px/1.2 monospace;padding:6px 8px;border:1px solid #0f0;border-radius:6px;max-width:75vw;pointer-events:none;';
+hud.textContent = 'boot…';
+document.body.appendChild(hud);
+window.addEventListener('error', e => { hud.textContent = 'JS ERROR: ' + (e.error?.message || e.message); });
+function hudSet(txt){ hud.textContent = txt; }
+// ==== /HUD ====
 
   const app = {
     vid:  $('#vid'),
@@ -79,6 +87,13 @@ let DITHER_ENABLED = true;
     recordChunks: [],
     lastGrid: { w:0, h:0 }, // запоминаем сетку для экспорта
   };
+  function updateHud(extra=''){
+  const v = app.vid;
+  const src = (state.mode==='photo' && state.imageEl) ? 'img'
+           : (v?.srcObject ? 'live' : (v?.src ? 'file' : 'none'));
+  const vw = v?.videoWidth|0, vh = v?.videoHeight|0, rs = v?.readyState|0;
+  hudSet(`mode:${state.mode} src:${src} vw:${vw} vh:${vh} rs:${rs} rec:${state.isRecording?'1':'0'} ${extra}`);
+}
   let forcedAspect = null;
   // === helpers ===
 function isFullscreenLike() {
@@ -388,56 +403,61 @@ function currentSource(){
     const el = state.imageEl;
     const w = el.naturalWidth || el.width || 1;
     const h = el.naturalHeight || el.height || 1;
+    updateHud(`src=img ${w}x${h}`);
     return { el, w, h, kind:'image' };
   }
   const v = app.vid;
   if (!v) return null;
-
-  // ждём метаданные, но не рисуем кадры 2×2 — ждём реальные размеры
+  // ждём реальные размеры, чтобы не рисовать мусор 2×2
   if (v.readyState >= 1 && v.videoWidth > 2 && v.videoHeight > 2) {
+    updateHud(`src=vid ${v.videoWidth}x${v.videoHeight}`);
     return { el: v, w: v.videoWidth, h: v.videoHeight, kind:(state.mode==='video'?'filevideo':'live') };
   }
+  updateHud(`src=vid wait rs:${v.readyState}`);
   return null;
 }
 
   // ============== КАМЕРА ==============
   async function startStream() {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: state.facing }
-      });
-      app.vid.srcObject = stream;
-          // как только камера сообщит размеры — прячем плейсхолдер и даём циклу источник
+  try {
+    // выставляем атрибуты на всякий
+    app.vid.setAttribute('playsinline',''); app.vid.setAttribute('autoplay',''); app.vid.setAttribute('muted','');
+    app.vid.playsInline = true; app.vid.autoplay = true; app.vid.muted = true;
+
+    const constraints = { video: { facingMode: state.facing || 'user' }, audio: false };
+    updateHud('getUserMedia…');
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+    app.vid.srcObject = stream;
+
     app.vid.onloadedmetadata = () => {
+      updateHud('loadedmetadata');
       if (app.vid.videoWidth > 0 && app.vid.videoHeight > 0) {
         app.ui.placeholder.hidden = true;
         requestAnimationFrame(() => {
-      const { w, h } = updateGridSize();
-      refitFont(w, h);
+          const { w, h } = updateGridSize(); refitFont(w, h);
+          updateHud('ready meta');
         });
       }
     };
-      app.vid.oncanplay = () => {
-  app.ui.placeholder.hidden = true;
-  requestAnimationFrame(() => {
-  const { w, h } = updateGridSize();
-  refitFont(w, h);
-    });
-};
-      app.vid.setAttribute('playsinline', '');
-app.vid.setAttribute('autoplay', '');
-app.vid.setAttribute('muted', '');
-app.vid.playsInline = true;
-app.vid.autoplay   = true;
-app.vid.muted      = true;
-      await app.vid.play();
+    app.vid.oncanplay = () => {
       app.ui.placeholder.hidden = true;
-      updateMirrorForFacing();
-    } catch (e) {
-      console.error('getUserMedia error', e);
-      alert('Камера недоступна');
-    }
+      requestAnimationFrame(() => {
+        const { w, h } = updateGridSize(); refitFont(w, h);
+        updateHud('canplay');
+      });
+    };
+    app.vid.onerror = (e)=> updateHud('video error');
+
+    await app.vid.play().catch(()=>{});
+    updateHud('play called');
+    return true;
+  } catch (err) {
+    updateHud('gUM ERR: '+ (err?.name||err));
+    alert('Камера недоступна: ' + (err?.message || err));
+    return false;
   }
+}
 
   // ============== РЕНДЕРИНГ ==============
   let raf = null;
@@ -1049,7 +1069,7 @@ app.ui.modePhoto.addEventListener('click', ()=> setMode('photo'));
 app.ui.modeVideo.addEventListener('click', ()=> setMode('video'));
 
 // --- Выбор фото из галереи ---
-app.ui.filePhoto.addEventListener('change', e=>{
+app.ui.filePhoto.addEventListener('change', (e) => {
   const f = e.target.files?.[0];
   if (!f) return;
   const img = new Image();
@@ -1057,14 +1077,13 @@ app.ui.filePhoto.addEventListener('change', e=>{
     state.imageEl = img;
     state.mirror = false;
     app.ui.placeholder.hidden = true;
-        // обновим размеры сетки и шрифт сразу после загрузки фото
-    const { w, h } = updateGridSize();
-    refitFont(w, h);
-    // подсказка циклу: источник появился — сразу перерисуй
-    if (raf) requestAnimationFrame(() => {});
+    const { w, h } = updateGridSize(); refitFont(w, h);
+    updateHud('img onload');
+    requestAnimationFrame(()=>{}); // разовый тик
   };
   img.src = URL.createObjectURL(f);
 });
+
 
 app.ui.fileVideo.addEventListener('change', async (e) => {
   const f = e.target.files?.[0];
@@ -1073,29 +1092,25 @@ app.ui.fileVideo.addEventListener('change', async (e) => {
   stopStream();
   app.vid.src = URL.createObjectURL(f);
 
-  // жёстко проставляем атрибуты для webview
-  app.vid.setAttribute('playsinline', '');
-  app.vid.setAttribute('autoplay', '');
-  app.vid.setAttribute('muted', '');
-  app.vid.playsInline = true;
-  app.vid.autoplay   = true;
-  app.vid.muted      = true;
+  // жестко атрибуты
+  app.vid.setAttribute('playsinline',''); app.vid.setAttribute('autoplay',''); app.vid.setAttribute('muted','');
+  app.vid.playsInline = true; app.vid.autoplay = true; app.vid.muted = true;
 
   app.vid.onloadedmetadata = () => {
+    updateHud('file meta');
     if (app.vid.videoWidth > 0 && app.vid.videoHeight > 0) {
       app.ui.placeholder.hidden = true;
       requestAnimationFrame(() => {
-        const { w, h } = updateGridSize();
-        refitFont(w, h);
+        const { w, h } = updateGridSize(); refitFont(w, h);
+        updateHud('file ready');
       });
     }
   };
-
   app.vid.oncanplay = () => {
     app.ui.placeholder.hidden = true;
     requestAnimationFrame(() => {
-      const { w, h } = updateGridSize();
-      refitFont(w, h);
+      const { w, h } = updateGridSize(); refitFont(w, h);
+      updateHud('file canplay');
     });
   };
 
@@ -1250,6 +1265,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
