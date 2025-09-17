@@ -401,6 +401,7 @@ function currentSource(){
       });
       app.vid.srcObject = stream;
       await app.vid.play();
+      app.ui.placeholder.hidden = true;
       updateMirrorForFacing();
     } catch (e) {
       console.error('getUserMedia error', e);
@@ -987,7 +988,13 @@ async function setMode(newMode){
   app.ui.modeLive.classList.toggle('active',  newMode==='live');
   app.ui.modePhoto.classList.toggle('active', newMode==='photo');
   app.ui.modeVideo.classList.toggle('active', newMode==='video');
-
+  if (newMode === 'live') {
+    app.ui.placeholder.hidden = true; // ← принудительно скрываем
+    stopStream();
+    await startStream();
+    updateMirrorForFacing?.();
+    return;
+  }
   // Плейсхолдер (дискета) — пока ничего не выбрано
   const needPH = (newMode==='photo' && !state.imageEl) ||
                  (newMode==='video' && !(app.vid && app.vid.src && app.vid.src!==''));
@@ -1186,6 +1193,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
