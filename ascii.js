@@ -731,16 +731,28 @@ function saveVideo(){
 
 // Универсальное скачивание/открытие
 function downloadBlob(blob, filename){
-  const url = URL.createObjectURL(blob);
-  if (window.Telegram?.WebApp) {
-    window.open(url, '_blank'); // в TG WebApp чаще срабатывает
+  const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
+
+  // 1) Попытка: системное «Поделиться» (Android/iOS) — удобнее для «в Галерею»
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    navigator.share({ files: [file], title: 'ASCII VISOR', text: filename }).catch(()=>{});
     return;
   }
+
+  // 2) В Telegram WebApp иногда блокируется download — открываем в новой вкладке
+  const url = URL.createObjectURL(blob);
+  if (window.Telegram?.WebApp) {
+    window.open(url, '_blank');
+    return;
+  }
+
+  // 3) Обычная загрузка ссылкой
   const a = document.createElement('a');
   a.href = url; a.download = filename; a.rel='noopener';
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(url), 3000);
 }
+
   // Подбор font-size
   let refitLock = false;
   function refitFont(cols, rows) {
@@ -1008,13 +1020,26 @@ async function setMode(newMode){
 
     // Кнопка "Фронт/Тыл"
 app.ui.flip.addEventListener('click', async () => {
+  // В ФОТО/ВИДЕО — только зеркалим, камеру НЕ трогаем
+  if (state.mode !== 'live') {
+    state.mirror = !state.mirror;
+    const { w, h } = updateGridSize();
+    refitFont(w, h);
+    return;
+  }
+
+  // В LIVE — на мобиле переключаем фронт/тыл (и обновляем флаг зеркала)
   if (isMobile) {
     state.facing = (state.facing === 'user') ? 'environment' : 'user';
     const s = app.vid.srcObject;
     if (s) s.getTracks().forEach(t => t.stop());
-    await startStream(); // внутри вызовется updateMirrorForFacing()
+    await startStream();
+    updateMirrorForFacing();
   } else {
-    state.mirror = !state.mirror; // на ПК по-прежнему просто зеркалим
+    // На десктопе в LIVE — просто зеркалим
+    state.mirror = !state.mirror;
+    const { w, h } = updateGridSize();
+    refitFont(w, h);
   }
 });
 
@@ -1261,6 +1286,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
