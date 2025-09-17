@@ -421,6 +421,12 @@ function currentSource(){
   const { w, h } = updateGridSize();
   refitFont(w, h);
 };
+      app.vid.setAttribute('playsinline', '');
+app.vid.setAttribute('autoplay', '');
+app.vid.setAttribute('muted', '');
+app.vid.playsInline = true;
+app.vid.autoplay   = true;
+app.vid.muted      = true;
       await app.vid.play();
       app.ui.placeholder.hidden = true;
       updateMirrorForFacing();
@@ -1055,12 +1061,18 @@ app.ui.filePhoto.addEventListener('change', e=>{
 
 // --- Выбор видео из галереи ---
 app.ui.fileVideo.addEventListener('change', async e=>{
-  const f = e.target.files?.[0];
-  if (!f) return;
-  stopStream();
-  app.vid.src = URL.createObjectURL(f);
-  app.vid.muted = true;
-  app.vid.playsInline = true;
+    const f = e.target.files?.[0];
+    if (!f) return;
+    stopStream();
+    app.vid.src = URL.createObjectURL(f);
+  app.vid.setAttribute('playsinline', '');
+app.vid.setAttribute('autoplay', '');
+app.vid.setAttribute('muted', '');
+app.vid.playsInline = true;
+app.vid.autoplay   = true;
+app.vid.muted      = true;
+    app.vid.muted = true;
+    app.vid.playsInline = true;
     app.vid.onloadedmetadata = () => {
     if (app.vid.videoWidth > 0 && app.vid.videoHeight > 0) {
       app.ui.placeholder.hidden = true;
@@ -1223,6 +1235,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
