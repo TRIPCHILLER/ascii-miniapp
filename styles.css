@@ -169,16 +169,14 @@ option{ background:var(--ui-panel); color:var(--ui-text); }
   max-width: 60vw;        /* но не шире 60% экрана */
   display: none;          /* показываем/прячем через JS */
 }
-/* MS Gothic для кана-блока + синтетический bold разрешаем */
+/* === Шрифт для CJK (MS Gothic) === */
 @font-face {
-  font-family: "MS Gothic";
-  src: url("./MS Gothic.woff2") format("woff2");
-  font-weight: 400 700;         /* позволяем диапазон веса (включая синтетический bold) */
-  font-style: normal;
-  font-display: swap;
-  unicode-range: U+30A0-30FF;   /* Катакана */
+    font-family: "MS Gothic";
+    src: url("./assets/MS Gothic.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
 }
-
 @font-face {
   font-family: "BetterVCR";
   src: url("./assets/BetterVCR.woff2") format("woff2");
@@ -269,7 +267,5 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 @media (max-width: 360px){
   .panel .row.colors{ flex-direction: column; }
 }
-
-
 
 
