@@ -32,9 +32,7 @@
   // ==== FONT STACKS (добавлено) ====
 const FONT_STACK_MAIN = `"BetterVCR",monospace`;
 
-const FONT_STACK_CJK =
-  // реальные моно/приближённые моно CJK + безопасные фолбэки
-  `"Cica Web","MS Gothic","IPAGothic","Osaka-Mono","VL Gothic",monospace`;
+const FONT_STACK_CJK = `"Cica Web", monospace`;
 // ==== /FONT STACKS ====
     // Значения по умолчанию
   // ===== Ordered dithering (8×8 Bayer) =====
@@ -457,7 +455,22 @@ if (isFsLike && isMobile) {
   off.height = h;
   return { w, h };
 }
+// ==== font-refit guard (глобальное состояние) ====
+let prevCols = -1;
+let prevRows = -1;
+let lastRefitAt = 0;
+const REFIT_MIN_INTERVAL_MS = 120;
 
+function maybeRefit(w, h) {
+  const now = performance.now ? performance.now() : Date.now();
+  if ((w !== prevCols || h !== prevRows) && (now - lastRefitAt) > REFIT_MIN_INTERVAL_MS) {
+    refitFont(w, h);
+    prevCols = w;
+    prevRows = h;
+    lastRefitAt = now;
+  }
+}
+// ==== /font-refit guard ====
   function loop(ts) {
     raf = requestAnimationFrame(loop);
 
@@ -995,3 +1008,4 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
