@@ -593,7 +593,6 @@ for (let y = 0; y < h; y++) {
 app.out.textContent = outBase;
 if (outBright) outBright.textContent = outHi;
 
-    app.out.textContent = out;
     refitFont(w, h);
   }
 
@@ -1023,6 +1022,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
