@@ -382,15 +382,25 @@ function measureCharAspect() {
   return charW / charH; // W/H
 }
 // Универсальный источник кадра для всех режимов
+// Универсальный источник кадра для всех режимов (терпимо ждём видео)
 function currentSource(){
   if (state.mode === 'photo' && state.imageEl) {
     const el = state.imageEl;
-    return { el, w: el.naturalWidth || el.width, h: el.naturalHeight || el.height, kind:'image' };
+    const w = el.naturalWidth || el.width || 1;
+    const h = el.naturalHeight || el.height || 1;
+    return { el, w, h, kind:'image' };
   }
   const v = app.vid;
-  if (v && (v.videoWidth>0 && v.videoHeight>0)) {
-    return { el: v, w: v.videoWidth, h: v.videoHeight, kind:(state.mode==='video'?'filevideo':'live') };
+  if (!v) return null;
+
+  // Если метаданные уже подгружены (HAVE_METADATA или выше) — считаем источник готовым,
+  // даже если в самый первый тик width/height ещё 0 (бывает в WebView).
+  if (v.readyState >= 1) { // HAVE_METADATA
+    const w = v.videoWidth  || 2; // временный минимальный размер, чтобы не возвращать null
+    const h = v.videoHeight || 2;
+    return { el: v, w, h, kind:(state.mode==='video'?'filevideo':'live') };
   }
+
   return null;
 }
   // ============== КАМЕРА ==============
@@ -406,6 +416,11 @@ function currentSource(){
         app.ui.placeholder.hidden = true;
       }
     };
+      app.vid.oncanplay = () => {
+  app.ui.placeholder.hidden = true;
+  const { w, h } = updateGridSize();
+  refitFont(w, h);
+};
       await app.vid.play();
       app.ui.placeholder.hidden = true;
       updateMirrorForFacing();
@@ -986,35 +1001,33 @@ function stopStream(){
 async function setMode(newMode){
   state.mode = newMode;
 
-  // Кнопки сверху: FS только для LIVE, СОХРАНИТЬ для фото/видео
+  // Верх: FS только в LIVE, СОХРАНИТЬ в фото/видео
   if (app.ui.fs)   app.ui.fs.hidden   = (newMode!=='live');
   if (app.ui.save) app.ui.save.hidden = (newMode==='live');
 
-  // Подсветка кнопок снизу
+  // Подсветка низа
   app.ui.modeLive.classList.toggle('active',  newMode==='live');
   app.ui.modePhoto.classList.toggle('active', newMode==='photo');
   app.ui.modeVideo.classList.toggle('active', newMode==='video');
+
   if (newMode === 'live') {
-    app.ui.placeholder.hidden = true; // ← принудительно скрываем
+    app.ui.placeholder.hidden = true; // живой источник — без плейсхолдера
     stopStream();
-    await startStream();
+    await startStream();               // выставит onloadedmetadata/oncanplay
     updateMirrorForFacing?.();
     return;
   }
-  // Плейсхолдер (дискета) — пока ничего не выбрано
+
+  // Фото/Видео → показываем плейсхолдер, пока файл не выбран/не готов
   const needPH = (newMode==='photo' && !state.imageEl) ||
                  (newMode==='video' && !(app.vid && app.vid.src && app.vid.src!==''));
   app.ui.placeholder.hidden = !needPH;
 
-  if (newMode === 'live') {
-    stopStream();
-    await startStream(); // твоя же функция
-    updateMirrorForFacing?.();
-  } else if (newMode === 'photo') {
-    stopStream();
+  stopStream(); // на фото/видео камеру гасим
+
+  if (newMode === 'photo') {
     if (!state.imageEl) app.ui.filePhoto.click();
   } else if (newMode === 'video') {
-    stopStream();
     if (!(app.vid && app.vid.src)) app.ui.fileVideo.click();
   }
 }
@@ -1210,6 +1223,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
