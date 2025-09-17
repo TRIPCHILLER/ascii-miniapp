@@ -995,5 +995,3 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
-
-
