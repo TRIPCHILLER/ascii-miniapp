@@ -32,7 +32,9 @@
   // ==== FONT STACKS (добавлено) ====
 const FONT_STACK_MAIN = `"BetterVCR",monospace`;
 
-const FONT_STACK_CJK = `"Cica Web", monospace`;
+const FONT_STACK_CJK =
+  // реальные моно/приближённые моно CJK + безопасные фолбэки
+  `"Cica Web","MS Gothic","IPAGothic","Osaka-Mono","VL Gothic",monospace`;
 // ==== /FONT STACKS ====
     // Значения по умолчанию
   // ===== Ordered dithering (8×8 Bayer) =====
@@ -153,15 +155,17 @@ measurePre.style.cssText = `
   -webkit-font-smoothing:none;
 `;
 
+// единая функция — применяем стек и к выводу, и к измерителю
 function applyFontStack(stack, weight = '700', eastAsianFullWidth = false) {
   if (app.out) {
     app.out.style.fontFamily = stack;
     app.out.style.fontWeight = weight;
-    app.out.style.fontSynthesis = 'none';
+    app.out.style.fontSynthesis = 'none';        // не синтезировать bold/italic
     app.out.style.fontKerning = 'none';
     app.out.style.fontVariantLigatures = 'none';
     app.out.style.fontVariantEastAsian = eastAsianFullWidth ? 'full-width' : 'normal';
-    app.out.style.fontFeatureSettings = eastAsianFullWidth ? '"fwid" 1' : 'normal';
+    app.out.style.letterSpacing = '0';
+    app.out.style.webkitFontSmoothing = 'none';
   }
   measurePre.style.fontFamily = stack;
   measurePre.style.fontWeight = weight;
@@ -169,7 +173,6 @@ function applyFontStack(stack, weight = '700', eastAsianFullWidth = false) {
   measurePre.style.fontKerning = 'none';
   measurePre.style.fontVariantLigatures = 'none';
   measurePre.style.fontVariantEastAsian = eastAsianFullWidth ? 'full-width' : 'normal';
-  measurePre.style.fontFeatureSettings = eastAsianFullWidth ? '"fwid" 1' : 'normal';
 }
 
 document.body.appendChild(measurePre);
@@ -294,7 +297,7 @@ function updateBinsForCurrentCharset() {
 try {
   const hasCJK = CJK_RE.test(state.charset || '');
   if (hasCJK) {
-  const FW_SPACE = '\u3000'; // IDEOGRAPHIC SPACE (fullwidth)
+  const FW_SPACE = pickDarkGlyph();
 
     // Убедимся, что он в наборе (на случай ручных изменений)
     if (!(state.charset || '').includes(FW_SPACE)) {
@@ -367,28 +370,18 @@ function measureCharAspect() {
 
   // ============== КАМЕРА ==============
   async function startStream() {
-  try {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      throw new Error('mediaDevices.getUserMedia недоступен');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: state.facing }
+      });
+      app.vid.srcObject = stream;
+      await app.vid.play();
+      updateMirrorForFacing();
+    } catch (e) {
+      console.error('getUserMedia error', e);
+      alert('Камера недоступна');
     }
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: state.facing },  // ← вместо 'user'
-      audio: false
-    });
-    app.vid.srcObject = stream;            // ← вместо app.video
-    await app.vid.play();                  // ← вместо app.video
-    app.stream = stream;
-
-    // обновим флаг зеркалирования под текущую камеру
-    updateMirrorForFacing();
-
-    return true;
-  } catch (err) {
-    console.error('CAMERA ERROR:', err);
-    if (app.out) app.out.textContent = 'Нет доступа к камере: ' + (err && err.message ? err.message : err);
-    return false;
   }
-}
 
   // ============== РЕНДЕРИНГ ==============
   let raf = null;
@@ -464,29 +457,7 @@ if (isFsLike && isMobile) {
   off.height = h;
   return { w, h };
 }
-// ==== font-refit guard (глобальное состояние) ====
-let prevCols = -1;
-let prevRows = -1;
-let lastRefitAt = 0;
-const REFIT_MIN_INTERVAL_MS = 120;
 
-function maybeRefit(w, h) {
-  const now = performance.now ? performance.now() : Date.now();
-  if ((w !== prevCols || h !== prevRows) && (now - lastRefitAt) > REFIT_MIN_INTERVAL_MS) {
-    refitFont(w, h);
-    prevCols = w;
-    prevRows = h;
-    lastRefitAt = now;
-  }
-}
-  // --- temporal smoothing for CJK (катакана) ---
-let prevLuma = null;            // буфер яркости прошлого кадра
-let SMOOTH_A = 1;               // 1 = сглаживание выкл (по умолчанию)
-let IS_CJK_MODE = false;        // флаг "сейчас катакана"
-// --- grid lock for katakana ---
-let kataLockW = -1;
-let kataLockH = -1;
-// ==== /font-refit guard ====
   function loop(ts) {
     raf = requestAnimationFrame(loop);
 
@@ -498,24 +469,8 @@ let kataLockH = -1;
     const v = app.vid;
     if (!v.videoWidth || !v.videoHeight) return;
 
-    const grid = updateGridSize();
-    let w = grid.w, h = grid.h;
+    const { w, h } = updateGridSize();
 
-// фиксируем сетку в катакане, чтобы не «дышала»
-if (IS_CJK_MODE) {
-  if (kataLockW < 0 || kataLockH < 0) {
-    kataLockW = w;
-    kataLockH = h;
-  }
-  w = kataLockW;
-  h = kataLockH;
-}
-
-// init/resize temporal buffer
-if (!prevLuma || prevLuma.length !== w*h) {
-  prevLuma = new Float32Array(w*h);
-  for (let i = 0; i < prevLuma.length; i++) prevLuma[i] = -1; // -1 = пусто
-}
     // Подготовка трансформа для зеркала
     // mirror = true ⇒ рисуем с scaleX(-1), чтобы получить НЕ-зеркальную картинку
 // --- FULLSCREEN cover-crop под 16:9 ---
@@ -557,9 +512,10 @@ const chars = Array.from(state.charset || '');
 const n = chars.length - 1;
 
 if (n < 0) {
+  // набор пустой → очищаем экран и выходим из функции loop
   app.out.textContent = '';
-  maybeRefit(1, 1);
-  return;
+  refitFont(1, 1);
+  return;   // ← важно, именно return из loop!
 }
 
 const inv = state.invert ? -1 : 1;
@@ -585,19 +541,7 @@ for (let y = 0; y < h; y++) {
     const wp = state.whitePoint;
     v01 = (v01 - bp) / Math.max(1e-6, (wp - bp));
     v01 = Math.min(1, Math.max(0, v01));
-// --- temporal smoothing only for CJK ---
-const pIndex = y * w + x;
-if (IS_CJK_MODE) {
-  const prev = prevLuma[pIndex];
-  if (prev >= 0) {
-    // EMA: чуть подпускаем новый кадр, основа — предыдущий
-    v01 = prev * (1 - SMOOTH_A) + v01 * SMOOTH_A;
-  }
-  prevLuma[pIndex] = v01;
-} else {
-  // в обычных режимах буфер не накапливаем
-  prevLuma[pIndex] = -1;
-}
+
     const Yc = Math.max(0, Math.min(255, (bias + inv * (v01 * 255))));
     // u — непрерывный индекс 0..n
 const u = (Yc / 255) * n;
@@ -625,10 +569,9 @@ if (palette && palette.length === K_BINS) {
   out += line + '\n';
 }
 
-  app.out.textContent = out;
-if (!IS_CJK_MODE) {
-  maybeRefit(w, h);     // в катакане не рефитим каждый кадр
-}
+    app.out.textContent = out;
+    refitFont(w, h);
+  }
 
   // Подбор font-size
   let refitLock = false;
@@ -947,36 +890,33 @@ const isPresetKatakana = (idx === 4); // «カタカナ» в твоём select
 if (isPresetKatakana) {
   // Моно CJK + full-width
   applyFontStack(FONT_STACK_CJK, '400', true);
-  IS_CJK_MODE = true;
-  SMOOTH_A = 0.28;         // можно 0.22..0.35
-  DITHER_ENABLED = false;   // оставим дизеринг, но без ротации
   forcedAspect = null;
 
-  // Жёсткий, безопасный full-width набор (Cica поддерживает):
-  //  ␠(FW space) + знаки + базовая ката + комбинации с дакутэн/хандакутэн + ヶ
-  const SAFE_KATA =
-    '\u3000' +                  // fullwidth space как «чёрный»
-    'ー・。、。「」' +
-    'ァィゥェォッャュョ' +
-    'アイウエオカキクケコサシスセソタチツテト' +
-    'ナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン' +
-    'ヴガギグゲゴザジズゼゾダヂヅデドバパビピブプベペボポ' +
-    'ヶ';
+  // Абсолютно тёмный символ для CJK — fullwidth space
+  const FW_SPACE = pickDarkGlyph();
 
-  // Без авто-сортировки: берём как есть (избегаем «тофу» от canvas)
-  state.charset = SAFE_KATA;
+  // Мини-набор «обогащения» (без редких скобок, чтобы не ловить tofu)
+  const enrichSafe = 'ー・。、。「」ァィゥェォッャュョヴヶ＝…';
 
-  // Бины/палитра — устойчивый профиль для каты
-  K_BINS = 12;
+  // ВАЖНО: fullwidth space идёт первым, затем исходный набор и обогащение
+  const withSpace = (FW_SPACE + (val + enrichSafe).replaceAll(' ', ''));
+
+  state.charset = autoSortCharset(withSpace);
+
+  // Профайл под CJK: чуть больше ступеней, фиксируем 2 самых тёмных
+  K_BINS = 14;
   DARK_LOCK_COUNT = 2;
+
+  // Дизеринг снова включаем — он даёт как раз тот «панч» в полутонах
+  DITHER_ENABLED  = true;
+
+  // Ротацию схожих символов выключаем, чтобы картинка не «дрожала»
   ROTATE_PALETTE  = false;
 
-  state.blackPoint = 0.10;
-  state.whitePoint = 0.92;
-
-  updateBinsForCurrentCharset();
+  // Более «жирный» клип для усиления контраста
+  state.blackPoint = 0.10;  // поднимаем чёрную точку
+  state.whitePoint = 0.92;  // слегка опускаем белую
 }
-
 else {
   // все остальные пресеты — как раньше
   applyFontStack(FONT_STACK_MAIN, '700', false);
@@ -987,12 +927,8 @@ else {
   DARK_LOCK_COUNT = 3;
   DITHER_ENABLED  = true;
   ROTATE_PALETTE  = true;
-  IS_CJK_MODE = false;
-SMOOTH_A = 1;
-DITHER_ENABLED = true;
-kataLockW = -1;
-kataLockH = -1;
 }
+updateBinsForCurrentCharset();
 
 });
 
@@ -1025,41 +961,39 @@ app.ui.invert.addEventListener('change', e => {
 
   // ============== СТАРТ ==============
   async function init() {
-  fillStyleSelect();
-  setUI();
+    fillStyleSelect();
+setUI();
 
-  // 1) Жёстко фиксируем отсутствие инверсии до первого кадра
-  state.invert = false;
-  if (app.ui.invert) app.ui.invert.checked = false;
-  {
-    const lbl = document.getElementById('invert_label');
-    if (lbl) lbl.textContent = 'ИНВЕРСИЯ: ВЫКЛ';
-  }
-
-  bindUI();
-  attachDoubleTapEnter();
-
-  // === ВАЖНО: СНАЧАЛА просим камеру (сразу покажет системный диалог) ===
-  try { await startStream(); } catch(e) { console.error(e); }
-
-  // Затем применяем выбранный набор (если select отдаст пусто — подстрахуемся)
-  if (app.ui.charset) {
-    app.ui.charset.dispatchEvent(new Event('change', { bubbles: true }));
-  }
-  if (!state.charset || state.charset.length === 0) {
-    state.charset = '@%#*+=-:. ';   // дефолтный CLASSIC
-  }
-  updateBinsForCurrentCharset();
-
-  // Теперь стартуем цикл рендера
-  if (raf) cancelAnimationFrame(raf);
-  raf = requestAnimationFrame(loop);
-
-  // Первый refit после старта
-  const { w, h } = updateGridSize();
-  refitFont(w, h);
+// 1) Жёстко фиксируем отсутствие инверсии до первого кадра
+state.invert = false;
+if (app.ui.invert) app.ui.invert.checked = false;
+{
+  const lbl = document.getElementById('invert_label');
+  if (lbl) lbl.textContent = 'ИНВЕРСИЯ: ВЫКЛ';
 }
+
+bindUI();
+attachDoubleTapEnter();
+
+// 2) Принудительно применяем шрифтовой стек под стартовый режим символов,
+//    чтобы исключить "ложный" первый кадр с некорректным стеком.
+if (app.ui.charset) {
+  // дёрнем обработчик, он сам решит: CJK → CJK стек без сортировки,
+  // не CJK → основной стек + авто-сорт.
+  app.ui.charset.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+await startStream();
+
+// 3) Только теперь стартуем цикл рендера
+if (raf) cancelAnimationFrame(raf);
+raf = requestAnimationFrame(loop);
+
+const { w, h } = updateGridSize();
+refitFont(w, h);
+  }
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
