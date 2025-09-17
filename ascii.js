@@ -28,6 +28,32 @@
       style:    $('#stylePreset'),
     }
   };
+// Настройки усиления для катаканы
+const BRIGHTEN_FOR_CJK = {
+  enabled: true,         // можно включать/выключать
+  binsToBrighten: 2,     // сколько самых светлых символов усиливать
+  isCJKMode: false       // переключается при выборе катаканы
+};
+
+let outBright = null;    // второй слой <pre>
+
+// создаём яркий слой поверх базового
+function ensureBrightLayer(){
+  if (outBright) return;
+  outBright = document.createElement('pre');
+  outBright.id = 'outBright';
+  Object.assign(outBright.style, {
+    position:'absolute',
+    top:'50%', left:'50%',
+    transform:'translate(-50%,-50%) scale(1)',
+    transformOrigin:'center center',
+    margin:'0', userSelect:'none',
+    whiteSpace:'pre', letterSpacing:'0', lineHeight:'1',
+    pointerEvents:'none',
+    mixBlendMode:'normal'
+  });
+  app.stage.appendChild(outBright);
+}
 
   // ==== FONT STACKS (добавлено) ====
 const FONT_STACK_MAIN = `"BetterVCR",monospace`;
@@ -135,6 +161,10 @@ function isFullscreenLike() {
     app.ui.fg.value = state.color; app.ui.bg.value = state.background;
     app.out.style.color = state.color;
     app.out.style.backgroundColor = state.background;
+    if (outBright) {
+    outBright.style.color = state.color;
+    outBright.style.backgroundColor = state.background;
+}
     app.stage.style.backgroundColor = state.background;
     app.ui.style.value = id;
   }
@@ -166,6 +196,16 @@ function applyFontStack(stack, weight = '700', eastAsianFullWidth = false) {
     app.out.style.fontVariantEastAsian = eastAsianFullWidth ? 'full-width' : 'normal';
     app.out.style.letterSpacing = '0';
     app.out.style.webkitFontSmoothing = 'none';
+  }
+    if (outBright) {
+    outBright.style.fontFamily = stack;
+    outBright.style.fontWeight = weight; // у bright-слоя вес мы будем менять отдельно
+    outBright.style.fontSynthesis = 'none';
+    outBright.style.fontKerning = 'none';
+    outBright.style.fontVariantLigatures = 'none';
+    outBright.style.fontVariantEastAsian = eastAsianFullWidth ? 'full-width' : 'normal';
+    outBright.style.letterSpacing = '0';
+    outBright.style.webkitFontSmoothing = 'none';
   }
   measurePre.style.fontFamily = stack;
   measurePre.style.fontWeight = weight;
@@ -525,49 +565,33 @@ const contrast = state.contrast;
 
 let out = '';
 let i = 0;
+let outBase = '';
+let outHi   = '';
+
 for (let y = 0; y < h; y++) {
-  let line = '';
+  let lineBase = '';
+  let lineHi   = '';
+
   for (let x = 0; x < w; x++, i += 4) {
-    const r = data[i], g = data[i+1], b = data[i+2];
+    // твои вычисления яркости (оставь как есть)
+    let bi = Math.round((Yc / 255) * (K_BINS - 1));
+    if (bi < 0) bi = 0; else if (bi >= K_BINS) bi = K_BINS - 1;
+    const ch = palette[bi] || ' ';
 
-    // яркость → контраст → гамма
-    let Y = 0.2126*r + 0.7152*g + 0.0722*b;
-    let v01 = Y / 255;
-    v01 = ((v01 - 0.5) * contrast) + 0.5;
-    v01 = Math.min(1, Math.max(0, v01));
-    v01 = Math.pow(v01, 1 / gamma);
-// Black/White clip для повышения «плотности» картинки
-    const bp = state.blackPoint;
-    const wp = state.whitePoint;
-    v01 = (v01 - bp) / Math.max(1e-6, (wp - bp));
-    v01 = Math.min(1, Math.max(0, v01));
-
-    const Yc = Math.max(0, Math.min(255, (bias + inv * (v01 * 255))));
-    // u — непрерывный индекс 0..n
-const u = (Yc / 255) * n;
-let i0 = u | 0;        // floor
-let idx = i0;
-
-if (DITHER_ENABLED) {
-  const frac = u - i0; // 0..1
-  const thr  = BAYER8[(y & 7) * 8 + (x & 7)] / 64; // 0..1
-  if (frac > thr) idx = i0 + 1;
-}
-
-if (idx < 0) idx = 0;
-else if (idx > n) idx = n;
-
-if (palette && palette.length === K_BINS) {
-  let bi = Math.round((Yc / 255) * (K_BINS - 1));
-  if (bi < 0) bi = 0; else if (bi >= K_BINS) bi = K_BINS - 1;
-  line += palette[bi] || ' ';
-} else {
-  line += chars[idx];
-}
-
+    if (BRIGHTEN_FOR_CJK.enabled && BRIGHTEN_FOR_CJK.isCJKMode && bi >= K_BINS - BRIGHTEN_FOR_CJK.binsToBrighten) {
+      lineBase += ' ';
+      lineHi   += ch;
+    } else {
+      lineBase += ch;
+      lineHi   += ' ';
+    }
   }
-  out += line + '\n';
+  outBase += lineBase + '\n';
+  outHi   += lineHi   + '\n';
 }
+
+app.out.textContent = outBase;
+if (outBright) outBright.textContent = outHi;
 
     app.out.textContent = out;
     refitFont(w, h);
@@ -610,7 +634,7 @@ if (palette && palette.length === K_BINS) {
 
     const finalFS = Math.max(6, Math.floor(newFS * k2));
     app.out.style.fontSize = finalFS + 'px';
-
+    if (outBright) outBright.style.fontSize = finalFS + 'px';
     refitLock = false;
   }
   // === Вписывание ASCII-блока внутрь stage ===
@@ -891,6 +915,9 @@ if (isPresetKatakana) {
   // Моно CJK + full-width
   applyFontStack(FONT_STACK_CJK, '500', true);
   forcedAspect = null;
+  BRIGHTEN_FOR_CJK.isCJKMode = true;
+  ensureBrightLayer();
+  if (outBright) outBright.style.fontWeight = '700';
 
   // Абсолютно тёмный символ для CJK — fullwidth space
   const FW_SPACE = pickDarkGlyph();
@@ -922,7 +949,7 @@ else {
   applyFontStack(FONT_STACK_MAIN, '700', false);
   forcedAspect = null;
   state.charset = autoSortCharset(val);
-
+  BRIGHTEN_FOR_CJK.isCJKMode = false;
   K_BINS = 10;
   DARK_LOCK_COUNT = 3;
   DITHER_ENABLED  = true;
@@ -974,6 +1001,7 @@ if (app.ui.invert) app.ui.invert.checked = false;
 
 bindUI();
 attachDoubleTapEnter();
+ensureBrightLayer();
 
 // 2) Принудительно применяем шрифтовой стек под стартовый режим символов,
 //    чтобы исключить "ложный" первый кадр с некорректным стеком.
@@ -995,5 +1023,6 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
