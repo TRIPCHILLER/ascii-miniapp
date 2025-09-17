@@ -26,6 +26,14 @@
       invert:   $('#invert'),
       fs:       $('#fs'),
       style:    $('#stylePreset'),
+    modePhoto:   $('#modePhoto'),
+    modeLive:    $('#modeLive'),
+    modeVideo:   $('#modeVideo'),
+    filePhoto:   $('#filePhoto'),
+    fileVideo:   $('#fileVideo'),
+    save:        $('#save'),
+    placeholder: $('#placeholder'),
+    render:      $('#render'),
     }
   };
 
@@ -64,6 +72,12 @@ let DITHER_ENABLED = true;
     isFullscreen: false,    // наш флаг
     blackPoint: 0.06,   // 0..1 — общий дефолт
     whitePoint: 0.98,   // 0..1 — общий дефолт
+    mode: 'live',           // 'live' | 'photo' | 'video'
+    imageEl: null,          // <img> для режима ФОТО
+    isRecording: false,     // запись видео (экспорт)
+    recorder: null,
+    recordChunks: [],
+    lastGrid: { w:0, h:0 }, // запоминаем сетку для экспорта
   };
   let forcedAspect = null;
   // === helpers ===
@@ -367,7 +381,18 @@ function measureCharAspect() {
   const charH = Math.max(1, r.height);
   return charW / charH; // W/H
 }
-
+// Универсальный источник кадра для всех режимов
+function currentSource(){
+  if (state.mode === 'photo' && state.imageEl) {
+    const el = state.imageEl;
+    return { el, w: el.naturalWidth || el.width, h: el.naturalHeight || el.height, kind:'image' };
+  }
+  const v = app.vid;
+  if (v && (v.videoWidth>0 && v.videoHeight>0)) {
+    return { el: v, w: v.videoWidth, h: v.videoHeight, kind:(state.mode==='video'?'filevideo':'live') };
+  }
+  return null;
+}
   // ============== КАМЕРА ==============
   async function startStream() {
     try {
@@ -431,23 +456,28 @@ if (lbl) lbl.textContent = state.invert ? 'ИНВЕРСИЯ: ВКЛ' : 'ИНВЕ
   }
 
   // Пересчёт h и подготовка offscreen размера
-  function updateGridSize() {
-  const v = app.vid;
-  if (!v.videoWidth || !v.videoHeight) return { w: state.widthChars, h: 1 };
+function updateGridSize() {
+  const src = currentSource();
+  if (!src) return { w: state.widthChars, h: 1 };
 
   const isFsLike = isFullscreenLike();
+  const ratioCharWOverH = measureCharAspect(); // W/H
 
-  // соотношение символа (W/H) → используем для правильного отношения столбцов/строк
-  const ratioCharWOverH = measureCharAspect();   // W/H
-  // нам нужна H/W, поэтому инверсия ниже в формулах
+  // базовый H/W источника
+  let sourceHOverW = src.h / src.w;
 
-  // Базовый аспект источника как H/W:
-  let sourceHOverW = v.videoHeight / v.videoWidth;
+  // в FS на мобиле — фикс 9:16 ТОЛЬКО для LIVE
+  if (isFsLike && isMobile && state.mode==='live') {
+    sourceHOverW = 16/9;
+  }
 
-// В FS: ТОЛЬКО на мобиле принудительно 9:16 (портрет).
-// На ПК оставляем нативное соотношение источника.
-if (isFsLike && isMobile) {
-  sourceHOverW = 16/9;
+  const w = Math.max(1, Math.round(state.widthChars));
+  const h = Math.max(1, Math.round(w * (sourceHOverW / (1 / ratioCharWOverH))));
+
+  off.width = w;
+  off.height = h;
+  state.lastGrid = { w, h };
+  return { w, h };
 }
 
   const w = Math.max(1, Math.round(state.widthChars));
@@ -466,44 +496,28 @@ if (isFsLike && isMobile) {
     if (ts - lastFrameTime < frameInterval) return;
     lastFrameTime = ts;
 
-    const v = app.vid;
-    if (!v.videoWidth || !v.videoHeight) return;
+    const src = currentSource();
+    if (!src) return;
 
     const { w, h } = updateGridSize();
 
     // Подготовка трансформа для зеркала
     // mirror = true ⇒ рисуем с scaleX(-1), чтобы получить НЕ-зеркальную картинку
 // --- FULLSCREEN cover-crop под 16:9 ---
+// --- FULLSCREEN cover-crop под 16:9 (только для LIVE на мобиле) ---
 const isFsLike = isFullscreenLike();
-const vw = v.videoWidth;
-const vh = v.videoHeight;
 
-let sx = 0, sy = 0, sw = vw, sh = vh;
-
-// В FS кропим ТОЛЬКО на мобиле под вертикаль 9:16.
-// На ПК в FS — без кропа (letterbox/pillarbox по contain).
-if (isFsLike && isMobile) {
+let sx = 0, sy = 0, sw = src.w, sh = src.h;
+if (isFsLike && isMobile && state.mode==='live') {
   const targetWH = 9/16; // W/H
-  const srcWH = vw / vh;
-
-  if (srcWH > targetWH) {
-    // Источник шире 9:16 → режем бока
-    sw = Math.round(vh * targetWH);
-    sx = Math.round((vw - sw) / 2);
-  } else if (srcWH < targetWH) {
-    // Источник уже 9:16 → режем сверху/снизу
-    sh = Math.round(vw / targetWH);
-    sy = Math.round((vh - sh) / 2);
-  }
+  const srcWH = src.w / src.h;
+  if (srcWH > targetWH) { sw = Math.round(src.h * targetWH); sx = Math.round((src.w - sw)/2); }
+  else if (srcWH < targetWH) { sh = Math.round(src.w / targetWH); sy = Math.round((src.h - sh)/2); }
 }
 
-// Подготовка трансформа для зеркала (как было)
+// зеркалим как и раньше: mirror=true ⇒ scaleX(-1)
 ctx.setTransform(state.mirror ? -1 : 1, 0, 0, 1, state.mirror ? w : 0, 0);
-
-// Рисуем уже с кропом, масштабируем на целевую сетку w×h
-ctx.drawImage(v, sx, sy, sw, sh, 0, 0, w, h);
-
-// Сброс трансформа
+ctx.drawImage(src.el, sx, sy, sw, sh, 0, 0, w, h);
 ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     const data = ctx.getImageData(0, 0, w, h).data;
@@ -571,6 +585,9 @@ if (palette && palette.length === K_BINS) {
 
     app.out.textContent = out;
     refitFont(w, h);
+    if (state.isRecording) {
+  renderAsciiToCanvas(app.out.textContent || '', state.lastGrid.w, state.lastGrid.h);
+}
   }
 
   // Подбор font-size
@@ -995,4 +1012,5 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
