@@ -367,18 +367,25 @@ function measureCharAspect() {
 
   // ============== КАМЕРА ==============
   async function startStream() {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: state.facing }
-      });
-      app.vid.srcObject = stream;
-      await app.vid.play();
-      updateMirrorForFacing();
-    } catch (e) {
-      console.error('getUserMedia error', e);
-      alert('Камера недоступна');
+  try {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error('mediaDevices.getUserMedia недоступен');
     }
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user' },
+      audio: false
+    });
+    app.video.srcObject = stream;
+    await app.video.play();
+    app.stream = stream;         // флаг, что камера запущена
+    return true;
+  } catch (err) {
+    console.error('CAMERA ERROR:', err);
+    // покажем тихое сообщение в интерфейсе, чтобы понимать причину
+    if (app.out) app.out.textContent = 'Нет доступа к камере: ' + (err && err.message ? err.message : err);
+    return false;
   }
+}
 
   // ============== РЕНДЕРИНГ ==============
   let raf = null;
@@ -1015,39 +1022,40 @@ app.ui.invert.addEventListener('change', e => {
 
   // ============== СТАРТ ==============
   async function init() {
-    fillStyleSelect();
-setUI();
+  fillStyleSelect();
+  setUI();
 
-// 1) Жёстко фиксируем отсутствие инверсии до первого кадра
-state.invert = false;
-if (app.ui.invert) app.ui.invert.checked = false;
-{
-  const lbl = document.getElementById('invert_label');
-  if (lbl) lbl.textContent = 'ИНВЕРСИЯ: ВЫКЛ';
-}
-
-bindUI();
-attachDoubleTapEnter();
-
-// 2) Принудительно применяем шрифтовой стек под стартовый режим символов,
-//    чтобы исключить "ложный" первый кадр с некорректным стеком.
-if (app.ui.charset) {
-  // дёрнем обработчик, он сам решит: CJK → CJK стек без сортировки,
-  // не CJK → основной стек + авто-сорт.
-  app.ui.charset.dispatchEvent(new Event('change', { bubbles: true }));
-}
-
-await startStream();
-
-// 3) Только теперь стартуем цикл рендера
-if (raf) cancelAnimationFrame(raf);
-raf = requestAnimationFrame(loop);
-
-const { w, h } = updateGridSize();
-refitFont(w, h);
+  // 1) Жёстко фиксируем отсутствие инверсии до первого кадра
+  state.invert = false;
+  if (app.ui.invert) app.ui.invert.checked = false;
+  {
+    const lbl = document.getElementById('invert_label');
+    if (lbl) lbl.textContent = 'ИНВЕРСИЯ: ВЫКЛ';
   }
+
+  bindUI();
+  attachDoubleTapEnter();
+
+  // === ВАЖНО: СНАЧАЛА просим камеру (сразу покажет системный диалог) ===
+  try { await startStream(); } catch(e) { console.error(e); }
+
+  // Затем применяем выбранный набор (если select отдаст пусто — подстрахуемся)
+  if (app.ui.charset) {
+    app.ui.charset.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  if (!state.charset || state.charset.length === 0) {
+    state.charset = '@%#*+=-:. ';   // дефолтный CLASSIC
+  }
+  updateBinsForCurrentCharset();
+
+  // Теперь стартуем цикл рендера
+  if (raf) cancelAnimationFrame(raf);
+  raf = requestAnimationFrame(loop);
+
+  // Первый refit после старта
+  const { w, h } = updateGridSize();
+  refitFont(w, h);
+}
 
   document.addEventListener('DOMContentLoaded', init);
 })();
-
-
