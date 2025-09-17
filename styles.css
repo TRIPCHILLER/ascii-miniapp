@@ -305,11 +305,8 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 /* тулбары — без жестового зума/скролла */
 .toolbar,
 .modebar,
-.panel {
-  touch-action: manipulation;
-}
+.panel { touch-action: manipulation; }
 
-/* сцена берёт все жесты (на ней будет свой пинч-зум) */
+/* сцена берёт все жесты (пинч-зум) */
 #stage {
-  touch-action: none;  /* важно: чтобы Pointer Events пришли нам */
-}
+  touch-action: none; }
