@@ -86,8 +86,7 @@ button:focus, .btn:focus{
   flex:1; min-height:0; position:relative;
   background:#000; overflow:hidden;
 }
-/* предотвращает системный double-tap zoom и делает тапы «сухими» */
-#stage { touch-action: manipulation; }
+
 #out{
   position:absolute;
   top:50%; left:50%;
@@ -232,7 +231,7 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 .body-fullscreen #stage {
   width: 100%;
   height: 100%;
-  touch-action: manipulation; /* приятнее на тапах */
+  touch-action: none; /* сцена должна ловить пинч даже в фоллскрине */
 }
 
 /* На всякий случай: скрыть любые пережитки иконок выхода, если где-то остались */
@@ -310,3 +309,4 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 /* сцена берёт все жесты (пинч-зум) */
 #stage {
   touch-action: none; }
+
