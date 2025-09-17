@@ -161,6 +161,7 @@ function applyFontStack(stack, weight = '700', eastAsianFullWidth = false) {
     app.out.style.fontKerning = 'none';
     app.out.style.fontVariantLigatures = 'none';
     app.out.style.fontVariantEastAsian = eastAsianFullWidth ? 'full-width' : 'normal';
+    app.out.style.fontFeatureSettings = eastAsianFullWidth ? '"fwid" 1' : 'normal';
   }
   measurePre.style.fontFamily = stack;
   measurePre.style.fontWeight = weight;
@@ -168,6 +169,7 @@ function applyFontStack(stack, weight = '700', eastAsianFullWidth = false) {
   measurePre.style.fontKerning = 'none';
   measurePre.style.fontVariantLigatures = 'none';
   measurePre.style.fontVariantEastAsian = eastAsianFullWidth ? 'full-width' : 'normal';
+  measurePre.style.fontFeatureSettings = eastAsianFullWidth ? '"fwid" 1' : 'normal';
 }
 
 document.body.appendChild(measurePre);
@@ -922,36 +924,35 @@ if (isPresetKatakana) {
   // Моно CJK + full-width
   applyFontStack(FONT_STACK_CJK, '400', true);
   IS_CJK_MODE = true;
-  SMOOTH_A = 0.28;        // 0.22..0.35 — можно потом подстроить
-  DITHER_ENABLED = false; // без дизеринга в катакане
-
+  SMOOTH_A = 0.28;         // можно 0.22..0.35
+  DITHER_ENABLED = true;   // оставим дизеринг, но без ротации
   forcedAspect = null;
 
-  // Абсолютно тёмный символ для CJK — fullwidth space
-  const FW_SPACE = '\u3000'; // fullwidth space
+  // Жёсткий, безопасный full-width набор (Cica поддерживает):
+  //  ␠(FW space) + знаки + базовая ката + комбинации с дакутэн/хандакутэн + ヶ
+  const SAFE_KATA =
+    '\u3000' +                  // fullwidth space как «чёрный»
+    'ー・。、。「」' +
+    'ァィゥェォッャュョ' +
+    'アイウエオカキクケコサシスセソタチツテト' +
+    'ナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン' +
+    'ヴガギグゲゴザジズゼゾダヂヅデドバパビピブプベペボポ' +
+    'ヶ';
 
-  // Мини-набор «обогащения» (без редких скобок, чтобы не ловить tofu)
-  const enrichSafe = 'ー・。、。「」ァィゥェォッャュョヴヶ＝…';
+  // Без авто-сортировки: берём как есть (избегаем «тофу» от canvas)
+  state.charset = SAFE_KATA;
 
-  // ВАЖНО: fullwidth space идёт первым, затем исходный набор и обогащение
-  const withSpace = (FW_SPACE + (val + enrichSafe).replaceAll(' ', ''));
-
-  state.charset = autoSortCharset(withSpace);
-
-  // Профайл под CJK: чуть больше ступеней, фиксируем 2 самых тёмных
-  K_BINS = 14;
+  // Бины/палитра — устойчивый профиль для каты
+  K_BINS = 12;
   DARK_LOCK_COUNT = 2;
-
-  // Дизеринг снова включаем — он даёт как раз тот «панч» в полутонах
-  DITHER_ENABLED  = true;
-
-  // Ротацию схожих символов выключаем, чтобы картинка не «дрожала»
   ROTATE_PALETTE  = false;
 
-  // Более «жирный» клип для усиления контраста
-  state.blackPoint = 0.10;  // поднимаем чёрную точку
-  state.whitePoint = 0.92;  // слегка опускаем белую
+  state.blackPoint = 0.10;
+  state.whitePoint = 0.92;
+
+  updateBinsForCurrentCharset();
 }
+
 else {
   // все остальные пресеты — как раньше
   applyFontStack(FONT_STACK_MAIN, '700', false);
@@ -1030,6 +1031,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
