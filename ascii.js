@@ -467,6 +467,11 @@ function maybeRefit(w, h) {
     lastRefitAt = now;
   }
 }
+  // --- temporal smoothing for CJK (катакана) ---
+let prevLuma = null;            // буфер яркости прошлого кадра
+let SMOOTH_A = 1;               // 1 = сглаживание выкл (по умолчанию)
+let IS_CJK_MODE = false;        // флаг "сейчас катакана"
+
 // ==== /font-refit guard ====
   function loop(ts) {
     raf = requestAnimationFrame(loop);
@@ -480,7 +485,11 @@ function maybeRefit(w, h) {
     if (!v.videoWidth || !v.videoHeight) return;
 
     const { w, h } = updateGridSize();
-
+// init/resize temporal buffer
+if (!prevLuma || prevLuma.length !== w*h) {
+  prevLuma = new Float32Array(w*h);
+  for (let i = 0; i < prevLuma.length; i++) prevLuma[i] = -1; // -1 = пусто
+}
     // Подготовка трансформа для зеркала
     // mirror = true ⇒ рисуем с scaleX(-1), чтобы получить НЕ-зеркальную картинку
 // --- FULLSCREEN cover-crop под 16:9 ---
@@ -550,7 +559,19 @@ for (let y = 0; y < h; y++) {
     const wp = state.whitePoint;
     v01 = (v01 - bp) / Math.max(1e-6, (wp - bp));
     v01 = Math.min(1, Math.max(0, v01));
-
+// --- temporal smoothing only for CJK ---
+const pIndex = y * w + x;
+if (IS_CJK_MODE) {
+  const prev = prevLuma[pIndex];
+  if (prev >= 0) {
+    // EMA: чуть подпускаем новый кадр, основа — предыдущий
+    v01 = prev * (1 - SMOOTH_A) + v01 * SMOOTH_A;
+  }
+  prevLuma[pIndex] = v01;
+} else {
+  // в обычных режимах буфер не накапливаем
+  prevLuma[pIndex] = -1;
+}
     const Yc = Math.max(0, Math.min(255, (bias + inv * (v01 * 255))));
     // u — непрерывный индекс 0..n
 const u = (Yc / 255) * n;
@@ -900,6 +921,10 @@ const isPresetKatakana = (idx === 4); // «カタカナ» в твоём select
 if (isPresetKatakana) {
   // Моно CJK + full-width
   applyFontStack(FONT_STACK_CJK, '400', true);
+  IS_CJK_MODE = true;
+  SMOOTH_A = 0.28;        // 0.22..0.35 — можно потом подстроить
+  DITHER_ENABLED = false; // без дизеринга в катакане
+
   forcedAspect = null;
 
   // Абсолютно тёмный символ для CJK — fullwidth space
@@ -1005,6 +1030,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
