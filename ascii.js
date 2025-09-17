@@ -393,16 +393,13 @@ function currentSource(){
   const v = app.vid;
   if (!v) return null;
 
-  // Если метаданные уже подгружены (HAVE_METADATA или выше) — считаем источник готовым,
-  // даже если в самый первый тик width/height ещё 0 (бывает в WebView).
-  if (v.readyState >= 1) { // HAVE_METADATA
-    const w = v.videoWidth  || 2; // временный минимальный размер, чтобы не возвращать null
-    const h = v.videoHeight || 2;
-    return { el: v, w, h, kind:(state.mode==='video'?'filevideo':'live') };
+  // ждём метаданные, но не рисуем кадры 2×2 — ждём реальные размеры
+  if (v.readyState >= 1 && v.videoWidth > 2 && v.videoHeight > 2) {
+    return { el: v, w: v.videoWidth, h: v.videoHeight, kind:(state.mode==='video'?'filevideo':'live') };
   }
-
   return null;
 }
+
   // ============== КАМЕРА ==============
   async function startStream() {
     try {
@@ -414,12 +411,18 @@ function currentSource(){
     app.vid.onloadedmetadata = () => {
       if (app.vid.videoWidth > 0 && app.vid.videoHeight > 0) {
         app.ui.placeholder.hidden = true;
+        requestAnimationFrame(() => {
+      const { w, h } = updateGridSize();
+      refitFont(w, h);
+        });
       }
     };
       app.vid.oncanplay = () => {
   app.ui.placeholder.hidden = true;
+  requestAnimationFrame(() => {
   const { w, h } = updateGridSize();
   refitFont(w, h);
+    });
 };
       app.vid.setAttribute('playsinline', '');
 app.vid.setAttribute('autoplay', '');
@@ -500,7 +503,9 @@ function updateGridSize() {
   }
 
   const w = Math.max(1, Math.round(state.widthChars));
-  const h = Math.max(1, Math.round(w * (sourceHOverW / (1 / ratioCharWOverH))));
+  const targetH = w * (sourceHOverW / (1 / Math.max(1e-6, ratioCharWOverH)));
+  const h = Math.max(1, Math.min(1000, Math.round(targetH)));
+
 
   off.width = w;
   off.height = h;
@@ -1055,6 +1060,8 @@ app.ui.filePhoto.addEventListener('change', e=>{
         // обновим размеры сетки и шрифт сразу после загрузки фото
     const { w, h } = updateGridSize();
     refitFont(w, h);
+    // подсказка циклу: источник появился — сразу перерисуй
+    if (raf) requestAnimationFrame(() => {});
   };
   img.src = URL.createObjectURL(f);
 });
@@ -1076,6 +1083,15 @@ app.vid.muted      = true;
     app.vid.onloadedmetadata = () => {
     if (app.vid.videoWidth > 0 && app.vid.videoHeight > 0) {
       app.ui.placeholder.hidden = true;
+      requestAnimationFrame(() => {
+      const { w, h } = updateGridSize();
+      refitFont(w, h);
+    });
+  }
+};
+app.vid.oncanplay = () => {
+  app.ui.placeholder.hidden = true;
+  requestAnimationFrame(() => {
       // лёгкий пинок вёрстке после появления размеров
       const { w, h } = updateGridSize();
       refitFont(w, h);
@@ -1223,9 +1239,7 @@ if (app.ui.charset) {
   app.ui.charset.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
-await startStream();
-setMode('live');
-// 3) Только теперь стартуем цикл рендера
+await setMode('live');         // внутри сам вызовется startStream()
 if (raf) cancelAnimationFrame(raf);
 raf = requestAnimationFrame(loop);
 
@@ -1235,6 +1249,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
