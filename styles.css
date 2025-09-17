@@ -16,8 +16,9 @@ html, body, .wrap { overflow-x: hidden; }
 /* ===== ТУЛБАР ===== */
 .toolbar {
   display:flex; gap:8px; align-items:center;
+  justify-content:center;
   padding:10px;
-  background:#000;   /* ← фиксированный чёрный */
+  background:#000; 
 }
 
 /* ===== КНОПКИ — полностью прозрачные ===== */
@@ -268,4 +269,17 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   .panel .row.colors{ flex-direction: column; }
 }
 
+/* ===== НИЖНИЙ РЯД РЕЖИМОВ ===== */
+.modebar{
+  display:flex; justify-content:center; gap:12px;
+  padding:10px; background:#000; border-top:1px solid #111;
+}
+.btn.active{ text-decoration: underline; }
 
+/* ===== ПЛЕЙСХОЛДЕР ДЛЯ ФОТО/ВИДЕО ===== */
+#placeholder{
+  position:absolute; inset:0;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:8px; color:#cfe6ff; text-align:center;
+}
+#placeholder .ph-ico{ font-size:48px; opacity:.7; }
