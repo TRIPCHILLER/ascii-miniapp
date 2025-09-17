@@ -1036,6 +1036,11 @@ if (app.ui.charset) {
   // не CJK → основной стек + авто-сорт.
   app.ui.charset.dispatchEvent(new Event('change', { bubbles: true }));
 }
+// страховка на старте: убедимся, что есть набор и собраны бины
+if (!state.charset || state.charset.length === 0) {
+  state.charset = '@%#*+=-:. '; // дефолтный CLASSIC
+}
+updateBinsForCurrentCharset();
 
 await startStream();
 
@@ -1049,6 +1054,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
