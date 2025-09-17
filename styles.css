@@ -94,8 +94,7 @@ button:focus, .btn:focus{
   margin:0;
   user-select:none;
 
-  font-family: "Cica Web","JetBrains Mono","Fira Mono","Cascadia Mono","Menlo",
-               "Consolas","DejaVu Sans Mono","Courier New",monospace;
+  font-family: "Ms Gothic",,monospace;
   font-weight: 400;
   font-variant-ligatures: none;
   -webkit-font-smoothing: none;
@@ -170,10 +169,10 @@ option{ background:var(--ui-panel); color:var(--ui-text); }
   max-width: 60vw;        /* но не шире 60% экрана */
   display: none;          /* показываем/прячем через JS */
 }
-/* === Шрифт для CJK (Cica) === */
+/* === Шрифт для CJK (MS Gothic) === */
 @font-face {
-    font-family: "Cica Web";
-    src: url("./assets/Cica-Regular.woff2") format("woff2");
+    font-family: "MS Gothic";
+    src: url("./assets/MS Gothic.woff2") format("woff2");
     font-weight: 400;
     font-style: normal;
     font-display: swap;
@@ -268,5 +267,6 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 @media (max-width: 360px){
   .panel .row.colors{ flex-direction: column; }
 }
+
 
 
