@@ -978,50 +978,46 @@ function updateMirrorForFacing() {
 
 async function setMode(newMode){
   state.mode = newMode;
-// Если ушли из PHOTO — сбросить выбранную картинку
-if (newMode !== 'photo') {
-  state.imageEl = null;
-}
 
-// Если ушли из VIDEO — сбросить файл-источник (но НЕ камеру)
-if (newMode !== 'video') {
-  try {
-    if (app.vid && !app.vid.srcObject) {
-      app.vid.pause?.();
-      app.vid.removeAttribute('src');
-    }
-  } catch(e){}
-}
-
+  // переключаем видимость верхних кнопок
   if (app.ui.fs)   app.ui.fs.hidden   = (newMode!=='live');
   if (app.ui.save) app.ui.save.hidden = (newMode==='live');
 
-  app.ui.modeLive.classList.toggle('active',  newMode==='live');
+  app.ui.modeLive .classList.toggle('active', newMode==='live');
   app.ui.modePhoto.classList.toggle('active', newMode==='photo');
   app.ui.modeVideo.classList.toggle('active', newMode==='video');
 
+  // общий сброс зума/плейсхолдера
+  state.viewScale = 1;
+  fitAsciiToViewport();
+
+  // если уходим из PHOTO — очищаем картинку
+  if (newMode !== 'photo') state.imageEl = null;
+
+  // если уходим из VIDEO — убираем файл-источник (но не камеру)
+  if (newMode !== 'video') {
+    try { if (app.vid && !app.vid.srcObject) { app.vid.pause?.(); app.vid.removeAttribute('src'); } } catch(e){}
+  }
+
   if (newMode === 'live') {
+    // LIVE: выключаем возможный файл и включаем камеру
+    stopStream();                 // на всякий
     app.ui.placeholder.hidden = true;
-    stopStream();
     await startStream();
     updateMirrorForFacing?.();
     return;
-    state.viewScale = 1;
-fitAsciiToViewport();
   }
 
-if (newMode === 'photo') {
-  if (!state.imageEl) app.ui.filePhoto.click();
-} else if (newMode === 'video') {
-  if (!(app.vid && app.vid.src)) app.ui.fileVideo.click();
-}
-
+  // не LIVE → камеру останавливаем
   stopStream();
 
+  // PHOTO/VIDEO: показываем плейсхолдер, если ещё нет источника
   if (newMode === 'photo') {
     if (!state.imageEl) app.ui.filePhoto.click();
+    else app.ui.placeholder.hidden = true;
   } else if (newMode === 'video') {
     if (!(app.vid && app.vid.src)) app.ui.fileVideo.click();
+    else app.ui.placeholder.hidden = true;
   }
 }
 
@@ -1360,6 +1356,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
