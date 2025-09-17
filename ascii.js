@@ -34,7 +34,7 @@ const FONT_STACK_MAIN = `"BetterVCR",monospace`;
 
 const FONT_STACK_CJK =
   // реальные моно/приближённые моно CJK + безопасные фолбэки
-  `"Cica Web","MS Gothic","IPAGothic","Osaka-Mono","VL Gothic",monospace`;
+  `"MS Gothic",monospace`;
 // ==== /FONT STACKS ====
     // Значения по умолчанию
   // ===== Ordered dithering (8×8 Bayer) =====
@@ -995,3 +995,4 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
