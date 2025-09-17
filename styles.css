@@ -88,19 +88,22 @@ button:focus, .btn:focus{
 #stage { touch-action: manipulation; }
 #out{
   position:absolute;
-  top:50%; left:50%;
+  top:50%; 
+  left:50%;
   transform:translate(-50%,-50%) scale(1);
   transform-origin:center center;
   margin:0;
   user-select:none;
 
-  font-family: "Cica Web","JetBrains Mono","Fira Mono","Cascadia Mono","Menlo",
-               "Consolas","DejaVu Sans Mono","Courier New",monospace;
+  font-family: "Cica Web", monospace !important; /* жёстко фиксируем */
   font-weight: 400;
   font-variant-ligatures: none;
+  font-kerning: none;
+  font-synthesis: none;              /* запрет подмены/синтеза */
+  font-variant-east-asian: full-width; /* фикс ширины CJK-глифов */
   -webkit-font-smoothing: none;
   white-space: pre;
-  letter-spacing: 0em;
+  letter-spacing: 0;
   line-height: 1;
 
   font-size:16px;
@@ -268,6 +271,7 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 @media (max-width: 360px){
   .panel .row.colors{ flex-direction: column; }
 }
+
 
 
 
