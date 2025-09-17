@@ -114,12 +114,13 @@
 
   <!-- Скрытый канвас для экспорта (PNG/видео) -->
   <canvas id="render" hidden></canvas>
-    <!-- Скрытое видео (источник камеры) -->
-    <video id="vid" playsinline autoplay muted hidden></video>
+<!-- Видео-источник: переносим «за экран», но не скрываем display:none -->
+<video id="vid" playsinline autoplay muted class="capture-src" aria-hidden="true"></video>
   </div>
 
   <script defer src="ascii.js?v=fit1"></script>
 </body>
 </html>
+
 
 
