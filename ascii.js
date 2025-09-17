@@ -372,16 +372,19 @@ function measureCharAspect() {
       throw new Error('mediaDevices.getUserMedia недоступен');
     }
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'user' },
+      video: { facingMode: state.facing },  // ← вместо 'user'
       audio: false
     });
-    app.video.srcObject = stream;
-    await app.video.play();
-    app.stream = stream;         // флаг, что камера запущена
+    app.vid.srcObject = stream;            // ← вместо app.video
+    await app.vid.play();                  // ← вместо app.video
+    app.stream = stream;
+
+    // обновим флаг зеркалирования под текущую камеру
+    updateMirrorForFacing();
+
     return true;
   } catch (err) {
     console.error('CAMERA ERROR:', err);
-    // покажем тихое сообщение в интерфейсе, чтобы понимать причину
     if (app.out) app.out.textContent = 'Нет доступа к камере: ' + (err && err.message ? err.message : err);
     return false;
   }
@@ -1059,3 +1062,4 @@ app.ui.invert.addEventListener('change', e => {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
