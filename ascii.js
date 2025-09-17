@@ -153,9 +153,15 @@ measurePre.style.cssText = `
   -webkit-font-smoothing:none;
 `;
 
-// единая функция — применяем стек и к выводу, и к измерителю
 function applyFontStack(stack, weight = '700', eastAsianFullWidth = false) {
-  // НИЧЕГО не трогаем в app.out — он фиксирован CSS на Cica Web
+  if (app.out) {
+    app.out.style.fontFamily = stack;
+    app.out.style.fontWeight = weight;
+    app.out.style.fontSynthesis = 'none';
+    app.out.style.fontKerning = 'none';
+    app.out.style.fontVariantLigatures = 'none';
+    app.out.style.fontVariantEastAsian = eastAsianFullWidth ? 'full-width' : 'normal';
+  }
   measurePre.style.fontFamily = stack;
   measurePre.style.fontWeight = weight;
   measurePre.style.fontSynthesis = 'none';
@@ -999,6 +1005,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
