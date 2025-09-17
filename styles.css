@@ -94,7 +94,7 @@ button:focus, .btn:focus{
   margin:0;
   user-select:none;
 
-  font-family: "Ms Gothic",,monospace;
+  font-family: "Ms Gothic",monospace;
   font-weight: 400;
   font-variant-ligatures: none;
   -webkit-font-smoothing: none;
@@ -267,5 +267,6 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 @media (max-width: 360px){
   .panel .row.colors{ flex-direction: column; }
 }
+
 
 
