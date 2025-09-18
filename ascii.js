@@ -1267,7 +1267,7 @@ app.ui.filePhoto.addEventListener('change', (e) => {
 });
 
 
-app.ui.fileVideo.addEventListener('change', async (e) => {
+  app.ui.fileVideo.addEventListener('change', async (e) => {
   const f = e.target.files?.[0];
   if (!f) return;
 
@@ -1275,13 +1275,26 @@ app.ui.fileVideo.addEventListener('change', async (e) => {
   app.vid.src = URL.createObjectURL(f);
 
   // жёстко атрибуты
-  app.vid.setAttribute('playsinline',''); app.vid.setAttribute('autoplay',''); app.vid.setAttribute('muted','');
-  app.vid.playsInline = true; app.vid.autoplay = true; app.vid.muted = true;
+  app.vid.setAttribute('playsinline','');
+  app.vid.setAttribute('autoplay','');
+  app.vid.setAttribute('muted','');
+  app.vid.playsInline = true;
+  app.vid.autoplay = true;
+  app.vid.muted = true;
 
   // >>> ЗАЦИКЛИВАНИЕ ПРИ ПРОСМОТРЕ ФАЙЛА
   app.vid.loop = true;
   app.vid.setAttribute('loop','');
-
+    // Дедуплицируем fallback на случай, если loop проигнорят (iOS)
+  if (app._loopFallback) {
+    app.vid.removeEventListener('ended', app._loopFallback);
+  }
+  app._loopFallback = () => {
+    if (!state.isRecording && state.mode === 'video' && app.vid.loop) {
+      try { app.vid.currentTime = 0; app.vid.play(); } catch(e){}
+    }
+  };
+  app.vid.addEventListener('ended', app._loopFallback);
   // (необязательно, но надёжно) iOS-fallback, если вдруг loop проигнорят
   app.vid.addEventListener('ended', () => {
     if (!state.isRecording && state.mode === 'video' && app.vid.loop) {
@@ -1452,6 +1465,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
