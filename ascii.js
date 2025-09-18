@@ -1266,55 +1266,62 @@ app.ui.filePhoto.addEventListener('change', (e) => {
   img.src = URL.createObjectURL(f);
 });
 
-
+// --- Выбор видео из галереи
   app.ui.fileVideo.addEventListener('change', async (e) => {
   const f = e.target.files?.[0];
   if (!f) return;
 
+  // остановим всё, что могло играть (live и т.п.)
   stopStream();
+
+  // источник — выбранный файл
   app.vid.src = URL.createObjectURL(f);
 
-  // жёстко атрибуты
+  // жёстко включаем нужные атрибуты
   app.vid.setAttribute('playsinline','');
   app.vid.setAttribute('autoplay','');
   app.vid.setAttribute('muted','');
   app.vid.playsInline = true;
-  app.vid.autoplay = true;
-  app.vid.muted = true;
+  app.vid.autoplay   = true;
+  app.vid.muted      = true;
 
-  // >>> ЗАЦИКЛИВАНИЕ ПРИ ПРОСМОТРЕ ФАЙЛА
+  // === зацикливание просмотра файла ===
   app.vid.loop = true;
   app.vid.setAttribute('loop','');
-    // Дедуплицируем fallback на случай, если loop проигнорят (iOS)
+
+  // dedupe-fallback на случай, если loop где-то игнорят (iOS)
   if (app._loopFallback) {
     app.vid.removeEventListener('ended', app._loopFallback);
   }
   app._loopFallback = () => {
     if (!state.isRecording && state.mode === 'video' && app.vid.loop) {
-      try { app.vid.currentTime = 0; app.vid.play(); } catch(e){}
+      try { app.vid.currentTime = 0; app.vid.play(); } catch(_) {}
     }
   };
   app.vid.addEventListener('ended', app._loopFallback);
 
+  // когда появились метаданные — прячем плейсхолдер, пересчитываем сетку/шрифт
   app.vid.onloadedmetadata = () => {
-  if (app.vid.videoWidth > 0 && app.vid.videoHeight > 0) {
+    if (app.vid.videoWidth > 0 && app.vid.videoHeight > 0) {
+      app.ui.placeholder.hidden = true;
+      requestAnimationFrame(() => {
+        const { w, h } = updateGridSize();
+        refitFont(w, h);
+      });
+    }
+  };
+
+  // как только ролик готов играть — ещё раз на всякий случай подогнать сетку
+  app.vid.oncanplay = () => {
     app.ui.placeholder.hidden = true;
     requestAnimationFrame(() => {
       const { w, h } = updateGridSize();
       refitFont(w, h);
     });
-  }
-};
+  };
 
-app.vid.oncanplay = () => {
-  app.ui.placeholder.hidden = true;
-  requestAnimationFrame(() => {
-    const { w, h } = updateGridSize();
-    refitFont(w, h);
-  });
-};
-
-  try { await app.vid.play(); } catch (err) {}
+  // стартуем воспроизведение
+  try { await app.vid.play?.(); } catch(_) {}
   state.mirror = false;
 });
 
@@ -1474,6 +1481,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
