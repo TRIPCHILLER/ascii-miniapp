@@ -701,7 +701,7 @@ function savePNG(){
   renderAsciiToCanvas(text, grid.w, grid.h, 2);
   app.ui.render.toBlob(blob=>{
     if(!blob) { alert('Не удалось сгенерировать PNG'); return; }
-    downloadBlob(blob, 'ascii.png');
+    downloadBlob(blob, '@tripchiller_ascii_bot.png');
     hudSet('PNG: сохранено/отправлено');
   }, 'image/png');
 }
@@ -786,7 +786,7 @@ function saveVideo(){
   state.recorder.ondataavailable = e => { if (e.data && e.data.size) state.recordChunks.push(e.data); };
     state.recorder.onstop = () => {
     const blob = new Blob(state.recordChunks, { type: mime });
-    downloadBlob(blob, mime.includes('mp4') ? 'ascii.mp4' : 'ascii.webm');
+    downloadBlob(blob, mime.includes('mp4') ? '@tripchiller_ascii_bot.mp4' : '@tripchiller_ascii_bot.webm');
 
     // <<< вернём исходное поведение зацикливания для просмотра
     if (wasLoop) {
@@ -818,7 +818,7 @@ function downloadBlob(blob, filename){
 
   // 1) Попытка: системное «Поделиться» (Android/iOS) — удобнее для «в Галерею»
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    navigator.share({ files: [file], title: 'ASCII VISOR', text: filename }).catch(()=>{});
+    navigator.share({ files: [file], title: ': ASCII ⛶ VISOR :', text: filename }).catch(()=>{});
     return;
   }
 
@@ -1490,6 +1490,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
