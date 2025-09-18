@@ -1295,15 +1295,24 @@ app.ui.filePhoto.addEventListener('change', (e) => {
     }
   };
   app.vid.addEventListener('ended', app._loopFallback);
-  // (необязательно, но надёжно) iOS-fallback, если вдруг loop проигнорят
-  app.vid.addEventListener('ended', () => {
-    if (!state.isRecording && state.mode === 'video' && app.vid.loop) {
-      try { app.vid.currentTime = 0; app.vid.play(); } catch(e){}
-    }
-  });
 
-  app.vid.onloadedmetadata = () => { /* ... как у тебя было ... */ };
-  app.vid.oncanplay = () => { /* ... */ };
+  app.vid.onloadedmetadata = () => {
+  if (app.vid.videoWidth > 0 && app.vid.videoHeight > 0) {
+    app.ui.placeholder.hidden = true;
+    requestAnimationFrame(() => {
+      const { w, h } = updateGridSize();
+      refitFont(w, h);
+    });
+  }
+};
+
+app.vid.oncanplay = () => {
+  app.ui.placeholder.hidden = true;
+  requestAnimationFrame(() => {
+    const { w, h } = updateGridSize();
+    refitFont(w, h);
+  });
+};
 
   try { await app.vid.play(); } catch (err) {}
   state.mirror = false;
@@ -1465,6 +1474,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
