@@ -93,6 +93,7 @@ let DITHER_ENABLED = true;
     isRecording: false,     // запись видео (экспорт)
     recorder: null,
     recordChunks: [],
+    recordDims: null,       // <— фиксированные размеры экспортного видео (W/H/шаги)
     lastGrid: { w:0, h:0 }, // запоминаем сетку для экспорта
     viewScale: 1,           // доп. масштаб ASCII внутри #stage
   };
@@ -639,8 +640,8 @@ if (palette && palette.length === K_BINS) {
 
     app.out.textContent = out;
     refitFont(w, h);
-    if (state.isRecording) {
-  renderAsciiToCanvas(app.out.textContent || '', state.lastGrid.w, state.lastGrid.h);
+    if (state.isRecording && state.recordDims) {
+  renderAsciiFrameLocked(app.out.textContent || '');
 }
   }
 // ---------- EXPORT HELPERS (PNG/VIDEO) ----------
@@ -715,13 +716,58 @@ function pickMime(){
   if (window.MediaRecorder?.isTypeSupported?.(webm8)) return webm8;
   return '';
 }
+// Считаем один раз размеры экспортного видео (фикс), исходя из COLS/ROWS и метрик шрифта
+function computeRecordDims(cols, rows, scale = 2) {
+  const ff   = getComputedStyle(app.out).fontFamily || 'monospace';
+  const fsPx = 12;                               // базовый размер
+  const stepY = Math.ceil(fsPx * scale);         // высота строки
+  const charAspect = Math.max(0.5, measureCharAspect()); // W/H из measurePre (устойчиво)
+  const stepX = Math.ceil(stepY * charAspect);   // ширина шага по X (моно-оценка)
 
+  const W = stepX * Math.max(1, cols);
+  const H = stepY * Math.max(1, rows);
+
+  return { W, H, stepY, font: `${fsPx * scale}px ${ff}`, cols, rows };
+}
+
+// Рендер одного ASCII-кадра в уже зафиксированный канвас (без изменения W/H)
+function renderAsciiFrameLocked(text) {
+  const d = state.recordDims;
+  if (!d) return;
+
+  const cvs = app.ui.render;
+  const c = cvs.getContext('2d');
+
+  // держим размер железно (на всякий — если кто-то сбросил)
+  if (cvs.width !== d.W || cvs.height !== d.H) {
+    cvs.width  = d.W;
+    cvs.height = d.H;
+  }
+
+  c.fillStyle = state.background;
+  c.fillRect(0, 0, d.W, d.H);
+
+  c.fillStyle = state.color;
+  c.font = d.font;
+  c.textBaseline = 'top';
+
+  const lines = (text || '').split('\n');
+  const rows = Math.min(d.rows, lines.length);
+  for (let y = 0; y < rows; y++) {
+    c.fillText(lines[y], 0, y * d.stepY);  // без измерений/смещений — фиксированная сетка
+  }
+}
 // Видео (режим ВИДЕО)
 function saveVideo(){
   if (state.mode!=='video') { alert('Видео-экспорт доступен только в режиме ВИДЕО'); return; }
   const mime = pickMime();
   if (!mime) { alert('Запись видео не поддерживается на этом устройстве.'); return; }
-
+    // Фиксируем экспортный размер под текущую ASCII-сетку (соотв. исходнику)
+  const grid = state.lastGrid;               // { w: cols, h: rows } — ты уже сохраняешь
+  state.recordDims = computeRecordDims(grid.w, grid.h, 2);   // scale=2 как для PNG
+  // задать размер канваса заранее (до captureStream)
+  app.ui.render.width  = state.recordDims.W;
+  app.ui.render.height = state.recordDims.H;
   const fps = Math.max(5, Math.min(60, state.fps));
   const stream = app.ui.render.captureStream(fps);
   state.recordChunks = [];
@@ -738,6 +784,7 @@ function saveVideo(){
     const blob = new Blob(state.recordChunks, { type: mime });
     downloadBlob(blob, mime.includes('mp4') ? 'ascii.mp4' : 'ascii.webm');
     state.isRecording = false;
+    state.recordDims = null;           // <— добавить
     hudSet('VIDEO: сохранено/отправлено');
   };
 
@@ -1393,5 +1440,6 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
