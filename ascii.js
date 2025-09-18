@@ -1120,7 +1120,7 @@ syncFpsVisibility(); // переключаем FPS в зависимости о�
     app.vid.setAttribute('loop','');
   }
 }
-
+}
   // ============== СВЯЗКА UI ==============
   function bindUI() {
     // Показ/скрытие панели
@@ -1490,6 +1490,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
