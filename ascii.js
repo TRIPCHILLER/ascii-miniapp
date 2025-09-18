@@ -433,9 +433,6 @@ function currentSource(){
     // выставляем атрибуты на всякий
     app.vid.setAttribute('playsinline',''); app.vid.setAttribute('autoplay',''); app.vid.setAttribute('muted','');
     app.vid.playsInline = true; app.vid.autoplay = true; app.vid.muted = true;
-  // >>> ВКЛЮЧАЕМ ЗАЦИКЛИВАНИЕ ДЛЯ ПРОСМОТРА
-    app.vid.loop = true;
-    app.vid.setAttribute('loop','');
 
     const constraints = { video: { facingMode: state.facing || 'user' }, audio: false };
     updateHud('getUserMedia…');
@@ -1277,27 +1274,23 @@ app.ui.fileVideo.addEventListener('change', async (e) => {
   stopStream();
   app.vid.src = URL.createObjectURL(f);
 
-  // жестко атрибуты
+  // жёстко атрибуты
   app.vid.setAttribute('playsinline',''); app.vid.setAttribute('autoplay',''); app.vid.setAttribute('muted','');
   app.vid.playsInline = true; app.vid.autoplay = true; app.vid.muted = true;
 
-  app.vid.onloadedmetadata = () => {
-    updateHud('file meta');
-    if (app.vid.videoWidth > 0 && app.vid.videoHeight > 0) {
-      app.ui.placeholder.hidden = true;
-      requestAnimationFrame(() => {
-        const { w, h } = updateGridSize(); refitFont(w, h);
-        updateHud('file ready');
-      });
+  // >>> ЗАЦИКЛИВАНИЕ ПРИ ПРОСМОТРЕ ФАЙЛА
+  app.vid.loop = true;
+  app.vid.setAttribute('loop','');
+
+  // (необязательно, но надёжно) iOS-fallback, если вдруг loop проигнорят
+  app.vid.addEventListener('ended', () => {
+    if (!state.isRecording && state.mode === 'video' && app.vid.loop) {
+      try { app.vid.currentTime = 0; app.vid.play(); } catch(e){}
     }
-  };
-  app.vid.oncanplay = () => {
-    app.ui.placeholder.hidden = true;
-    requestAnimationFrame(() => {
-      const { w, h } = updateGridSize(); refitFont(w, h);
-      updateHud('file canplay');
-    });
-  };
+  });
+
+  app.vid.onloadedmetadata = () => { /* ... как у тебя было ... */ };
+  app.vid.oncanplay = () => { /* ... */ };
 
   try { await app.vid.play(); } catch (err) {}
   state.mirror = false;
@@ -1459,6 +1452,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
