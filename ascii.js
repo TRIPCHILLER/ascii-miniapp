@@ -42,9 +42,17 @@ function hudSet(txt){ hud.textContent = txt; }
     save:        $('#save'),
     placeholder: $('#placeholder'),
     render:      $('#render'),
+    fpsWrap: null, // обёртка для скрытия FPS 
     }
   };
+// найдем обертку (label) вокруг ползунка FPS
+app.ui.fpsWrap = app.ui.fps?.closest('label') || null;
 
+function syncFpsVisibility(){
+  if (!app.ui.fpsWrap) return;
+  // в режиме ФОТО скрываем, в остальных показываем
+  app.ui.fpsWrap.hidden = (state.mode === 'photo');
+}
   // ==== FONT STACKS (добавлено) ====
 const FONT_STACK_MAIN = `"BetterVCR",monospace`;
 
@@ -505,6 +513,7 @@ if (lbl) lbl.textContent = state.invert ? 'ИНВЕРСИЯ: ВКЛ' : 'ИНВЕ
     fillStyleSelect();
     const matched = detectPreset(state.color, state.background);
     if (app.ui.style) app.ui.style.value = matched === 'custom' ? 'custom' : matched;
+    syncFpsVisibility(); // обновим видимость FPS на старте
   }
 
   // Пересчёт h и подготовка offscreen размера
@@ -990,8 +999,23 @@ function updateMirrorForFacing() {
 }
 
 async function setMode(newMode){
-  state.mode = newMode;
+  // если нажали на ту же вкладку → заново открыть выбор файла
+  if (newMode === state.mode) {
+    if (newMode === 'photo') {
+      app.ui.filePhoto.value = '';   // сброс, иначе не даст выбрать тот же файл
+      app.ui.filePhoto.click();
+      return;
+    }
+    if (newMode === 'video') {
+      app.ui.fileVideo.value = '';
+      app.ui.fileVideo.click();
+      return;
+    }
+    // для live ничего не делаем
+  }
 
+  state.mode = newMode;
+syncFpsVisibility(); // переключаем FPS в зависимости от режима
   // переключаем видимость верхних кнопок
   if (app.ui.fs)   app.ui.fs.hidden   = (newMode!=='live');
   if (app.ui.save) app.ui.save.hidden = (newMode==='live');
@@ -1369,22 +1393,5 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
