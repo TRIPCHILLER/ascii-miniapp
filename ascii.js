@@ -1263,7 +1263,11 @@ app.ui.filePhoto.addEventListener('change', (e) => {
     updateHud('img onload');
     requestAnimationFrame(()=>{}); // разовый тик
   };
-  img.src = URL.createObjectURL(f);
+  if (app._lastImageURL) { try { URL.revokeObjectURL(app._lastImageURL); } catch(_) {} }
+const urlImg = URL.createObjectURL(f);
+img.src = urlImg;
+app._lastImageURL = urlImg;
+
 });
 
 // --- Выбор видео из галереи
@@ -1486,6 +1490,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
