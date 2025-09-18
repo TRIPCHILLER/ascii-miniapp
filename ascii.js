@@ -2,6 +2,9 @@
   // ============== УТИЛИТЫ ==============
   const $ = s => document.querySelector(s);
   const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
+  // — окружение —
+const IN_TG = !!(window.Telegram && window.Telegram.WebApp);
+const IS_DESKTOP = !isMobile; // упрощённо: не мобила = десктоп
 // ==== TEMP HUD ====
 const hud = document.createElement('div');
 hud.style.cssText = 'position:fixed;left:6px;bottom:6px;z-index:99999;background:rgba(0,0,0,.6);color:#0f0;font:12px/1.2 monospace;padding:6px 8px;border:1px solid #0f0;border-radius:6px;max-width:75vw;pointer-events:none;';
@@ -1119,9 +1122,20 @@ async function setMode(newMode){
   state.mode = newMode;
 syncFpsVisibility(); // переключаем FPS в зависимости от режима
   // переключаем видимость верхних кнопок
-  if (app.ui.fs)   app.ui.fs.hidden   = (newMode!=='live');
-  if (app.ui.save) app.ui.save.hidden = (newMode==='live');
-  if (app.ui.share) app.ui.share.hidden = (newMode==='live');
+// переключаем видимость верхних кнопок
+if (app.ui.fs)   app.ui.fs.hidden   = (newMode!=='live');
+if (app.ui.save) app.ui.save.hidden = (newMode==='live');
+
+// Кнопка «ПОДЕЛИТЬСЯ»:
+// - На ДЕСКТОПЕ вне Telegram: всегда скрыта (есть «СОХРАНИТЬ»).
+// - На мобиле и/или внутри Telegram: показываем, но НЕ в live-режиме.
+if (app.ui.share) {
+  if (IS_DESKTOP && !IN_TG) {
+    app.ui.share.hidden = true;
+  } else {
+    app.ui.share.hidden = (newMode === 'live');
+  }
+}
 
   app.ui.modeLive .classList.toggle('active', newMode==='live');
   app.ui.modePhoto.classList.toggle('active', newMode==='photo');
@@ -1552,6 +1566,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
