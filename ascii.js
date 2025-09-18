@@ -2,9 +2,6 @@
   // ============== УТИЛИТЫ ==============
   const $ = s => document.querySelector(s);
   const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
-  // — окружение —
-const IN_TG = !!(window.Telegram && window.Telegram.WebApp);
-const IS_DESKTOP = !isMobile; // упрощённо: не мобила = десктоп
 // ==== TEMP HUD ====
 const hud = document.createElement('div');
 hud.style.cssText = 'position:fixed;left:6px;bottom:6px;z-index:99999;background:rgba(0,0,0,.6);color:#0f0;font:12px/1.2 monospace;padding:6px 8px;border:1px solid #0f0;border-radius:6px;max-width:75vw;pointer-events:none;';
@@ -43,7 +40,6 @@ function hudSet(txt){ hud.textContent = txt; }
     filePhoto:   $('#filePhoto'),
     fileVideo:   $('#fileVideo'),
     save:        $('#save'),
-    share:       $('#share'),
     placeholder: $('#placeholder'),
     render:      $('#render'),
     fpsWrap: null, // обёртка для скрытия FPS 
@@ -818,69 +814,26 @@ function saveVideo(){
 
 // Универсальное скачивание/открытие
 function downloadBlob(blob, filename){
-  // если мы внутри Telegram WebApp
-  if (window.Telegram?.WebApp?.openLink) {
-    // 1) PNG — откроем как data:URL (во внешнем браузере можно сохранить)
-    if ((blob.type || '').startsWith('image/')) {
-      const r = new FileReader();
-      r.onload = () => {
-        try {
-          window.Telegram.WebApp.openLink(r.result, { try_browser: true });
-        } catch(_) {}
-      };
-      r.readAsDataURL(blob);
-      return;
-    }
-
-    // 2) Видео — без сервера не сохранить надёжно из WebView
-    alert('Внутри Telegram видео напрямую не сохраняется. Нажми «СОХРАНИТЬ» вне Telegram или используй «ПОДЕЛИТЬСЯ» и сохрани там.');
-    return;
-  }
-
-  // Обычная загрузка (GitHub Pages / любые браузеры вне TG)
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.rel = 'noopener';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 3000);
-}
-
-async function shareBlob(blob, filename){
   const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
 
-  // 0) Внутри Telegram WebView — НЕТ navigator.share.
-  //    Для изображений откроем data:URL во внешнем браузере; видео — честное предупреждение.
-  if (window.Telegram?.WebApp?.openLink) {
-    if ((blob.type || '').startsWith('image/')) {
-      const r = new FileReader();
-      r.onload = () => {
-        try { window.Telegram.WebApp.openLink(r.result, { try_browser: true }); } catch(_) {}
-      };
-      r.readAsDataURL(blob);
-    } else {
-      alert('Внутри Telegram «Поделиться» видео недоступно без сервера. Сначала «СОХРАНИТЬ» вне TG или открой в браузере и поделись оттуда.');
-    }
+  // 1) Попытка: системное «Поделиться» (Android/iOS) — удобнее для «в Галерею»
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    navigator.share({ files: [file], title: ': ASCII ⛶ VISOR :', text: filename }).catch(()=>{});
     return;
   }
 
-  // 1) В обычном браузере — нативный Share, если доступен
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try {
-      await navigator.share({
-        files: [file],
-        title: ' : ASCII ⛶ VISOR : ',
-        text: filename
-      });
-      return;
-    } catch { /* отменили — ничего страшного */ }
+  // 2) В Telegram WebApp иногда блокируется download — открываем в новой вкладке
+  const url = URL.createObjectURL(blob);
+  if (window.Telegram?.WebApp) {
+    window.open(url, '_blank');
+    return;
   }
 
-  // 2) Фолбэк: просто скачать
-  downloadBlob(blob, filename);
+  // 3) Обычная загрузка ссылкой
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.rel='noopener';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 3000);
 }
 
   // Подбор font-size
@@ -1122,20 +1075,8 @@ async function setMode(newMode){
   state.mode = newMode;
 syncFpsVisibility(); // переключаем FPS в зависимости от режима
   // переключаем видимость верхних кнопок
-// переключаем видимость верхних кнопок
-if (app.ui.fs)   app.ui.fs.hidden   = (newMode!=='live');
-if (app.ui.save) app.ui.save.hidden = (newMode==='live');
-
-// Кнопка «ПОДЕЛИТЬСЯ»:
-// - На ДЕСКТОПЕ вне Telegram: всегда скрыта (есть «СОХРАНИТЬ»).
-// - На мобиле и/или внутри Telegram: показываем, но НЕ в live-режиме.
-if (app.ui.share) {
-  if (IS_DESKTOP && !IN_TG) {
-    app.ui.share.hidden = true;
-  } else {
-    app.ui.share.hidden = (newMode === 'live');
-  }
-}
+  if (app.ui.fs)   app.ui.fs.hidden   = (newMode!=='live');
+  if (app.ui.save) app.ui.save.hidden = (newMode==='live');
 
   app.ui.modeLive .classList.toggle('active', newMode==='live');
   app.ui.modePhoto.classList.toggle('active', newMode==='photo');
@@ -1407,23 +1348,6 @@ app.ui.save.addEventListener('click', ()=>{
     saveVideo();
   }
 });
-// --- Кнопка ПОДЕЛИТЬСЯ ---
-app.ui.share.addEventListener('click', () => {
-  if (state.mode === 'photo') {
-    const grid = state.lastGrid;
-    const text = app.out.textContent || '';
-    if (!text.trim()) { alert('Нечего отправлять'); return; }
-    renderAsciiToCanvas(text, grid.w, grid.h, 2);
-    app.ui.render.toBlob(b => {
-      if (!b) { alert('Не удалось подготовить PNG'); return; }
-      shareBlob(b, '@tripchiller_ascii_bot.png');
-    }, 'image/png');
-  } else if (state.mode === 'video') {
-    alert('Поделиться видео прямо из WebView ограничено. Сначала нажми «СОХРАНИТЬ», затем шарь файл из галереи/браузера.');
-  } else {
-    alert('В режиме LIVE нечего отправлять — выбери ФОТО или ВИДЕО.');
-  }
-});
 
 // Выбираем реально «чёрный» символ под текущий стек шрифтов
 function pickDarkGlyph() {
@@ -1566,19 +1490,4 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
