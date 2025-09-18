@@ -40,6 +40,7 @@ function hudSet(txt){ hud.textContent = txt; }
     filePhoto:   $('#filePhoto'),
     fileVideo:   $('#fileVideo'),
     save:        $('#save'),
+    share:       $('#share'),
     placeholder: $('#placeholder'),
     render:      $('#render'),
     fpsWrap: null, // обёртка для скрытия FPS 
@@ -814,26 +815,50 @@ function saveVideo(){
 
 // Универсальное скачивание/открытие
 function downloadBlob(blob, filename){
+  const url = URL.createObjectURL(blob);
+
+  // Telegram WebApp → открыть во внешнем браузере, там загрузка сработает
+  if (window.Telegram?.WebApp?.openLink) {
+    window.Telegram.WebApp.openLink(url, { try_browser: true });
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    return;
+  }
+
+  // Обычное прямое скачивание
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
+}
+async function shareBlob(blob, filename){
   const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
 
-  // 1) Попытка: системное «Поделиться» (Android/iOS) — удобнее для «в Галерею»
+  // Нативное системное «Поделиться», если доступно
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    navigator.share({ files: [file], title: ': ASCII ⛶ VISOR :', text: filename }).catch(()=>{});
-    return;
+    try {
+      await navigator.share({
+        files: [file],
+        title: ' : ASCII ⛶ VISOR : ',
+        text: filename
+      });
+      return;
+    } catch (_) { /* отмена пользователем — ок */ }
   }
 
-  // 2) В Telegram WebApp иногда блокируется download — открываем в новой вкладке
+  // Внутри Telegram WebView — уводим во внешний браузер
   const url = URL.createObjectURL(blob);
-  if (window.Telegram?.WebApp) {
-    window.open(url, '_blank');
+  if (window.Telegram?.WebApp?.openLink) {
+    window.Telegram.WebApp.openLink(url, { try_browser: true });
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
     return;
   }
 
-  // 3) Обычная загрузка ссылкой
-  const a = document.createElement('a');
-  a.href = url; a.download = filename; a.rel='noopener';
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url), 3000);
+  // Фолбэк: просто скачиваем
+  downloadBlob(blob, filename);
 }
 
   // Подбор font-size
@@ -1077,6 +1102,7 @@ syncFpsVisibility(); // переключаем FPS в зависимости о�
   // переключаем видимость верхних кнопок
   if (app.ui.fs)   app.ui.fs.hidden   = (newMode!=='live');
   if (app.ui.save) app.ui.save.hidden = (newMode==='live');
+  if (app.ui.share) app.ui.share.hidden = (newMode==='live');
 
   app.ui.modeLive .classList.toggle('active', newMode==='live');
   app.ui.modePhoto.classList.toggle('active', newMode==='photo');
@@ -1348,6 +1374,23 @@ app.ui.save.addEventListener('click', ()=>{
     saveVideo();
   }
 });
+// --- Кнопка ПОДЕЛИТЬСЯ ---
+app.ui.share.addEventListener('click', () => {
+  if (state.mode === 'photo') {
+    const grid = state.lastGrid;
+    const text = app.out.textContent || '';
+    if (!text.trim()) { alert('Нечего отправлять'); return; }
+    renderAsciiToCanvas(text, grid.w, grid.h, 2);
+    app.ui.render.toBlob(b => {
+      if (!b) { alert('Не удалось подготовить PNG'); return; }
+      shareBlob(b, '@tripchiller_ascii_bot.png');
+    }, 'image/png');
+  } else if (state.mode === 'video') {
+    alert('Поделиться видео прямо из WebView ограничено. Сначала нажми «СОХРАНИТЬ», затем шарь файл из галереи/браузера.');
+  } else {
+    alert('В режиме LIVE нечего отправлять — выбери ФОТО или ВИДЕО.');
+  }
+});
 
 // Выбираем реально «чёрный» символ под текущий стек шрифтов
 function pickDarkGlyph() {
@@ -1490,6 +1533,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
