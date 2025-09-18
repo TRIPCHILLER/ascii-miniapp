@@ -640,16 +640,10 @@ if (palette && palette.length === K_BINS) {
 function renderAsciiToCanvas(text, cols, rows, scale = 2){
   const cvs = app.ui.render;
   const c = cvs.getContext('2d');
-  const cs = getComputedStyle(app.out);
-  const fsPx = parseFloat(cs.fontSize) || 16;
-  const ff = cs.fontFamily || 'monospace';
-  const lh = (parseFloat(cs.lineHeight)||1) * fsPx;
 
-  // ширина «M» как шаг по X
-  c.font = `${fsPx}px ${ff}`;
-  const m = c.measureText('M');
-  const stepX = Math.ceil(m.width);
-  const stepY = Math.ceil(lh);
+  const fsPx = 12;                  // фиксированный базовый размер
+  const stepX = fsPx * 0.6;         // средняя ширина символа (≈60% от высоты)
+  const stepY = fsPx;               // шаг по Y = размер шрифта
 
   const W = stepX * cols * scale;
   const H = stepY * rows * scale;
@@ -657,11 +651,11 @@ function renderAsciiToCanvas(text, cols, rows, scale = 2){
   cvs.width = Math.max(2, W);
   cvs.height = Math.max(2, H);
 
-  // фон/текст из текущих настроек
+  // фон/текст
   c.fillStyle = state.background;
   c.fillRect(0,0,W,H);
   c.fillStyle = state.color;
-  c.font = `${fsPx*scale}px ${ff}`;
+  c.font = `${fsPx*scale}px ${getComputedStyle(app.out).fontFamily}`;
   c.textBaseline = 'top';
 
   const lines = text.split('\n');
@@ -1356,6 +1350,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
