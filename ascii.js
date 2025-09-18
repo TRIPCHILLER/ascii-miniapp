@@ -849,7 +849,22 @@ function downloadBlob(blob, filename){
 async function shareBlob(blob, filename){
   const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
 
-  // Нативное системное «Поделиться», если доступно
+  // 0) Внутри Telegram WebView — НЕТ navigator.share.
+  //    Для изображений откроем data:URL во внешнем браузере; видео — честное предупреждение.
+  if (window.Telegram?.WebApp?.openLink) {
+    if ((blob.type || '').startsWith('image/')) {
+      const r = new FileReader();
+      r.onload = () => {
+        try { window.Telegram.WebApp.openLink(r.result, { try_browser: true }); } catch(_) {}
+      };
+      r.readAsDataURL(blob);
+    } else {
+      alert('Внутри Telegram «Поделиться» видео недоступно без сервера. Сначала «СОХРАНИТЬ» вне TG или открой в браузере и поделись оттуда.');
+    }
+    return;
+  }
+
+  // 1) В обычном браузере — нативный Share, если доступен
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
       await navigator.share({
@@ -858,18 +873,10 @@ async function shareBlob(blob, filename){
         text: filename
       });
       return;
-    } catch (_) { /* отмена пользователем — ок */ }
+    } catch { /* отменили — ничего страшного */ }
   }
 
-  // Внутри Telegram WebView — уводим во внешний браузер
-  const url = URL.createObjectURL(blob);
-  if (window.Telegram?.WebApp?.openLink) {
-    window.Telegram.WebApp.openLink(url, { try_browser: true });
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
-    return;
-  }
-
-  // Фолбэк: просто скачиваем
+  // 2) Фолбэк: просто скачать
   downloadBlob(blob, filename);
 }
 
@@ -1545,6 +1552,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
