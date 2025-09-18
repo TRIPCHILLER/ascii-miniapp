@@ -637,30 +637,49 @@ if (palette && palette.length === K_BINS) {
 // ---------- EXPORT HELPERS (PNG/VIDEO) ----------
 
 // Рендер готового ASCII-текста в canvas для экспорта
+// Рендер ASCII-текста в canvas для экспорта — с сохранением исходного соотношения сторон
 function renderAsciiToCanvas(text, cols, rows, scale = 2){
   const cvs = app.ui.render;
   const c = cvs.getContext('2d');
 
-  const fsPx = 12;                  // фиксированный базовый размер
-  const stepX = fsPx * 0.6;         // средняя ширина символа (≈60% от высоты)
-  const stepY = fsPx;               // шаг по Y = размер шрифта
-
-  const W = stepX * cols * scale;
-  const H = stepY * rows * scale;
-
-  cvs.width = Math.max(2, W);
-  cvs.height = Math.max(2, H);
-
-  // фон/текст
-  c.fillStyle = state.background;
-  c.fillRect(0,0,W,H);
-  c.fillStyle = state.color;
-  c.font = `${fsPx*scale}px ${getComputedStyle(app.out).fontFamily}`;
+  const ff   = getComputedStyle(app.out).fontFamily || 'monospace';
+  const fsPx = 12;  // базовый размер для экспорта
+  c.font = `${fsPx}px ${ff}`;
   c.textBaseline = 'top';
 
   const lines = text.split('\n');
-  for (let y=0; y<rows && y<lines.length; y++){
-    c.fillText(lines[y], 0, y*stepY*scale);
+  const maxRows = Math.min(rows, lines.length);
+
+  // считаем реальную ширину всех строк
+  let maxLinePx = 0;
+  for (let y = 0; y < maxRows; y++) {
+    const w = c.measureText(lines[y]).width;
+    if (w > maxLinePx) maxLinePx = w;
+  }
+
+  const stepY = fsPx;
+  const Wtxt  = Math.ceil(maxLinePx * scale);
+  const Htxt  = Math.ceil(stepY * rows * scale);
+
+  // ➡️ тут сохраняем исходное соотношение
+  // rows/cols — это ASCII-сетка, повторяющая src.h/src.w
+  // поэтому мы просто берём Wtxt/Htxt как есть
+  const W = Wtxt;
+  const H = Htxt;
+
+  cvs.width  = W;
+  cvs.height = H;
+
+  // фон
+  c.fillStyle = state.background;
+  c.fillRect(0, 0, W, H);
+
+  // текст
+  c.fillStyle = state.color;
+  c.font = `${fsPx * scale}px ${ff}`;
+
+  for (let y = 0; y < maxRows; y++) {
+    c.fillText(lines[y], 0, y * stepY * scale);
   }
 }
 
@@ -1350,6 +1369,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
