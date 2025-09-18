@@ -815,16 +815,27 @@ function saveVideo(){
 
 // Универсальное скачивание/открытие
 function downloadBlob(blob, filename){
-  const url = URL.createObjectURL(blob);
-
-  // Telegram WebApp → открыть во внешнем браузере, там загрузка сработает
+  // если мы внутри Telegram WebApp
   if (window.Telegram?.WebApp?.openLink) {
-    window.Telegram.WebApp.openLink(url, { try_browser: true });
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    // 1) PNG — откроем как data:URL (во внешнем браузере можно сохранить)
+    if ((blob.type || '').startsWith('image/')) {
+      const r = new FileReader();
+      r.onload = () => {
+        try {
+          window.Telegram.WebApp.openLink(r.result, { try_browser: true });
+        } catch(_) {}
+      };
+      r.readAsDataURL(blob);
+      return;
+    }
+
+    // 2) Видео — без сервера не сохранить надёжно из WebView
+    alert('Внутри Telegram видео напрямую не сохраняется. Нажми «СОХРАНИТЬ» вне Telegram или используй «ПОДЕЛИТЬСЯ» и сохрани там.');
     return;
   }
 
-  // Обычное прямое скачивание
+  // Обычная загрузка (GitHub Pages / любые браузеры вне TG)
+  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
@@ -834,6 +845,7 @@ function downloadBlob(blob, filename){
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 3000);
 }
+
 async function shareBlob(blob, filename){
   const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
 
@@ -1533,6 +1545,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
