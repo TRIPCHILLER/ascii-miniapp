@@ -433,6 +433,9 @@ function currentSource(){
     // выставляем атрибуты на всякий
     app.vid.setAttribute('playsinline',''); app.vid.setAttribute('autoplay',''); app.vid.setAttribute('muted','');
     app.vid.playsInline = true; app.vid.autoplay = true; app.vid.muted = true;
+  // >>> ВКЛЮЧАЕМ ЗАЦИКЛИВАНИЕ ДЛЯ ПРОСМОТРА
+    app.vid.loop = true;
+    app.vid.setAttribute('loop','');
 
     const constraints = { video: { facingMode: state.facing || 'user' }, audio: false };
     updateHud('getUserMedia…');
@@ -768,6 +771,10 @@ function saveVideo(){
   // задать размер канваса заранее (до captureStream)
   app.ui.render.width  = state.recordDims.W;
   app.ui.render.height = state.recordDims.H;
+    // >>> На время записи выключаем loop, чтобы поймать 'ended'
+  const wasLoop = app.vid.loop === true;
+  app.vid.loop = false;
+  app.vid.removeAttribute('loop');
   const fps = Math.max(5, Math.min(60, state.fps));
   const stream = app.ui.render.captureStream(fps);
   state.recordChunks = [];
@@ -780,11 +787,18 @@ function saveVideo(){
   }
 
   state.recorder.ondataavailable = e => { if (e.data && e.data.size) state.recordChunks.push(e.data); };
-  state.recorder.onstop = () => {
+    state.recorder.onstop = () => {
     const blob = new Blob(state.recordChunks, { type: mime });
     downloadBlob(blob, mime.includes('mp4') ? 'ascii.mp4' : 'ascii.webm');
+
+    // <<< вернём исходное поведение зацикливания для просмотра
+    if (wasLoop) {
+      app.vid.loop = true;
+      app.vid.setAttribute('loop','');
+    }
+
     state.isRecording = false;
-    state.recordDims = null;           // <— добавить
+    state.recordDims = null;
     hudSet('VIDEO: сохранено/отправлено');
   };
 
@@ -1099,9 +1113,14 @@ syncFpsVisibility(); // переключаем FPS в зависимости о�
   if (newMode === 'photo') {
     if (!state.imageEl) app.ui.filePhoto.click();
     else app.ui.placeholder.hidden = true;
-  } else if (newMode === 'video') {
-    if (!(app.vid && app.vid.src)) app.ui.fileVideo.click();
-    else app.ui.placeholder.hidden = true;
+} else if (newMode === 'video') {
+  if (!(app.vid && app.vid.src)) {
+    app.ui.fileVideo.click();
+  } else {
+    app.ui.placeholder.hidden = true;
+    // на всякий: при возврате в режим видео держим зацикливание
+    app.vid.loop = true;
+    app.vid.setAttribute('loop','');
   }
 }
 
@@ -1440,6 +1459,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
