@@ -309,6 +309,3 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 /* сцена берёт все жесты (пинч-зум) */
 #stage {
   touch-action: none; }
-
-
-
