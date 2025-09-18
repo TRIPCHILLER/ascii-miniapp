@@ -1275,7 +1275,12 @@ app.ui.filePhoto.addEventListener('change', (e) => {
   stopStream();
 
   // источник — выбранный файл
-  app.vid.src = URL.createObjectURL(f);
+  // освободим прошлый blob-URL, если был
+if (app._lastVideoURL) { try { URL.revokeObjectURL(app._lastVideoURL); } catch(_) {} }
+// создаём новый и запоминаем
+const url = URL.createObjectURL(f);
+app.vid.src = url;
+app._lastVideoURL = url;
 
   // жёстко включаем нужные атрибуты
   app.vid.setAttribute('playsinline','');
@@ -1481,6 +1486,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
