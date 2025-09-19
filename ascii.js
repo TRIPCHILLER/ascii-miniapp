@@ -872,7 +872,7 @@ function saveVideo(){
       const outName = 'out.mp4';
 
       ff.FS('writeFile', inName, await fetchFile(blob));
-      await ff.run(
+await ff.run(
   '-i', inName,
   // ↓ фиксируем ЧАСТОТУ КАДРОВ ВЫХОДА под текущий fps из настроек
   '-r', String(fps),
@@ -882,9 +882,11 @@ function saveVideo(){
   '-preset', 'veryfast',
   '-crf', '18',
   outName
-        console.log('[FFmpeg] transcode ok');
-hudSet('FFmpeg: transcode ok');
 );
+
+console.log('[FFmpeg] transcode ok');
+hudSet('FFmpeg: transcode ok');
+
       const data = ff.FS('readFile', outName);
       const mp4Blob = new Blob([data.buffer], { type: 'video/mp4' });
       downloadBlob(mp4Blob, '@tripchiller_ascii_bot.mp4');
@@ -1605,6 +1607,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
