@@ -644,6 +644,19 @@ if (palette && palette.length === K_BINS) {
   renderAsciiFrameLocked(app.out.textContent || '');
 }
   }
+  // ---- FFmpeg (wasm) lazy-loader: подключаем при необходимости ----
+let _ff = null, _fetchFile = null, _ffLoaded = false;
+async function ensureFFmpeg() {
+  if (_ffLoaded) return { ff: _ff, fetchFile: _fetchFile };
+  if (!window.FFmpeg) throw new Error('FFmpeg lib not loaded');
+  const { createFFmpeg, fetchFile } = FFmpeg;
+  _ff = createFFmpeg({ log: false }); // поставь true, если хочешь лог в консоль
+  await _ff.load();
+  _fetchFile = fetchFile;
+  _ffLoaded = true;
+  return { ff: _ff, fetchFile };
+}
+
 // ---------- EXPORT HELPERS (PNG/VIDEO) ----------
 
 // Рендер готового ASCII-текста в canvas для экспорта
@@ -721,13 +734,25 @@ function computeRecordDims(cols, rows, scale = 2) {
   const ff   = getComputedStyle(app.out).fontFamily || 'monospace';
   const fsPx = 12;                               // базовый размер
   const stepY = Math.ceil(fsPx * scale);         // высота строки
-  const charAspect = Math.max(0.5, measureCharAspect()); // W/H из measurePre (устойчиво)
-  const stepX = Math.ceil(stepY * charAspect);   // ширина шага по X (моно-оценка)
+  const charAspect = Math.max(0.5, measureCharAspect()); // W/H
+  const stepX = Math.ceil(stepY * charAspect);   // ширина шага по X
 
-  const W = stepX * Math.max(1, cols);
-  const H = stepY * Math.max(1, rows);
+  // Базовый «пиксельный» размер
+  let W = stepX * Math.max(1, cols);
+  let H = stepY * Math.max(1, rows);
 
-  return { W, H, stepY, font: `${fsPx * scale}px ${ff}`, cols, rows };
+  // Минимум ~720p по одной из сторон (сохраняем пропорции ASCII)
+  const MIN_W = 1280, MIN_H = 720;
+  const kW = MIN_W / W, kH = MIN_H / H;
+  const k = Math.max(1, Math.min(Number.isFinite(kW) ? kW : 1, Number.isFinite(kH) ? kH : 1));
+  W = Math.round(W * k);
+  H = Math.round(H * k);
+
+  // Чётные размеры под H.264
+  if (W % 2) W += 1;
+  if (H % 2) H += 1;
+
+  return { W, H, stepY: stepY * k, font: `${fsPx * scale * k}px ${ff}`, cols, rows };
 }
 
 // Рендер одного ASCII-кадра в уже зафиксированный канвас (без изменения W/H)
@@ -777,27 +802,59 @@ function saveVideo(){
   state.recordChunks = [];
 
   try {
-    state.recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 4_000_000 });
+    state.recorder = new MediaRecorder(stream, {
+  mimeType: mime,
+  videoBitsPerSecond: 8_000_000
+});
   } catch(e) {
     alert('MediaRecorder недоступен: ' + (e.message||e));
     return;
   }
 
   state.recorder.ondataavailable = e => { if (e.data && e.data.size) state.recordChunks.push(e.data); };
-    state.recorder.onstop = () => {
-    const blob = new Blob(state.recordChunks, { type: mime });
-    downloadBlob(blob, mime.includes('mp4') ? '@tripchiller_ascii_bot.mp4' : '@tripchiller_ascii_bot.webm');
+    state.recorder.onstop = async () => {
+  const blob = new Blob(state.recordChunks, { type: mime });
 
-    // <<< вернём исходное поведение зацикливания для просмотра
-    if (wasLoop) {
-      app.vid.loop = true;
-      app.vid.setAttribute('loop','');
+  try {
+    if (mime.includes('mp4')) {
+      // Уже mp4 — просто сохранить
+      downloadBlob(blob, '@tripchiller_ascii_bot.mp4');
+    } else {
+      // WebM -> MP4 через ffmpeg.wasm
+      const { ff, fetchFile } = await ensureFFmpeg();
+      const inName  = 'in.webm';
+      const outName = 'out.mp4';
+
+      ff.FS('writeFile', inName, await fetchFile(blob));
+      await ff.run(
+        '-i', inName,
+        '-c:v', 'libx264',
+        '-pix_fmt', 'yuv420p',
+        '-movflags', 'faststart',
+        '-preset', 'veryfast',
+        '-crf', '18',
+        outName
+      );
+      const data = ff.FS('readFile', outName);
+      const mp4Blob = new Blob([data.buffer], { type: 'video/mp4' });
+      downloadBlob(mp4Blob, '@tripchiller_ascii_bot.mp4');
+      try { ff.FS('unlink', inName); ff.FS('unlink', outName); } catch(e) {}
     }
+  } catch (e) {
+    console.warn('FFmpeg transcode failed:', e);
+    // Фоллбэк: если конвертация не удалась, хотя бы отдать исходник
+    downloadBlob(blob, mime.includes('mp4') ? '@tripchiller_ascii_bot.mp4' : '@tripchiller_ascii_bot.webm');
+  }
 
-    state.isRecording = false;
-    state.recordDims = null;
-    hudSet('VIDEO: сохранено/отправлено');
-  };
+  // восстановление state
+  if (wasLoop) {
+    app.vid.loop = true;
+    app.vid.setAttribute('loop','');
+  }
+  state.isRecording = false;
+  state.recordDims = null;
+  hudSet('VIDEO: сохранено/отправлено');
+};
 
   try { app.vid.currentTime = 0; } catch(e){}
   app.vid.play?.();
@@ -1490,4 +1547,5 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
