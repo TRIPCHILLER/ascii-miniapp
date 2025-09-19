@@ -9,6 +9,15 @@ hud.textContent = 'boot…';
 document.body.appendChild(hud);
 window.addEventListener('error', e => { hud.textContent = 'JS ERROR: ' + (e.error?.message || e.message); });
 function hudSet(txt){ hud.textContent = txt; }
+  // ---- BUSY overlay helpers ----
+function busyShow(msg){
+  if (app.ui.busyText) app.ui.busyText.textContent = msg || 'Пожалуйста, подождите…';
+  if (app.ui.busy) app.ui.busy.hidden = false;
+}
+function busyHide(){
+  if (app.ui.busy) app.ui.busy.hidden = true;
+}
+
 // ==== /HUD ====
 
   const app = {
@@ -43,7 +52,10 @@ function hudSet(txt){ hud.textContent = txt; }
     placeholder: $('#placeholder'),
     render:      $('#render'),
     fpsWrap: null, // обёртка для скрытия FPS 
-    }
+    // overlay
+    busy:        $('#busy'),
+    busyText:    $('#busyText'),
+}
   };
 // найдем обертку (label) вокруг ползунка FPS
 app.ui.fpsWrap = app.ui.fps?.closest('label') || null;
@@ -824,14 +836,16 @@ function saveVideo(){
     return;
   }
 
-  state.recorder.ondataavailable = e => { if (e.data && e.data.size) state.recordChunks.push(e.data); };
-    state.recorder.onstop = async () => {
-  const blob = new Blob(state.recordChunks, { type: mime });
+      state.recorder.ondataavailable = e => { if (e.data && e.data.size) state.recordChunks.push(e.data); };
+      state.recorder.onstop = async () => {
+      busyShow('Конвертация в MP4…');
+      const blob = new Blob(state.recordChunks, { type: mime });
 
   try {
     if (mime.includes('mp4')) {
-      // Уже mp4 — просто сохранить
       downloadBlob(blob, '@tripchiller_ascii_bot.mp4');
+      busyShow('MP4 готово');
+      setTimeout(busyHide, 400);
     } else {
       // WebM -> MP4 через ffmpeg.wasm
       const { ff, fetchFile } = await ensureFFmpeg();
@@ -840,23 +854,30 @@ function saveVideo(){
 
       ff.FS('writeFile', inName, await fetchFile(blob));
       await ff.run(
-        '-i', inName,
-        '-c:v', 'libx264',
-        '-pix_fmt', 'yuv420p',
-        '-movflags', 'faststart',
-        '-preset', 'veryfast',
-        '-crf', '18',
-        outName
-      );
+  '-i', inName,
+  // ↓ фиксируем ЧАСТОТУ КАДРОВ ВЫХОДА под текущий fps из настроек
+  '-r', String(fps),
+  '-c:v', 'libx264',
+  '-pix_fmt', 'yuv420p',
+  '-movflags', 'faststart',
+  '-preset', 'veryfast',
+  '-crf', '18',
+  outName
+);
       const data = ff.FS('readFile', outName);
       const mp4Blob = new Blob([data.buffer], { type: 'video/mp4' });
       downloadBlob(mp4Blob, '@tripchiller_ascii_bot.mp4');
+      
+      busyShow('MP4 готово');
+      setTimeout(busyHide, 400);
+
       try { ff.FS('unlink', inName); ff.FS('unlink', outName); } catch(e) {}
     }
   } catch (e) {
     console.warn('FFmpeg transcode failed:', e);
-    // Фоллбэк: если конвертация не удалась, хотя бы отдать исходник
+    busyShow('Конвертация не удалась.\nСкачан исходный файл.');
     downloadBlob(blob, mime.includes('mp4') ? '@tripchiller_ascii_bot.mp4' : '@tripchiller_ascii_bot.webm');
+    setTimeout(busyHide, 1200);
   }
 
   // восстановление state
@@ -873,6 +894,7 @@ function saveVideo(){
   app.vid.play?.();
 
   state.isRecording = true;
+  busyShow('Запись ASCII-видео…');
   state.recorder.start(200);
 
   const onEnded = () => {
@@ -1560,6 +1582,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
