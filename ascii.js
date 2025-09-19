@@ -667,7 +667,7 @@ async function ensureFFmpeg() {
   const { createFFmpeg, fetchFile } = FFmpeg;
   _ff = createFFmpeg({
     log: false, // поставь true, если хочешь логи в консоль
-    corePath: 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/ffmpeg-core.js'
+    corePath: 'https://unpkg.com/@ffmpeg/core@0.11.6/dist/ffmpeg-core.js'
   });
 
   try {
@@ -874,11 +874,13 @@ function saveVideo(){
       try { ff.FS('unlink', inName); ff.FS('unlink', outName); } catch(e) {}
     }
   } catch (e) {
-    console.warn('FFmpeg transcode failed:', e);
-    busyShow('Конвертация не удалась.\nСкачан исходный файл.');
-    downloadBlob(blob, mime.includes('mp4') ? '@tripchiller_ascii_bot.mp4' : '@tripchiller_ascii_bot.webm');
-    setTimeout(busyHide, 1200);
-  }
+  console.warn('FFmpeg transcode failed:', e);
+  const errMsg = (e && (e.message || e.name)) ? String(e.message || e.name) : 'unknown';
+  hudSet('FFmpeg ERR: ' + errMsg);
+  busyShow('Конвертация не удалась.\nСкачан исходный файл.');
+  downloadBlob(blob, mime.includes('mp4') ? '@tripchiller_ascii_bot.mp4' : '@tripchiller_ascii_bot.webm');
+  setTimeout(busyHide, 1200);
+}
 
   // восстановление state
   if (wasLoop) {
@@ -1582,6 +1584,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
