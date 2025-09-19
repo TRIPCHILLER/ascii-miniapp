@@ -644,14 +644,27 @@ if (palette && palette.length === K_BINS) {
   renderAsciiFrameLocked(app.out.textContent || '');
 }
   }
-  // ---- FFmpeg (wasm) lazy-loader: подключаем при необходимости ----
+  // ---- FFmpeg (wasm) lazy-loader ----
+// ВАЖНО: указываем corePath на тот же CDN/версию, иначе ядро не найдется.
 let _ff = null, _fetchFile = null, _ffLoaded = false;
+
 async function ensureFFmpeg() {
   if (_ffLoaded) return { ff: _ff, fetchFile: _fetchFile };
   if (!window.FFmpeg) throw new Error('FFmpeg lib not loaded');
+
   const { createFFmpeg, fetchFile } = FFmpeg;
-  _ff = createFFmpeg({ log: false }); // поставь true, если хочешь лог в консоль
-  await _ff.load();
+  _ff = createFFmpeg({
+    log: false, // поставь true, если хочешь логи в консоль
+    corePath: 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/ffmpeg-core.js'
+  });
+
+  try {
+    await _ff.load();
+  } catch (e) {
+    console.error('FFmpeg load failed', e);
+    throw e;
+  }
+
   _fetchFile = fetchFile;
   _ffLoaded = true;
   return { ff: _ff, fetchFile };
@@ -1547,5 +1560,6 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
