@@ -233,6 +233,34 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   height: 100%;
   touch-action: none; /* сцена должна ловить пинч даже в фоллскрине */
 }
+/* === BUSY OVERLAY === */
+#busy{
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  background:rgba(0,0,0,.75);
+  z-index: 2;           /* поверх #out и #placeholder */
+  backdrop-filter: blur(2px);
+}
+#busy[hidden]{ display:none !important; }
+
+#busy .busy-box{
+  display:flex; flex-direction:column; align-items:center; gap:10px;
+  padding:16px 20px;
+  background:rgba(0,0,0,.35);
+  border:1px solid #fff;
+}
+#busy .busy-text{
+  color:#fff; font-family:'Better VCR', sans-serif; font-size:18px;
+  text-align:center; white-space:pre-line;
+}
+
+/* Спиннер — минималистичный */
+.busy-spinner{
+  width:28px; height:28px; border:2px solid #fff;
+  border-right-color: transparent; border-radius:50%;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* На всякий случай: скрыть любые пережитки иконок выхода, если где-то остались */
 .fs-exit,
@@ -317,3 +345,4 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 .modebar .btn.active {
   color: #ffffff; /* белый для выбранного */
 }
+
