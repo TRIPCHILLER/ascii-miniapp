@@ -9,15 +9,6 @@ hud.textContent = 'boot…';
 document.body.appendChild(hud);
 window.addEventListener('error', e => { hud.textContent = 'JS ERROR: ' + (e.error?.message || e.message); });
 function hudSet(txt){ hud.textContent = txt; }
-  // ---- BUSY overlay helpers ----
-function busyShow(msg){
-  if (app.ui.busyText) app.ui.busyText.textContent = msg || 'Пожалуйста, подождите…';
-  if (app.ui.busy) app.ui.busy.hidden = false;
-}
-function busyHide(){
-  if (app.ui.busy) app.ui.busy.hidden = true;
-}
-
 // ==== /HUD ====
 
   const app = {
@@ -52,10 +43,7 @@ function busyHide(){
     placeholder: $('#placeholder'),
     render:      $('#render'),
     fpsWrap: null, // обёртка для скрытия FPS 
-    // overlay
-    busy:        $('#busy'),
-    busyText:    $('#busyText'),
-}
+    }
   };
 // найдем обертку (label) вокруг ползунка FPS
 app.ui.fpsWrap = app.ui.fps?.closest('label') || null;
@@ -436,8 +424,6 @@ function currentSource(){
     return { el: v, w: v.videoWidth, h: v.videoHeight, kind:(state.mode==='video'?'filevideo':'live') };
   }
   updateHud(`src=vid wait rs:${v.readyState}`);
-  // не прячем плейсхолдер, пока нет кадра
-  if (app.ui && app.ui.placeholder) app.ui.placeholder.hidden = false;
   return null;
 }
 
@@ -566,12 +552,8 @@ function updateGridSize() {
     if (ts - lastFrameTime < frameInterval) return;
     lastFrameTime = ts;
 
-const src = currentSource();
-if (!src) {
-  // явный статус, чтобы было понятно, что мы ждём
-  hudSet(`Ждём источник: ${state.mode.toUpperCase()}`);
-  return;
-}
+    const src = currentSource();
+    if (!src) return;
 
     const { w, h } = updateGridSize();
 
@@ -662,49 +644,6 @@ if (palette && palette.length === K_BINS) {
   renderAsciiFrameLocked(app.out.textContent || '');
 }
   }
-// ---- FFmpeg (wasm) lazy-loader ----
-// ВАЖНО: corePath той же версии, что и скрипт ffmpeg.min.js (0.11.6)
-let _ff = null, _fetchFile = null, _ffLoaded = false;
-
-async function ensureFFmpeg() {
-  if (_ffLoaded) return { ff: _ff, fetchFile: _fetchFile };
-  if (!window.FFmpeg) throw new Error('FFmpeg lib not loaded');
-
-  const { createFFmpeg, fetchFile } = FFmpeg;
-
-  _ff = createFFmpeg({
-    log: true,
-    corePath: 'https://unpkg.com/@ffmpeg/core@0.11.6/dist/ffmpeg-core.js'
-    // (если перейдёшь на jsDelivr, здесь тоже поменяй на cdn.jsdelivr.net)
-  });
-
-  try {
-    // 1) До загрузки ядра
-    hudSet('FFmpeg: loading core…');
-
-    // 2) Загрузка ядра
-    await _ff.load();
-
-    // 3) Успешно загрузили ядро — вот сюда и вставляем «успешный load»
-    hudSet('FFmpeg: core loaded');
-
-    // 4) Быстрый smoke-test (необязательный, но полезен для диагностики)
-    try {
-      await _ff.run('-formats');
-      console.log('[FFmpeg] smoke test ok');
-    } catch (smokeErr) {
-      console.error('[FFmpeg] smoke test failed', smokeErr);
-    }
-
-    _fetchFile = fetchFile;
-    _ffLoaded = true;
-    return { ff: _ff, fetchFile };
-  } catch (e) {
-    console.error('FFmpeg load failed', e);
-    throw e; // поймаем в onstop и покажем HUD-ошибку
-  }
-}
-
 // ---------- EXPORT HELPERS (PNG/VIDEO) ----------
 
 // Рендер готового ASCII-текста в canvas для экспорта
@@ -782,25 +721,13 @@ function computeRecordDims(cols, rows, scale = 2) {
   const ff   = getComputedStyle(app.out).fontFamily || 'monospace';
   const fsPx = 12;                               // базовый размер
   const stepY = Math.ceil(fsPx * scale);         // высота строки
-  const charAspect = Math.max(0.5, measureCharAspect()); // W/H
-  const stepX = Math.ceil(stepY * charAspect);   // ширина шага по X
+  const charAspect = Math.max(0.5, measureCharAspect()); // W/H из measurePre (устойчиво)
+  const stepX = Math.ceil(stepY * charAspect);   // ширина шага по X (моно-оценка)
 
-  // Базовый «пиксельный» размер
-  let W = stepX * Math.max(1, cols);
-  let H = stepY * Math.max(1, rows);
+  const W = stepX * Math.max(1, cols);
+  const H = stepY * Math.max(1, rows);
 
-  // Минимум ~720p по одной из сторон (сохраняем пропорции ASCII)
-  const MIN_W = 1280, MIN_H = 720;
-  const kW = MIN_W / W, kH = MIN_H / H;
-  const k = Math.max(1, Math.min(Number.isFinite(kW) ? kW : 1, Number.isFinite(kH) ? kH : 1));
-  W = Math.round(W * k);
-  H = Math.round(H * k);
-
-  // Чётные размеры под H.264
-  if (W % 2) W += 1;
-  if (H % 2) H += 1;
-
-  return { W, H, stepY: stepY * k, font: `${fsPx * scale * k}px ${ff}`, cols, rows };
+  return { W, H, stepY, font: `${fsPx * scale}px ${ff}`, cols, rows };
 }
 
 // Рендер одного ASCII-кадра в уже зафиксированный канвас (без изменения W/H)
@@ -850,82 +777,32 @@ function saveVideo(){
   state.recordChunks = [];
 
   try {
-    state.recorder = new MediaRecorder(stream, {
-  mimeType: mime,
-  videoBitsPerSecond: 8_000_000
-});
+    state.recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 4_000_000 });
   } catch(e) {
     alert('MediaRecorder недоступен: ' + (e.message||e));
     return;
   }
 
-      state.recorder.ondataavailable = e => { if (e.data && e.data.size) state.recordChunks.push(e.data); };
-      state.recorder.onstop = async () => {
-      busyShow('Конвертация в MP4…');
-      const blob = new Blob(state.recordChunks, { type: mime });
+  state.recorder.ondataavailable = e => { if (e.data && e.data.size) state.recordChunks.push(e.data); };
+    state.recorder.onstop = () => {
+    const blob = new Blob(state.recordChunks, { type: mime });
+    downloadBlob(blob, mime.includes('mp4') ? '@tripchiller_ascii_bot.mp4' : '@tripchiller_ascii_bot.webm');
 
-  try {
-    if (mime.includes('mp4')) {
-      downloadBlob(blob, '@tripchiller_ascii_bot.mp4');
-      busyShow('MP4 готово');
-      setTimeout(busyHide, 400);
-    } else {
-      // WebM -> MP4 через ffmpeg.wasm
-      const { ff, fetchFile } = await ensureFFmpeg();
-      hudSet('FFmpeg: start transcode');
-      console.log('[FFmpeg] start transcode, fps=', fps);
-      const inName  = 'in.webm';
-      const outName = 'out.mp4';
-
-      ff.FS('writeFile', inName, await fetchFile(blob));
-await ff.run(
-  '-i', inName,
-  // ↓ фиксируем ЧАСТОТУ КАДРОВ ВЫХОДА под текущий fps из настроек
-  '-r', String(fps),
-  '-c:v', 'libx264',
-  '-pix_fmt', 'yuv420p',
-  '-movflags', 'faststart',
-  '-preset', 'veryfast',
-  '-crf', '18',
-  outName
-);
-
-console.log('[FFmpeg] transcode ok');
-hudSet('FFmpeg: transcode ok');
-
-      const data = ff.FS('readFile', outName);
-      const mp4Blob = new Blob([data.buffer], { type: 'video/mp4' });
-      downloadBlob(mp4Blob, '@tripchiller_ascii_bot.mp4');
-      
-      busyShow('MP4 готово');
-      setTimeout(busyHide, 400);
-
-      try { ff.FS('unlink', inName); ff.FS('unlink', outName); } catch(e) {}
+    // <<< вернём исходное поведение зацикливания для просмотра
+    if (wasLoop) {
+      app.vid.loop = true;
+      app.vid.setAttribute('loop','');
     }
-  } catch (e) {
-  console.warn('FFmpeg transcode failed:', e);
-  const errMsg = (e && (e.message || e.name)) ? String(e.message || e.name) : 'unknown';
-  hudSet('FFmpeg ERR: ' + errMsg);
-  busyShow('Конвертация не удалась.\nСкачан исходный файл.');
-  downloadBlob(blob, mime.includes('mp4') ? '@tripchiller_ascii_bot.mp4' : '@tripchiller_ascii_bot.webm');
-  setTimeout(busyHide, 1200);
-}
 
-  // восстановление state
-  if (wasLoop) {
-    app.vid.loop = true;
-    app.vid.setAttribute('loop','');
-  }
-  state.isRecording = false;
-  state.recordDims = null;
-  hudSet('VIDEO: сохранено/отправлено');
-};
+    state.isRecording = false;
+    state.recordDims = null;
+    hudSet('VIDEO: сохранено/отправлено');
+  };
 
   try { app.vid.currentTime = 0; } catch(e){}
   app.vid.play?.();
 
   state.isRecording = true;
-  busyShow('Запись ASCII-видео…');
   state.recorder.start(200);
 
   const onEnded = () => {
@@ -1217,25 +1094,14 @@ syncFpsVisibility(); // переключаем FPS в зависимости о�
     try { if (app.vid && !app.vid.srcObject) { app.vid.pause?.(); app.vid.removeAttribute('src'); } } catch(e){}
   }
 
-if (newMode === 'live') {
-  // LIVE: выключаем возможный файл и включаем камеру
-  stopStream();
-
-  // временно показываем плейсхолдер «пока не пошёл кадр»
-  app.ui.placeholder.hidden = false;
-  hudSet('LIVE: запрашиваем камеру…');
-
-  const ok = await startStream();
-  if (!ok) {
-    // камера не дала поток → остаёмся с плейсхолдером
-    hudSet('LIVE: камера недоступна');
-  } else {
-    hudSet('LIVE: поток получен');
+  if (newMode === 'live') {
+    // LIVE: выключаем возможный файл и включаем камеру
+    stopStream();                 // на всякий
     app.ui.placeholder.hidden = true;
+    await startStream();
+    updateMirrorForFacing?.();
+    return;
   }
-  updateMirrorForFacing?.();
-  return;
-}
 
   // не LIVE → камеру останавливаем
   stopStream();
@@ -1624,12 +1490,4 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
-
-
-
-
-
-
-
-
 
