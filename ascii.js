@@ -656,8 +656,8 @@ if (palette && palette.length === K_BINS) {
   renderAsciiFrameLocked(app.out.textContent || '');
 }
   }
-  // ---- FFmpeg (wasm) lazy-loader ----
-// ВАЖНО: указываем corePath на тот же CDN/версию, иначе ядро не найдется.
+// ---- FFmpeg (wasm) lazy-loader ----
+// ВАЖНО: corePath той же версии, что и скрипт ffmpeg.min.js (0.11.6)
 let _ff = null, _fetchFile = null, _ffLoaded = false;
 
 async function ensureFFmpeg() {
@@ -665,17 +665,40 @@ async function ensureFFmpeg() {
   if (!window.FFmpeg) throw new Error('FFmpeg lib not loaded');
 
   const { createFFmpeg, fetchFile } = FFmpeg;
+
   _ff = createFFmpeg({
-    log: false, // поставь true, если хочешь логи в консоль
+    log: true,
     corePath: 'https://unpkg.com/@ffmpeg/core@0.11.6/dist/ffmpeg-core.js'
+    // (если перейдёшь на jsDelivr, здесь тоже поменяй на cdn.jsdelivr.net)
   });
 
   try {
+    // 1) До загрузки ядра
+    hudSet('FFmpeg: loading core…');
+
+    // 2) Загрузка ядра
     await _ff.load();
+
+    // 3) Успешно загрузили ядро — вот сюда и вставляем «успешный load»
+    hudSet('FFmpeg: core loaded');
+
+    // 4) Быстрый smoke-test (необязательный, но полезен для диагностики)
+    try {
+      await _ff.run('-formats');
+      console.log('[FFmpeg] smoke test ok');
+    } catch (smokeErr) {
+      console.error('[FFmpeg] smoke test failed', smokeErr);
+    }
+
+    _fetchFile = fetchFile;
+    _ffLoaded = true;
+    return { ff: _ff, fetchFile };
   } catch (e) {
     console.error('FFmpeg load failed', e);
-    throw e;
+    throw e; // поймаем в onstop и покажем HUD-ошибку
   }
+}
+
 
   _fetchFile = fetchFile;
   _ffLoaded = true;
@@ -1584,6 +1607,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
