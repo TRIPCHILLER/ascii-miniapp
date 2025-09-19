@@ -93,9 +93,10 @@
     </div>
 
     <!-- Сцена вывода -->
-    <div class="stage" id="stage">
+<div class="stage" id="stage">
   <pre id="out"></pre>
-  <!-- Плейсхолдер ... -->
+
+  <!-- Плейсхолдер -->
   <div id="placeholder" hidden>
     <div class="ph-ico">💾</div>
     <div class="ph-txt">ВЫБЕРИТЕ МОМЕНТ ИЗ ГАЛЕРЕИ</div>
@@ -109,26 +110,25 @@
     </div>
   </div>
 
-      <!-- НИЖНИЙ ряд переключения режимов -->
-<div class="modebar">
-  <button class="btn ghost" id="modePhoto">ФОТО</button>
-  <button class="btn ghost active" id="modeLive">LIVE</button>
-  <button class="btn ghost" id="modeVideo">ВИДЕО</button>
+  <!-- НИЖНИЙ ряд переключения режимов -->
+  <div class="modebar">
+    <button class="btn ghost" id="modePhoto">ФОТО</button>
+    <button class="btn ghost active" id="modeLive">LIVE</button>
+    <button class="btn ghost" id="modeVideo">ВИДЕО</button>
+  </div>
+
+  <!-- Скрытые инпуты, канвас и видео -->
+  <input id="filePhoto" type="file" accept="image/*" hidden>
+  <input id="fileVideo" type="file" accept="video/*" hidden>
+  <canvas id="render" hidden></canvas>
+  <video id="vid" playsinline autoplay muted class="capture-src" aria-hidden="true"></video>
 </div>
 
-<!-- Скрытые инпуты для выбора из галереи -->
-<input id="filePhoto" type="file" accept="image/*" hidden>
-<input id="fileVideo" type="file" accept="video/*" hidden>
-
-  <!-- Скрытый канвас для экспорта (PNG/видео) -->
-  <canvas id="render" hidden></canvas>
-<!-- Видео-источник: переносим «за экран», но не скрываем display:none -->
-<video id="vid" playsinline autoplay muted class="capture-src" aria-hidden="true"></video>
-  </div>
 <!-- FFmpeg.wasm для принудительной конвертации в MP4 -->
   <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
   <script defer src="ascii.js?v=fit1"></script>
 </body>
 </html>
+
 
 
