@@ -699,12 +699,6 @@ async function ensureFFmpeg() {
   }
 }
 
-
-  _fetchFile = fetchFile;
-  _ffLoaded = true;
-  return { ff: _ff, fetchFile };
-}
-
 // ---------- EXPORT HELPERS (PNG/VIDEO) ----------
 
 // Рендер готового ASCII-текста в canvas для экспорта
@@ -872,6 +866,8 @@ function saveVideo(){
     } else {
       // WebM -> MP4 через ffmpeg.wasm
       const { ff, fetchFile } = await ensureFFmpeg();
+      hudSet('FFmpeg: start transcode');
+      console.log('[FFmpeg] start transcode, fps=', fps);
       const inName  = 'in.webm';
       const outName = 'out.mp4';
 
@@ -886,6 +882,8 @@ function saveVideo(){
   '-preset', 'veryfast',
   '-crf', '18',
   outName
+        console.log('[FFmpeg] transcode ok');
+hudSet('FFmpeg: transcode ok');
 );
       const data = ff.FS('readFile', outName);
       const mp4Blob = new Blob([data.buffer], { type: 'video/mp4' });
@@ -1607,6 +1605,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
