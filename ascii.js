@@ -436,6 +436,8 @@ function currentSource(){
     return { el: v, w: v.videoWidth, h: v.videoHeight, kind:(state.mode==='video'?'filevideo':'live') };
   }
   updateHud(`src=vid wait rs:${v.readyState}`);
+  // не прячем плейсхолдер, пока нет кадра
+  if (app.ui && app.ui.placeholder) app.ui.placeholder.hidden = false;
   return null;
 }
 
@@ -564,8 +566,12 @@ function updateGridSize() {
     if (ts - lastFrameTime < frameInterval) return;
     lastFrameTime = ts;
 
-    const src = currentSource();
-    if (!src) return;
+const src = currentSource();
+if (!src) {
+  // явный статус, чтобы было понятно, что мы ждём
+  hudSet(`Ждём источник: ${state.mode.toUpperCase()}`);
+  return;
+}
 
     const { w, h } = updateGridSize();
 
@@ -1211,14 +1217,25 @@ syncFpsVisibility(); // переключаем FPS в зависимости о�
     try { if (app.vid && !app.vid.srcObject) { app.vid.pause?.(); app.vid.removeAttribute('src'); } } catch(e){}
   }
 
-  if (newMode === 'live') {
-    // LIVE: выключаем возможный файл и включаем камеру
-    stopStream();                 // на всякий
+if (newMode === 'live') {
+  // LIVE: выключаем возможный файл и включаем камеру
+  stopStream();
+
+  // временно показываем плейсхолдер «пока не пошёл кадр»
+  app.ui.placeholder.hidden = false;
+  hudSet('LIVE: запрашиваем камеру…');
+
+  const ok = await startStream();
+  if (!ok) {
+    // камера не дала поток → остаёмся с плейсхолдером
+    hudSet('LIVE: камера недоступна');
+  } else {
+    hudSet('LIVE: поток получен');
     app.ui.placeholder.hidden = true;
-    await startStream();
-    updateMirrorForFacing?.();
-    return;
   }
+  updateMirrorForFacing?.();
+  return;
+}
 
   // не LIVE → камеру останавливаем
   stopStream();
@@ -1607,6 +1624,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
