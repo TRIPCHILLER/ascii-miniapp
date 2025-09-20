@@ -12,6 +12,36 @@ html, body, .wrap { overflow-x: hidden; }
 }
 
 .wrap{ display:flex; flex-direction:column; height:100%; }
+/* ===== АНТИ-ВЫДЕЛЕНИЕ UI ===== */
+/* На всём приложении — нельзя выделять, вызывать callout, перетаскивать */
+.wrap, .toolbar, .panel, .modebar,
+button, .btn, label, output {
+  -webkit-user-select: none;
+      -ms-user-select: none;
+          user-select: none;
+  -webkit-touch-callout: none;        /* отключает лонгтап-меню iOS */
+  -webkit-tap-highlight-color: transparent; /* убирает синий флэш на мобилках */
+}
+
+/* Но полям ввода — можно (иначе нельзя править кастомный набор и т.п.) */
+input, textarea, select {
+  -webkit-user-select: text;
+          user-select: text;
+  -webkit-touch-callout: default;
+}
+
+/* Запретить перетаскивание медиа/пре */
+img, video, canvas, pre {
+  -webkit-user-drag: none;
+          user-drag: none;
+}
+
+/* На всякий: ссылки в тулбарах (если появятся) тоже без выделения */
+.toolbar a, .modebar a { 
+  -webkit-user-select: none;
+          user-select: none;
+  -webkit-touch-callout: none;
+}
 
 /* ===== ТУЛБАР ===== */
 .toolbar {
@@ -345,4 +375,5 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 .modebar .btn.active {
   color: #ffffff; /* белый для выбранного */
 }
+
 
