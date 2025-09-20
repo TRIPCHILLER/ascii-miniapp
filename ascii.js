@@ -57,6 +57,30 @@ function busyHide(){
     busyText:    $('#busyText'),
 }
   };
+  // ===== Блок нежелательного выделения/контекстного меню в UI =====
+(() => {
+  const root = document.getElementById('app');
+  if (!root) return;
+
+  // Никакого выделения текста по даблклику/свайпу на UI,
+  // но оставляем возможность выделять в input/textarea/select
+  root.addEventListener('selectstart', (e) => {
+    const t = e.target;
+    if (t.closest('input, textarea, select') && !t.readOnly && !t.disabled) return;
+    e.preventDefault();
+  }, { passive: false });
+
+  // Отключаем контекстное меню (ленг-тап на мобилках, правый клик),
+  // но не мешаем нативным полям ввода
+  root.addEventListener('contextmenu', (e) => {
+    if (e.target.closest('input, textarea, select')) return;
+    e.preventDefault();
+  }, { passive: false });
+
+  // На всякий — запретим перетаскивание элементов внутри приложения
+  root.addEventListener('dragstart', (e) => e.preventDefault());
+})();
+
 // найдем обертку (label) вокруг ползунка FPS
 app.ui.fpsWrap = app.ui.fps?.closest('label') || null;
 
@@ -1584,5 +1608,6 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
