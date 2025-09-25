@@ -1507,8 +1507,12 @@ app.ui.save.addEventListener('click', doSave);
 
 // Кнопка в Telegram (MainButton)
 if (tg) {
-  tg.MainButton.offClick?.();
-  tg.MainButton.onClick(doSave);
+  tg.MainButton.offClick?.(); // снимаем старый обработчик
+  tg.MainButton.onClick(() => {
+    tg.MainButton.showProgress();  // индикатор
+    doSave();
+    setTimeout(() => tg.MainButton.hideProgress(), 2000);
+  });
 }
 
 // Выбираем реально «чёрный» символ под текущий стек шрифтов
@@ -1652,6 +1656,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
