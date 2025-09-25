@@ -947,11 +947,15 @@ function saveVideo(){
   };
   app.vid.addEventListener('ended', onEnded, { once:true });
 }
-
+let uploadInFlight = false;
 // Универсальная отправка: в Telegram → на сервер; иначе → локальная загрузка
 async function downloadBlob(blob, filename){
   const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
-
+if (uploadInFlight) { 
+  console.warn('Upload already in progress — skip');
+  return;
+}
+uploadInFlight = true;
   // Если открыто внутри Telegram WebApp — шлём на свой backend
   if (window.Telegram?.WebApp?.initData) {
     try {
@@ -965,22 +969,19 @@ async function downloadBlob(blob, filename){
       form.append('initData', window.Telegram.WebApp.initData);
 
       // ⚠️ Путь замени на свой (см. сервер ниже):
-      const res = await fetch('https://api.tripchiller.com/api/upload', { 
-    method: 'POST', 
-    body: form, 
-    credentials: 'include' 
-});
-      const json = await res.json().catch(()=> ({}));
+     try {
+  const res = await fetch('https://api.tripchiller.com/api/upload', { ... });
+  const json = await res.json().catch(() => ({}));
 
-      if (!res.ok) throw new Error(json?.error || `Upload failed: ${res.status}`);
+  if (!res.ok) throw new Error(json?.error || `Upload failed: ${res.status}`);
 
-      // Можем показать пользователю подтверждение
-      window.Telegram.WebApp.showPopup?.({
-        title: 'Готово',
-        message: 'Файл отправлен в ваш чат с ботом.'
-      });
-      return;
-    } catch (e) {
+  window.Telegram.WebApp.showPopup({ ... });
+  return;
+} catch (e) {
+  console.error(e);
+} finally {
+  uploadInFlight = false;   // ✅ сброс флага всегда
+}
       // Фолбэк: если сервер недоступен — дадим скачать локально
       console.warn('Upload to bot failed, fallback to local download:', e);
       tryLocalDownload(file);
@@ -1691,6 +1692,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
