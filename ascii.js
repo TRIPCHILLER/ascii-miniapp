@@ -959,31 +959,31 @@ async function downloadBlob(blob, filename) {
   uploadInFlight = true;
 
   if (window.Telegram?.WebApp?.initData) {
-    try {
-      window.Telegram.WebApp.HapticFeedback?.impactOccurred?.('light');
-      window.Telegram.WebApp?.MainButton?.showProgress?.();
+  try {
+    window.Telegram.WebApp.HapticFeedback?.impactOccurred?.('light');
+    window.Telegram.WebApp?.MainButton?.showProgress?.();
 
-      const form = new FormData();
-      form.append('file', file, filename);
-      form.append('filename', filename);
-      form.append('initData', window.Telegram.WebApp.initData);
+    const form = new FormData();
+    form.append('file', file, filename);
+    form.append('filename', filename);
+    form.append('initData', window.Telegram.WebApp.initData);
 
-      const res = await fetch('https://api.tripchiller.com/api/upload', { method: 'POST', body: form });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json?.error || `Upload failed: ${res.status}`);
+    const res  = await fetch('https://api.tripchiller.com/api/upload', { method: 'POST', body: form });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json?.error || `Upload failed: ${res.status}`);
 
-      window.Telegram.WebApp.showPopup({ title: 'Готово', message: 'Файл отправлен в ваш чат ✔️' });
-      return;
-    } catch (e) {
-      console.error(e);
-      console.warn('Upload to bot failed, fallback to local download:', e);
-      tryLocalDownload(file);
-      return;
-    } finally {
-      window.Telegram.WebApp?.MainButton?.hideProgress?.();
-      uploadInFlight = false;   // ✅ сброс флага
-    }
+    window.Telegram.WebApp.showPopup({ title: 'Готово', message: 'Файл отправлен в ваш чат ✔️' });
+    return;
+  } catch (e) {
+    console.error(e);
+    console.warn('Upload to bot failed, fallback to local download:', e);
+    tryLocalDownload(file);
+    return;
+  } finally {
+    window.Telegram.WebApp?.MainButton?.hideProgress?.();
+    uploadInFlight = false;
   }
+}
 
   // Если не Telegram — fallback
   tryLocalDownload(file);
@@ -1686,6 +1686,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
