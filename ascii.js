@@ -948,37 +948,59 @@ function saveVideo(){
   app.vid.addEventListener('ended', onEnded, { once:true });
 }
 
-// Универсальное скачивание/шеринг — работает в Telegram WebView
-function downloadBlob(blob, filename){
+// Универсальная отправка: в Telegram → на сервер; иначе → локальная загрузка
+async function downloadBlob(blob, filename){
   const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
 
-  // 1) Системное "Поделиться" (iOS/Android)
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    navigator.share({ files: [file], title: ': ASCII ⛶ VISOR :', text: filename }).catch(()=>{});
-    return;
+  // Если открыто внутри Telegram WebApp — шлём на свой backend
+  if (window.Telegram?.WebApp?.initData) {
+    try {
+      window.Telegram.WebApp.HapticFeedback?.impactOccurred?.('light');
+      window.Telegram.WebApp?.MainButton?.showProgress?.();
+
+      const form = new FormData();
+      form.append('file', file, filename);
+      form.append('filename', filename);
+      // initData — подпись Telegram; на сервере проверим её токеном бота
+      form.append('initData', window.Telegram.WebApp.initData);
+
+      // ⚠️ Путь замени на свой (см. сервер ниже):
+      const res = await fetch('/api/upload', { method: 'POST', body: form, credentials: 'include' });
+      const json = await res.json().catch(()=> ({}));
+
+      if (!res.ok) throw new Error(json?.error || `Upload failed: ${res.status}`);
+
+      // Можем показать пользователю подтверждение
+      window.Telegram.WebApp.showPopup?.({
+        title: 'Готово',
+        message: 'Файл отправлен в ваш чат с ботом.'
+      });
+      return;
+    } catch (e) {
+      // Фолбэк: если сервер недоступен — дадим скачать локально
+      console.warn('Upload to bot failed, fallback to local download:', e);
+      tryLocalDownload(file);
+      return;
+    } finally {
+      window.Telegram.WebApp?.MainButton?.hideProgress?.();
+    }
   }
 
-  // 2) Универсальная загрузка через <a download> (надёжно в Телеге)
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.rel = 'noopener';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url), 3000);
+  // Не Telegram (обычный браузер) → локальная загрузка/шэр
+  tryLocalDownload(file);
 
-  // 3) Небольшой отклик в Телеге
-  try {
-    if (window.Telegram?.WebApp) {
-      window.Telegram.WebApp.HapticFeedback?.impactOccurred?.('light');
-      window.Telegram.WebApp.showPopup?.({
-        title: 'Сохранение',
-        message: 'Файл отправлен на загрузку.'
-      });
+  // вспомогательная локальная закачка/шэр
+  function tryLocalDownload(file){
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: ': ASCII ⛶ VISOR :', text: file.name }).catch(()=>{});
+      return;
     }
-  } catch(_) {}
+    const url = URL.createObjectURL(file);
+    const a = document.createElement('a');
+    a.href = url; a.download = file.name; a.rel = 'noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 3000);
+  }
 }
 
   // Подбор font-size
@@ -1665,6 +1687,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
