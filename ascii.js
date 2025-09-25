@@ -959,17 +959,33 @@ function downloadBlob(blob, filename){
   }
 
   // 2) В Telegram WebApp иногда блокируется download — открываем в новой вкладке
-  const url = URL.createObjectURL(blob);
-  if (window.Telegram?.WebApp) {
-    window.open(url, '_blank');
+function downloadBlob(blob, filename){
+  const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
+
+  // 1) Системное «Поделиться» (если доступно) — идеальный путь на мобилках
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    navigator.share({ files: [file], title: ': ASCII ⛶ VISOR :', text: filename }).catch(()=>{});
     return;
   }
 
-  // 3) Обычная загрузка ссылкой
+  // 2) Универсальная загрузка через <a download> — РАБОТАЕТ внутри Telegram WebView
+  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = filename; a.rel='noopener';
-  document.body.appendChild(a); a.click(); a.remove();
+  a.href = url;
+  a.download = filename;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
   setTimeout(()=>URL.revokeObjectURL(url), 3000);
+
+  // 3) На всякий — визуальный отклик в Телеге
+  try {
+    if (window.Telegram?.WebApp) {
+      window.Telegram.WebApp.HapticFeedback?.impactOccurred?.('light');
+      window.Telegram.WebApp.showPopup?.({ title: 'Сохранение', message: 'Файл отправлен на загрузку.' });
+    }
+  } catch(_) {}
 }
 
   // Подбор font-size
@@ -1656,6 +1672,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
