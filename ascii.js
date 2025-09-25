@@ -948,27 +948,17 @@ function saveVideo(){
   app.vid.addEventListener('ended', onEnded, { once:true });
 }
 
-// Универсальное скачивание/открытие
+// Универсальное скачивание/шеринг — работает в Telegram WebView
 function downloadBlob(blob, filename){
   const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
 
-  // 1) Попытка: системное «Поделиться» (Android/iOS) — удобнее для «в Галерею»
+  // 1) Системное "Поделиться" (iOS/Android)
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     navigator.share({ files: [file], title: ': ASCII ⛶ VISOR :', text: filename }).catch(()=>{});
     return;
   }
 
-  // 2) В Telegram WebApp иногда блокируется download — открываем в новой вкладке
-function downloadBlob(blob, filename){
-  const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
-
-  // 1) Системное «Поделиться» (если доступно) — идеальный путь на мобилках
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    navigator.share({ files: [file], title: ': ASCII ⛶ VISOR :', text: filename }).catch(()=>{});
-    return;
-  }
-
-  // 2) Универсальная загрузка через <a download> — РАБОТАЕТ внутри Telegram WebView
+  // 2) Универсальная загрузка через <a download> (надёжно в Телеге)
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -979,11 +969,14 @@ function downloadBlob(blob, filename){
   a.remove();
   setTimeout(()=>URL.revokeObjectURL(url), 3000);
 
-  // 3) На всякий — визуальный отклик в Телеге
+  // 3) Небольшой отклик в Телеге
   try {
     if (window.Telegram?.WebApp) {
       window.Telegram.WebApp.HapticFeedback?.impactOccurred?.('light');
-      window.Telegram.WebApp.showPopup?.({ title: 'Сохранение', message: 'Файл отправлен на загрузку.' });
+      window.Telegram.WebApp.showPopup?.({
+        title: 'Сохранение',
+        message: 'Файл отправлен на загрузку.'
+      });
     }
   } catch(_) {}
 }
@@ -1672,6 +1665,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
