@@ -965,7 +965,11 @@ async function downloadBlob(blob, filename){
       form.append('initData', window.Telegram.WebApp.initData);
 
       // ⚠️ Путь замени на свой (см. сервер ниже):
-      const res = await fetch('/api/upload', { method: 'POST', body: form, credentials: 'include' });
+      const res = await fetch('https://api.tripchiller.com/api/upload', { 
+    method: 'POST', 
+    body: form, 
+    credentials: 'include' 
+});
       const json = await res.json().catch(()=> ({}));
 
       if (!res.ok) throw new Error(json?.error || `Upload failed: ${res.status}`);
@@ -1687,6 +1691,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
