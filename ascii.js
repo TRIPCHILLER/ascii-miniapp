@@ -949,14 +949,15 @@ function saveVideo(){
 }
 let uploadInFlight = false;
 // Универсальная отправка: в Telegram → на сервер; иначе → локальная загрузка
-async function downloadBlob(blob, filename){
+async function downloadBlob(blob, filename) {
   const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
-if (uploadInFlight) { 
-  console.warn('Upload already in progress — skip');
-  return;
-}
-uploadInFlight = true;
-  // Если открыто внутри Telegram WebApp — шлём на свой backend
+
+  if (uploadInFlight) { 
+    console.warn('Upload already in progress — skip');
+    return;
+  }
+  uploadInFlight = true;
+
   if (window.Telegram?.WebApp?.initData) {
     try {
       window.Telegram.WebApp.HapticFeedback?.impactOccurred?.('light');
@@ -965,37 +966,30 @@ uploadInFlight = true;
       const form = new FormData();
       form.append('file', file, filename);
       form.append('filename', filename);
-      // initData — подпись Telegram; на сервере проверим её токеном бота
       form.append('initData', window.Telegram.WebApp.initData);
 
-      // ⚠️ Путь замени на свой (см. сервер ниже):
-     try {
-  const res = await fetch('https://api.tripchiller.com/api/upload', { ... });
-  const json = await res.json().catch(() => ({}));
+      const res = await fetch('https://api.tripchiller.com/api/upload', { method: 'POST', body: form });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || `Upload failed: ${res.status}`);
 
-  if (!res.ok) throw new Error(json?.error || `Upload failed: ${res.status}`);
-
-  window.Telegram.WebApp.showPopup({ ... });
-  return;
-} catch (e) {
-  console.error(e);
-} finally {
-  uploadInFlight = false;   // ✅ сброс флага всегда
-}
-      // Фолбэк: если сервер недоступен — дадим скачать локально
+      window.Telegram.WebApp.showPopup({ title: 'Готово', message: 'Файл отправлен в ваш чат ✔️' });
+      return;
+    } catch (e) {
+      console.error(e);
       console.warn('Upload to bot failed, fallback to local download:', e);
       tryLocalDownload(file);
       return;
     } finally {
       window.Telegram.WebApp?.MainButton?.hideProgress?.();
+      uploadInFlight = false;   // ✅ сброс флага
     }
   }
 
-  // Не Telegram (обычный браузер) → локальная загрузка/шэр
+  // Если не Telegram — fallback
   tryLocalDownload(file);
+  uploadInFlight = false;
 
-  // вспомогательная локальная закачка/шэр
-  function tryLocalDownload(file){
+  function tryLocalDownload(file) {
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       navigator.share({ files: [file], title: ': ASCII ⛶ VISOR :', text: file.name }).catch(()=>{});
       return;
@@ -1692,6 +1686,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
