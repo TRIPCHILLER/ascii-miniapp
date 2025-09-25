@@ -57,6 +57,24 @@ function busyHide(){
     busyText:    $('#busyText'),
 }
   };
+  // ===== Telegram WebApp (если открыто внутри Telegram) =====
+const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
+
+function mainBtnHide() {
+  try { tg && tg.MainButton.hide(); } catch(_) {}
+}
+function mainBtnShow(text, onClick) {
+  if (!tg) return;
+  try {
+    tg.MainButton.setText(text || 'СОХРАНИТЬ');
+    tg.MainButton.show();
+    if (onClick) {
+      tg.MainButton.offClick?.();     // снять старый
+      tg.MainButton.onClick(onClick); // навесить новый
+    }
+  } catch(_) {}
+}
+
   // ===== Блок нежелательного выделения/контекстного меню в UI =====
 (() => {
   const root = document.getElementById('app');
@@ -1195,7 +1213,15 @@ syncFpsVisibility(); // переключаем FPS в зависимости о�
   // переключаем видимость верхних кнопок
   if (app.ui.fs)   app.ui.fs.hidden   = (newMode!=='live');
   if (app.ui.save) app.ui.save.hidden = (newMode==='live');
-
+// Telegram MainButton: показываем только в ФОТО/ВИДЕО, скрываем в LIVE
+if (tg) {
+  if (newMode === 'live') {
+    mainBtnHide();
+  } else {
+    // покажем, но итогово включим после появления контента (см. ниже)
+    mainBtnShow('СОХРАНИТЬ', doSave);
+  }
+}
   app.ui.modeLive .classList.toggle('active', newMode==='live');
   app.ui.modePhoto.classList.toggle('active', newMode==='photo');
   app.ui.modeVideo.classList.toggle('active', newMode==='video');
@@ -1380,6 +1406,9 @@ app.ui.filePhoto.addEventListener('change', (e) => {
     const { w, h } = updateGridSize(); refitFont(w, h);
     updateHud('img onload');
     requestAnimationFrame(()=>{}); // разовый тик
+    if (tg && state.mode === 'photo') {
+  mainBtnShow('СОХРАНИТЬ', doSave);
+}
   };
   if (app._lastImageURL) { try { URL.revokeObjectURL(app._lastImageURL); } catch(_) {} }
 const urlImg = URL.createObjectURL(f);
@@ -1436,6 +1465,9 @@ app._lastVideoURL = url;
         refitFont(w, h);
       });
     }
+    if (tg && state.mode === 'video') {
+  mainBtnShow('СОХРАНИТЬ', doSave);
+}
   };
 
   // как только ролик готов играть — ещё раз на всякий случай подогнать сетку
@@ -1445,6 +1477,9 @@ app._lastVideoURL = url;
       const { w, h } = updateGridSize();
       refitFont(w, h);
     });
+    if (tg && state.mode === 'video') {
+  mainBtnShow('СОХРАНИТЬ', doSave);
+}
   };
 
   // стартуем воспроизведение
@@ -1452,8 +1487,8 @@ app._lastVideoURL = url;
   state.mirror = false;
 });
 
-// --- Кнопка СОХРАНИТЬ ---
-app.ui.save.addEventListener('click', ()=>{
+// --- ЕДИНАЯ функция сохранения ---
+function doSave() {
   if (state.mode === 'photo') {
     hudSet('PNG: экспорт…');
     savePNG();
@@ -1465,7 +1500,16 @@ app.ui.save.addEventListener('click', ()=>{
     hudSet('VIDEO: запись… (дождитесь окончания)');
     saveVideo();
   }
-});
+}
+
+// Кнопка в тулбаре
+app.ui.save.addEventListener('click', doSave);
+
+// Кнопка в Telegram (MainButton)
+if (tg) {
+  tg.MainButton.offClick?.();
+  tg.MainButton.onClick(doSave);
+}
 
 // Выбираем реально «чёрный» символ под текущий стек шрифтов
 function pickDarkGlyph() {
@@ -1608,6 +1652,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
