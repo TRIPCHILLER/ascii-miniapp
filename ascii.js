@@ -2,13 +2,8 @@
   // ============== УТИЛИТЫ ==============
   const $ = s => document.querySelector(s);
   const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
-// ==== TEMP HUD ====
-const hud = document.createElement('div');
-hud.style.cssText = 'position:fixed;left:6px;bottom:6px;z-index:99999;background:rgba(0,0,0,.6);color:#0f0;font:12px/1.2 monospace;padding:6px 8px;border:1px solid #0f0;border-radius:6px;max-width:75vw;pointer-events:none;';
-hud.textContent = 'boot…';
-document.body.appendChild(hud);
-window.addEventListener('error', e => { hud.textContent = 'JS ERROR: ' + (e.error?.message || e.message); });
-function hudSet(txt){ hud.textContent = txt; }
+// HUD выключен на проде
+const hudSet = () => {};
   // ---- BUSY overlay helpers ----
 function busyShow(msg){
   if (app.ui.busyText) app.ui.busyText.textContent = msg || 'Пожалуйста, подождите…';
@@ -967,7 +962,7 @@ if (window.Telegram?.WebApp?.initData) {
     form.append('file', file, filename);
     form.append('filename', filename);
     form.append('initData', window.Telegram.WebApp.initData);
-
+    form.append('mediaType', (state.mode === 'video') ? 'video' : 'photo');
     const res = await fetch('https://api.tripchiller.com/api/upload', {
       method: 'POST',
       body: form,
@@ -976,10 +971,12 @@ if (window.Telegram?.WebApp?.initData) {
 
     if (!res.ok) throw new Error(json?.error || `Upload failed: ${res.status}`);
 
-    window.Telegram.WebApp.showPopup({
-      title: 'Готово',
-      message: 'Файл отправлен в ваш чат ✅',
-    });
+    const left = (typeof json?.balance === 'number') ? `\nОстаток: ${json.balance} кредитов` : '';
+window.Telegram.WebApp.showPopup({
+  title: 'Готово',
+  message: 'Файл отправлен в ваш чат ✅' + left,
+});
+
   } catch (e) {
     console.error(e);
     console.warn('Upload to bot failed, fallback to local download:', e);
@@ -1691,6 +1688,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
