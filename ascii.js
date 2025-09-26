@@ -944,6 +944,7 @@ function saveVideo(){
 }
 let uploadInFlight = false;
 
+// Универсальная отправка: в Telegram → на сервер; иначе → локальная загрузка
 async function downloadBlob(blob, filename) {
   const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
 
@@ -970,35 +971,32 @@ async function downloadBlob(blob, filename) {
       const res  = await fetch('https://api.tripchiller.com/api/upload', { method: 'POST', body: form });
       const json = await res.json().catch(() => ({}));
 
-      // Спец-обработка нехватки средств — не делаем локальный фолбэк
+      // нехватка средств — показываем попап и ВЫХОД без локального скачивания
       if (res.status === 402 || json?.error === 'INSUFFICIENT_FUNDS') {
         tg.showPopup({
           title: 'Недостаточно средств',
           message: `Нужно кредитов: ${json?.need ?? (state.mode==='video'?3:1)}\nТекущий остаток: ${json?.balance ?? '0'}`,
         });
-        return; // выходим без локального скачивания
+        return; // ⬅️ критично
       }
 
-      if (!res.ok) {
-        throw new Error(json?.error || `Upload failed: ${res.status}`);
-      }
+      if (!res.ok) throw new Error(json?.error || `Upload failed: ${res.status}`);
 
       const left = (typeof json?.balance === 'number') ? `\nОстаток: ${json.balance} кредитов` : '';
       tg.showPopup({ title: 'Готово', message: 'Файл отправлен в ваш чат ✅' + left });
 
-      return; // ✅ успешная загрузка в Telegram — выходим, БЕЗ локального фолбэка
+      return; // ⬅️ критично: успешная отправка → НИКАКОГО локального фолбэка
     } catch (e) {
-      console.error('Upload to bot failed, fallback to local download:', e);
-      // провал в загрузке → делаем локальный фолбэк
-      tryLocalDownload(file);
-      return;
+      console.warn('Upload to bot failed, fallback to local download:', e);
+      tryLocalDownload(file); // фолбэк только при реальном провале запроса
+      return;                 // ⬅️ выходим после фолбэка
     } finally {
       window.Telegram.WebApp?.MainButton?.hideProgress?.();
-      uploadInFlight = false; // сброс единожды
+      uploadInFlight = false;
     }
   }
 
-  // Не Telegram → сразу локальный фолбэк
+  // Не Telegram — сразу локальный фолбэк
   tryLocalDownload(file);
   uploadInFlight = false;
 
@@ -1011,7 +1009,7 @@ async function downloadBlob(blob, filename) {
     const a = document.createElement('a');
     a.href = url; a.download = file.name; a.rel = 'noopener';
     document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 3000);
+    setTimeout(()=>URL.revokeObjectURL(url), 3000);
   }
 }
 
@@ -1699,6 +1697,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
