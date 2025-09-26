@@ -943,51 +943,62 @@ function saveVideo(){
   app.vid.addEventListener('ended', onEnded, { once:true });
 }
 let uploadInFlight = false;
-// Универсальная отправка: в Telegram → на сервер; иначе → локальная загрузка
+
 async function downloadBlob(blob, filename) {
   const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
 
-  if (uploadInFlight) { 
+  if (uploadInFlight) {
     console.warn('Upload already in progress — skip');
     return;
   }
   uploadInFlight = true;
 
-if (window.Telegram?.WebApp?.initData) {
-  try {
-    window.Telegram.WebApp.HapticFeedback?.impactOccurred?.('light');
-    window.Telegram.WebApp.MainButton?.showProgress?.();
+  const isTg = !!(window.Telegram?.WebApp?.initData);
 
-    const form = new FormData();
-    form.append('file', file, filename);
-    form.append('filename', filename);
-    form.append('initData', window.Telegram.WebApp.initData);
-    form.append('mediaType', (state.mode === 'video') ? 'video' : 'photo');
-    const res = await fetch('https://api.tripchiller.com/api/upload', {
-      method: 'POST',
-      body: form,
-    });
-    const json = await res.json().catch(() => ({}));
+  if (isTg) {
+    try {
+      const tg = window.Telegram.WebApp;
+      tg.HapticFeedback?.impactOccurred?.('light');
+      tg.MainButton?.showProgress?.();
 
-    if (!res.ok) throw new Error(json?.error || `Upload failed: ${res.status}`);
+      const form = new FormData();
+      form.append('file', file, filename);
+      form.append('filename', filename);
+      form.append('initData', tg.initData);
+      form.append('mediaType', (state.mode === 'video') ? 'video' : 'photo');
 
-    const left = (typeof json?.balance === 'number') ? `\nОстаток: ${json.balance} кредитов` : '';
-window.Telegram.WebApp.showPopup({
-  title: 'Готово',
-  message: 'Файл отправлен в ваш чат ✅' + left,
-});
+      const res  = await fetch('https://api.tripchiller.com/api/upload', { method: 'POST', body: form });
+      const json = await res.json().catch(() => ({}));
 
-  } catch (e) {
-    console.error(e);
-    console.warn('Upload to bot failed, fallback to local download:', e);
-    tryLocalDownload(file);
-  } finally {
-    window.Telegram.WebApp?.MainButton?.hideProgress?.();
-    uploadInFlight = false;   // сброс всегда
+      // Спец-обработка нехватки средств — не делаем локальный фолбэк
+      if (res.status === 402 || json?.error === 'INSUFFICIENT_FUNDS') {
+        tg.showPopup({
+          title: 'Недостаточно средств',
+          message: `Нужно кредитов: ${json?.need ?? (state.mode==='video'?3:1)}\nТекущий остаток: ${json?.balance ?? '0'}`,
+        });
+        return; // выходим без локального скачивания
+      }
+
+      if (!res.ok) {
+        throw new Error(json?.error || `Upload failed: ${res.status}`);
+      }
+
+      const left = (typeof json?.balance === 'number') ? `\nОстаток: ${json.balance} кредитов` : '';
+      tg.showPopup({ title: 'Готово', message: 'Файл отправлен в ваш чат ✅' + left });
+
+      return; // ✅ успешная загрузка в Telegram — выходим, БЕЗ локального фолбэка
+    } catch (e) {
+      console.error('Upload to bot failed, fallback to local download:', e);
+      // провал в загрузке → делаем локальный фолбэк
+      tryLocalDownload(file);
+      return;
+    } finally {
+      window.Telegram.WebApp?.MainButton?.hideProgress?.();
+      uploadInFlight = false; // сброс единожды
+    }
   }
-}
 
-  // Если не Telegram — fallback
+  // Не Telegram → сразу локальный фолбэк
   tryLocalDownload(file);
   uploadInFlight = false;
 
@@ -1000,7 +1011,7 @@ window.Telegram.WebApp.showPopup({
     const a = document.createElement('a');
     a.href = url; a.download = file.name; a.rel = 'noopener';
     document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url), 3000);
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
   }
 }
 
@@ -1688,6 +1699,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
