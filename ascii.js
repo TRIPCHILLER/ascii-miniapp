@@ -1753,6 +1753,8 @@ if (app.ui.charset) {
   // не CJK → основной стек + авто-сорт.
   app.ui.charset.dispatchEvent(new Event('change', { bubbles: true }));
 }
+if (tg && tg.ready) tg.ready();  // дать телеграму «проснуться»
+await new Promise(r => setTimeout(r, 0)); // 1 тик, чтобы DOM устаканился
 
 await setMode('live');         // внутри сам вызовется startStream()
 if (raf) cancelAnimationFrame(raf);
@@ -1764,6 +1766,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
