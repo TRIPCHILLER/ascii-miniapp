@@ -1261,9 +1261,24 @@ async function setMode(newMode){
 
   state.mode = newMode;
 syncFpsVisibility(); // переключаем FPS в зависимости от режима
+
   // переключаем видимость кнопки СОХРАНИТЬ
 const isSaveVisible = (newMode === 'photo' || newMode === 'video');
-if (app.ui.save) app.ui.save.classList.toggle('hidden', !isSaveVisible);
+app.ui.save?.classList.toggle('hidden', !isSaveVisible);
+if (tg) { isSaveVisible ? mainBtnShow('СОХРАНИТЬ', doSave) : mainBtnHide(); }
+
+// 2) Авто-пикер на ПЕРВЫЙ клик
+if (newMode === 'photo') {
+  if (app.ui.filePhoto) {
+    app.ui.filePhoto.value = '';               // сброс, чтобы выбрать тот же файл
+    requestAnimationFrame(() => app.ui.filePhoto.click());
+  }
+} else if (newMode === 'video') {
+  if (app.ui.fileVideo) {
+    app.ui.fileVideo.value = '';
+    requestAnimationFrame(() => app.ui.fileVideo.click());
+  }
+}
 
 // Telegram MainButton
 if (tg) {
@@ -1690,7 +1705,60 @@ app.ui.invert.addEventListener('change', e => {
   async function init() {
     fillStyleSelect();
 setUI();
+  if (!app.ui.filePhoto) {
+    const ip = document.createElement('input');
+    ip.type = 'file';
+    ip.accept = 'image/*';
+    ip.style.display = 'none';
+    ip.onchange = e => {
+      const f = e.target.files?.[0];
+      if (f) {
+        const img = new Image();
+        img.onload = () => {
+          state.imageEl = img;
+          state.mirror = false;
+          app.ui.placeholder.hidden = true;
+          const { w, h } = updateGridSize(); refitFont(w, h);
+          updateHud('img onload');
+          requestAnimationFrame(()=>{});
+          if (tg && state.mode === 'photo') {
+            mainBtnShow('СОХРАНИТЬ', doSave);
+          }
+        };
+        const urlImg = URL.createObjectURL(f);
+        img.src = urlImg;
+        app._lastImageURL = urlImg;
+      }
+    };
+    document.body.appendChild(ip);
+    app.ui.filePhoto = ip;
+  }
 
+  if (!app.ui.fileVideo) {
+    const iv = document.createElement('input');
+    iv.type = 'file';
+    iv.accept = 'video/*';
+    iv.style.display = 'none';
+    iv.onchange = async e => {
+      const f = e.target.files?.[0];
+      if (f) {
+        stopStream();
+        if (app._lastVideoURL) { try { URL.revokeObjectURL(app._lastVideoURL); } catch(_) {} }
+        const url = URL.createObjectURL(f);
+        app.vid.src = url;
+        app._lastVideoURL = url;
+        app.vid.setAttribute('playsinline','');
+        app.vid.setAttribute('autoplay','');
+        app.vid.setAttribute('muted','');
+        app.vid.loop = true;
+        app.vid.setAttribute('loop','');
+        try { await app.vid.play?.(); } catch(_) {}
+        state.mirror = false;
+      }
+    };
+    document.body.appendChild(iv);
+    app.ui.fileVideo = iv;
+  }
 // 1) Жёстко фиксируем отсутствие инверсии до первого кадра
 state.invert = false;
 if (app.ui.invert) app.ui.invert.checked = false;
@@ -1720,6 +1788,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
