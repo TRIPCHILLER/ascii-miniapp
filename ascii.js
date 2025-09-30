@@ -1699,19 +1699,54 @@ refitFont(w, h);
 })();
 
 
+// ===== мини debug-попап/alert =====
+function debug(msg) {
+  // если у тебя уже есть модальное окно — можно дернуть его
+  if (window.showDebug) return window.showDebug(String(msg));
+  alert(String(msg));
+}
 
+// ===== helper: получить Blob результата =====
+// ЗАМЕНИ содержимое на твою функцию экспорта результата.
+// Должен вернуться Blob (png/webp/jpg/gif — не важно)
+async function exportCurrentResultBlob() {
+  // пример для canvas:
+  const canvas = document.querySelector('canvas'); // или твой id
+  if (!canvas) return null;
+  const dataUrl = canvas.toDataURL('image/png');
+  const res = await fetch(dataUrl);
+  return await res.blob();
+}
 
+// ===== обработчик кнопки Сохранить =====
+async function onSaveClick() {
+  try {
+    const isTg = !!(window.Telegram && Telegram.WebApp);
+    debug('click SAVE; isTg=' + isTg);
 
+    const blob = await exportCurrentResultBlob();
+    if (!blob) return debug('ERR: blob empty');
 
+    const form = new FormData();
+    form.append('file', blob, 'ascii.png');          // ВАЖНО: ключ именно "file"
+    // form.append('mediaType','photo'); // если нужно различать
 
+    const url = 'https://api.tripchiller.com/api/upload';
+    const headers = {};
+    if (isTg) headers['x-telegram-init-data'] = Telegram.WebApp.initData || '';
 
+    debug('before fetch: ' + url);
+    const res = await fetch(url, { method:'POST', body: form, headers });
+    const text = await res.text();
+    debug('upload status=' + res.status + '; body=' + text.slice(0,200));
+  } catch (e) {
+    debug('ERR fetch: ' + e.message);
+  }
+}
 
-
-
-
-
-
-
-
-
-
+// ===== навешиваем слушатель на кнопку =====
+(function attachSaveHandler(){
+  const btn = document.querySelector('#saveBtn, [data-action="save"]');
+  if (!btn) { console.warn('Save button not found'); return; }
+  btn.addEventListener('click', onSaveClick);
+})();
