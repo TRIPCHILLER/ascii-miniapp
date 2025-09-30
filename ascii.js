@@ -946,6 +946,7 @@ let uploadInFlight = false;
 
 // Универсальная отправка: в Telegram → на сервер; иначе → локальная загрузка
 async function downloadBlob(blob, filename) {
+  window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'downloadBlob() start' });
   const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
 
   if (uploadInFlight) {
@@ -1530,6 +1531,7 @@ app._lastVideoURL = url;
 
 // --- ЕДИНАЯ функция сохранения ---
 function doSave() {
+  window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'doSave() start' });
   if (state.mode === 'photo') {
     hudSet('PNG: экспорт…');
     savePNG();
@@ -1697,3 +1699,4 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
