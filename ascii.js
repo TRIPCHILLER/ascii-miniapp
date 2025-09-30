@@ -955,7 +955,7 @@ async function downloadBlob(blob, filename) {
   uploadInFlight = true;
 
   const isTg = !!(window.Telegram?.WebApp?.initData);
-
+window.Telegram?.WebApp?.showPopup?.({ title: 'DEBUG', message: 'isTg=' + isTg });
   if (isTg) {
     try {
       const tg = window.Telegram.WebApp;
@@ -1697,6 +1697,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
