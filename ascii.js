@@ -768,17 +768,25 @@ function renderAsciiToCanvas(text, cols, rows, scale = 2){
   }
 }
 
-// PNG (режим ФОТО)
-function savePNG(){
-  const grid = state.lastGrid;
-  const text = app.out.textContent || '';
-  if (!text.trim()) { alert('Нечего сохранять'); return; }
-  renderAsciiToCanvas(text, grid.w, grid.h, 2);
-  app.ui.render.toBlob(blob=>{
-    if(!blob) { alert('Не удалось сгенерировать PNG'); return; }
-    downloadBlob(blob, '@tripchiller_ascii_bot.png');
-    hudSet('PNG: сохранено/отправлено');
-  }, 'image/png');
+// Сохранение фото → обязательно вызывает downloadBlob
+async function savePNG() {
+  window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'savePNG() start' });
+
+  // найди твой canvas с результатом; если у тебя другой — подставь его
+  const canvas = document.querySelector('canvas#out, canvas#result, canvas');
+  if (!canvas) {
+    window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'ERR: canvas not found' });
+    return;
+  }
+
+  const blob = await new Promise(res => canvas.toBlob(res, 'image/png', 0.92));
+  if (!blob) {
+    window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'ERR: blob is null' });
+    return;
+  }
+
+  window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'blob ok: ' + (blob.size||0) + ' bytes' });
+  await downloadBlob(blob, 'ascii.png');                // ← КЛЮЧЕВОЙ ВЫЗОВ
 }
 
 // Пытаемся дать MP4, иначе WebM
@@ -846,6 +854,7 @@ function renderAsciiFrameLocked(text) {
 }
 // Видео (режим ВИДЕО)
 function saveVideo(){
+  window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'saveVideo() start' });
   if (state.mode!=='video') { alert('Видео-экспорт доступен только в режиме ВИДЕО'); return; }
   const mime = pickMime();
   if (!mime) { alert('Запись видео не поддерживается на этом устройстве.'); return; }
@@ -877,7 +886,7 @@ function saveVideo(){
       state.recorder.onstop = async () => {
       busyShow('Конвертация в MP4…');
       const blob = new Blob(state.recordChunks, { type: mime });
-
+      await downloadBlob(blob, 'ascii.mp4');
   try {
     if (mime.includes('mp4')) {
       downloadBlob(blob, '@tripchiller_ascii_bot.mp4');
@@ -1699,4 +1708,5 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
