@@ -1320,70 +1320,6 @@ async function setMode(newMode){
   }
 }
 
-// Telegram MainButton
-if (tg) {
-  if (isSaveVisible) {
-    mainBtnShow('СОХРАНИТЬ', doSave);
-  } else {
-    mainBtnHide();
-  }
-}
-
-  // переключаем видимость верхних кнопок
-  if (app.ui.fs)   app.ui.fs.hidden   = (newMode!=='live');
-  if (app.ui.save) app.ui.save.hidden = (newMode==='live');
-// Telegram MainButton: показываем только в ФОТО/ВИДЕО, скрываем в LIVE
-if (tg) {
-  if (newMode === 'live') {
-    mainBtnHide();
-  } else {
-    // покажем, но итогово включим после появления контента (см. ниже)
-    mainBtnShow('СОХРАНИТЬ', doSave);
-  }
-}
-  app.ui.modeLive .classList.toggle('active', newMode==='live');
-  app.ui.modePhoto.classList.toggle('active', newMode==='photo');
-  app.ui.modeVideo.classList.toggle('active', newMode==='video');
-
-  // общий сброс зума/плейсхолдера
-  state.viewScale = 1;
-  fitAsciiToViewport();
-
-  // если уходим из PHOTO — очищаем картинку
-  if (newMode !== 'photo') state.imageEl = null;
-
-  // если уходим из VIDEO — убираем файл-источник (но не камеру)
-  if (newMode !== 'video') {
-    try { if (app.vid && !app.vid.srcObject) { app.vid.pause?.(); app.vid.removeAttribute('src'); } } catch(e){}
-  }
-
-  if (newMode === 'live') {
-    // LIVE: выключаем возможный файл и включаем камеру
-    stopStream();                 // на всякий
-    app.ui.placeholder.hidden = true;
-    await startStream();
-    updateMirrorForFacing?.();
-    return;
-  }
-
-  // не LIVE → камеру останавливаем
-  stopStream();
-
-  // PHOTO/VIDEO: показываем плейсхолдер, если ещё нет источника
-  if (newMode === 'photo') {
-    if (!state.imageEl) app.ui.filePhoto.click();
-    else app.ui.placeholder.hidden = true;
-} else if (newMode === 'video') {
-  if (!(app.vid && app.vid.src)) {
-    app.ui.fileVideo.click();
-  } else {
-    app.ui.placeholder.hidden = true;
-    // на всякий: при возврате в режим видео держим зацикливание
-    app.vid.loop = true;
-    app.vid.setAttribute('loop','');
-  }
-}
-}
   // ============== СВЯЗКА UI ==============
   function bindUI() {
     // Показ/скрытие панели
@@ -1822,6 +1758,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
