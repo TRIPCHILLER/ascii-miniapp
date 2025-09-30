@@ -1702,9 +1702,6 @@ async function init() {
         const { w, h } = updateGridSize(); refitFont(w, h);
         updateHud('img onload');
         requestAnimationFrame(()=>{});
-        if (tg && state.mode === 'photo') {
-          mainBtnShow('СОХРАНИТЬ', doSave);
-        }
       };
       const urlImg = URL.createObjectURL(f);
       img.src = urlImg;
@@ -1756,7 +1753,7 @@ async function init() {
   }
 
   if (tg && tg.ready) tg.ready();
-  await new Promise(r => setTimeout(r, 0)); // один тик, чтобы DOM устаканился
+  await new Promise(r => requestAnimationFrame(r)); // ждём реальный кадр — gUM спрашивается стабильно
 
   await setMode('live');            // сразу просим камеру
   if (raf) cancelAnimationFrame(raf);
@@ -1768,3 +1765,4 @@ async function init() {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
