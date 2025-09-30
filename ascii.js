@@ -768,14 +768,20 @@ function renderAsciiToCanvas(text, cols, rows, scale = 2){
   }
 }
 
-// Сохранение фото → обязательно вызывает downloadBlob
+// Сохранение фото → рендерим ASCII в #render и отправляем
 async function savePNG() {
   window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'savePNG() start' });
 
-  // найди твой canvas с результатом; если у тебя другой — подставь его
-  const canvas = document.querySelector('canvas#out, canvas#result, canvas');
+  const text = app.out?.textContent || '';
+  const cols = state.lastGrid?.w || 80;
+  const rows = state.lastGrid?.h || 50;
+
+  // рисуем ASCII-текст на скрытом canvas #render
+  renderAsciiToCanvas(text, cols, rows, 2);
+
+  const canvas = app.ui.render;
   if (!canvas) {
-    window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'ERR: canvas not found' });
+    window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'ERR: render canvas not found' });
     return;
   }
 
@@ -786,7 +792,7 @@ async function savePNG() {
   }
 
   window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'blob ok: ' + (blob.size||0) + ' bytes' });
-  await downloadBlob(blob, 'ascii.png');                // ← КЛЮЧЕВОЙ ВЫЗОВ
+  await downloadBlob(blob, 'ascii.png');
 }
 
 // Пытаемся дать MP4, иначе WebM
@@ -1243,49 +1249,74 @@ function updateMirrorForFacing() {
 }
 
 async function setMode(newMode){
-  // если нажали на ту же вкладку → заново открыть выбор файла
+  // повторный клик по той же вкладке — сразу открыть выбор
   if (newMode === state.mode) {
-    if (newMode === 'photo') {
-      app.ui.filePhoto.value = '';   // сброс, иначе не даст выбрать тот же файл
+    if (newMode === 'photo' && app.ui.filePhoto) {
+      app.ui.filePhoto.value = '';
       app.ui.filePhoto.click();
-      return;
-    }
-    if (newMode === 'video') {
+    } else if (newMode === 'video' && app.ui.fileVideo) {
       app.ui.fileVideo.value = '';
       app.ui.fileVideo.click();
-      return;
     }
-    // для live ничего не делаем
+    return;
   }
 
   state.mode = newMode;
-  // сброс активного состояния
-app.ui.tabLive?.classList.remove('active');
-app.ui.tabPhoto?.classList.remove('active');
-app.ui.tabVideo?.classList.remove('active');
 
-// включаем активное состояние для текущего режима
-if (newMode === 'live')  app.ui.tabLive?.classList.add('active');
-if (newMode === 'photo') app.ui.tabPhoto?.classList.add('active');
-if (newMode === 'video') app.ui.tabVideo?.classList.add('active');
+  // === Подсветка активной вкладки ===
+  app.ui.modeLive .classList.toggle('active', newMode==='live');
+  app.ui.modePhoto.classList.toggle('active', newMode==='photo');
+  app.ui.modeVideo.classList.toggle('active', newMode==='video');
 
-syncFpsVisibility(); // переключаем FPS в зависимости от режима
+  // FPS видно везде, кроме фото
+  syncFpsVisibility();
 
-  // переключаем видимость кнопки СОХРАНИТЬ
-const isSaveVisible = (newMode === 'photo' || newMode === 'video');
-app.ui.save?.classList.toggle('hidden', !isSaveVisible);
-if (tg) { isSaveVisible ? mainBtnShow('СОХРАНИТЬ', doSave) : mainBtnHide(); }
+  // === Верхние кнопки ===
+  // FULLSCREEN показываем только в LIVE
+  if (app.ui.fs)   app.ui.fs.hidden   = (newMode !== 'live');
+  // СОХРАНИТЬ показываем только в ФОТО/ВИДЕО
+  if (app.ui.save) app.ui.save.hidden = (newMode === 'live');
 
-// 2) Авто-пикер на ПЕРВЫЙ клик
-if (newMode === 'photo') {
-  if (app.ui.filePhoto) {
-    app.ui.filePhoto.value = '';               // сброс, чтобы выбрать тот же файл
-    requestAnimationFrame(() => app.ui.filePhoto.click());
+  // Телеграм-кнопку снизу убираем всегда (решили оставить верхнюю)
+  if (tg) mainBtnHide();
+
+  // общий сброс зума/плейсхолдера
+  state.viewScale = 1;
+  fitAsciiToViewport();
+
+  // очистки при смене
+  if (newMode !== 'photo') state.imageEl = null;
+  if (newMode !== 'video') {
+    try { if (app.vid && !app.vid.srcObject) { app.vid.pause?.(); app.vid.removeAttribute('src'); } } catch(e){}
   }
-} else if (newMode === 'video') {
-  if (app.ui.fileVideo) {
-    app.ui.fileVideo.value = '';
-    requestAnimationFrame(() => app.ui.fileVideo.click());
+
+  if (newMode === 'live') {
+    // Включаем камеру
+    stopStream();
+    app.ui.placeholder.hidden = true;
+    await startStream();
+    updateMirrorForFacing?.();
+    return;
+  }
+
+  // Фото/видео: камеру выключаем, показываем плейсхолдер до выбора файла
+  stopStream();
+
+  if (newMode === 'photo') {
+    app.ui.placeholder.hidden = !(!state.imageEl);
+    if (app.ui.filePhoto) {
+      app.ui.filePhoto.value = '';
+      requestAnimationFrame(() => app.ui.filePhoto.click()); // первый клик → сразу пикер
+    }
+  } else if (newMode === 'video') {
+    app.ui.placeholder.hidden = !!(app.vid && app.vid.src);
+    if (!(app.vid && app.vid.src) && app.ui.fileVideo) {
+      app.ui.fileVideo.value = '';
+      requestAnimationFrame(() => app.ui.fileVideo.click());
+    } else if (app.vid) {
+      app.vid.loop = true;
+      app.vid.setAttribute('loop','');
+    }
   }
 }
 
@@ -1494,9 +1525,6 @@ app.ui.filePhoto.addEventListener('change', (e) => {
     const { w, h } = updateGridSize(); refitFont(w, h);
     updateHud('img onload');
     requestAnimationFrame(()=>{}); // разовый тик
-    if (tg && state.mode === 'photo') {
-  mainBtnShow('СОХРАНИТЬ', doSave);
-}
   };
   if (app._lastImageURL) { try { URL.revokeObjectURL(app._lastImageURL); } catch(_) {} }
 const urlImg = URL.createObjectURL(f);
@@ -1553,9 +1581,6 @@ app._lastVideoURL = url;
         refitFont(w, h);
       });
     }
-    if (tg && state.mode === 'video') {
-  mainBtnShow('СОХРАНИТЬ', doSave);
-}
   };
 
   // как только ролик готов играть — ещё раз на всякий случай подогнать сетку
@@ -1797,6 +1822,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
