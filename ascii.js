@@ -768,35 +768,39 @@ function renderAsciiToCanvas(text, cols, rows, scale = 2){
   }
 }
 
-// Сохранение фото → рендерим ASCII в #render и отправляем
+// Сохранение фото → рисуем ASCII в #render и отправляем как PNG
 async function savePNG() {
   window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'savePNG() start' });
 
-  const canvas = app.ui.render; // у тебя рендерится в #render
+  const canvas = app.ui.render; // именно скрытый canvas для экспорта
   if (!canvas) {
     window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'ERR: canvas not found' });
     return;
   }
-// нарисовать текущий ASCII в скрытом канвасе перед сохранением
-const txt  = app.out.textContent || '';
-const cols = state.lastGrid?.w || 80;
-const rows = state.lastGrid?.h || 50;
-renderAsciiToCanvas(txt, cols, rows, 2); // scale=2 как и планировали
-  try {
-    const blob = await new Promise(res => {
-      canvas.toBlob(res, 'image/png', 0.92);
-    });
 
-    if (!blob) {
-      window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'ERR: blob is null' });
+  // нарисовать текущий ASCII в #render (на всякий — обновим перед экспортом)
+  const txt  = app.out?.textContent || '';
+  const cols = state.lastGrid?.w || 80;
+  const rows = state.lastGrid?.h || 50;
+  renderAsciiToCanvas(txt, cols, rows, 2); // scale=2 — как и планировали
+
+  try {
+    // надёжный способ: dataURL → fetch → blob (toBlob иногда зависает в WebView)
+    const dataUrl = canvas.toDataURL('image/png', 0.92);
+    const resp = await fetch(dataUrl);
+    const blob = await resp.blob();
+
+    if (!blob || !blob.size) {
+      window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'ERR: blob empty' });
       return;
     }
 
-    window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'blob ok: ' + (blob.size||0) + ' bytes' });
+    window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'blob ok: ' + blob.size + ' bytes' });
 
+    // ключевой вызов — это запускает upload → файл в ЛС и списание кредита
     await downloadBlob(blob, 'ascii.png');
   } catch (e) {
-    window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'ERR in savePNG: ' + e.message });
+    window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'ERR in savePNG: ' + (e?.message || e) });
   }
 }
 
@@ -989,10 +993,10 @@ window.Telegram?.WebApp?.showPopup?.({ title: 'DEBUG', message: 'isTg=' + isTg }
       form.append('mediaType', (state.mode === 'video') ? 'video' : 'photo');
       window.Telegram?.WebApp?.showPopup({ title: 'DEBUG', message: 'about to POST /api/upload' });
       const res = await fetch('https://api.tripchiller.com/api/upload', {
-  method: 'POST',
-  headers: { 'x-telegram-init-data': tg.initData }, // ⟵ добавили
-  body: form
-});
+      method: 'POST',
+      headers: { 'x-telegram-init-data': tg.initData }, // ⟵ добавили
+      body: form
+    });
       const json = await res.json().catch(() => ({}));
 
       // нехватка средств — показываем попап и ВЫХОД без локального скачивания
@@ -1766,6 +1770,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
