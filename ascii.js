@@ -772,27 +772,28 @@ function renderAsciiToCanvas(text, cols, rows, scale = 2){
 async function savePNG() {
   window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'savePNG() start' });
 
-  const text = app.out?.textContent || '';
-  const cols = state.lastGrid?.w || 80;
-  const rows = state.lastGrid?.h || 50;
-
-  // рисуем ASCII-текст на скрытом canvas #render
-  renderAsciiToCanvas(text, cols, rows, 2);
-
-  const canvas = app.ui.render;
+  const canvas = app.ui.render; // у тебя рендерится в #render
   if (!canvas) {
-    window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'ERR: render canvas not found' });
+    window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'ERR: canvas not found' });
     return;
   }
 
-  const blob = await new Promise(res => canvas.toBlob(res, 'image/png', 0.92));
-  if (!blob) {
-    window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'ERR: blob is null' });
-    return;
-  }
+  try {
+    const blob = await new Promise(res => {
+      canvas.toBlob(res, 'image/png', 0.92);
+    });
 
-  window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'blob ok: ' + (blob.size||0) + ' bytes' });
-  await downloadBlob(blob, 'ascii.png');
+    if (!blob) {
+      window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'ERR: blob is null' });
+      return;
+    }
+
+    window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'blob ok: ' + (blob.size||0) + ' bytes' });
+
+    await downloadBlob(blob, 'ascii.png');
+  } catch (e) {
+    window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'ERR in savePNG: ' + e.message });
+  }
 }
 
 // Пытаемся дать MP4, иначе WebM
@@ -1755,6 +1756,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
