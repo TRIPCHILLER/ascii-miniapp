@@ -777,7 +777,11 @@ async function savePNG() {
     window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'ERR: canvas not found' });
     return;
   }
-
+// нарисовать текущий ASCII в скрытом канвасе перед сохранением
+const txt  = app.out.textContent || '';
+const cols = state.lastGrid?.w || 80;
+const rows = state.lastGrid?.h || 50;
+renderAsciiToCanvas(txt, cols, rows, 2); // scale=2 как и планировали
   try {
     const blob = await new Promise(res => {
       canvas.toBlob(res, 'image/png', 0.92);
@@ -984,7 +988,11 @@ window.Telegram?.WebApp?.showPopup?.({ title: 'DEBUG', message: 'isTg=' + isTg }
       form.append('initData', tg.initData);
       form.append('mediaType', (state.mode === 'video') ? 'video' : 'photo');
       window.Telegram?.WebApp?.showPopup({ title: 'DEBUG', message: 'about to POST /api/upload' });
-      const res  = await fetch('https://api.tripchiller.com/api/upload', { method: 'POST', body: form });
+      const res = await fetch('https://api.tripchiller.com/api/upload', {
+  method: 'POST',
+  headers: { 'x-telegram-init-data': tg.initData }, // ⟵ добавили
+  body: form
+});
       const json = await res.json().catch(() => ({}));
 
       // нехватка средств — показываем попап и ВЫХОД без локального скачивания
@@ -1756,6 +1764,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
