@@ -886,7 +886,6 @@ function saveVideo(){
       state.recorder.onstop = async () => {
       busyShow('Конвертация в MP4…');
       const blob = new Blob(state.recordChunks, { type: mime });
-      await downloadBlob(blob, 'ascii.mp4');
   try {
     if (mime.includes('mp4')) {
       downloadBlob(blob, '@tripchiller_ascii_bot.mp4');
@@ -1788,6 +1787,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
