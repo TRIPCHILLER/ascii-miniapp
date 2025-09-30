@@ -1259,6 +1259,16 @@ async function setMode(newMode){
   }
 
   state.mode = newMode;
+  // сброс активного состояния
+app.ui.tabLive?.classList.remove('active');
+app.ui.tabPhoto?.classList.remove('active');
+app.ui.tabVideo?.classList.remove('active');
+
+// включаем активное состояние для текущего режима
+if (newMode === 'live')  app.ui.tabLive?.classList.add('active');
+if (newMode === 'photo') app.ui.tabPhoto?.classList.add('active');
+if (newMode === 'video') app.ui.tabVideo?.classList.add('active');
+
 syncFpsVisibility(); // переключаем FPS в зависимости от режима
 
   // переключаем видимость кнопки СОХРАНИТЬ
@@ -1787,6 +1797,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
