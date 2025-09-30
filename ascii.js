@@ -770,37 +770,44 @@ function renderAsciiToCanvas(text, cols, rows, scale = 2){
 
 // Сохранение фото → рисуем ASCII в #render и отправляем как PNG
 async function savePNG() {
-  window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'savePNG() start' });
-
-  const canvas = app.ui.render; // именно скрытый canvas для экспорта
+  // НЕ спамим попапами — Telegram игнорит второй, пока открыт первый
+  const canvas = app.ui.render;
   if (!canvas) {
-    window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'ERR: canvas not found' });
+    window.Telegram?.WebApp?.showPopup({ title:'Ошибка', message:'Внутренний canvas для экспорта не найден.' });
     return;
   }
 
-  // нарисовать текущий ASCII в #render (на всякий — обновим перед экспортом)
+  // перерисуем текущий ASCII в #render (чтобы гарантировать актуальные размеры)
   const txt  = app.out?.textContent || '';
   const cols = state.lastGrid?.w || 80;
   const rows = state.lastGrid?.h || 50;
-  renderAsciiToCanvas(txt, cols, rows, 2); // scale=2 — как и планировали
+  renderAsciiToCanvas(txt, cols, rows, 2);
 
   try {
-    // надёжный способ: dataURL → fetch → blob (toBlob иногда зависает в WebView)
+    // надёжный способ: dataURL → fetch → blob
     const dataUrl = canvas.toDataURL('image/png', 0.92);
     const resp = await fetch(dataUrl);
     const blob = await resp.blob();
 
     if (!blob || !blob.size) {
-      window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'ERR: blob empty' });
+      window.Telegram?.WebApp?.showPopup({ title:'Ошибка', message:'Не удалось сформировать PNG.' });
       return;
     }
 
-    window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'blob ok: ' + blob.size + ' bytes' });
-
-    // ключевой вызов — это запускает upload → файл в ЛС и списание кредита
+    // ключевой вызов — именно он делает POST /api/upload в Telegram-вебвью
     await downloadBlob(blob, 'ascii.png');
+
+    // один итоговый попап после возврата из downloadBlob (если это Telegram)
+    if (window.Telegram?.WebApp?.initData) {
+      // downloadBlob уже показывает «Готово» при успехе — здесь можно ничего не дублировать
+      // но если очень хочется — оставь короткий тост-подтверждение
+      // window.Telegram.WebApp.showPopup({ title:'OK', message:'Отправлено.' });
+    }
   } catch (e) {
-    window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'ERR in savePNG: ' + (e?.message || e) });
+    window.Telegram?.WebApp?.showPopup({
+      title:'Ошибка сохранения',
+      message:String(e?.message || e)
+    });
   }
 }
 
@@ -1260,6 +1267,34 @@ function updateMirrorForFacing() {
   try { app.vid.pause?.(); } catch(e){}
   app.vid.removeAttribute('src');
 }
+// --- Warm start камеры + фолбэк на первый жест ---
+let _warmTried = false;
+async function warmStartCameraOnce(){
+  if (_warmTried) return;
+  _warmTried = true;
+  if (!navigator.mediaDevices?.getUserMedia) return;
+  try {
+    const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: state.facing || 'user' }, audio:false });
+    // сразу выключим, это только для запроса пермишена
+    s.getTracks().forEach(t=>t.stop());
+  } catch(_) { /* игнорим — спросится при реальном старте */ }
+}
+
+// если при загрузке камера не стартанула — дёргаем на первый тап/клик
+function bindFirstGestureCameraKick(){
+  const kick = async () => {
+    if (state.mode === 'live' && !app.vid?.srcObject) {
+      await startStream();
+      updateMirrorForFacing?.();
+    }
+    window.removeEventListener('pointerup', kick, { capture:true });
+    window.removeEventListener('touchend', kick, { capture:true });
+    window.removeEventListener('click', kick, { capture:true });
+  };
+  window.addEventListener('pointerup', kick, { capture:true, once:true });
+  window.addEventListener('touchend',  kick, { capture:true, once:true });
+  window.addEventListener('click',     kick, { capture:true, once:true });
+}
 
 async function setMode(newMode){
   // повторный клик по той же вкладке — сразу открыть выбор
@@ -1684,6 +1719,8 @@ app.ui.invert.addEventListener('change', e => {
 async function init() {
   fillStyleSelect();
   setUI();
+await warmStartCameraOnce();   // заранее пинганём getUserMedia чтобы показать системный попап
+bindFirstGestureCameraKick();  // если вебвью всё равно не дало — стартанём на ПЕРВЫЙ тап
 
   // гарантируем скрытые инпуты (photo/video)
   if (!app.ui.filePhoto) {
@@ -1765,4 +1802,5 @@ async function init() {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
