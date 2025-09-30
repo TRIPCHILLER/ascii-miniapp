@@ -1261,6 +1261,19 @@ async function setMode(newMode){
 
   state.mode = newMode;
 syncFpsVisibility(); // переключаем FPS в зависимости от режима
+  // переключаем видимость кнопки СОХРАНИТЬ
+const isSaveVisible = (newMode === 'photo' || newMode === 'video');
+if (app.ui.save) app.ui.save.classList.toggle('hidden', !isSaveVisible);
+
+// Telegram MainButton
+if (tg) {
+  if (isSaveVisible) {
+    mainBtnShow('СОХРАНИТЬ', doSave);
+  } else {
+    mainBtnHide();
+  }
+}
+
   // переключаем видимость верхних кнопок
   if (app.ui.fs)   app.ui.fs.hidden   = (newMode!=='live');
   if (app.ui.save) app.ui.save.hidden = (newMode==='live');
@@ -1540,19 +1553,18 @@ app._lastVideoURL = url;
 
 // --- ЕДИНАЯ функция сохранения ---
 function doSave() {
-  window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'doSave() start' });
-  if (state.mode === 'photo') {
-    hudSet('PNG: экспорт…');
-    savePNG();
-  } else if (state.mode === 'video') {
-    if (!app.vid || (!app.vid.src && !app.vid.srcObject)) {
-      alert('Нет выбранного видео.');
-      return;
-    }
-    hudSet('VIDEO: запись… (дождитесь окончания)');
-    saveVideo();
-  }
+  const mode = state.mode;
+
+  if (mode === 'photo') return savePNG();
+  if (mode === 'video') return saveVideo();
+
+  // LIVE и всё прочее → без сохранения
+  window.Telegram?.WebApp?.showPopup({
+    title: 'Режим LIVE',
+    message: 'Сохранение доступно в режимах ФОТО или ВИДЕО.'
+  });
 }
+
 
 // Кнопка в тулбаре
 app.ui.save.addEventListener('click', doSave);
@@ -1708,5 +1720,6 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
