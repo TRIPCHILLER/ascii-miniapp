@@ -1526,9 +1526,6 @@ app._lastVideoURL = url;
       const { w, h } = updateGridSize();
       refitFont(w, h);
     });
-    if (tg && state.mode === 'video') {
-  mainBtnShow('СОХРАНИТЬ', doSave);
-}
   };
 
   // стартуем воспроизведение
@@ -1758,6 +1755,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
