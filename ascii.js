@@ -967,7 +967,7 @@ window.Telegram?.WebApp?.showPopup?.({ title: 'DEBUG', message: 'isTg=' + isTg }
       form.append('filename', filename);
       form.append('initData', tg.initData);
       form.append('mediaType', (state.mode === 'video') ? 'video' : 'photo');
-
+      window.Telegram?.WebApp?.showPopup({ title: 'DEBUG', message: 'about to POST /api/upload' });
       const res  = await fetch('https://api.tripchiller.com/api/upload', { method: 'POST', body: form });
       const json = await res.json().catch(() => ({}));
 
@@ -1750,3 +1750,4 @@ async function onSaveClick() {
   if (!btn) { console.warn('Save button not found'); return; }
   btn.addEventListener('click', onSaveClick);
 })();
+
