@@ -1681,10 +1681,11 @@ app.ui.invert.addEventListener('change', e => {
     }).observe(app.stage);
   }
 
-  // ============== СТАРТ ==============
-  async function init() {
-    fillStyleSelect();
-setUI();
+async function init() {
+  fillStyleSelect();
+  setUI();
+
+  // гарантируем скрытые инпуты (photo/video)
   if (!app.ui.filePhoto) {
     const ip = document.createElement('input');
     ip.type = 'file';
@@ -1692,23 +1693,22 @@ setUI();
     ip.style.display = 'none';
     ip.onchange = e => {
       const f = e.target.files?.[0];
-      if (f) {
-        const img = new Image();
-        img.onload = () => {
-          state.imageEl = img;
-          state.mirror = false;
-          app.ui.placeholder.hidden = true;
-          const { w, h } = updateGridSize(); refitFont(w, h);
-          updateHud('img onload');
-          requestAnimationFrame(()=>{});
-          if (tg && state.mode === 'photo') {
-            mainBtnShow('СОХРАНИТЬ', doSave);
-          }
-        };
-        const urlImg = URL.createObjectURL(f);
-        img.src = urlImg;
-        app._lastImageURL = urlImg;
-      }
+      if (!f) return;
+      const img = new Image();
+      img.onload = () => {
+        state.imageEl = img;
+        state.mirror = false;
+        app.ui.placeholder.hidden = true;
+        const { w, h } = updateGridSize(); refitFont(w, h);
+        updateHud('img onload');
+        requestAnimationFrame(()=>{});
+        if (tg && state.mode === 'photo') {
+          mainBtnShow('СОХРАНИТЬ', doSave);
+        }
+      };
+      const urlImg = URL.createObjectURL(f);
+      img.src = urlImg;
+      app._lastImageURL = urlImg;
     };
     document.body.appendChild(ip);
     app.ui.filePhoto = ip;
@@ -1721,65 +1721,50 @@ setUI();
     iv.style.display = 'none';
     iv.onchange = async e => {
       const f = e.target.files?.[0];
-      if (f) {
-        stopStream();
-        if (app._lastVideoURL) { try { URL.revokeObjectURL(app._lastVideoURL); } catch(_) {} }
-        const url = URL.createObjectURL(f);
-        app.vid.src = url;
-        app._lastVideoURL = url;
-        app.vid.setAttribute('playsinline','');
-        app.vid.setAttribute('autoplay','');
-        app.vid.setAttribute('muted','');
-        app.vid.loop = true;
-        app.vid.setAttribute('loop','');
-        try { await app.vid.play?.(); } catch(_) {}
-        state.mirror = false;
-      }
+      if (!f) return;
+      stopStream();
+      if (app._lastVideoURL) { try { URL.revokeObjectURL(app._lastVideoURL); } catch(_) {} }
+      const url = URL.createObjectURL(f);
+      app.vid.src = url;
+      app._lastVideoURL = url;
+      app.vid.setAttribute('playsinline','');
+      app.vid.setAttribute('autoplay','');
+      app.vid.setAttribute('muted','');
+      app.vid.loop = true;
+      app.vid.setAttribute('loop','');
+      try { await app.vid.play?.(); } catch(_) {}
+      state.mirror = false;
     };
     document.body.appendChild(iv);
     app.ui.fileVideo = iv;
   }
-// 1) Жёстко фиксируем отсутствие инверсии до первого кадра
-state.invert = false;
-if (app.ui.invert) app.ui.invert.checked = false;
-{
-  const lbl = document.getElementById('invert_label');
-  if (lbl) lbl.textContent = 'ИНВЕРСИЯ: ВЫКЛ';
-}
 
-bindUI();
-attachDoubleTapEnter();
-
-// 2) Принудительно применяем шрифтовой стек под стартовый режим символов,
-//    чтобы исключить "ложный" первый кадр с некорректным стеком.
-if (app.ui.charset) {
-  // дёрнем обработчик, он сам решит: CJK → CJK стек без сортировки,
-  // не CJK → основной стек + авто-сорт.
-  app.ui.charset.dispatchEvent(new Event('change', { bubbles: true }));
-}
-if (tg && tg.ready) tg.ready();  // дать телеграму «проснуться»
-await new Promise(r => setTimeout(r, 0)); // 1 тик, чтобы DOM устаканился
-
-await setMode('live');         // внутри сам вызовется startStream()
-if (raf) cancelAnimationFrame(raf);
-raf = requestAnimationFrame(loop);
-
-const { w, h } = updateGridSize();
-refitFont(w, h);
+  // фиксим инверсию до первого кадра
+  state.invert = false;
+  if (app.ui.invert) app.ui.invert.checked = false;
+  {
+    const lbl = document.getElementById('invert_label');
+    if (lbl) lbl.textContent = 'ИНВЕРСИЯ: ВЫКЛ';
   }
+
+  bindUI();
+  attachDoubleTapEnter();
+
+  // применяем стек шрифтов под выбранный набор символов
+  if (app.ui.charset) {
+    app.ui.charset.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  if (tg && tg.ready) tg.ready();
+  await new Promise(r => setTimeout(r, 0)); // один тик, чтобы DOM устаканился
+
+  await setMode('live');            // сразу просим камеру
+  if (raf) cancelAnimationFrame(raf);
+  raf = requestAnimationFrame(loop);
+
+  const { w, h } = updateGridSize();
+  refitFont(w, h);
+}
 
   document.addEventListener('DOMContentLoaded', init);
 })();
-
-
-
-
-
-
-
-
-
-
-
-
-
