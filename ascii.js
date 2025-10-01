@@ -979,11 +979,12 @@ async function downloadBlob(blob, filename) {
       const to = setTimeout(() => ctrl.abort(), 20000); // 20s timeout
 
       const res = await fetch('https://api.tripchiller.com/api/upload', {
-        method: 'POST',
-        headers: { 'x-telegram-init-data': tg.initData || '' },
-        body: form,
-        signal: ctrl.signal,
-      });
+  method: 'POST',
+  // без кастомных заголовков — initData уже в form (initdata и initData)
+  body: form,
+  signal: ctrl.signal,
+});
+      
       clearTimeout(to);
 
       const text = await res.text(); // тело может быть и текстом, и json
@@ -1756,6 +1757,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
