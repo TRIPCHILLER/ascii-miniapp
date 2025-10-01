@@ -497,6 +497,19 @@ function currentSource(){
           const { w, h } = updateGridSize(); refitFont(w, h);
           updateHud('ready meta');
         });
+        function stopStream() {
+  try {
+    if (app.vid) {
+      const s = app.vid.srcObject;
+      if (s && typeof s.getTracks === 'function') {
+        s.getTracks().forEach(t => { try { t.stop(); } catch(_){} });
+      }
+      app.vid.pause?.();
+      app.vid.removeAttribute('src');
+      app.vid.srcObject = null;
+    }
+  } catch(_) {}
+}
       }
     };
     app.vid.oncanplay = () => {
@@ -791,13 +804,6 @@ async function savePNG() {
 
   window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'blob ok: ' + (blob.size||0) + ' bytes' });
   await downloadBlob(blob, 'ascii.png'); // дальше — твой существующий пайплайн
-}
-    
-  } catch (e) {
-    window.Telegram?.WebApp?.showPopup({
-      title:'Ошибка сохранения',
-      message:String(e?.message || e)
-    });
   }
 }
 
@@ -1793,6 +1799,7 @@ bindFirstGestureCameraKick();  // если вебвью всё равно не �
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
