@@ -1361,14 +1361,10 @@ mainBtnHide();
  // PHOTO/VIDEO: всегда сразу открываем выбор файла на первом клике по режиму
  if (newMode === 'photo') {
    app.ui.filePhoto.value = '';
-   openFilePicker(app.ui.filePhoto);     // ← ключевая строка
    app.ui.placeholder.hidden = !!state.imageEl;
-   return; // больше ничего не делаем в этом заходе
  }
  if (newMode === 'video') {
    app.ui.fileVideo.value = '';
-   openFilePicker(app.ui.fileVideo);     // ← ключевая строка
-   return; // то же
  }
 }
   // ============== СВЯЗКА UI ==============
@@ -1771,6 +1767,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
