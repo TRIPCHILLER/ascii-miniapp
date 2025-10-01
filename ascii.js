@@ -1301,21 +1301,9 @@ function openFilePicker(el) {
   }, 0);
 }
 function updateModeTabs(newMode){
-  const all = [app.ui.modeLive, app.ui.modePhoto, app.ui.modeVideo];
-  all.forEach(el => {
-    if (!el) return;
-    el.classList.remove('active');
-    el.setAttribute('aria-selected', 'false');
-  });
-  let el = null;
-  if (newMode === 'live')  el = app.ui.modeLive;
-  if (newMode === 'photo') el = app.ui.modePhoto;
-  if (newMode === 'video') el = app.ui.modeVideo;
-  if (el) {
-    el.classList.add('active');
-    el.setAttribute('aria-selected', 'true');
-  }
-  // ключ: централизованная метка на body
+  if (app?.ui?.modeLive)  app.ui.modeLive.classList.toggle('active', newMode === 'live');
+  if (app?.ui?.modePhoto) app.ui.modePhoto.classList.toggle('active', newMode === 'photo');
+  if (app?.ui?.modeVideo) app.ui.modeVideo.classList.toggle('active', newMode === 'video');
   document.body.setAttribute('data-mode', newMode);
 }
 
@@ -1335,7 +1323,7 @@ async function setMode(newMode){
   }
 
   state.mode = newMode;
-  
+  updateModeTabs(newMode);
   syncFpsVisibility(); // переключаем FPS в зависимости от режима
   
   // переключаем видимость верхних кнопок
@@ -1350,7 +1338,6 @@ if (tg) {
     mainBtnShow('СОХРАНИТЬ', doSave);
   }
 }
-updateModeTabs(newMode);
 
   // общий сброс зума/плейсхолдера
   state.viewScale = 1;
@@ -1792,5 +1779,6 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
