@@ -781,30 +781,53 @@ function renderAsciiToCanvas(text, cols, rows, scale = 2){
   }
 }
 
-// Сохранение фото → toBlob → downloadBlob
+// Сохранение фото → рендер ASCII в скрытый canvas → blob → upload/share
 async function savePNG() {
-  window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'savePNG() start' });
+  // 1) визуальный индикатор – не popup, а overlay
+  busyShow('Готовим PNG…');
 
-  // Берём канвас безопасно
+  // 2) возьми скрытый canvas
   const canvas = app?.ui?.render;
   if (!canvas) {
-    window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'ERR: canvas not found (ui.render)' });
+    busyHide();
+    alert('ERR: не найден canvas для экспорта.');
     return;
   }
 
-  // Принудительно перерендерим (если у тебя используется рендер в скрытый canvas)
-  try { renderAsciiToCanvas?.(app.out.textContent || '', state.lastGrid?.w || 80, state.lastGrid?.h || 50); } catch(_) {}
+  // 3) принудительный ререндер на canvas
+  try {
+    const cols = state?.lastGrid?.w || 80;
+    const rows = state?.lastGrid?.h || Math.max(1, (app.out.textContent || '').split('\n').length);
+    renderAsciiToCanvas(app.out.textContent || '', cols, rows, 2);
+  } catch (e) {
+    // даже если рендер дал сбой — продолжим и попробуем снять то, что есть
+    console.warn('renderAsciiToCanvas failed:', e);
+  }
 
-  // Делаем PNG из канваса
-  const blob = await new Promise(res => canvas.toBlob(res, 'image/png', 0.92));
+  // 4) получаем blob (с резервом через dataURL)
+  let blob = await new Promise(res => canvas.toBlob(res, 'image/png', 0.92));
   if (!blob) {
-    window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'ERR: blob is null' });
-    return;
+    // резерв: через dataURL → Blob
+    try {
+      const url = canvas.toDataURL('image/png');
+      const bin = atob(url.split(',')[1] || '');
+      const buf = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+      blob = new Blob([buf], { type: 'image/png' });
+    } catch (e) {
+      busyHide();
+      alert('ERR: не удалось сформировать PNG.');
+      return;
+    }
   }
 
-  window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'blob ok: ' + (blob.size||0) + ' bytes' });
-  await downloadBlob(blob, 'ascii.png'); 
-  }
+  // 5) upload/share
+  busyShow('Отправляю…');
+  await downloadBlob(blob, 'ascii.png');
+
+  // 6) финальный статус
+  busyHide();
+}
 
 // Пытаемся дать MP4, иначе WebM
 function pickMime(){
@@ -1556,7 +1579,8 @@ app._lastVideoURL = url;
       });
     }
   };
-
+// небольшой «пинок» к воспроизведению
+setTimeout(() => { try { app.vid.play(); } catch(_) {} }, 0);
   // как только ролик готов играть — ещё раз на всякий случай подогнать сетку
   app.vid.oncanplay = () => {
     app.ui.placeholder.hidden = true;
@@ -1709,8 +1733,8 @@ app.ui.invert.addEventListener('change', e => {
 async function init() {
   fillStyleSelect();
   setUI();
-//await warmStartCameraOnce(); 
-//bindFirstGestureCameraKick(); 
+await warmStartCameraOnce(); 
+bindFirstGestureCameraKick(); 
 
   // гарантируем скрытые инпуты (photo/video)
   if (!app.ui.filePhoto) {
@@ -1791,6 +1815,7 @@ async function init() {
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
