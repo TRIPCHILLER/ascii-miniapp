@@ -1259,18 +1259,59 @@ function updateMirrorForFacing() {
   try { app.vid.pause?.(); } catch(e){}
   app.vid.removeAttribute('src');
 }
+function openFilePicker(el) {
+  if (!el) return;
+  // Запоминаем стили
+  const prev = {
+    hidden: el.hidden,
+    display: el.style.display,
+    pos: el.style.position,
+    left: el.style.left,
+    top: el.style.top,
+    opacity: el.style.opacity,
+    pe: el.style.pointerEvents,
+    w: el.style.width,
+    h: el.style.height,
+  };
+
+  // Делаем элемент «видимым» для браузера, но вне экрана
+  el.hidden = false;
+  el.style.display = 'block';
+  el.style.position = 'fixed';
+  el.style.left = '-9999px';
+  el.style.top = '-9999px';
+  el.style.opacity = '0';
+  el.style.pointerEvents = 'none';
+  el.style.width = '1px';
+  el.style.height = '1px';
+
+  try { el.click(); } catch(_) {}
+
+  // Восстанавливаем сразу после синхронного клика
+  setTimeout(() => {
+    el.hidden = prev.hidden;
+    el.style.display = prev.display;
+    el.style.position = prev.pos;
+    el.style.left = prev.left;
+    el.style.top = prev.top;
+    el.style.opacity = prev.opacity;
+    el.style.pointerEvents = prev.pe;
+    el.style.width = prev.w;
+    el.style.height = prev.h;
+  }, 0);
+}
 
 async function setMode(newMode){
   // если нажали на ту же вкладку → заново открыть выбор файла
   if (newMode === state.mode) {
     if (newMode === 'photo') {
-      app.ui.filePhoto.value = '';   // сброс, иначе не даст выбрать тот же файл
-      app.ui.filePhoto.click();
+    app.ui.filePhoto.value = '';
+    openFilePicker(app.ui.filePhoto);
       return;
     }
     if (newMode === 'video') {
-      app.ui.fileVideo.value = '';
-      app.ui.fileVideo.click();
+    app.ui.fileVideo.value = '';
+    openFilePicker(app.ui.fileVideo);
       return;
     }
     // для live ничего не делаем
@@ -1320,12 +1361,16 @@ if (tg) {
 
   // PHOTO/VIDEO: показываем плейсхолдер, если ещё нет источника
   if (newMode === 'photo') {
-    if (!state.imageEl) app.ui.filePhoto.click();
+  if (!state.imageEl) {
+  app.ui.filePhoto.value = '';
+  openFilePicker(app.ui.filePhoto);
+  }
     else app.ui.placeholder.hidden = true;
 } else if (newMode === 'video') {
-  if (!(app.vid && app.vid.src)) {
-    app.ui.fileVideo.click();
-  } else {
+if (!(app.vid && app.vid.src)) {
+  app.ui.fileVideo.value = '';
+  openFilePicker(app.ui.fileVideo);
+ } else {
     app.ui.placeholder.hidden = true;
     // на всякий: при возврате в режим видео держим зацикливание
     app.vid.loop = true;
@@ -1724,5 +1769,6 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
