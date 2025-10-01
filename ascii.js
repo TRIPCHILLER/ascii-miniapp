@@ -1301,19 +1301,25 @@ function openFilePicker(el) {
   }, 0);
 }
 function updateModeTabs(newMode){
-  const tabs = [
-    [app.ui.modeLive,'live'],
-    [app.ui.modePhoto,'photo'],
-    [app.ui.modeVideo,'video'],
-  ];
-  tabs.forEach(([el,mode])=>{
+  const all = [app.ui.modeLive, app.ui.modePhoto, app.ui.modeVideo];
+  // 1) безусловно снимаем активность со всех
+  all.forEach(el => {
     if (!el) return;
-    const active = (mode === newMode);
-    el.classList.toggle('active', active);         // если CSS всё-таки есть — пусть сработает
-    el.setAttribute('aria-selected', active ? 'true' : 'false');
-    // принудительная раскраска как просил: белый активный, серый неактивный
-    el.style.color = active ? '#ffffff' : '#808080';
+    el.classList.remove('active');
+    el.setAttribute('aria-selected', 'false');
+    el.style.color = '#808080'; // серый для неактивных
   });
+
+  // 2) задаём активную
+  let el = null;
+  if (newMode === 'live')  el = app.ui.modeLive;
+  if (newMode === 'photo') el = app.ui.modePhoto;
+  if (newMode === 'video') el = app.ui.modeVideo;
+  if (el) {
+    el.classList.add('active');
+    el.setAttribute('aria-selected', 'true');
+    el.style.color = '#ffffff'; // белый для активной
+  }
 }
 
 async function setMode(newMode){
@@ -1793,6 +1799,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
