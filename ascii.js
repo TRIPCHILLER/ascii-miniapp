@@ -480,9 +480,24 @@ function currentSource(){
 let _liveLock = null;
 
 async function startStream() {
-  // если уже идёт запрос/запуск — дожидаемся его
+function stopStream() {
+  try {
+    const s = app.vid?.srcObject;
+    if (s && s.getTracks) s.getTracks().forEach(t => t.stop());
+  } catch (_) {}
+  try {
+    app.vid.srcObject = null;
+    // чистим возможный file-URL
+    if (app._lastVideoURL) {
+      try { URL.revokeObjectURL(app._lastVideoURL); } catch (_) {}
+      app._lastVideoURL = null;
+    }
+    app.vid.removeAttribute('src');
+    app.vid.src = '';
+    app.vid.load?.();
+  } catch (_) {}
+}
   if (_liveLock) return _liveLock;
-
   _liveLock = (async () => {
     try {
       // 0) гасим старый стрим (если вдруг остался)
@@ -1789,6 +1804,7 @@ async function init() {
 }
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
