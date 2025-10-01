@@ -1302,15 +1302,11 @@ function openFilePicker(el) {
 }
 function updateModeTabs(newMode){
   const all = [app.ui.modeLive, app.ui.modePhoto, app.ui.modeVideo];
-  // 1) безусловно снимаем активность со всех
   all.forEach(el => {
     if (!el) return;
     el.classList.remove('active');
     el.setAttribute('aria-selected', 'false');
-    el.style.color = '#808080'; // серый для неактивных
   });
-
-  // 2) задаём активную
   let el = null;
   if (newMode === 'live')  el = app.ui.modeLive;
   if (newMode === 'photo') el = app.ui.modePhoto;
@@ -1318,8 +1314,9 @@ function updateModeTabs(newMode){
   if (el) {
     el.classList.add('active');
     el.setAttribute('aria-selected', 'true');
-    el.style.color = '#ffffff'; // белый для активной
   }
+  // ключ: централизованная метка на body
+  document.body.setAttribute('data-mode', newMode);
 }
 
 async function setMode(newMode){
@@ -1337,10 +1334,7 @@ async function setMode(newMode){
     // для live ничего не делаем
   }
 
-  // === Подсветка активной вкладки ===
-  app.ui.modeLive .classList.toggle('active', newMode==='live');
-  app.ui.modePhoto.classList.toggle('active', newMode==='photo');
-  app.ui.modeVideo.classList.toggle('active', newMode==='video');
+  state.mode = newMode;
   
   syncFpsVisibility(); // переключаем FPS в зависимости от режима
   
@@ -1521,25 +1515,26 @@ app.ui.flip.addEventListener('click', async () => {
 
 
 // --- Кнопки режимов внизу (с приоритетным вызовом file picker) ---
-app.ui.modeLive.addEventListener('click',  (e) => {
-  setMode('live');
-});
-app.ui.modePhoto.addEventListener('click', (e) => {
-  // 1) сразу — пикер (в рамках пользовательского жеста)
-  if (app?.ui?.filePhoto) {
-    app.ui.filePhoto.value = '';
-    openFilePicker(app.ui.filePhoto);
-  }
-  // 2) затем — смена режима (микротаск, чтобы не сбить доверенный жест)
-  Promise.resolve().then(() => setMode('photo'));
-});
-app.ui.modeVideo.addEventListener('click', (e) => {
-  if (app?.ui?.fileVideo) {
-    app.ui.fileVideo.value = '';
-    openFilePicker(app.ui.fileVideo);
-  }
-  Promise.resolve().then(() => setMode('video'));
-});
+ app.ui.modeLive.addEventListener('click', (e) => {
+   updateModeTabs('live');           // ← сразу подсветили
+   setMode('live');                  // потом логика режима
+ });
+ app.ui.modePhoto.addEventListener('click', (e) => {
+   updateModeTabs('photo');          // ← сразу подсветили
+   if (app?.ui?.filePhoto) {
+     app.ui.filePhoto.value = '';
+     openFilePicker(app.ui.filePhoto);
+   }
+   Promise.resolve().then(() => setMode('photo'));
+ });
+ app.ui.modeVideo.addEventListener('click', (e) => {
+   updateModeTabs('video');          // ← сразу подсветили
+   if (app?.ui?.fileVideo) {
+     app.ui.fileVideo.value = '';
+     openFilePicker(app.ui.fileVideo);
+   }
+   Promise.resolve().then(() => setMode('video'));
+ });
 
 // --- Выбор фото из галереи ---
 app.ui.filePhoto.addEventListener('change', (e) => {
@@ -1797,6 +1792,5 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
-
 
 
