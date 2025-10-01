@@ -368,11 +368,5 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   touch-action: none; }
 
 /* Централизованная подсветка активного режима */
-.modebar .btn { color:#808080 !important; }
-
-/* Активная — белая. Привязка к body[data-mode], чтобы не зависеть от классов */
-body[data-mode="live"]  #modeLive,
-body[data-mode="photo"] #modePhoto,
-body[data-mode="video"] #modeVideo {
-  color:#ffffff !important;
-}
+.modebar .btn { color:#808080; }
+.modebar .btn.active { color:#ffffff; }
