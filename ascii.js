@@ -1304,58 +1304,30 @@ function updateMirrorForFacing() {
       if (!state.isFullscreen) enterFullscreen();
     });
   }
-// --- Warm start камеры + фолбэк на первый жест ---
-let _warmTried = false;
-async function warmStartCameraOnce(){
-  if (_warmTried) return;
-  _warmTried = true;
-  if (!navigator.mediaDevices?.getUserMedia) return;
-  try {
-    const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: state.facing || 'user' }, audio:false });
-    // сразу выключим, это только для запроса пермишена
-    s.getTracks().forEach(t=>t.stop());
-  } catch(_) { /* игнорим — спросится при реальном старте */ }
-}
-
-// если при загрузке камера не стартанула — дёргаем на первый тап/клик
-function bindFirstGestureCameraKick(){
-  const kick = async () => {
-    if (state.mode === 'live' && !app.vid?.srcObject) {
-      await startStream();
-      updateMirrorForFacing?.();
-    }
-    window.removeEventListener('pointerup', kick, { capture:true });
-    window.removeEventListener('touchend', kick, { capture:true });
-    window.removeEventListener('click', kick, { capture:true });
-  };
-  window.addEventListener('pointerup', kick, { capture:true, once:true });
-  window.addEventListener('touchend',  kick, { capture:true, once:true });
-  window.addEventListener('click',     kick, { capture:true, once:true });
-}
 
 async function setMode(newMode){
   // повторный клик по той же вкладке — сразу открыть выбор
-if (newMode === state.mode) {
-  // всегда обновляем подсветку/видимость кнопок
-  app.ui.modeLive .classList.toggle('active', newMode === 'live');
-  app.ui.modePhoto.classList.toggle('active', newMode === 'photo');
-  app.ui.modeVideo.classList.toggle('active', newMode === 'video');
-  syncFpsVisibility?.();
+  if (newMode === state.mode) {
+    // подсветка актуального режима
+    app.ui.modeLive .classList.toggle('active', newMode === 'live');
+    app.ui.modePhoto.classList.toggle('active', newMode === 'photo');
+    app.ui.modeVideo.classList.toggle('active', newMode === 'video');
+    syncFpsVisibility?.();
 
-  // если кликнули по уже активной «ФОТО»/«ВИДЕО» — просто открываем галерею
-  if (newMode === 'photo' && app.ui.filePhoto) {
-    app.ui.filePhoto.value = '';
-    app.ui.filePhoto.click();
-  } else if (newMode === 'video' && app.ui.fileVideo) {
-    app.ui.fileVideo.value = '';
-    app.ui.fileVideo.click();
+    // при повторном клике по ФОТО/ВИДЕО сразу открываем пикер
+    if (newMode === 'photo' && app.ui.filePhoto) {
+      app.ui.filePhoto.value = '';
+      app.ui.filePhoto.click();
+    } else if (newMode === 'video' && app.ui.fileVideo) {
+      app.ui.fileVideo.value = '';
+      app.ui.fileVideo.click();
+    }
+    return;
   }
-  return;
-}
 
   state.mode = newMode;
 
-  // === Подсветка активной вкладки ===
+  // подсветка режимов
   app.ui.modeLive .classList.toggle('active', newMode==='live');
   app.ui.modePhoto.classList.toggle('active', newMode==='photo');
   app.ui.modeVideo.classList.toggle('active', newMode==='video');
@@ -1363,39 +1335,36 @@ if (newMode === state.mode) {
   // FPS видно везде, кроме фото
   syncFpsVisibility();
 
-  // === Верхние кнопки ===
-  // FULLSCREEN показываем только в LIVE
+  // верхние кнопки: FULLSCREEN только в LIVE; СОХРАНИТЬ только в ФОТО/ВИДЕО
   if (app.ui.fs)   app.ui.fs.hidden   = (newMode !== 'live');
-  // СОХРАНИТЬ показываем только в ФОТО/ВИДЕО
   if (app.ui.save) app.ui.save.hidden = (newMode === 'live');
 
-  // Телеграм-кнопку снизу убираем всегда (решили оставить верхнюю)
-  if (tg) mainBtnHide();
-
-  // общий сброс зума/плейсхолдера
+  // сброс зума
   state.viewScale = 1;
   fitAsciiToViewport();
 
-  // очистки при смене
+  // очищаем фото-источник, когда выходим из фото
   if (newMode !== 'photo') state.imageEl = null;
-  if (newMode !== 'video') {
-    try { if (app.vid && !app.vid.srcObject) { app.vid.pause?.(); app.vid.removeAttribute('src'); } } catch(e){}
+
+  // если уходим ИЗ LIVE → гасим реальный стрим, чтобы не конфликтовал
+  if (newMode !== 'live') {
+    stopStream(); // <<< КРИТИЧНО
   }
 
   if (newMode === 'live') {
-    // Включаем камеру
+    // включаем камеру
     app.ui.placeholder.hidden = true;
     await startStream();
     updateMirrorForFacing?.();
     return;
   }
 
-  // Фото/видео: камеру выключаем, показываем плейсхолдер до выбора файла
+  // PHOTO/VIDEO — показываем плейсхолдер до выбора файла и сразу дёргаем пикер
   if (newMode === 'photo') {
     app.ui.placeholder.hidden = !(!state.imageEl);
     if (app.ui.filePhoto) {
       app.ui.filePhoto.value = '';
-      requestAnimationFrame(() => app.ui.filePhoto.click()); // первый клик → сразу пикер
+      requestAnimationFrame(() => app.ui.filePhoto.click());
     }
   } else if (newMode === 'video') {
     app.ui.placeholder.hidden = !!(app.vid && app.vid.src);
@@ -1758,61 +1727,8 @@ app.ui.invert.addEventListener('change', e => {
 async function init() {
   fillStyleSelect();
   setUI();
-await warmStartCameraOnce(); 
-bindFirstGestureCameraKick(); 
 
-  // гарантируем скрытые инпуты (photo/video)
-  if (!app.ui.filePhoto) {
-    const ip = document.createElement('input');
-    ip.type = 'file';
-    ip.accept = 'image/*';
-    ip.style.display = 'none';
-    ip.onchange = e => {
-      const f = e.target.files?.[0];
-      if (!f) return;
-      const img = new Image();
-      img.onload = () => {
-        state.imageEl = img;
-        state.mirror = false;
-        app.ui.placeholder.hidden = true;
-        const { w, h } = updateGridSize(); refitFont(w, h);
-        updateHud('img onload');
-        requestAnimationFrame(()=>{});
-      };
-      const urlImg = URL.createObjectURL(f);
-      img.src = urlImg;
-      app._lastImageURL = urlImg;
-    };
-    document.body.appendChild(ip);
-    app.ui.filePhoto = ip;
-  }
-
-  if (!app.ui.fileVideo) {
-    const iv = document.createElement('input');
-    iv.type = 'file';
-    iv.accept = 'video/*';
-    iv.style.display = 'none';
-    iv.onchange = async e => {
-      const f = e.target.files?.[0];
-      if (!f) return;
-      stopStream(); // <<< ВАЖНО: гасим живой стрим, чтобы файл уверенно стал src
-      if (app._lastVideoURL) { try { URL.revokeObjectURL(app._lastVideoURL); } catch(_) {} }
-      const url = URL.createObjectURL(f);
-      app.vid.src = url;
-      app._lastVideoURL = url;
-      app.vid.setAttribute('playsinline','');
-      app.vid.setAttribute('autoplay','');
-      app.vid.setAttribute('muted','');
-      app.vid.loop = true;
-      app.vid.setAttribute('loop','');
-      try { await app.vid.play?.(); } catch(_) {}
-      state.mirror = false;
-    };
-    document.body.appendChild(iv);
-    app.ui.fileVideo = iv;
-  }
-
-  // фиксим инверсию до первого кадра
+  // фикс инверсии до первого кадра
   state.invert = false;
   if (app.ui.invert) app.ui.invert.checked = false;
   {
@@ -1823,30 +1739,22 @@ bindFirstGestureCameraKick();
   bindUI();
   attachDoubleTapEnter();
 
-  // применяем стек шрифтов под выбранный набор символов
+  // применяем шрифтовой стек под текущий пресет символов
   if (app.ui.charset) {
     app.ui.charset.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
-  if (tg && tg.ready) tg.ready();
-  await new Promise(r => requestAnimationFrame(r)); // ждём реальный кадр — gUM спрашивается стабильно
+  // СТАРТУЕМ LIVE (внутри вызовется getUserMedia)
+  await setMode('live');
 
-  await setMode('live');            // сразу просим камеру
+  // РЕНДЕР-ЦИКЛ
   if (raf) cancelAnimationFrame(raf);
   raf = requestAnimationFrame(loop);
 
   const { w, h } = updateGridSize();
   refitFont(w, h);
 }
-
   document.addEventListener('DOMContentLoaded', init);
 })();
-
-
-
-
-
-
-
 
 
