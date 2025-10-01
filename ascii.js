@@ -783,10 +783,7 @@ function renderAsciiToCanvas(text, cols, rows, scale = 2){
 
 // Сохранение фото → рендер ASCII в скрытый canvas → blob → upload/share
 async function savePNG() {
-  // 1) визуальный индикатор – не popup, а overlay
   busyShow('Готовим PNG…');
-
-  // 2) возьми скрытый canvas
   const canvas = app?.ui?.render;
   if (!canvas) {
     busyHide();
@@ -794,13 +791,11 @@ async function savePNG() {
     return;
   }
 
-  // 3) принудительный ререндер на canvas
   try {
     const cols = state?.lastGrid?.w || 80;
     const rows = state?.lastGrid?.h || Math.max(1, (app.out.textContent || '').split('\n').length);
     renderAsciiToCanvas(app.out.textContent || '', cols, rows, 2);
   } catch (e) {
-    // даже если рендер дал сбой — продолжим и попробуем снять то, что есть
     console.warn('renderAsciiToCanvas failed:', e);
   }
 
@@ -824,8 +819,6 @@ async function savePNG() {
   // 5) upload/share
   busyShow('Отправляю…');
   await downloadBlob(blob, 'ascii.png');
-
-  // 6) финальный статус
   busyHide();
 }
 
@@ -1756,5 +1749,6 @@ async function init() {
 }
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
