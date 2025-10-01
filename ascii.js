@@ -497,21 +497,9 @@ function currentSource(){
           const { w, h } = updateGridSize(); refitFont(w, h);
           updateHud('ready meta');
         });
-        function stopStream() {
-  try {
-    if (app.vid) {
-      const s = app.vid.srcObject;
-      if (s && typeof s.getTracks === 'function') {
-        s.getTracks().forEach(t => { try { t.stop(); } catch(_){} });
-      }
-      app.vid.pause?.();
-      app.vid.removeAttribute('src');
-      app.vid.srcObject = null;
-    }
-  } catch(_) {}
-}
       }
     };
+    
     app.vid.oncanplay = () => {
       app.ui.placeholder.hidden = true;
       requestAnimationFrame(() => {
@@ -530,7 +518,19 @@ function currentSource(){
     return false;
   }
 }
-
+function stopStream() {
+  try {
+    if (app.vid) {
+      const s = app.vid.srcObject;
+      if (s && typeof s.getTracks === 'function') {
+        s.getTracks().forEach(t => { try { t.stop(); } catch(_){} });
+      }
+      app.vid.pause?.();
+      app.vid.removeAttribute('src');
+      app.vid.srcObject = null;
+    }
+  } catch(_) {}
+}
   // ============== РЕНДЕРИНГ ==============
   let raf = null;
   let lastFrameTime = 0;
@@ -1799,6 +1799,7 @@ bindFirstGestureCameraKick();  // если вебвью всё равно не �
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
