@@ -1359,24 +1359,18 @@ if (tg) {
   // не LIVE → камеру останавливаем
   stopStream();
 
-  // PHOTO/VIDEO: показываем плейсхолдер, если ещё нет источника
-  if (newMode === 'photo') {
-  if (!state.imageEl) {
-  app.ui.filePhoto.value = '';
-  openFilePicker(app.ui.filePhoto);
-  }
-    else app.ui.placeholder.hidden = true;
-} else if (newMode === 'video') {
-if (!(app.vid && app.vid.src)) {
-  app.ui.fileVideo.value = '';
-  openFilePicker(app.ui.fileVideo);
- } else {
-    app.ui.placeholder.hidden = true;
-    // на всякий: при возврате в режим видео держим зацикливание
-    app.vid.loop = true;
-    app.vid.setAttribute('loop','');
-  }
-}
+ // PHOTO/VIDEO: всегда сразу открываем выбор файла на первом клике по режиму
+ if (newMode === 'photo') {
+   app.ui.filePhoto.value = '';
+   openFilePicker(app.ui.filePhoto);     // ← ключевая строка
+   app.ui.placeholder.hidden = !!state.imageEl;
+   return; // больше ничего не делаем в этом заходе
+ }
+ if (newMode === 'video') {
+   app.ui.fileVideo.value = '';
+   openFilePicker(app.ui.fileVideo);     // ← ключевая строка
+   return; // то же
+ }
 }
   // ============== СВЯЗКА UI ==============
   function bindUI() {
@@ -1769,6 +1763,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
