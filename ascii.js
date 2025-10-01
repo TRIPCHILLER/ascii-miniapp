@@ -1011,34 +1011,59 @@ window.Telegram?.WebApp?.showPopup?.({ title: 'DEBUG', message: 'isTg=' + isTg }
       tg.HapticFeedback?.impactOccurred?.('light');
       tg.MainButton?.showProgress?.();
 
-      const form = new FormData();
-      form.append('file', file, filename);
-      form.append('filename', filename);
-      form.append('initData', tg.initData);
-      form.append('mediaType', (state.mode === 'video') ? 'video' : 'photo');
-      window.Telegram?.WebApp?.showPopup({ title: 'DEBUG', message: 'about to POST /api/upload' });
-      const res = await fetch('https://api.tripchiller.com/api/upload', {
-      method: 'POST',
-      headers: { 'x-telegram-init-data': tg.initData }, // ⟵ добавили
-      body: form
-    });
-      const json = await res.json().catch(() => ({}));
+// ====== СБОР ФОРМЫ (строго такие ключи!) ======
+const form = new FormData();
+form.append('file', file, filename);
+form.append('filename', filename);
+form.append('initdata', tg_initData || '');                      // <= нижний регистр
+form.append('mediatype', (state.mode === 'video') ? 'video' : 'photo'); // <= нижний регистр
 
-      // нехватка средств — показываем попап и ВЫХОД без локального скачивания
-      if (res.status === 402 || json?.error === 'INSUFFICIENT_FUNDS') {
-        tg.showPopup({
-          title: 'Недостаточно средств',
-          message: `Нужно кредитов: ${json?.need ?? (state.mode==='video'?3:1)}\nТекущий остаток: ${json?.balance ?? '0'}`,
-        });
-        return; // ⬅️ критично
-      }
+// ====== ОТПРАВКА С ТАЙМАУТОМ И ДИАГНОСТИКОЙ ======
+window.Telegram?.WebApp?.showPopup({ title: 'DEBUG', message: 'about to POST /api/upload' });
 
-      if (!res.ok) throw new Error(json?.error || `Upload failed: ${res.status}`);
+const ctrl = new AbortController();
+const to = setTimeout(() => ctrl.abort(), 20000); // 20s
 
-      const left = (typeof json?.balance === 'number') ? `\nОстаток: ${json.balance} кредитов` : '';
-      tg.showPopup({ title: 'Готово', message: 'Файл отправлен в ваш чат ✅' + left });
+let res, text = '';
+try {
+  res = await fetch('https://api.tripchiller.com/api/upload', {
+    method: 'POST',
+    headers: { 'x-telegram-init-data': tg.initData || '' },    // НЕ ставим Content-Type вручную
+    body: form,
+    signal: ctrl.signal,
+  });
+  text = await res.text();
+} catch (e) {
+  clearTimeout(to);
+  busyHide?.();
+  window.Telegram?.WebApp?.showPopup({ title: 'UPLOAD FAIL', message: 'Сеть/таймаут: ' + (e?.name || e) });
+  return;
+}
+clearTimeout(to);
 
-      return; // ⬅️ критично: успешная отправка → НИКАКОГО локального фолбэка
+// Показать статус/тело для диагностики
+window.Telegram?.WebApp?.showPopup({
+  title: 'DEBUG',
+  message: `status=${res.status}\n${(text || '').slice(0, 4000)}`
+});
+
+// Опционально парсим JSON, чтобы показать «недостаточно средств»
+let json = {};
+try { json = JSON.parse(text || '{}'); } catch (_) {}
+
+if (res.status === 402 || json?.error === 'INSUFFICIENT_FUNDS') {
+  tg.showPopup?.({
+    title: 'Недостаточно средств',
+    message: `Нужно кредитов: ${json?.need ?? (state.mode==='video'?3:1)}\nТекущий остаток: ${json?.balance ?? '—'}`
+  });
+  busyHide?.();
+  return;
+}
+
+busyShow?.('Готово!');
+setTimeout(() => busyHide?.(), 800);
+return;
+
     } catch (e) {
       console.warn('Upload to bot failed, fallback to local download:', e);
       tryLocalDownload(file); // фолбэк только при реальном провале запроса
@@ -1770,6 +1795,7 @@ bindFirstGestureCameraKick();
     iv.onchange = async e => {
       const f = e.target.files?.[0];
       if (!f) return;
+      stopStream(); // <<< ВАЖНО: гасим живой стрим, чтобы файл уверенно стал src
       if (app._lastVideoURL) { try { URL.revokeObjectURL(app._lastVideoURL); } catch(_) {} }
       const url = URL.createObjectURL(f);
       app.vid.src = url;
@@ -1815,6 +1841,7 @@ bindFirstGestureCameraKick();
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
