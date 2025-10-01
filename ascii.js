@@ -1302,11 +1302,15 @@ function openFilePicker(el) {
 }
 function updateModeTabs(newMode){
   const all = [app.ui.modeLive, app.ui.modePhoto, app.ui.modeVideo];
+  // 1) безусловно снимаем активность со всех
   all.forEach(el => {
     if (!el) return;
     el.classList.remove('active');
     el.setAttribute('aria-selected', 'false');
+    el.style.color = '#808080'; // серый для неактивных
   });
+
+  // 2) задаём активную
   let el = null;
   if (newMode === 'live')  el = app.ui.modeLive;
   if (newMode === 'photo') el = app.ui.modePhoto;
@@ -1314,9 +1318,8 @@ function updateModeTabs(newMode){
   if (el) {
     el.classList.add('active');
     el.setAttribute('aria-selected', 'true');
+    el.style.color = '#ffffff'; // белый для активной
   }
-  // ключ: централизованная метка на body
-  document.body.setAttribute('data-mode', newMode);
 }
 
 async function setMode(newMode){
@@ -1791,12 +1794,5 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
-
-
-
-
-
-
-
 
 
