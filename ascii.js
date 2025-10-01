@@ -1549,9 +1549,6 @@ app.ui.filePhoto.addEventListener('change', (e) => {
     const { w, h } = updateGridSize(); refitFont(w, h);
     updateHud('img onload');
     requestAnimationFrame(()=>{}); // разовый тик
-    if (tg && state.mode === 'photo') {
-  mainBtnShow('СОХРАНИТЬ', doSave);
-}
   };
   if (app._lastImageURL) { try { URL.revokeObjectURL(app._lastImageURL); } catch(_) {} }
 const urlImg = URL.createObjectURL(f);
@@ -1608,9 +1605,6 @@ app._lastVideoURL = url;
         refitFont(w, h);
       });
     }
-    if (tg && state.mode === 'video') {
-  mainBtnShow('СОХРАНИТЬ', doSave);
-}
   };
 
   // как только ролик готов играть — ещё раз на всякий случай подогнать сетку
@@ -1799,6 +1793,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
