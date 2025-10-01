@@ -1004,7 +1004,6 @@ async function downloadBlob(blob, filename) {
           title: 'Ошибка загрузки',
           message: `Статус: ${res.status}\n${(text || '').slice(0,1000)}`
         });
--       tryLocalDownload(file);
         return;
       }
 
@@ -1757,6 +1756,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
