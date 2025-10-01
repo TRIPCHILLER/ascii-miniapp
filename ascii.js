@@ -803,9 +803,8 @@ async function savePNG() {
   }
 
   window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'blob ok: ' + (blob.size||0) + ' bytes' });
-  await downloadBlob(blob, 'ascii.png'); // дальше — твой существующий пайплайн
+  await downloadBlob(blob, 'ascii.png'); 
   }
-}
 
 // Пытаемся дать MP4, иначе WebM
 function pickMime(){
@@ -1337,7 +1336,6 @@ if (newMode === state.mode) {
 
   if (newMode === 'live') {
     // Включаем камеру
-    stopStream();
     app.ui.placeholder.hidden = true;
     await startStream();
     updateMirrorForFacing?.();
@@ -1345,8 +1343,6 @@ if (newMode === state.mode) {
   }
 
   // Фото/видео: камеру выключаем, показываем плейсхолдер до выбора файла
-  stopStream();
-
   if (newMode === 'photo') {
     app.ui.placeholder.hidden = !(!state.imageEl);
     if (app.ui.filePhoto) {
@@ -1799,6 +1795,7 @@ bindFirstGestureCameraKick();  // если вебвью всё равно не �
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
