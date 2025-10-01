@@ -1331,12 +1331,7 @@ async function setMode(newMode){
   if (app.ui.save) app.ui.save.hidden = (newMode==='live');
 // Telegram MainButton: показываем только в ФОТО/ВИДЕО, скрываем в LIVE
 if (tg) {
-  if (newMode === 'live') {
-    mainBtnHide();
-  } else {
-    // покажем, но итогово включим после появления контента (см. ниже)
-    mainBtnShow('СОХРАНИТЬ', doSave);
-  }
+mainBtnHide();
 }
 
   // общий сброс зума/плейсхолдера
@@ -1600,9 +1595,6 @@ app._lastVideoURL = url;
       const { w, h } = updateGridSize();
       refitFont(w, h);
     });
-    if (tg && state.mode === 'video') {
-  mainBtnShow('СОХРАНИТЬ', doSave);
-}
   };
 
   // стартуем воспроизведение
@@ -1779,6 +1771,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
