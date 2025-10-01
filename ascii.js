@@ -980,7 +980,6 @@ async function downloadBlob(blob, filename) {
 
       const res = await fetch('https://api.tripchiller.com/api/upload', {
   method: 'POST',
-  // без кастомных заголовков — initData уже в form (initdata и initData)
   body: form,
   signal: ctrl.signal,
 });
@@ -1757,6 +1756,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
