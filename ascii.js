@@ -2,8 +2,13 @@
   // ============== УТИЛИТЫ ==============
   const $ = s => document.querySelector(s);
   const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
-// HUD выключен на проде
-const hudSet = () => {};
+// ==== TEMP HUD ====
+const hud = document.createElement('div');
+hud.style.cssText = 'position:fixed;left:6px;bottom:6px;z-index:99999;background:rgba(0,0,0,.6);color:#0f0;font:12px/1.2 monospace;padding:6px 8px;border:1px solid #0f0;border-radius:6px;max-width:75vw;pointer-events:none;';
+hud.textContent = 'boot…';
+document.body.appendChild(hud);
+window.addEventListener('error', e => { hud.textContent = 'JS ERROR: ' + (e.error?.message || e.message); });
+function hudSet(txt){ hud.textContent = txt; }
   // ---- BUSY overlay helpers ----
 function busyShow(msg){
   if (app.ui.busyText) app.ui.busyText.textContent = msg || 'Пожалуйста, подождите…';
@@ -476,116 +481,48 @@ function currentSource(){
   return null;
 }
 
-// Глобальная блокировка, чтобы не дергать getUserMedia параллельно
-let _liveLock = null;
-
-async function startStream() {
-function stopStream() {
+  // ============== КАМЕРА ==============
+  async function startStream() {
   try {
-    const s = app.vid?.srcObject;
-    if (s && s.getTracks) s.getTracks().forEach(t => t.stop());
-  } catch (_) {}
-  try {
-    app.vid.srcObject = null;
-    // чистим возможный file-URL
-    if (app._lastVideoURL) {
-      try { URL.revokeObjectURL(app._lastVideoURL); } catch (_) {}
-      app._lastVideoURL = null;
-    }
-    app.vid.removeAttribute('src');
-    app.vid.src = '';
-    app.vid.load?.();
-  } catch (_) {}
-}
-  if (_liveLock) return _liveLock;
-  _liveLock = (async () => {
-    try {
-      // 0) гасим старый стрим (если вдруг остался)
-      try {
-        const s = app.vid?.srcObject;
-        if (s && s.getTracks) s.getTracks().forEach(t => t.stop());
-      } catch (_) {}
-      app.vid.srcObject = null;
+    // выставляем атрибуты на всякий
+    app.vid.setAttribute('playsinline',''); app.vid.setAttribute('autoplay',''); app.vid.setAttribute('muted','');
+    app.vid.playsInline = true; app.vid.autoplay = true; app.vid.muted = true;
 
-      // 1) базовые настройки тега <video>
-      app.vid.setAttribute('playsinline', '');
-      app.vid.setAttribute('autoplay', '');
-      app.vid.setAttribute('muted', '');
-      app.vid.muted = true;
+    const constraints = { video: { facingMode: state.facing || 'user' }, audio: false };
+    updateHud('getUserMedia…');
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
 
-      // 2) собираем констрейнты и пробуем ЗАДНЮЮ камеру → если не вышло, падаем на фронталку
-      const tryGet = async (facing) => {
-        const constraints = {
-          audio: false,
-          video: {
-            facingMode: { ideal: facing },        // 'environment' | 'user'
-            width:  { ideal: 1280 },
-            height: { ideal: 720 },
-          }
-        };
-        return await navigator.mediaDevices.getUserMedia(constraints);
-      };
+    app.vid.srcObject = stream;
 
-      let stream = null;
-      try {
-        stream = await tryGet('environment');
-      } catch (e1) {
-        try {
-          stream = await tryGet('user');
-        } catch (e2) {
-          window.Telegram?.WebApp?.showPopup({
-            title: 'Камера недоступна',
-            message: (e2 && e2.message) ? e2.message : 'getUserMedia failed'
-          });
-          throw e2;
-        }
+    app.vid.onloadedmetadata = () => {
+      updateHud('loadedmetadata');
+      if (app.vid.videoWidth > 0 && app.vid.videoHeight > 0) {
+        app.ui.placeholder.hidden = true;
+        requestAnimationFrame(() => {
+          const { w, h } = updateGridSize(); refitFont(w, h);
+          updateHud('ready meta');
+        });
       }
+    };
+    app.vid.oncanplay = () => {
+      app.ui.placeholder.hidden = true;
+      requestAnimationFrame(() => {
+        const { w, h } = updateGridSize(); refitFont(w, h);
+        updateHud('canplay');
+      });
+    };
+    app.vid.onerror = (e)=> updateHud('video error');
 
-      // 3) назначаем поток и ждём готовности
-      app.vid.srcObject = stream;
-
-      // подробные события — сразу увидишь, что реально происходит
-      const logEv = (name) => () => {
-        // комментни popups, когда починим
-        window.Telegram?.WebApp?.showPopup({ title: 'DEBUG', message: 'video:' + name });
-      };
-      app.vid.onloadedmetadata = logEv('loadedmetadata');
-      app.vid.oncanplay        = logEv('canplay');
-      app.vid.onplay           = logEv('play');
-      app.vid.onpause          = logEv('pause');
-      app.vid.onerror          = logEv('error');
-      app.vid.onstalled        = logEv('stalled');
-
-      // иногда helps
-      try { app.vid.load?.(); } catch (_) {}
-
-      // 4) стартуем воспроизведение
-      try {
-        await app.vid.play();
-      } catch (e) {
-        // некоторые вебвью хотят ещё один тик
-        await new Promise(r => setTimeout(r, 50));
-        try { await app.vid.play(); } catch (e2) {
-          window.Telegram?.WebApp?.showPopup({
-            title: 'DEBUG',
-            message: 'video.play() failed: ' + (e2?.message || e2)
-          });
-          throw e2;
-        }
-      }
-
-      // 5) показываем живой вид и убираем плейсхолдер/оверлеи
-      if (app.ui?.placeholder) app.ui.placeholder.hidden = true;
-
-      return true;
-    } finally {
-      // снимаем блокировку
-      _liveLock = null;
-    }
-  })();
-
-  return _liveLock;
+    await app.vid.play().catch(()=>{});
+    updateHud('play called');
+    return true;
+  } catch (err) {
+    updateHud('gUM ERR: '+ (err?.name||err));
+    alert('Камера недоступна: ' + (err?.message || err));
+    return false;
+  }
 }
+
   // ============== РЕНДЕРИНГ ==============
   let raf = null;
   let lastFrameTime = 0;
@@ -836,45 +773,17 @@ function renderAsciiToCanvas(text, cols, rows, scale = 2){
   }
 }
 
-// Сохранение фото → рендер ASCII в скрытый canvas → blob → upload/share
-async function savePNG() {
-  busyShow('Готовим PNG…');
-  const canvas = app?.ui?.render;
-  if (!canvas) {
-    busyHide();
-    alert('ERR: не найден canvas для экспорта.');
-    return;
-  }
-
-  try {
-    const cols = state?.lastGrid?.w || 80;
-    const rows = state?.lastGrid?.h || Math.max(1, (app.out.textContent || '').split('\n').length);
-    renderAsciiToCanvas(app.out.textContent || '', cols, rows, 2);
-  } catch (e) {
-    console.warn('renderAsciiToCanvas failed:', e);
-  }
-
-  // 4) получаем blob (с резервом через dataURL)
-  let blob = await new Promise(res => canvas.toBlob(res, 'image/png', 0.92));
-  if (!blob) {
-    // резерв: через dataURL → Blob
-    try {
-      const url = canvas.toDataURL('image/png');
-      const bin = atob(url.split(',')[1] || '');
-      const buf = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
-      blob = new Blob([buf], { type: 'image/png' });
-    } catch (e) {
-      busyHide();
-      alert('ERR: не удалось сформировать PNG.');
-      return;
-    }
-  }
-
-  // 5) upload/share
-  busyShow('Отправляю…');
-  await downloadBlob(blob, 'ascii.png');
-  busyHide();
+// PNG (режим ФОТО)
+function savePNG(){
+  const grid = state.lastGrid;
+  const text = app.out.textContent || '';
+  if (!text.trim()) { alert('Нечего сохранять'); return; }
+  renderAsciiToCanvas(text, grid.w, grid.h, 2);
+  app.ui.render.toBlob(blob=>{
+    if(!blob) { alert('Не удалось сгенерировать PNG'); return; }
+    downloadBlob(blob, '@tripchiller_ascii_bot.png');
+    hudSet('PNG: сохранено/отправлено');
+  }, 'image/png');
 }
 
 // Пытаемся дать MP4, иначе WebM
@@ -942,7 +851,6 @@ function renderAsciiFrameLocked(text) {
 }
 // Видео (режим ВИДЕО)
 function saveVideo(){
-  window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'saveVideo() start' });
   if (state.mode!=='video') { alert('Видео-экспорт доступен только в режиме ВИДЕО'); return; }
   const mime = pickMime();
   if (!mime) { alert('Запись видео не поддерживается на этом устройстве.'); return; }
@@ -974,6 +882,7 @@ function saveVideo(){
       state.recorder.onstop = async () => {
       busyShow('Конвертация в MP4…');
       const blob = new Blob(state.recordChunks, { type: mime });
+
   try {
     if (mime.includes('mp4')) {
       downloadBlob(blob, '@tripchiller_ascii_bot.mp4');
@@ -1042,7 +951,6 @@ let uploadInFlight = false;
 
 // Универсальная отправка: в Telegram → на сервер; иначе → локальная загрузка
 async function downloadBlob(blob, filename) {
-  window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'downloadBlob() start' });
   const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
 
   if (uploadInFlight) {
@@ -1052,77 +960,70 @@ async function downloadBlob(blob, filename) {
   uploadInFlight = true;
 
   const isTg = !!(window.Telegram?.WebApp?.initData);
-window.Telegram?.WebApp?.showPopup?.({ title: 'DEBUG', message: 'isTg=' + isTg });
   if (isTg) {
     try {
       const tg = window.Telegram.WebApp;
       tg.HapticFeedback?.impactOccurred?.('light');
       tg.MainButton?.showProgress?.();
 
-// ====== СБОР ФОРМЫ (строго такие ключи!) ======
-const form = new FormData();
-form.append('file', file, filename);
-form.append('filename', filename);
-form.append('initdata', tg.initData || '');                      // <= нижний регистр
-form.append('mediatype', (state.mode === 'video') ? 'video' : 'photo'); // <= нижний регистр
+      // === важно: именно такие поля и заголовки ===
+      const form = new FormData();
+      form.append('file', file, filename);
+      form.append('filename', filename);
+      form.append('initdata', tg.initData || ''); // НИЖНИЙ регистр — как ждёт бэкенд
+      form.append('mediatype', (state.mode === 'video') ? 'video' : 'photo');
 
-// ====== ОТПРАВКА С ТАЙМАУТОМ И ДИАГНОСТИКОЙ ======
-window.Telegram?.WebApp?.showPopup({ title: 'DEBUG', message: 'about to POST /api/upload' });
+      const ctrl = new AbortController();
+      const to = setTimeout(() => ctrl.abort(), 20000); // 20s timeout
 
-const ctrl = new AbortController();
-const to = setTimeout(() => ctrl.abort(), 20000); // 20s
+      const res = await fetch('https://api.tripchiller.com/api/upload', {
+        method: 'POST',
+        headers: { 'x-telegram-init-data': tg.initData || '' },
+        body: form,
+        signal: ctrl.signal,
+      });
+      clearTimeout(to);
 
-let res, text = '';
-try {
-  res = await fetch('https://api.tripchiller.com/api/upload', {
-    method: 'POST',
-    headers: { 'x-telegram-init-data': tg.initData || '' },    // НЕ ставим Content-Type вручную
-    body: form,
-    signal: ctrl.signal,
-  });
-  text = await res.text();
-} catch (e) {
-  clearTimeout(to);
-  busyHide?.();
-  window.Telegram?.WebApp?.showPopup({ title: 'UPLOAD FAIL', message: 'Сеть/таймаут: ' + (e?.name || e) });
-  return;
-}
-clearTimeout(to);
+      const text = await res.text(); // тело может быть и текстом, и json
+      let json = {};
+      try { json = JSON.parse(text || '{}'); } catch(_) {}
 
-// Показать статус/тело для диагностики
-window.Telegram?.WebApp?.showPopup({
-  title: 'DEBUG',
-  message: `status=${res.status}\n${(text || '').slice(0, 4000)}`
-});
+      // 402 = нет кредитов
+      if (res.status === 402 || json?.error === 'INSUFFICIENT_FUNDS') {
+        tg.showPopup?.({
+          title: 'Недостаточно средств',
+          message: `Нужно кредитов: ${json?.need ?? (state.mode==='video'?3:1)}\nТекущий остаток: ${json?.balance ?? '—'}`
+        });
+        return; // без локального сохранения
+      }
 
-// Опционально парсим JSON, чтобы показать «недостаточно средств»
-let json = {};
-try { json = JSON.parse(text || '{}'); } catch (_) {}
+      if (!res.ok) {
+        // нелокальная ошибка — покажем и упадём в локальный фолбэк
+        tg.showPopup?.({
+          title: 'Ошибка загрузки',
+          message: `Статус: ${res.status}\n${(text || '').slice(0,4000)}`
+        });
+        tryLocalDownload(file);
+        return;
+      }
 
-if (res.status === 402 || json?.error === 'INSUFFICIENT_FUNDS') {
-  tg.showPopup?.({
-    title: 'Недостаточно средств',
-    message: `Нужно кредитов: ${json?.need ?? (state.mode==='video'?3:1)}\nТекущий остаток: ${json?.balance ?? '—'}`
-  });
-  busyHide?.();
-  return;
-}
-
-busyShow?.('Готово!');
-setTimeout(() => busyHide?.(), 800);
-return;
-
+      // успех: файл улетел, бот сам пришлёт его в ЛС
+      tg.showPopup?.({
+        title: 'Готово',
+        message: 'Файл отправлен в ваш чат ✅'
+      });
+      return;
     } catch (e) {
       console.warn('Upload to bot failed, fallback to local download:', e);
-      tryLocalDownload(file); // фолбэк только при реальном провале запроса
-      return;                 // ⬅️ выходим после фолбэка
+      tryLocalDownload(file); // сетевой фейл → локальный фолбэк
+      return;
     } finally {
-      window.Telegram.WebApp?.MainButton?.hideProgress?.();
+      window.Telegram?.WebApp?.MainButton?.hideProgress?.();
       uploadInFlight = false;
     }
   }
 
-  // Не Telegram — сразу локальный фолбэк
+  // Не Telegram — сразу локально
   tryLocalDownload(file);
   uploadInFlight = false;
 
@@ -1352,80 +1253,86 @@ function updateMirrorForFacing() {
       if (!state.isFullscreen) enterFullscreen();
     });
   }
+  function stopStream(){
+  const s = app.vid?.srcObject;
+  if (s) { s.getTracks().forEach(t=>t.stop()); app.vid.srcObject = null; }
+  try { app.vid.pause?.(); } catch(e){}
+  app.vid.removeAttribute('src');
+}
 
 async function setMode(newMode){
-  // повторный клик по той же вкладке — сразу открыть выбор
+  // если нажали на ту же вкладку → заново открыть выбор файла
   if (newMode === state.mode) {
-    // подсветка актуального режима
-    app.ui.modeLive .classList.toggle('active', newMode === 'live');
-    app.ui.modePhoto.classList.toggle('active', newMode === 'photo');
-    app.ui.modeVideo.classList.toggle('active', newMode === 'video');
-    syncFpsVisibility?.();
-
-    // при повторном клике по ФОТО/ВИДЕО сразу открываем пикер
-    if (newMode === 'photo' && app.ui.filePhoto) {
-      app.ui.filePhoto.value = '';
+    if (newMode === 'photo') {
+      app.ui.filePhoto.value = '';   // сброс, иначе не даст выбрать тот же файл
       app.ui.filePhoto.click();
-    } else if (newMode === 'video' && app.ui.fileVideo) {
+      return;
+    }
+    if (newMode === 'video') {
       app.ui.fileVideo.value = '';
       app.ui.fileVideo.click();
+      return;
     }
-    return;
+    // для live ничего не делаем
   }
 
   state.mode = newMode;
-
-  // подсветка режимов
+syncFpsVisibility(); // переключаем FPS в зависимости от режима
+  // переключаем видимость верхних кнопок
+  if (app.ui.fs)   app.ui.fs.hidden   = (newMode!=='live');
+  if (app.ui.save) app.ui.save.hidden = (newMode==='live');
+// Telegram MainButton: показываем только в ФОТО/ВИДЕО, скрываем в LIVE
+if (tg) {
+  if (newMode === 'live') {
+    mainBtnHide();
+  } else {
+    // покажем, но итогово включим после появления контента (см. ниже)
+    mainBtnShow('СОХРАНИТЬ', doSave);
+  }
+}
   app.ui.modeLive .classList.toggle('active', newMode==='live');
   app.ui.modePhoto.classList.toggle('active', newMode==='photo');
   app.ui.modeVideo.classList.toggle('active', newMode==='video');
 
-  // FPS видно везде, кроме фото
-  syncFpsVisibility();
-
-  // верхние кнопки: FULLSCREEN только в LIVE; СОХРАНИТЬ только в ФОТО/ВИДЕО
-  if (app.ui.fs)   app.ui.fs.hidden   = (newMode !== 'live');
-  if (app.ui.save) app.ui.save.hidden = (newMode === 'live');
-
-  // сброс зума
+  // общий сброс зума/плейсхолдера
   state.viewScale = 1;
   fitAsciiToViewport();
 
-  // очищаем фото-источник, когда выходим из фото
+  // если уходим из PHOTO — очищаем картинку
   if (newMode !== 'photo') state.imageEl = null;
 
-  // если уходим ИЗ LIVE → гасим реальный стрим, чтобы не конфликтовал
-  if (newMode !== 'live') {
-    stopStream(); // <<< КРИТИЧНО
+  // если уходим из VIDEO — убираем файл-источник (но не камеру)
+  if (newMode !== 'video') {
+    try { if (app.vid && !app.vid.srcObject) { app.vid.pause?.(); app.vid.removeAttribute('src'); } } catch(e){}
   }
 
   if (newMode === 'live') {
-    // включаем камеру
+    // LIVE: выключаем возможный файл и включаем камеру
+    stopStream();                 // на всякий
     app.ui.placeholder.hidden = true;
     await startStream();
     updateMirrorForFacing?.();
     return;
   }
 
-  // PHOTO/VIDEO — показываем плейсхолдер до выбора файла и сразу дёргаем пикер
+  // не LIVE → камеру останавливаем
+  stopStream();
+
+  // PHOTO/VIDEO: показываем плейсхолдер, если ещё нет источника
   if (newMode === 'photo') {
-    app.ui.placeholder.hidden = !(!state.imageEl);
-    if (app.ui.filePhoto) {
-      app.ui.filePhoto.value = '';
-      requestAnimationFrame(() => app.ui.filePhoto.click());
-    }
-  } else if (newMode === 'video') {
-    app.ui.placeholder.hidden = !!(app.vid && app.vid.src);
-    if (!(app.vid && app.vid.src) && app.ui.fileVideo) {
-      app.ui.fileVideo.value = '';
-      requestAnimationFrame(() => app.ui.fileVideo.click());
-    } else if (app.vid) {
-      app.vid.loop = true;
-      app.vid.setAttribute('loop','');
-    }
+    if (!state.imageEl) app.ui.filePhoto.click();
+    else app.ui.placeholder.hidden = true;
+} else if (newMode === 'video') {
+  if (!(app.vid && app.vid.src)) {
+    app.ui.fileVideo.click();
+  } else {
+    app.ui.placeholder.hidden = true;
+    // на всякий: при возврате в режим видео держим зацикливание
+    app.vid.loop = true;
+    app.vid.setAttribute('loop','');
   }
 }
-
+}
   // ============== СВЯЗКА UI ==============
   function bindUI() {
     // Показ/скрытие панели
@@ -1567,6 +1474,9 @@ app.ui.filePhoto.addEventListener('change', (e) => {
     const { w, h } = updateGridSize(); refitFont(w, h);
     updateHud('img onload');
     requestAnimationFrame(()=>{}); // разовый тик
+    if (tg && state.mode === 'photo') {
+  mainBtnShow('СОХРАНИТЬ', doSave);
+}
   };
   if (app._lastImageURL) { try { URL.revokeObjectURL(app._lastImageURL); } catch(_) {} }
 const urlImg = URL.createObjectURL(f);
@@ -1579,6 +1489,9 @@ app._lastImageURL = urlImg;
   app.ui.fileVideo.addEventListener('change', async (e) => {
   const f = e.target.files?.[0];
   if (!f) return;
+
+  // остановим всё, что могло играть (live и т.п.)
+  stopStream();
 
   // источник — выбранный файл
   // освободим прошлый blob-URL, если был
@@ -1620,9 +1533,11 @@ app._lastVideoURL = url;
         refitFont(w, h);
       });
     }
+    if (tg && state.mode === 'video') {
+  mainBtnShow('СОХРАНИТЬ', doSave);
+}
   };
-// небольшой «пинок» к воспроизведению
-setTimeout(() => { try { app.vid.play(); } catch(_) {} }, 0);
+
   // как только ролик готов играть — ещё раз на всякий случай подогнать сетку
   app.vid.oncanplay = () => {
     app.ui.placeholder.hidden = true;
@@ -1630,6 +1545,9 @@ setTimeout(() => { try { app.vid.play(); } catch(_) {} }, 0);
       const { w, h } = updateGridSize();
       refitFont(w, h);
     });
+    if (tg && state.mode === 'video') {
+  mainBtnShow('СОХРАНИТЬ', doSave);
+}
   };
 
   // стартуем воспроизведение
@@ -1639,18 +1557,18 @@ setTimeout(() => { try { app.vid.play(); } catch(_) {} }, 0);
 
 // --- ЕДИНАЯ функция сохранения ---
 function doSave() {
-  const mode = state.mode;
-
-  if (mode === 'photo') return savePNG();
-  if (mode === 'video') return saveVideo();
-
-  // LIVE и всё прочее → без сохранения
-  window.Telegram?.WebApp?.showPopup({
-    title: 'Режим LIVE',
-    message: 'Сохранение доступно в режимах ФОТО или ВИДЕО.'
-  });
+  if (state.mode === 'photo') {
+    hudSet('PNG: экспорт…');
+    savePNG();
+  } else if (state.mode === 'video') {
+    if (!app.vid || (!app.vid.src && !app.vid.srcObject)) {
+      alert('Нет выбранного видео.');
+      return;
+    }
+    hudSet('VIDEO: запись… (дождитесь окончания)');
+    saveVideo();
+  }
 }
-
 
 // Кнопка в тулбаре
 app.ui.save.addEventListener('click', doSave);
@@ -1772,40 +1690,39 @@ app.ui.invert.addEventListener('change', e => {
     }).observe(app.stage);
   }
 
-async function init() {
-  fillStyleSelect();
-  setUI();
+  // ============== СТАРТ ==============
+  async function init() {
+    fillStyleSelect();
+setUI();
 
-  // фикс инверсии до первого кадра
-  state.invert = false;
-  if (app.ui.invert) app.ui.invert.checked = false;
-  {
-    const lbl = document.getElementById('invert_label');
-    if (lbl) lbl.textContent = 'ИНВЕРСИЯ: ВЫКЛ';
-  }
-
-  bindUI();
-  attachDoubleTapEnter();
-
-  // применяем шрифтовой стек под текущий пресет символов
-  if (app.ui.charset) {
-    app.ui.charset.dispatchEvent(new Event('change', { bubbles: true }));
-  }
-
-  // СТАРТУЕМ LIVE (внутри вызовется getUserMedia)
-  await setMode('live');
-
-  // РЕНДЕР-ЦИКЛ
-  if (raf) cancelAnimationFrame(raf);
-  raf = requestAnimationFrame(loop);
-
-  const { w, h } = updateGridSize();
-  refitFont(w, h);
+// 1) Жёстко фиксируем отсутствие инверсии до первого кадра
+state.invert = false;
+if (app.ui.invert) app.ui.invert.checked = false;
+{
+  const lbl = document.getElementById('invert_label');
+  if (lbl) lbl.textContent = 'ИНВЕРСИЯ: ВЫКЛ';
 }
+
+bindUI();
+attachDoubleTapEnter();
+
+// 2) Принудительно применяем шрифтовой стек под стартовый режим символов,
+//    чтобы исключить "ложный" первый кадр с некорректным стеком.
+if (app.ui.charset) {
+  // дёрнем обработчик, он сам решит: CJK → CJK стек без сортировки,
+  // не CJK → основной стек + авто-сорт.
+  app.ui.charset.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+await setMode('live');         // внутри сам вызовется startStream()
+if (raf) cancelAnimationFrame(raf);
+raf = requestAnimationFrame(loop);
+
+const { w, h } = updateGridSize();
+refitFont(w, h);
+  }
+
   document.addEventListener('DOMContentLoaded', init);
 })();
-
-
-
 
 
