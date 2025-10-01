@@ -476,60 +476,100 @@ function currentSource(){
   return null;
 }
 
-  // ============== КАМЕРА ==============
-  async function startStream() {
-  try {
-    // выставляем атрибуты на всякий
-    app.vid.setAttribute('playsinline',''); app.vid.setAttribute('autoplay',''); app.vid.setAttribute('muted','');
-    app.vid.playsInline = true; app.vid.autoplay = true; app.vid.muted = true;
+// Глобальная блокировка, чтобы не дергать getUserMedia параллельно
+let _liveLock = null;
 
-    const constraints = { video: { facingMode: state.facing || 'user' }, audio: false };
-    updateHud('getUserMedia…');
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+async function startStream() {
+  // если уже идёт запрос/запуск — дожидаемся его
+  if (_liveLock) return _liveLock;
 
-    app.vid.srcObject = stream;
-
-    app.vid.onloadedmetadata = () => {
-      updateHud('loadedmetadata');
-      if (app.vid.videoWidth > 0 && app.vid.videoHeight > 0) {
-        app.ui.placeholder.hidden = true;
-        requestAnimationFrame(() => {
-          const { w, h } = updateGridSize(); refitFont(w, h);
-          updateHud('ready meta');
-        });
-      }
-    };
-    
-    app.vid.oncanplay = () => {
-      app.ui.placeholder.hidden = true;
-      requestAnimationFrame(() => {
-        const { w, h } = updateGridSize(); refitFont(w, h);
-        updateHud('canplay');
-      });
-    };
-    app.vid.onerror = (e)=> updateHud('video error');
-
-    await app.vid.play().catch(()=>{});
-    updateHud('play called');
-    return true;
-  } catch (err) {
-    updateHud('gUM ERR: '+ (err?.name||err));
-    alert('Камера недоступна: ' + (err?.message || err));
-    return false;
-  }
-}
-function stopStream() {
-  try {
-    if (app.vid) {
-      const s = app.vid.srcObject;
-      if (s && typeof s.getTracks === 'function') {
-        s.getTracks().forEach(t => { try { t.stop(); } catch(_){} });
-      }
-      app.vid.pause?.();
-      app.vid.removeAttribute('src');
+  _liveLock = (async () => {
+    try {
+      // 0) гасим старый стрим (если вдруг остался)
+      try {
+        const s = app.vid?.srcObject;
+        if (s && s.getTracks) s.getTracks().forEach(t => t.stop());
+      } catch (_) {}
       app.vid.srcObject = null;
+
+      // 1) базовые настройки тега <video>
+      app.vid.setAttribute('playsinline', '');
+      app.vid.setAttribute('autoplay', '');
+      app.vid.setAttribute('muted', '');
+      app.vid.muted = true;
+
+      // 2) собираем констрейнты и пробуем ЗАДНЮЮ камеру → если не вышло, падаем на фронталку
+      const tryGet = async (facing) => {
+        const constraints = {
+          audio: false,
+          video: {
+            facingMode: { ideal: facing },        // 'environment' | 'user'
+            width:  { ideal: 1280 },
+            height: { ideal: 720 },
+          }
+        };
+        return await navigator.mediaDevices.getUserMedia(constraints);
+      };
+
+      let stream = null;
+      try {
+        stream = await tryGet('environment');
+      } catch (e1) {
+        try {
+          stream = await tryGet('user');
+        } catch (e2) {
+          window.Telegram?.WebApp?.showPopup({
+            title: 'Камера недоступна',
+            message: (e2 && e2.message) ? e2.message : 'getUserMedia failed'
+          });
+          throw e2;
+        }
+      }
+
+      // 3) назначаем поток и ждём готовности
+      app.vid.srcObject = stream;
+
+      // подробные события — сразу увидишь, что реально происходит
+      const logEv = (name) => () => {
+        // комментни popups, когда починим
+        window.Telegram?.WebApp?.showPopup({ title: 'DEBUG', message: 'video:' + name });
+      };
+      app.vid.onloadedmetadata = logEv('loadedmetadata');
+      app.vid.oncanplay        = logEv('canplay');
+      app.vid.onplay           = logEv('play');
+      app.vid.onpause          = logEv('pause');
+      app.vid.onerror          = logEv('error');
+      app.vid.onstalled        = logEv('stalled');
+
+      // иногда helps
+      try { app.vid.load?.(); } catch (_) {}
+
+      // 4) стартуем воспроизведение
+      try {
+        await app.vid.play();
+      } catch (e) {
+        // некоторые вебвью хотят ещё один тик
+        await new Promise(r => setTimeout(r, 50));
+        try { await app.vid.play(); } catch (e2) {
+          window.Telegram?.WebApp?.showPopup({
+            title: 'DEBUG',
+            message: 'video.play() failed: ' + (e2?.message || e2)
+          });
+          throw e2;
+        }
+      }
+
+      // 5) показываем живой вид и убираем плейсхолдер/оверлеи
+      if (app.ui?.placeholder) app.ui.placeholder.hidden = true;
+
+      return true;
+    } finally {
+      // снимаем блокировку
+      _liveLock = null;
     }
-  } catch(_) {}
+  })();
+
+  return _liveLock;
 }
   // ============== РЕНДЕРИНГ ==============
   let raf = null;
@@ -1008,7 +1048,7 @@ window.Telegram?.WebApp?.showPopup?.({ title: 'DEBUG', message: 'isTg=' + isTg }
 const form = new FormData();
 form.append('file', file, filename);
 form.append('filename', filename);
-form.append('initdata', tg_initData || '');                      // <= нижний регистр
+form.append('initdata', tg.initData || '');                      // <= нижний регистр
 form.append('mediatype', (state.mode === 'video') ? 'video' : 'photo'); // <= нижний регистр
 
 // ====== ОТПРАВКА С ТАЙМАУТОМ И ДИАГНОСТИКОЙ ======
@@ -1749,6 +1789,7 @@ async function init() {
 }
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
