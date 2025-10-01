@@ -1515,9 +1515,6 @@ app._lastImageURL = urlImg;
   const f = e.target.files?.[0];
   if (!f) return;
 
-  // остановим всё, что могло играть (live и т.п.)
-  stopStream();
-
   // источник — выбранный файл
   // освободим прошлый blob-URL, если был
 if (app._lastVideoURL) { try { URL.revokeObjectURL(app._lastVideoURL); } catch(_) {} }
@@ -1712,8 +1709,8 @@ app.ui.invert.addEventListener('change', e => {
 async function init() {
   fillStyleSelect();
   setUI();
-await warmStartCameraOnce();   // заранее пинганём getUserMedia чтобы показать системный попап
-bindFirstGestureCameraKick();  // если вебвью всё равно не дало — стартанём на ПЕРВЫЙ тап
+//await warmStartCameraOnce(); 
+//bindFirstGestureCameraKick(); 
 
   // гарантируем скрытые инпуты (photo/video)
   if (!app.ui.filePhoto) {
@@ -1749,7 +1746,6 @@ bindFirstGestureCameraKick();  // если вебвью всё равно не �
     iv.onchange = async e => {
       const f = e.target.files?.[0];
       if (!f) return;
-      stopStream();
       if (app._lastVideoURL) { try { URL.revokeObjectURL(app._lastVideoURL); } catch(_) {} }
       const url = URL.createObjectURL(f);
       app.vid.src = url;
@@ -1795,6 +1791,7 @@ bindFirstGestureCameraKick();  // если вебвью всё равно не �
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
