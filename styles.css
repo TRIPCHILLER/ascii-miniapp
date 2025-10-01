@@ -368,12 +368,6 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   touch-action: none; }
 
 /* --- Цвета кнопок режимов --- */
-.modebar .btn {
-  color: #808080; /* серый для всех по умолчанию */
-}
+.modebar .btn { color:#808080 !important; }
 
-.modebar .btn.active {
-  color: #ffffff; /* белый для выбранного */
-}
-
-
+.modebar .btn.active { color:#ffffff !important; }
