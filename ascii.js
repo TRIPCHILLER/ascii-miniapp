@@ -969,8 +969,10 @@ async function downloadBlob(blob, filename) {
       // === важно: именно такие поля и заголовки ===
       const form = new FormData();
       form.append('file', file, filename);
+      form.append('document', file, filename);
       form.append('filename', filename);
       form.append('initdata', tg.initData || ''); // НИЖНИЙ регистр — как ждёт бэкенд
+      form.append('initData', tg.initData || '');
       form.append('mediatype', (state.mode === 'video') ? 'video' : 'photo');
 
       const ctrl = new AbortController();
@@ -998,25 +1000,29 @@ async function downloadBlob(blob, filename) {
       }
 
       if (!res.ok) {
-        // нелокальная ошибка — покажем и упадём в локальный фолбэк
         tg.showPopup?.({
           title: 'Ошибка загрузки',
-          message: `Статус: ${res.status}\n${(text || '').slice(0,4000)}`
+          message: `Статус: ${res.status}\n${(text || '').slice(0,1000)}`
         });
-        tryLocalDownload(file);
+-       tryLocalDownload(file);
         return;
       }
 
       // успех: файл улетел, бот сам пришлёт его в ЛС
       tg.showPopup?.({
         title: 'Готово',
-        message: 'Файл отправлен в ваш чат ✅'
+        message: `Файл отправлен в ваш чат ✅${(json && typeof json.balance !== 'undefined') ? `\nБаланс: ${json.balance}` : ''}`
       });
+
       return;
-    } catch (e) {
-      console.warn('Upload to bot failed, fallback to local download:', e);
-      tryLocalDownload(file); // сетевой фейл → локальный фолбэк
+        } catch (e) {
+      console.warn('Upload to bot failed:', e);
+     tg.showPopup?.({
+       title: 'Не удалось отправить',
+       message: (e?.name === 'AbortError') ? 'Таймаут ответа сервера.' : (e?.message || 'Сетевая ошибка.')
+     });
       return;
+
     } finally {
       window.Telegram?.WebApp?.MainButton?.hideProgress?.();
       uploadInFlight = false;
@@ -1610,16 +1616,6 @@ function doSave() {
 // Кнопка в тулбаре
 app.ui.save.addEventListener('click', doSave);
 
-// Кнопка в Telegram (MainButton)
-if (tg) {
-  tg.MainButton.offClick?.(); // снимаем старый обработчик
-  tg.MainButton.onClick(() => {
-    tg.MainButton.showProgress();  // индикатор
-    doSave();
-    setTimeout(() => tg.MainButton.hideProgress(), 2000);
-  });
-}
-
 // Выбираем реально «чёрный» символ под текущий стек шрифтов
 function pickDarkGlyph() {
   const candidates = [
@@ -1761,6 +1757,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
