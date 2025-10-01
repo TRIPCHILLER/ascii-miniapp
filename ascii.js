@@ -1323,7 +1323,6 @@ function updateModeTabs(newMode){
 }
 
 async function setMode(newMode){
-  // если нажали на ту же вкладку → заново открыть выбор файла
   if (newMode === state.mode) {
     if (newMode === 'photo') {
     app.ui.filePhoto.value = '';
@@ -1339,7 +1338,9 @@ async function setMode(newMode){
   }
 
   state.mode = newMode;
-syncFpsVisibility(); // переключаем FPS в зависимости от режима
+  
+  syncFpsVisibility(); // переключаем FPS в зависимости от режима
+  
   // переключаем видимость верхних кнопок
   if (app.ui.fs)   app.ui.fs.hidden   = (newMode!=='live');
   if (app.ui.save) app.ui.save.hidden = (newMode==='live');
@@ -1793,6 +1794,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
