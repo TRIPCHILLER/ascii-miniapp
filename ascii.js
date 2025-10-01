@@ -1337,7 +1337,10 @@ async function setMode(newMode){
     // для live ничего не делаем
   }
 
-  state.mode = newMode;
+  // === Подсветка активной вкладки ===
+  app.ui.modeLive .classList.toggle('active', newMode==='live');
+  app.ui.modePhoto.classList.toggle('active', newMode==='photo');
+  app.ui.modeVideo.classList.toggle('active', newMode==='video');
   
   syncFpsVisibility(); // переключаем FPS в зависимости от режима
   
@@ -1794,5 +1797,6 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
