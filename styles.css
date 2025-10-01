@@ -367,7 +367,12 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 #stage {
   touch-action: none; }
 
-/* --- Цвета кнопок режимов --- */
-.modebar .btn { color:#808080; }
+/* Централизованная подсветка активного режима */
+.modebar .btn { color:#808080 !important; }
 
-.modebar .btn.active { color:#ffffff; }
+/* Активная — белая. Привязка к body[data-mode], чтобы не зависеть от классов */
+body[data-mode="live"]  #modeLive,
+body[data-mode="photo"] #modePhoto,
+body[data-mode="video"] #modeVideo {
+  color:#ffffff !important;
+}
