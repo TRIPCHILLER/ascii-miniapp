@@ -978,7 +978,7 @@ async function downloadBlob(blob, filename) {
       const ctrl = new AbortController();
       const to = setTimeout(() => ctrl.abort(), 20000); // 20s timeout
 
-      const res = await fetch('/api/upload', {
+      const res = await fetch('https://api.tripchiller.com/api/upload', {
         method: 'POST',
         headers: { 'x-telegram-init-data': tg.initData || '' },
         body: form,
@@ -1756,6 +1756,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
