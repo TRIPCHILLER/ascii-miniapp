@@ -768,41 +768,31 @@ function renderAsciiToCanvas(text, cols, rows, scale = 2){
   }
 }
 
-// Сохранение фото → рисуем ASCII в #render и отправляем как PNG
+// Сохранение фото → toBlob → downloadBlob
 async function savePNG() {
-  // НЕ спамим попапами — Telegram игнорит второй, пока открыт первый
-  const canvas = app.ui.render;
+  window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'savePNG() start' });
+
+  // Берём канвас безопасно
+  const canvas = app?.ui?.render;
   if (!canvas) {
-    window.Telegram?.WebApp?.showPopup({ title:'Ошибка', message:'Внутренний canvas для экспорта не найден.' });
+    window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'ERR: canvas not found (ui.render)' });
     return;
   }
 
-  // перерисуем текущий ASCII в #render (чтобы гарантировать актуальные размеры)
-  const txt  = app.out?.textContent || '';
-  const cols = state.lastGrid?.w || 80;
-  const rows = state.lastGrid?.h || 50;
-  renderAsciiToCanvas(txt, cols, rows, 2);
+  // Принудительно перерендерим (если у тебя используется рендер в скрытый canvas)
+  try { renderAsciiToCanvas?.(app.out.textContent || '', state.lastGrid?.w || 80, state.lastGrid?.h || 50); } catch(_) {}
 
-  try {
-    // надёжный способ: dataURL → fetch → blob
-    const dataUrl = canvas.toDataURL('image/png', 0.92);
-    const resp = await fetch(dataUrl);
-    const blob = await resp.blob();
+  // Делаем PNG из канваса
+  const blob = await new Promise(res => canvas.toBlob(res, 'image/png', 0.92));
+  if (!blob) {
+    window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'ERR: blob is null' });
+    return;
+  }
 
-    if (!blob || !blob.size) {
-      window.Telegram?.WebApp?.showPopup({ title:'Ошибка', message:'Не удалось сформировать PNG.' });
-      return;
-    }
-
-    // ключевой вызов — именно он делает POST /api/upload в Telegram-вебвью
-    await downloadBlob(blob, 'ascii.png');
-
-    // один итоговый попап после возврата из downloadBlob (если это Telegram)
-    if (window.Telegram?.WebApp?.initData) {
-      // downloadBlob уже показывает «Готово» при успехе — здесь можно ничего не дублировать
-      // но если очень хочется — оставь короткий тост-подтверждение
-      // window.Telegram.WebApp.showPopup({ title:'OK', message:'Отправлено.' });
-    }
+  window.Telegram?.WebApp?.showPopup({ title:'DEBUG', message:'blob ok: ' + (blob.size||0) + ' bytes' });
+  await downloadBlob(blob, 'ascii.png'); // дальше — твой существующий пайплайн
+}
+    
   } catch (e) {
     window.Telegram?.WebApp?.showPopup({
       title:'Ошибка сохранения',
@@ -1261,12 +1251,6 @@ function updateMirrorForFacing() {
       if (!state.isFullscreen) enterFullscreen();
     });
   }
-  function stopStream(){
-  const s = app.vid?.srcObject;
-  if (s) { s.getTracks().forEach(t=>t.stop()); app.vid.srcObject = null; }
-  try { app.vid.pause?.(); } catch(e){}
-  app.vid.removeAttribute('src');
-}
 // --- Warm start камеры + фолбэк на первый жест ---
 let _warmTried = false;
 async function warmStartCameraOnce(){
@@ -1298,16 +1282,23 @@ function bindFirstGestureCameraKick(){
 
 async function setMode(newMode){
   // повторный клик по той же вкладке — сразу открыть выбор
-  if (newMode === state.mode) {
-    if (newMode === 'photo' && app.ui.filePhoto) {
-      app.ui.filePhoto.value = '';
-      app.ui.filePhoto.click();
-    } else if (newMode === 'video' && app.ui.fileVideo) {
-      app.ui.fileVideo.value = '';
-      app.ui.fileVideo.click();
-    }
-    return;
+if (newMode === state.mode) {
+  // всегда обновляем подсветку/видимость кнопок
+  app.ui.modeLive .classList.toggle('active', newMode === 'live');
+  app.ui.modePhoto.classList.toggle('active', newMode === 'photo');
+  app.ui.modeVideo.classList.toggle('active', newMode === 'video');
+  syncFpsVisibility?.();
+
+  // если кликнули по уже активной «ФОТО»/«ВИДЕО» — просто открываем галерею
+  if (newMode === 'photo' && app.ui.filePhoto) {
+    app.ui.filePhoto.value = '';
+    app.ui.filePhoto.click();
+  } else if (newMode === 'video' && app.ui.fileVideo) {
+    app.ui.fileVideo.value = '';
+    app.ui.fileVideo.click();
   }
+  return;
+}
 
   state.mode = newMode;
 
@@ -1802,5 +1793,6 @@ bindFirstGestureCameraKick();  // если вебвью всё равно не �
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
