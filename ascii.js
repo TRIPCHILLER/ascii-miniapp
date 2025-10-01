@@ -1358,13 +1358,15 @@ mainBtnHide();
   // не LIVE → камеру останавливаем
   stopStream();
 
- // PHOTO/VIDEO: всегда сразу открываем выбор файла на первом клике по режиму
- if (newMode === 'photo') {
+ // PHOTO/VIDEO: сразу просим файл (в той же интеракции, но безопасно через rAF)
+ if (newMode === 'photo' && app.ui.filePhoto) {
    app.ui.filePhoto.value = '';
    app.ui.placeholder.hidden = !!state.imageEl;
+   requestAnimationFrame(() => app.ui.filePhoto.click());
  }
- if (newMode === 'video') {
+ if (newMode === 'video' && app.ui.fileVideo) {
    app.ui.fileVideo.value = '';
+   requestAnimationFrame(() => app.ui.fileVideo.click());
  }
 }
   // ============== СВЯЗКА UI ==============
@@ -1493,25 +1495,17 @@ app.ui.flip.addEventListener('click', async () => {
 
 
 // --- Кнопки режимов внизу (с приоритетным вызовом file picker) ---
- app.ui.modeLive.addEventListener('click', (e) => {
-   updateModeTabs('live');           // ← сразу подсветили
-   setMode('live');                  // потом логика режима
+ app.ui.modeLive.addEventListener('click', () => {
+   updateModeTabs('live');
+   setMode('live');
  });
- app.ui.modePhoto.addEventListener('click', (e) => {
-   updateModeTabs('photo');          // ← сразу подсветили
-   if (app?.ui?.filePhoto) {
-     app.ui.filePhoto.value = '';
-     openFilePicker(app.ui.filePhoto);
-   }
-   Promise.resolve().then(() => setMode('photo'));
+ app.ui.modePhoto.addEventListener('click', () => {
+   updateModeTabs('photo');
+   setMode('photo');
  });
- app.ui.modeVideo.addEventListener('click', (e) => {
-   updateModeTabs('video');          // ← сразу подсветили
-   if (app?.ui?.fileVideo) {
-     app.ui.fileVideo.value = '';
-     openFilePicker(app.ui.fileVideo);
-   }
-   Promise.resolve().then(() => setMode('video'));
+ app.ui.modeVideo.addEventListener('click', () => {
+   updateModeTabs('video');
+   setMode('video');
  });
 
 // --- Выбор фото из галереи ---
@@ -1767,6 +1761,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
