@@ -1300,6 +1300,21 @@ function openFilePicker(el) {
     el.style.height = prev.h;
   }, 0);
 }
+function updateModeTabs(newMode){
+  const tabs = [
+    [app.ui.modeLive,'live'],
+    [app.ui.modePhoto,'photo'],
+    [app.ui.modeVideo,'video'],
+  ];
+  tabs.forEach(([el,mode])=>{
+    if (!el) return;
+    const active = (mode === newMode);
+    el.classList.toggle('active', active);         // если CSS всё-таки есть — пусть сработает
+    el.setAttribute('aria-selected', active ? 'true' : 'false');
+    // принудительная раскраска как просил: белый активный, серый неактивный
+    el.style.color = active ? '#ffffff' : '#808080';
+  });
+}
 
 async function setMode(newMode){
   // если нажали на ту же вкладку → заново открыть выбор файла
@@ -1331,9 +1346,7 @@ if (tg) {
     mainBtnShow('СОХРАНИТЬ', doSave);
   }
 }
-  app.ui.modeLive .classList.toggle('active', newMode==='live');
-  app.ui.modePhoto.classList.toggle('active', newMode==='photo');
-  app.ui.modeVideo.classList.toggle('active', newMode==='video');
+updateModeTabs(newMode);
 
   // общий сброс зума/плейсхолдера
   state.viewScale = 1;
@@ -1496,10 +1509,27 @@ app.ui.flip.addEventListener('click', async () => {
       if(app.ui.style){ const m = detectPreset(state.color, state.background); app.ui.style.value = (m==='custom'?'custom':m); }
     });
 
-// --- Кнопки режимов внизу ---
-app.ui.modeLive.addEventListener('click',  ()=> setMode('live'));
-app.ui.modePhoto.addEventListener('click', ()=> setMode('photo'));
-app.ui.modeVideo.addEventListener('click', ()=> setMode('video'));
+
+// --- Кнопки режимов внизу (с приоритетным вызовом file picker) ---
+app.ui.modeLive.addEventListener('click',  (e) => {
+  setMode('live');
+});
+app.ui.modePhoto.addEventListener('click', (e) => {
+  // 1) сразу — пикер (в рамках пользовательского жеста)
+  if (app?.ui?.filePhoto) {
+    app.ui.filePhoto.value = '';
+    openFilePicker(app.ui.filePhoto);
+  }
+  // 2) затем — смена режима (микротаск, чтобы не сбить доверенный жест)
+  Promise.resolve().then(() => setMode('photo'));
+});
+app.ui.modeVideo.addEventListener('click', (e) => {
+  if (app?.ui?.fileVideo) {
+    app.ui.fileVideo.value = '';
+    openFilePicker(app.ui.fileVideo);
+  }
+  Promise.resolve().then(() => setMode('video'));
+});
 
 // --- Выбор фото из галереи ---
 app.ui.filePhoto.addEventListener('change', (e) => {
@@ -1763,6 +1793,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
