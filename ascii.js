@@ -887,7 +887,7 @@ function saveVideo(){
     const name = mime.includes('mp4') ? '@tripchiller_ascii_bot.mp4' : '@tripchiller_ascii_bot.webm';
     downloadBlob(blob, name);
     setTimeout(busyHide, 400);
-}
+};
 
   // восстановление state
   if (wasLoop) {
@@ -1721,6 +1721,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
