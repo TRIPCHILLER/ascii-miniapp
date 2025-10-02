@@ -871,7 +871,7 @@ function saveVideo(){
   try {
     state.recorder = new MediaRecorder(stream, {
   mimeType: mime,
-  videoBitsPerSecond: 12_000_000
+  videoBitsPerSecond: 8_000_000
 });
   } catch(e) {
     alert('MediaRecorder недоступен: ' + (e.message||e));
@@ -880,14 +880,49 @@ function saveVideo(){
 
       state.recorder.ondataavailable = e => { if (e.data && e.data.size) state.recordChunks.push(e.data); };
       state.recorder.onstop = async () => {
-      busyShow('Отправка на сервер…');
+      busyShow('Конвертация в MP4…');
       const blob = new Blob(state.recordChunks, { type: mime });
 
-  // Никаких локальных конвертаций: просто отправляем исходник на бэкенд
-    const name = mime.includes('mp4') ? '@tripchiller_ascii_bot.mp4' : '@tripchiller_ascii_bot.webm';
-    downloadBlob(blob, name);
-    setTimeout(busyHide, 400);
-};
+  try {
+    if (mime.includes('mp4')) {
+      downloadBlob(blob, '@tripchiller_ascii_bot.mp4');
+      busyShow('MP4 готово');
+      setTimeout(busyHide, 400);
+    } else {
+      // WebM -> MP4 через ffmpeg.wasm
+      const { ff, fetchFile } = await ensureFFmpeg();
+      const inName  = 'in.webm';
+      const outName = 'out.mp4';
+
+      ff.FS('writeFile', inName, await fetchFile(blob));
+      await ff.run(
+  '-i', inName,
+  // ↓ фиксируем ЧАСТОТУ КАДРОВ ВЫХОДА под текущий fps из настроек
+  '-r', String(fps),
+  '-c:v', 'libx264',
+  '-pix_fmt', 'yuv420p',
+  '-movflags', 'faststart',
+  '-preset', 'veryfast',
+  '-crf', '18',
+  outName
+);
+      const data = ff.FS('readFile', outName);
+      const mp4Blob = new Blob([data.buffer], { type: 'video/mp4' });
+      downloadBlob(mp4Blob, '@tripchiller_ascii_bot.mp4');
+      
+      busyShow('MP4 готово');
+      setTimeout(busyHide, 400);
+
+      try { ff.FS('unlink', inName); ff.FS('unlink', outName); } catch(e) {}
+    }
+  } catch (e) {
+  console.warn('FFmpeg transcode failed:', e);
+  const errMsg = (e && (e.message || e.name)) ? String(e.message || e.name) : 'unknown';
+  hudSet('FFmpeg ERR: ' + errMsg);
+  busyShow('Конвертация не удалась.\nСкачан исходный файл.');
+  downloadBlob(blob, mime.includes('mp4') ? '@tripchiller_ascii_bot.mp4' : '@tripchiller_ascii_bot.webm');
+  setTimeout(busyHide, 1200);
+}
 
   // восстановление state
   if (wasLoop) {
@@ -941,7 +976,7 @@ async function downloadBlob(blob, filename) {
       form.append('mediatype', (state.mode === 'video') ? 'video' : 'photo');
 
       const ctrl = new AbortController();
-      const to = setTimeout(() => ctrl.abort(), 120000); // 120s timeout
+      const to = setTimeout(() => ctrl.abort(), 20000); // 20s timeout
 
       const res = await fetch('https://api.tripchiller.com/api/upload', {
   method: 'POST',
@@ -1721,18 +1756,5 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
