@@ -9,6 +9,7 @@ hud.textContent = 'boot…';
 document.body.appendChild(hud);
 window.addEventListener('error', e => { hud.textContent = 'JS ERROR: ' + (e.error?.message || e.message); });
 function hudSet(txt){ hud.textContent = txt; }
+hud.style.display = 'none';
 // ---- BUSY overlay helpers ----
 let busyLock = false; // <— не даём спрятать overlay, пока true
 
@@ -1782,6 +1783,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
