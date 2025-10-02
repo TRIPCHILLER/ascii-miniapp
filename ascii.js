@@ -8,7 +8,6 @@ hud.style.cssText = 'position:fixed;left:6px;bottom:6px;z-index:99999;background
 hud.textContent = 'boot…';
 document.body.appendChild(hud);
 window.addEventListener('error', e => { hud.textContent = 'JS ERROR: ' + (e.error?.message || e.message); });
-function hudSet(txt){ hud.textContent = txt; }
   // ---- BUSY overlay helpers ----
 function busyShow(msg){
   if (app.ui.busyText) app.ui.busyText.textContent = msg || 'Пожалуйста, подождите…';
@@ -1776,5 +1775,6 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
