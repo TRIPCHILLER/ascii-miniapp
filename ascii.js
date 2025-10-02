@@ -888,8 +888,6 @@ state.recorder = new MediaRecorder(stream, {
   try {
     if (mime.includes('mp4')) {
       downloadBlob(blob, '@tripchiller_ascii_bot.mp4');
-      busyShow('MP4 готово');
-      setTimeout(busyHide, 400);
     } else {
       // WebM -> MP4 через ffmpeg.wasm
       const { ff, fetchFile } = await ensureFFmpeg();
@@ -911,9 +909,6 @@ state.recorder = new MediaRecorder(stream, {
       const data = ff.FS('readFile', outName);
       const mp4Blob = new Blob([data.buffer], { type: 'video/mp4' });
       downloadBlob(mp4Blob, '@tripchiller_ascii_bot.mp4');
-      
-      busyShow('MP4 готово');
-      setTimeout(busyHide, 400);
 
       try { ff.FS('unlink', inName); ff.FS('unlink', outName); } catch(e) {}
     }
@@ -1783,6 +1778,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
