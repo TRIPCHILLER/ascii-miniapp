@@ -9,12 +9,16 @@ hud.textContent = 'boot…';
 document.body.appendChild(hud);
 window.addEventListener('error', e => { hud.textContent = 'JS ERROR: ' + (e.error?.message || e.message); });
 function hudSet(txt){ hud.textContent = txt; }
-  // ---- BUSY overlay helpers ----
+// ---- BUSY overlay helpers ----
+let busyLock = false; // <— не даём спрятать overlay, пока true
+
 function busyShow(msg){
   if (app.ui.busyText) app.ui.busyText.textContent = msg || 'Пожалуйста, подождите…';
   if (app.ui.busy) app.ui.busy.hidden = false;
 }
-function busyHide(){
+
+function busyHide(force = false){
+  if (busyLock && !force) return;  // <— защищаемся от чужих вызовов
   if (app.ui.busy) app.ui.busy.hidden = true;
 }
 
@@ -981,6 +985,7 @@ async function downloadBlob(blob, filename) {
       form.append('mediatype', (state.mode === 'video') ? 'video' : 'photo');
 
       // показываем «длинный» overlay на всё время запроса
+      busyLock = true;
       busyShow('Отправляю файл в чат…');
       pulse = setInterval(() => {
         dots = (dots + 1) % 4;
@@ -1044,7 +1049,8 @@ async function downloadBlob(blob, filename) {
 
       window.Telegram?.WebApp?.MainButton?.hideProgress?.();
       uploadInFlight = false;
-      setTimeout(busyHide, 200);
+      busyLock = false;
+      setTimeout(() => busyHide(true), 200);
     }
   }
 
@@ -1776,6 +1782,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
