@@ -871,7 +871,7 @@ function saveVideo(){
   try {
     state.recorder = new MediaRecorder(stream, {
   mimeType: mime,
-  videoBitsPerSecond: 8_000_000
+  videoBitsPerSecond: 12_000_000
 });
   } catch(e) {
     alert('MediaRecorder недоступен: ' + (e.message||e));
@@ -1758,6 +1758,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
