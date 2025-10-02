@@ -965,8 +965,16 @@ async function downloadBlob(blob, filename) {
 
   const isTg = !!(window.Telegram?.WebApp?.initData);
   if (isTg) {
+    // делаем tg доступным в любом блоке
+    const tg = window.Telegram.WebApp;
+
+    // объявляем заранее → доступны в finally
+    const ctrl = new AbortController();
+    let to = null;
+    let pulse = null;
+    let dots = 0;
+
     try {
-      const tg = window.Telegram.WebApp;
       tg.HapticFeedback?.impactOccurred?.('light');
       tg.MainButton?.showProgress?.();
 
@@ -975,30 +983,32 @@ async function downloadBlob(blob, filename) {
       form.append('file', file, filename);
       form.append('document', file, filename);
       form.append('filename', filename);
-      form.append('initdata', tg.initData || ''); // НИЖНИЙ регистр — как ждёт бэкенд
+      form.append('initdata', tg.initData || ''); // нижний регистр — как ждёт бэкенд
       form.append('initData', tg.initData || '');
       form.append('mediatype', (state.mode === 'video') ? 'video' : 'photo');
 
-      const ctrl = new AbortController();
-      const to = setTimeout(() => ctrl.abort(), 120000); // 120s timeout
-      
+      // показываем «длинный» overlay на всё время запроса
       busyShow('Отправляю файл в чат…');
-      let dots = 0;
-      const pulse = setInterval(() => {
-      dots = (dots + 1) % 4;
-      if (app?.ui?.busyText) app.ui.busyText.textContent = 'Отправляю файл в чат' + '.'.repeat(dots);
-    }, 500);
-      const res = await fetch('https://api.tripchiller.com/api/upload', {
-      method: 'POST',
-      body: form,
-      signal: ctrl.signal,
-});
-      
-      clearTimeout(to);
+      pulse = setInterval(() => {
+        dots = (dots + 1) % 4;
+        if (app?.ui?.busyText) {
+          app.ui.busyText.textContent = 'Отправляю файл в чат' + '.'.repeat(dots);
+        }
+      }, 500);
 
-      const text = await res.text(); // тело может быть и текстом, и json
+      // общий таймаут (120s)
+      to = setTimeout(() => ctrl.abort(), 120000);
+
+      const res = await fetch('https://api.tripchiller.com/api/upload', {
+        method: 'POST',
+        body: form,
+        signal: ctrl.signal,
+      });
+
+      // ответ может быть и текстом, и json
+      const text = await res.text();
       let json = {};
-      try { json = JSON.parse(text || '{}'); } catch(_) {}
+      try { json = JSON.parse(text || '{}'); } catch (_) {}
 
       // 402 = нет кредитов
       if (res.status === 402 || json?.error === 'INSUFFICIENT_FUNDS') {
@@ -1024,20 +1034,23 @@ async function downloadBlob(blob, filename) {
       });
 
       return;
-        } catch (e) {
+
+    } catch (e) {
       console.warn('Upload to bot failed:', e);
-tg.showPopup?.({
-  title: 'Сеть нестабильна',
-  message: (e?.name === 'AbortError')
-    ? 'Сервер ответил слишком долго. Проверьте чат — файл, вероятно, уже пришёл.'
-    : (e?.message || 'Сетевая ошибка. Проверьте чат — файл мог отправиться.')
-});
+      tg.showPopup?.({
+        title: 'Сеть нестабильна',
+        message: (e?.name === 'AbortError')
+          ? 'Сервер ответил слишком долго. Проверьте чат — файл, вероятно, уже пришёл.'
+          : (e?.message || 'Сетевая ошибка. Проверьте чат — файл мог отправиться.')
+      });
       return;
 
     } finally {
+      if (to) clearTimeout(to);
+      if (pulse) clearInterval(pulse);
+
       window.Telegram?.WebApp?.MainButton?.hideProgress?.();
       uploadInFlight = false;
-      clearInterval(pulse);
       setTimeout(busyHide, 200);
     }
   }
@@ -1770,6 +1783,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
