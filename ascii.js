@@ -976,7 +976,7 @@ async function downloadBlob(blob, filename) {
       form.append('mediatype', (state.mode === 'video') ? 'video' : 'photo');
 
       const ctrl = new AbortController();
-      const to = setTimeout(() => ctrl.abort(), 20000); // 20s timeout
+      const to = setTimeout(() => ctrl.abort(), 120000); // 120s timeout
 
       const res = await fetch('https://api.tripchiller.com/api/upload', {
   method: 'POST',
@@ -1756,6 +1756,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
