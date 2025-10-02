@@ -880,7 +880,7 @@ function saveVideo(){
 
       state.recorder.ondataavailable = e => { if (e.data && e.data.size) state.recordChunks.push(e.data); };
       state.recorder.onstop = async () => {
-      busyShow('Конвертация в MP4…');
+      busyShow('Подготовка файла…');
       const blob = new Blob(state.recordChunks, { type: mime });
 
   try {
@@ -916,12 +916,14 @@ function saveVideo(){
       try { ff.FS('unlink', inName); ff.FS('unlink', outName); } catch(e) {}
     }
   } catch (e) {
-  console.warn('FFmpeg transcode failed:', e);
-  const errMsg = (e && (e.message || e.name)) ? String(e.message || e.name) : 'unknown';
-  hudSet('FFmpeg ERR: ' + errMsg);
-  busyShow('Конвертация не удалась.\nСкачан исходный файл.');
-  downloadBlob(blob, mime.includes('mp4') ? '@tripchiller_ascii_bot.mp4' : '@tripchiller_ascii_bot.webm');
-  setTimeout(busyHide, 1200);
+console.warn('FFmpeg transcode failed:', e);
+const errMsg = (e && (e.message || e.name)) ? String(e.message || e.name) : 'unknown';
+hudSet('FFmpeg WARN: ' + errMsg);
+// Мягкий фолбэк: просто говорим, что отправляем файл и просим дождаться
+busyShow('Отправка...\nГотовый файл придёт в чат с ботом.');
+downloadBlob(blob, mime.includes('mp4') ? '@tripchiller_ascii_bot.mp4' : '@tripchiller_ascii_bot.webm');
+setTimeout(busyHide, 1200);
+
 }
 
   // восстановление state
@@ -1758,6 +1760,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
