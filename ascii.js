@@ -869,9 +869,11 @@ function saveVideo(){
   state.recordChunks = [];
 
   try {
-    state.recorder = new MediaRecorder(stream, {
+const bpp = 0.07; // эмпирически норм для «чистого» ASCII-видео
+const vbr = Math.round((state.recordDims?.W || 1280) * (state.recordDims?.H || 720) * fps * bpp);
+state.recorder = new MediaRecorder(stream, {
   mimeType: mime,
-  videoBitsPerSecond: 12_000_000
+  videoBitsPerSecond: Math.max(4_000_000, Math.min(12_000_000, vbr))
 });
   } catch(e) {
     alert('MediaRecorder недоступен: ' + (e.message||e));
@@ -979,11 +981,17 @@ async function downloadBlob(blob, filename) {
 
       const ctrl = new AbortController();
       const to = setTimeout(() => ctrl.abort(), 120000); // 120s timeout
-
+      
+      busyShow('Отправляю файл в чат…');
+      let dots = 0;
+      const pulse = setInterval(() => {
+      dots = (dots + 1) % 4;
+      if (app?.ui?.busyText) app.ui.busyText.textContent = 'Отправляю файл в чат' + '.'.repeat(dots);
+    }, 500);
       const res = await fetch('https://api.tripchiller.com/api/upload', {
-  method: 'POST',
-  body: form,
-  signal: ctrl.signal,
+      method: 'POST',
+      body: form,
+      signal: ctrl.signal,
 });
       
       clearTimeout(to);
@@ -1029,6 +1037,8 @@ tg.showPopup?.({
     } finally {
       window.Telegram?.WebApp?.MainButton?.hideProgress?.();
       uploadInFlight = false;
+      clearInterval(pulse);
+      setTimeout(busyHide, 200);
     }
   }
 
@@ -1760,6 +1770,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
