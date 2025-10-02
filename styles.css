@@ -209,8 +209,8 @@ option{ background:var(--ui-panel); color:var(--ui-text); }
     font-display: swap;
 }
 @font-face {
-  font-family: "BetterVCR";
-  src: url("./assets/BetterVCR.woff2") format("woff2");
+  font-family: "BitCell";
+  src: url("./assets/BitCell.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -218,7 +218,7 @@ option{ background:var(--ui-panel); color:var(--ui-text); }
 
 /* === Шрифт интерфейса === */
 body, .toolbar, .panel, .btn, label, output, select, option {
-  font-family: 'Better VCR', sans-serif;
+  font-family: 'BitCell', sans-serif;
   font-size: 18px; /* сделает одинаковым для кнопок и подписей */
   line-height: 1.1;
 }
@@ -280,7 +280,7 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   border:1px solid #fff;
 }
 #busy .busy-text{
-  color:#fff; font-family:'Better VCR', sans-serif; font-size:18px;
+  color:#fff; font-family:'BitCell', sans-serif; font-size:18px;
   text-align:center; white-space:pre-line;
 }
 
@@ -370,3 +370,4 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 /* Централизованная подсветка активного режима */
 .modebar .btn { color:#808080; }
 .modebar .btn.active { color:#ffffff; }
+
