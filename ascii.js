@@ -976,7 +976,7 @@ async function downloadBlob(blob, filename) {
       form.append('mediatype', (state.mode === 'video') ? 'video' : 'photo');
 
       const ctrl = new AbortController();
-      const to = setTimeout(() => ctrl.abort(), 20000); // 20s timeout
+      const to = setTimeout(() => ctrl.abort(), 120000); // 120s timeout
 
       const res = await fetch('https://api.tripchiller.com/api/upload', {
   method: 'POST',
@@ -1016,10 +1016,12 @@ async function downloadBlob(blob, filename) {
       return;
         } catch (e) {
       console.warn('Upload to bot failed:', e);
-     tg.showPopup?.({
-       title: 'Не удалось отправить',
-       message: (e?.name === 'AbortError') ? 'Таймаут ответа сервера.' : (e?.message || 'Сетевая ошибка.')
-     });
+tg.showPopup?.({
+  title: 'Сеть нестабильна',
+  message: (e?.name === 'AbortError')
+    ? 'Сервер ответил слишком долго. Проверьте чат — файл, вероятно, уже пришёл.'
+    : (e?.message || 'Сетевая ошибка. Проверьте чат — файл мог отправиться.')
+});
       return;
 
     } finally {
@@ -1756,5 +1758,6 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
