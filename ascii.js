@@ -983,11 +983,11 @@ async function downloadBlob(blob, filename) {
 
       // показываем «длинный» overlay на всё время запроса
       busyLock = true;
-      busyShow('Отправляю файл в чат…');
+      busyShow('ОТПРАВКА ФАЙЛА В ЧАТ…');
       pulse = setInterval(() => {
         dots = (dots + 1) % 4;
         if (app?.ui?.busyText) {
-          app.ui.busyText.textContent = 'Отправляю файл в чат' + '.'.repeat(dots);
+          app.ui.busyText.textContent = 'ОТПРАВКА ФАЙЛА В ЧАТ' + '.'.repeat(dots);
         }
       }, 500);
 
@@ -1008,8 +1008,8 @@ async function downloadBlob(blob, filename) {
       // 402 = нет кредитов
       if (res.status === 402 || json?.error === 'INSUFFICIENT_FUNDS') {
         tg.showPopup?.({
-          title: 'Недостаточно средств',
-          message: `Нужно кредитов: ${json?.need ?? (state.mode==='video'?3:1)}\nТекущий остаток: ${json?.balance ?? '—'}`
+          title: 'Недостаточно сигилов для проведения ритуала',
+          message: `Требуется: ${json?.need ?? (state.mode==='video'?3:1)}\nТекущий остаток: ${json?.balance ?? '—'}`
         });
         return; // без локального сохранения
       }
@@ -1024,8 +1024,8 @@ async function downloadBlob(blob, filename) {
 
       // успех: файл улетел, бот сам пришлёт его в ЛС
       tg.showPopup?.({
-        title: 'Готово',
-        message: `Файл отправлен в ваш чат ✅${(json && typeof json.balance !== 'undefined') ? `\nБаланс: ${json.balance}` : ''}`
+        title: 'ПРЕОБРАЗОВАНИЕ ЗАВЕРШЕНО',
+        message: `Файл отправлен в ваш чат ${(json && typeof json.balance !== 'undefined') ? `\nОсталось сигилов: ${json.balance}` : ''}`
       });
 
       return;
@@ -1779,6 +1779,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
