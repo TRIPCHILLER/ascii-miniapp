@@ -980,7 +980,7 @@ async function downloadBlob(blob, filename) {
       form.append('initdata', tg.initData || ''); // нижний регистр — как ждёт бэкенд
       form.append('initData', tg.initData || '');
       form.append('mediatype', (state.mode === 'video') ? 'video' : 'photo');
-      form.append('fps', String(Math.max(1, Math.min(60, Math.round(state.fps || 30)))));
+      form.append('fps', String(Math.max(5, Math.min(60, Math.round(state.fps || 30)))));
       // показываем «длинный» overlay на всё время запроса
       busyLock = true;
       busyShow('ОТПРАВКА ФАЙЛА В ЧАТ…');
@@ -1779,6 +1779,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
