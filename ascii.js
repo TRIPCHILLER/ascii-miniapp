@@ -1008,7 +1008,7 @@ async function downloadBlob(blob, filename) {
       // 402 = нет кредитов
       if (res.status === 402 || json?.error === 'INSUFFICIENT_FUNDS') {
         tg.showPopup?.({
-          title: 'Недостаточно сигилов для проведения ритуала',
+          title: 'Недостаточно энергии для преобразования',
           message: `Требуется: ${json?.need ?? (state.mode==='video'?3:1)}\nТекущий остаток: ${json?.balance ?? '—'}`
         });
         return; // без локального сохранения
@@ -1025,7 +1025,7 @@ async function downloadBlob(blob, filename) {
       // успех: файл улетел, бот сам пришлёт его в ЛС
       tg.showPopup?.({
         title: 'ПРЕОБРАЗОВАНИЕ ЗАВЕРШЕНО',
-        message: `Файл отправлен в ваш чат ${(json && typeof json.balance !== 'undefined') ? `\nОсталось сигилов: ${json.balance}` : ''}`
+        message: `Файл отправлен в чат ${(json && typeof json.balance !== 'undefined') ? `\nОсталось импульсов: ${json.balance}` : ''}`
       });
 
       return;
@@ -1779,6 +1779,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
