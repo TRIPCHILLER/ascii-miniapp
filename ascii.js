@@ -800,27 +800,28 @@ function pickMime(){
 // Считаем один раз размеры экспортного видео (фикс), исходя из COLS/ROWS и метрик шрифта
 function computeRecordDims(cols, rows, scale = 2) {
   const ff   = getComputedStyle(app.out).fontFamily || 'monospace';
-  const fsPx = 12;                               // базовый размер
-  const stepY = Math.ceil(fsPx * scale);         // высота строки
+  const fsPx = 12;
+  const stepY = Math.ceil(fsPx * scale);
   const charAspect = Math.max(0.5, measureCharAspect()); // W/H
-  const stepX = Math.ceil(stepY * charAspect);   // ширина шага по X
+  const stepX = Math.ceil(stepY * charAspect);
 
-  // Базовый «пиксельный» размер
+  // Базовый пиксельный размер текущей ASCII-сетки
   let W = stepX * Math.max(1, cols);
   let H = stepY * Math.max(1, rows);
 
-  // Минимум ~720p по одной из сторон (сохраняем пропорции ASCII)
-  const MIN_W = 1280, MIN_H = 720;
-  const kW = MIN_W / W, kH = MIN_H / H;
-  const k = Math.max(1, Math.min(Number.isFinite(kW) ? kW : 1, Number.isFinite(kH) ? kH : 1));
+  // ТРЕБУЕМ длинную сторону ≈ 2000 px (но не уменьшаем, если уже больше)
+  const LONG = Math.max(W, H);
+  const TARGET_LONG = 2000;
+  const k = Math.max(1, TARGET_LONG / LONG);   // только апскейл
+
   W = Math.round(W * k);
   H = Math.round(H * k);
 
-  // Чётные размеры под H.264
+  // чётные размеры — дружелюбно к H.264
   if (W % 2) W += 1;
   if (H % 2) H += 1;
 
-  return { W, H, stepY: stepY * k, font: `${fsPx * scale * k}px ${ff}`, cols, rows };
+  return { W, H, stepY: Math.round(stepY * k), font: `${Math.round(fsPx * scale * k)}px ${ff}`, cols, rows };
 }
 
 // Рендер одного ASCII-кадра в уже зафиксированный канвас (без изменения W/H)
@@ -859,8 +860,14 @@ function saveVideo(){
   const grid = state.lastGrid;               // { w: cols, h: rows } — ты уже сохраняешь
   state.recordDims = computeRecordDims(grid.w, grid.h, 2);   // scale=2 как для PNG
   // задать размер канваса заранее (до captureStream)
-  app.ui.render.width  = state.recordDims.W;
-  app.ui.render.height = state.recordDims.H;
+app.ui.render.width  = state.recordDims.W;
+app.ui.render.height = state.recordDims.H;
+
+{
+  const c = app.ui.render.getContext('2d', { willReadFrequently: true });
+  c.imageSmoothingEnabled = false; // никаких «мыл» — соседний пиксель
+}
+
     // >>> На время записи выключаем loop, чтобы поймать 'ended'
   const wasLoop = app.vid.loop === true;
   app.vid.loop = false;
@@ -1779,6 +1786,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
