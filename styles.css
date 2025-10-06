@@ -284,13 +284,45 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   text-align:center; white-space:pre-line;
 }
 
-/* Спиннер — минималистичный */
-.busy-spinner{
-  width:28px; height:28px; border:2px solid #fff;
-  border-right-color: transparent; border-radius:50%;
-  animation: spin 0.9s linear infinite;
+/* === CUSTOM LOGO SPINNER === */
+.busy-spinner {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+
+.spinner-layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinner-layer img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+/* вращается только внешняя часть (лепестки) */
+.spinner-layer.flower {
+  animation: spin 2.5s linear infinite;
+  transform-origin: center;
+}
+
+/* зрачок неподвижен */
+.spinner-layer.pupil {
+  animation: none;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
 
 /* На всякий случай: скрыть любые пережитки иконок выхода, если где-то остались */
 .fs-exit,
@@ -370,5 +402,6 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 /* Централизованная подсветка активного режима */
 .modebar .btn { color:#808080; }
 .modebar .btn.active { color:#ffffff; }
+
 
 
