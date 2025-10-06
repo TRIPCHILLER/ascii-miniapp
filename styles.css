@@ -274,11 +274,14 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 #busy[hidden]{ display:none !important; }
 
 #busy .busy-box{
-  display:flex; flex-direction:column; align-items:center; gap:10px;
-  padding:16px 20px;
-  background:rgba(0,0,0,.35);
-  border:1px solid #fff;
+  display:flex; flex-direction:column; align-items:center; gap:24px; /* ↑ больше расстояние */
+  padding:0;                                      /* без внутренней карты */
+  background:transparent;                         /* убрали подложку */
+  border:none;                                    /* убрали белую рамку */
+  box-shadow:none;
 }
+
+
 #busy .busy-text{
   color:#fff; font-family:'BetterVCR', sans-serif; font-size:18px;
   text-align:center; white-space:pre-line;
@@ -287,8 +290,8 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 /* === CUSTOM LOGO SPINNER === */
 .busy-spinner {
   position: relative;
-  width: 96px;
-  height: 96px;
+  width: 64px;
+  height: 64px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -309,19 +312,22 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   pointer-events: none;
 }
 
-/* вращается только внешняя часть (лепестки) */
-.spinner-layer.flower {
-  animation: spin 2.5s linear infinite;
+/* вращается только внешняя часть (лепестки) с инерцией */
+.spinner-layer.flower{
+  animation: spin-inertia 2.6s cubic-bezier(.2,.8,.2,1) infinite;
   transform-origin: center;
+  will-change: transform;
 }
 
-/* зрачок неподвижен */
-.spinner-layer.pupil {
-  animation: none;
-}
+/* зрачок остаётся статичным */
+.spinner-layer.pupil{ animation: none; }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
+/* Разгон → оборот → замедление + пауза (держим 360° в конце цикла) */
+@keyframes spin-inertia{
+  0%   { transform: rotate(0deg); }
+  60%  { transform: rotate(360deg); }  /* основное движение происходит раньше — ощущение разгона */
+  82%  { transform: rotate(380deg); }  /* лёгкий овершут для «живости» */
+  100% { transform: rotate(360deg); }  /* возврат и короткая «пауза» */
 }
 
 /* На всякий случай: скрыть любые пережитки иконок выхода, если где-то остались */
@@ -402,6 +408,7 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 /* Централизованная подсветка активного режима */
 .modebar .btn { color:#808080; }
 .modebar .btn.active { color:#ffffff; }
+
 
 
 
