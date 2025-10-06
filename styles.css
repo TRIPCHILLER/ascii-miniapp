@@ -322,12 +322,11 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 /* зрачок остаётся статичным */
 .spinner-layer.pupil{ animation: none; }
 
-/* Разгон → оборот → замедление + пауза (держим 360° в конце цикла) */
+/* Разгон → один оборот → замедление → пауза (без перекрутки) */
 @keyframes spin-inertia{
-  0%   { transform: rotate(0deg); }
-  60%  { transform: rotate(360deg); }  /* основное движение происходит раньше — ощущение разгона */
-  82%  { transform: rotate(380deg); }  /* лёгкий овершут для «живости» */
-  100% { transform: rotate(360deg); }  /* возврат и короткая «пауза» */
+  0%   { transform: rotate(0turn); }
+  70%  { transform: rotate(1turn); }  /* один полный оборот завершён */
+  100% { transform: rotate(1turn); }  /* короткая пауза в конце */
 }
 
 /* На всякий случай: скрыть любые пережитки иконок выхода, если где-то остались */
@@ -408,6 +407,7 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 /* Централизованная подсветка активного режима */
 .modebar .btn { color:#808080; }
 .modebar .btn.active { color:#ffffff; }
+
 
 
 
