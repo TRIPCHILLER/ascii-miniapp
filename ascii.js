@@ -1052,7 +1052,7 @@ async function downloadBlob(blob, filename) {
       form.append('fps', String(Math.max(5, Math.min(60, Math.round(state.fps || 30)))));
       // показываем «длинный» overlay на всё время запроса
       busyLock = true;
-      busyShow('ОТПРАВКА ФАЙЛА В ЧАТ…');
+      busyShow('0ТПР4ВК4 Ф4ЙЛ4 В Ч4Т…');
       pulse = setInterval(() => {
         dots = (dots + 1) % 4;
         if (app?.ui?.busyText) {
@@ -1078,14 +1078,14 @@ async function downloadBlob(blob, filename) {
       if (res.status === 402 || json?.error === 'INSUFFICIENT_FUNDS') {
         tg.showPopup?.({
           title: 'Недостаточно энергии для преобразования',
-          message: `Требуется: ${json?.need ?? (state.mode==='video'?3:1)}\nТекущий остаток: ${json?.balance ?? '—'}`
+          message: `Требуется: ${json?.need ?? (state.mode==='video'?3:1)}\nТекущий запас: ${json?.balance ?? '—'}`
         });
         return; // без локального сохранения
       }
 
       if (!res.ok) {
         tg.showPopup?.({
-          title: 'Ошибка загрузки',
+          title: 'О̸Ш̵И̶Б̴К̵А̷ ̸З̵А̷Г̴Р̵У̶З̵К̴И̴',
           message: `Статус: ${res.status}\n${(text || '').slice(0,1000)}`
         });
         return;
@@ -1093,7 +1093,7 @@ async function downloadBlob(blob, filename) {
 
       // успех: файл улетел, бот сам пришлёт его в ЛС
       tg.showPopup?.({
-        title: 'ПРЕ0БР4З0В4НИЕ З4ВЕРШЕН0',
+        title: 'П̶Р̷Е̷О̴Б̶Р̶А̵З̸О̶В̵А̷Н̴И̸Е̸ ̸З̷А̸В̸Е̷Р̸Ш̶Е̴Н̵О̶',
         message: `Файл отправлен в чат ${(json && typeof json.balance !== 'undefined') ? `\nОсталось импульсов: ${json.balance}` : ''}`
       });
 
@@ -1102,10 +1102,10 @@ async function downloadBlob(blob, filename) {
     } catch (e) {
       console.warn('Upload to bot failed:', e);
       tg.showPopup?.({
-        title: 'Сеть нестабильна',
+        title: 'С̶Е̶Т̴Ь̶ ̴Н̷Е̸С̶Т̷А̵Б̶И̷Л̶Ь̵Н̴А̶',
         message: (e?.name === 'AbortError')
-          ? 'Сервер ответил слишком долго. Проверьте чат — файл, вероятно, уже пришёл.'
-          : (e?.message || 'Сетевая ошибка. Проверьте чат — файл мог отправиться.')
+          ? 'Сервер отвечал слишком долго. Проверь чат — файл, вероятно, уже пришёл.'
+          : (e?.message || 'Сетевая ошибка. Проверь чат — файл, вероятно, уже пришёл.')
       });
       return;
 
@@ -1848,6 +1848,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
