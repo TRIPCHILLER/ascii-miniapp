@@ -528,25 +528,25 @@ function cameraErrorToText(err) {
 
   if (name.includes('notfound') || name.includes('overconstrained'))
     return { 
-      title: 'МОДУЛЬ ЗРЕНИЯ ОТСУТСТВУЕТ', 
+      title: 'М̶О̷Д̵У̶Л̶Ь̶ ̴З̴Р̵Е̸Н̴И̵Я̴ ̷О̸Т̸С̴У̴Т̸С̵Т̴В̶У̵Е̴Т̵', 
       message: 'мне нечем смотреть...' 
     };
 
   if (name.includes('notreadable'))
     return { 
-      title: 'Я Н3 М0ГУ УВИД3ТЬ Т3БЯ,', 
+      title: 'Я̵ ̵Н̵Е̴ ̵М̵О̴Г̸У̵ ̷У̶В̸И̶Д̸Е̶Т̷Ь̶ ̵Т̷Е̴Б̵Я̸,', 
       message: 'пока кто-то другой смотрит моими глазами...' 
     };
 
   if (name.includes('security'))
     return { 
-      title: 'ТВ0Я СИСТЕМ4 БЛ0КИРУЕТ М0И ГЛАЗА', 
-      message: 'в доступе отказано.' 
+      title: 'Т̸В̶О̵Я̶ ̸С̸И̸С̶Т̴Е̷М̷А̸ ̶Б̵Л̷О̶К̴И̷Р̵У̶Е̵Т̴ ̸М̷О̵И̷ ̶Г̷Л̸А̶З̴А̵', 
+      message: 'отключи безопасность...' 
     };
 
   return { 
-    title: 'НЕИЗВЕСТН4Я 0ШИБК4', 
-    message: 'это редкость, но не радуйся...' 
+    title: 'Н̸Е̶И̵З̸В̴Е̴С̶Т̷Н̶А̸Я̶ ̸О̵Ш̸И̷Б̶К̶А̴', 
+    message: 'это редкость, но не приятная...' 
   };
 }
   // ============== КАМЕРА ==============
@@ -1005,7 +1005,7 @@ downloadBlob(blob, mime.includes('mp4') ? '@tripchiller_ascii_bot.mp4' : '@tripc
   app.vid.play?.();
 
   state.isRecording = true;
-  busyShow('Запись ASCII-видео…');
+  busyShow('ЗАПИСЬ ASCII-ВИДЕ0…');
   state.recorder.start(200);
 
   const onEnded = () => {
@@ -1848,6 +1848,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
