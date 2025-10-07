@@ -407,8 +407,3 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 /* Централизованная подсветка активного режима */
 .modebar .btn { color:#808080; }
 .modebar .btn.active { color:#ffffff; }
-
-
-
-
-
