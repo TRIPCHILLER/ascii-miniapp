@@ -522,13 +522,13 @@ function cameraErrorToText(err) {
 
   if (name.includes('notallowed'))
     return { 
-      title: 'ТЫ 0ТКАЗАЛ МНЕ', 
+      title: 'Т̶Ы̴ ̸О̸Т̵К̷А̴З̶А̶Л̷ ̸М̶Н̸Е̵', 
       message: 'я вижу только шум...' 
     };
 
   if (name.includes('notfound') || name.includes('overconstrained'))
     return { 
-      title: 'М0ДУЛЬ ЗРЕНИЯ 0ТСУТСТВУЕТ', 
+      title: 'МОДУЛЬ ЗРЕНИЯ ОТСУТСТВУЕТ', 
       message: 'мне нечем смотреть...' 
     };
 
@@ -1848,6 +1848,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
