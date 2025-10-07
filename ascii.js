@@ -1734,7 +1734,7 @@ app.ui.invert.addEventListener('change', e => {
   state.invert = e.target.checked;
   const lbl = document.getElementById('invert_label');
   if (lbl) {
-    lbl.textContent = state.invert ? 'ИНВЕРСИЯ: ВКЛ' : 'ИНВЕРСИЯ: ВЫКЛ';
+    lbl.textContent = state.invert ? 'ИНВ3РСИЯ: ВКЛ' : 'ИНВ3РСИЯ: ВЫКЛ';
   }
 });
     // Подгон при изменении окна/ориентации
@@ -1778,6 +1778,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
