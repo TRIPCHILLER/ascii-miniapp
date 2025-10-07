@@ -1126,7 +1126,7 @@ async function downloadBlob(blob, filename) {
 
   function tryLocalDownload(file) {
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      navigator.share({ files: [file], title: ': ASCII ⛶ VISOR :', text: file.name }).catch(()=>{});
+      navigator.share({ files: [file], title: ': 4SC11 ⛶ V1S0R :', text: file.name }).catch(()=>{});
       return;
     }
     const url = URL.createObjectURL(file);
@@ -1848,6 +1848,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
