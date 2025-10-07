@@ -1077,7 +1077,7 @@ async function downloadBlob(blob, filename) {
       // 402 = нет кредитов
       if (res.status === 402 || json?.error === 'INSUFFICIENT_FUNDS') {
         tg.showPopup?.({
-          title: ': Н̶Е̷Д̶О̵С̷Т̵А̷Т̴О̵Ч̴Н̴О̶ ̸Э̸Н̵Е̶Р̵Г̷И̶И :',
+          title: 'Н̶Е̷Д̶О̵С̷Т̵А̷Т̴О̵Ч̴Н̴О̶ ̸Э̸Н̵Е̶Р̵Г̷И̶И',
           message: `Требуется: ${json?.need ?? (state.mode==='video'?3:1)}\nТекущий запас: ${json?.balance ?? '—'}`
         });
         return; // без локального сохранения
@@ -1085,7 +1085,7 @@ async function downloadBlob(blob, filename) {
 
       if (!res.ok) {
         tg.showPopup?.({
-          title: ': О̸Ш̵И̶Б̴К̵А̷ ̸З̵А̷Г̴Р̵У̶З̵К̴И̴ :',
+          title: 'О̸Ш̵И̶Б̴К̵А̷ ̸З̵А̷Г̴Р̵У̶З̵К̴И',
           message: `Статус: ${res.status}\n${(text || '').slice(0,1000)}`
         });
         return;
@@ -1093,7 +1093,7 @@ async function downloadBlob(blob, filename) {
 
       // успех: файл улетел, бот сам пришлёт его в ЛС
       tg.showPopup?.({
-        title: ': П̶Р̷Е̷О̴Б̶Р̶А̵З̸О̶В̵А̷Н̴И̸Е̸ ̸З̷А̸В̸Е̷Р̸Ш̶Е̴Н̵О̶ :',
+        title: 'П̶Р̷Е̷О̴Б̶Р̶А̵З̸О̶В̵А̷Н̴И̸Е̸ ̸З̷А̸В̸Е̷Р̸Ш̶Е̴Н̵О',
         message: `ФАЙЛ ОТПРАВЛЕН В ЧАТ. ${(json && typeof json.balance !== 'undefined') ? `\nОсталось импульсов: ${json.balance}` : ''}`
       });
 
@@ -1102,7 +1102,7 @@ async function downloadBlob(blob, filename) {
     } catch (e) {
       console.warn('Upload to bot failed:', e);
       tg.showPopup?.({
-        title: ': С̶Е̶Т̴Ь̶ ̴Н̷Е̸С̶Т̷А̵Б̶И̷Л̶Ь̵Н̴А̶ :',
+        title: 'С̶Е̶Т̴Ь̶ ̴Н̷Е̸С̶Т̷А̵Б̶И̷Л̶Ь̵Н̴А',
         message: (e?.name === 'AbortError')
           ? 'Сервер отвечал слишком долго. Проверь чат — файл, вероятно, уже пришёл.'
           : (e?.message || 'Сетевая ошибка. Проверь чат — файл, вероятно, уже пришёл.')
@@ -1848,6 +1848,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
