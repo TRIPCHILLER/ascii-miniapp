@@ -1093,7 +1093,7 @@ async function downloadBlob(blob, filename) {
 
       // успех: файл улетел, бот сам пришлёт его в ЛС
       tg.showPopup?.({
-        title: 'П̶Р̷Е̷О̴Б̶Р̶А̵З̸О̶В̵А̷Н̴И̸Е̸ ̸З̷А̸В̸Е̷Р̸Ш̶Е̴Н̵О',
+        title: 'П̶Р̷Е̷О̴Б̶Р̶А̵З̸О̶В̵А̷Н̴И̸Е З̷АВ̸ЕР̸Ш̶Е̴Н̵О',
         message: `ФАЙЛ ОТПРАВЛЕН В ЧАТ. ${(json && typeof json.balance !== 'undefined') ? `\nОсталось импульсов: ${json.balance}` : ''}`
       });
 
@@ -1848,6 +1848,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
