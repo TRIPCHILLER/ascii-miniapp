@@ -522,30 +522,30 @@ function cameraErrorToText(err) {
 
   if (name.includes('notallowed'))
     return { 
-      title: ': Т̶Ы̴ ̸О̸Т̵К̷А̴З̶А̶Л̷ ̸М̶Н̸Е :', 
+      title: 'Т̶Ы ̸О̸Т̵К̷А̴З̶А̶Л ̸М̶Н̸Е', 
       message: 'я вижу только шум...' 
     };
 
   if (name.includes('notfound') || name.includes('overconstrained'))
     return { 
-      title: ': М̶О̷Д̵У̶Л̶Ь̶ ̴З̴Р̵Е̸Н̴И̵Я̴ ̷О̸Т̸С̴У̴Т̸С̵Т̴В̶У̵Е̴Т :', 
+      title: 'М̶О̷Д̵У̶Л̶Ь З̴Р̵Е̸Н̴И̵Я О̸Т̸С̴У̴Т̸С̵Т̴В̶У̵Е̴Т', 
       message: 'мне нечем смотреть...' 
     };
 
   if (name.includes('notreadable'))
     return { 
-      title: ': Я̵ ̵Н̵Е̴ ̵М̵О̴Г̸У̵ ̷У̶В̸И̶Д̸Е̶Т̷Ь̶ ̵Т̷Е̴Б̵Я :', 
+      title: 'Я ̵Н̵Е̴ ̵М̵О̴Г̸У ̷У̶В̸И̶Д̸Е̶Т̷Ь ̵Т̷Е̴Б̵Я', 
       message: 'пока кто-то другой смотрит моими глазами...' 
     };
 
   if (name.includes('security'))
     return { 
-      title: ': Т̸В̶О̵Я̶ ̸С̸И̸С̶Т̴Е̷М̷А̸ ̶Б̵Л̷О̶К̴И̷Р̵У̶Е̵Т̴ ̸М̷О̵И̷ ̶Г̷Л̸А̶З̴А :', 
+      title: 'Т̸В̶О̵Я ̸С̸И̸С̶Т̴Е̷М̷А ̶Б̵Л̷О̶К̴И̷Р̵У̶Е̵Т ̸М̷О̵И ̶Г̷Л̸А̶З̴А', 
       message: 'отключи безопасность...' 
     };
 
   return { 
-    title: ': Н̸Е̶И̵З̸В̴Е̴С̶Т̷Н̶А̸Я̶ ̸О̵Ш̸И̷Б̶К̶А :', 
+    title: 'Н̸Е̶И̵З̸В̴Е̴С̶Т̷Н̶А̸Я̶ ̸О̵Ш̸И̷Б̶К̶А', 
     message: 'это редкость, но не приятная...' 
   };
 }
@@ -1848,6 +1848,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
