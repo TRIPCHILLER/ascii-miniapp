@@ -1754,7 +1754,7 @@ state.invert = false;
 if (app.ui.invert) app.ui.invert.checked = false;
 {
   const lbl = document.getElementById('invert_label');
-  if (lbl) lbl.textContent = 'ИНВЕРСИЯ: ВЫКЛ';
+  if (lbl) lbl.textContent = 'ИНВ3РСИЯ: ВЫКЛ';
 }
 
 bindUI();
@@ -1778,6 +1778,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
