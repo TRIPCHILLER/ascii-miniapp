@@ -5,7 +5,7 @@
       content="default-src 'self' https: data: blob:; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline' https:; script-src 'self' https: 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https://api.tripchiller.com https: data: blob:;">
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
-  <title>: ASCII ⛶ VISOR : PRO</title>
+  <title>: 4SC11 ⛶ V1S0R :</title>
   <link rel="preload" as="font" type="font/woff2" href="./assets/MS Gothic.woff2" crossorigin>
   <link rel="stylesheet" href="https://fonts.cdnfonts.com/css/BetterVCR" />
   <link rel="stylesheet" href="styles.css?v=fit1" />
@@ -15,10 +15,10 @@
 
     <!-- Верхняя панель -->
     <div class="toolbar">
-      <button class="btn" id="flip">РАЗВЕРНУТЬ</button>
-      <button class="btn" id="toggle">НАСТРОЙКИ</button>
-      <button class="btn ghost" id="fs" aria-label="Fullscreen">FULLSCREEN</button>
-      <button class="btn ghost" id="save" hidden>СОХРАНИТЬ</button>
+      <button class="btn" id="flip">П0В3РНУТЬ</button>
+      <button class="btn" id="toggle">Н4СТР0ЙКИ</button>
+      <button class="btn ghost" id="fs" aria-label="Fullscreen">СКРЫТЬ</button>
+      <button class="btn ghost" id="save" hidden>С0ХР4НИТЬ</button>
     </div>
 
     <!-- Панель настроек (по умолчанию скрыта) -->
@@ -26,38 +26,38 @@
 
       <!-- 1) НАБОР -->
       <label>
-        <span>НАБОР:</span>
+        <span>Н4Б0Р:</span>
         <select id="charset">
-          <option value='@%#*+=-:. '>CLASSIC</option>
-          <option value='01²346⁷𝟴⁸9+. ,'>NUMBERS</option>
-          <option value='Ａ 𝗠  E ᶠ ᵖ ⁱ t  x  ᶻ . , y W . '>LATIN</option>
-          <option value='а Б в Г д Е ж З и Й к Л м Н о П р С т У ф Х ц Ч ш Щ ъ Ы ь Э ю Я .  : '>КИРИЛЛИЦА</option>
+          <option value='@%#*+=-:. '>CL4SS1C</option>
+          <option value='01²346⁷𝟴⁸9+. ,'>NUMB3RS</option>
+          <option value='Ａ 𝗠  E ᶠ ᵖ ⁱ t  x  ᶻ . , y W . '>L4T1N</option>
+          <option value='а Б в Г д Е ж З и Й к Л м Н о П р С т У ф Х ц Ч ш Щ ъ Ы ь Э ю Я .  : '>КИРИJIJIИЦ4</option>
           <option value='カタサシスセソラリルレロワヲンツッー '>カタカナ</option>
-          <option value='. · ▪ ■ '>PIXEL</option>
+          <option value='. · ▪ ■ '>P1X3L</option>
           <option value='····•○◦ '>. · • ○</option>
           <option value='█▓▒░'>█▓▒░ </option>
-          <option value='CUSTOM'>(РУЧНОЙ ВВОД)</option>
+          <option value='CUSTOM'>(РУЧН0Й ВВ0Д)</option>
         </select>
-        <input id="charset_custom" type="text" placeholder="[ВВЕДИТЕ СИМВОЛЫ]" style="width:260px; display:none" />
+        <input id="charset_custom" type="text" placeholder="[ВВ3ДИТ3 СИМВ0ЛЫ]" style="width:260px; display:none" />
       </label>
 
       <!-- 2) РАЗМЕР -->
       <label>
-        <span>РАЗМЕР</span>
+        <span>Р4ЗМЕР</span>
         <input id="width" type="range" min="50" max="175" step="5" />
         <output id="width_val"></output>
       </label>
 
       <!-- 3) КОНТРАСТ -->
       <label>
-        <span>КОНТРАСТ</span>
+        <span>К0НТР4СТ</span>
         <input id="contrast" type="range" min="1.0" max="3.0" step="0.1" />
         <output id="contrast_val"></output>
       </label>
 
       <!-- 4) ГАММА -->
       <label>
-        <span>ГАММА</span>
+        <span>Г4ММ4</span>
         <input id="gamma" type="range" min="0.6" max="2.0" step="0.1" />
         <output id="gamma_val"></output>
       </label>
@@ -71,11 +71,11 @@
       <!-- 6) ОТДЕЛЬНАЯ СТРОКА — ТЕКСТ + ФОН -->
       <div class="row colors">
         <label class="color">
-          <span>ТЕКСТ</span>
+          <span>Т3КСТ</span>
           <input id="fg" type="color" />
         </label>
         <label class="color">
-          <span>ФОН</span>
+          <span>Ф0Н</span>
           <input id="bg" type="color" />
         </label>
       </div>
@@ -83,7 +83,7 @@
       <!-- 7) ИНВЕРСИЯ -->
       <label class="check">
         <input id="invert" type="checkbox" />
-        <span id="invert_label">ИНВЕРСИЯ: ВКЛ</span>
+        <span id="invert_label">ИНВ3РСИЯ: ВКЛ</span>
       </label>
 
       <!-- 8) FPS -->
@@ -100,7 +100,7 @@
       <!-- Плейсхолдер (иконка «дискета» + текст), показывается, пока фото/видео не выбраны -->
   <div id="placeholder" hidden>
     <div class="ph-ico">💾</div>
-    <div class="ph-txt">ВЫБЕРИТЕ МОМЕНТ ИЗ ГАЛЕРЕИ</div>
+    <div class="ph-txt">ВЫБ3РИТ3 М0М3НТ ИЗ Г4Л3Р3И</div>
   </div>
  </div>
       <!-- Оверлей "занято" во время записи/конвертации -->
@@ -120,9 +120,9 @@
 
       <!-- НИЖНИЙ ряд переключения режимов -->
 <div class="modebar">
-  <button class="btn ghost" id="modePhoto">ФОТО</button>
-  <button class="btn ghost active" id="modeLive">LIVE</button>
-  <button class="btn ghost" id="modeVideo">ВИДЕО</button>
+  <button class="btn ghost" id="modePhoto">Ф0Т0</button>
+  <button class="btn ghost active" id="modeLive">К4М3Р4</button>
+  <button class="btn ghost" id="modeVideo">ВИД30</button>
 </div>
 
 <!-- Скрытые инпуты для выбора из галереи -->
@@ -142,9 +142,5 @@
 <script defer src="ascii.js?v=fit1"></script>
 </body>
 </html>
-
-
-
-
 
 
