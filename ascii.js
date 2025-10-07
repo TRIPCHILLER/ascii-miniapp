@@ -1466,6 +1466,122 @@ mainBtnHide();
    requestAnimationFrame(() => app.ui.fileVideo.click());
  }
 }
+  // === Android ColorPicker override (HSV square + hue slider) ===
+const isAndroid = /Android/i.test(navigator.userAgent);
+const CP = (() => {
+  const modal = document.getElementById('cp-modal');
+  if (!modal) return { open:()=>{}, close:()=>{} };
+
+  const sv = document.getElementById('cp-sv');
+  const h  = document.getElementById('cp-h');
+  const ok = document.getElementById('cp-ok');
+  const cancel = document.getElementById('cp-cancel');
+  const preview = document.getElementById('cp-preview-swatch');
+
+  const ctx = sv.getContext('2d');
+  let targetInput = null;   // app.ui.fg | app.ui.bg
+  let H = 210, S = 0.5, V = 0.6; // старт
+
+  function hsv2rgb(h,s,v){
+    const f = (n,k=(n+h/60)%6)=> v - v*s*Math.max(Math.min(k,4-k,1),0);
+    return [Math.round(f(5)*255), Math.round(f(3)*255), Math.round(f(1)*255)];
+  }
+  function rgb2hex(r,g,b){ return '#'+[r,g,b].map(x=>x.toString(16).padStart(2,'0')).join(''); }
+  function hex2hsv(hex){
+    const m = (hex||'').replace('#','');
+    if (m.length<6) return [H,S,V];
+    let r=parseInt(m.slice(0,2),16)/255, g=parseInt(m.slice(2,4),16)/255, b=parseInt(m.slice(4,6),16)/255;
+    const max=Math.max(r,g,b), min=Math.min(r,g,b), d=max-min;
+    let h=0, s=max? d/max:0, v=max;
+    if(d){
+      switch(max){
+        case r: h=(g-b)/d + (g<b?6:0); break;
+        case g: h=(b-r)/d + 2; break;
+        case b: h=(r-g)/d + 4; break;
+      }
+      h *= 60;
+    }
+    return [h,s,v];
+  }
+
+  function repaintSV(){
+    // слой 1: чистый цвет по H с полной насыщенностью и яркостью
+    const [r,g,b] = hsv2rgb(H,1,1);
+    const grdX = ctx.createLinearGradient(0,0,sv.width,0);
+    grdX.addColorStop(0, 'rgb(255,255,255)');
+    grdX.addColorStop(1, `rgb(${r},${g},${b})`);
+    ctx.fillStyle = grdX; ctx.fillRect(0,0,sv.width,sv.height);
+
+    const grdY = ctx.createLinearGradient(0,0,0,sv.height);
+    grdY.addColorStop(0, 'rgba(0,0,0,0)');
+    grdY.addColorStop(1, 'rgba(0,0,0,1)');
+    ctx.fillStyle = grdY; ctx.fillRect(0,0,sv.width,sv.height);
+
+    // курсор
+    const x = Math.round(S * sv.width);
+    const y = Math.round((1 - V) * sv.height);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI*2); ctx.strokeStyle = '#000'; ctx.stroke();
+
+    const [pr,pg,pb] = hsv2rgb(H,S,V);
+    preview.style.background = rgb2hex(pr,pg,pb);
+  }
+
+  function svFromEvent(e){
+    const rect = sv.getBoundingClientRect();
+    const cx = (e.touches? e.touches[0].clientX: e.clientX) - rect.left;
+    const cy = (e.touches? e.touches[0].clientY: e.clientY) - rect.top;
+    S = Math.min(1, Math.max(0, cx / rect.width));
+    V = 1 - Math.min(1, Math.max(0, cy / rect.height));
+    repaintSV();
+  }
+
+  function open(targetEl){
+    targetInput = targetEl;
+    // берем стартовое значение из поля
+    [H,S,V] = hex2hsv(targetInput.value || '#8ac7ff');
+    h.value = Math.round(H);
+    modal.hidden = false;
+    repaintSV();
+  }
+  function close(){ modal.hidden = true; }
+
+  // события
+  h.addEventListener('input', ()=> { H = +h.value; repaintSV(); });
+
+  const drag = (on)=> (ev)=>{ ev.preventDefault(); on(ev);
+    const move = (e)=> on(e);
+    const up = ()=>{ window.removeEventListener('mousemove', move);
+                     window.removeEventListener('touchmove', move);
+                     window.removeEventListener('mouseup', up);
+                     window.removeEventListener('touchend', up); };
+    window.addEventListener('mousemove', move, { passive:false });
+    window.addEventListener('touchmove', move, { passive:false });
+    window.addEventListener('mouseup', up);
+    window.addEventListener('touchend', up);
+  };
+  sv.addEventListener('mousedown', drag(svFromEvent), { passive:false });
+  sv.addEventListener('touchstart', drag(svFromEvent), { passive:false });
+
+  cancel.addEventListener('click', close);
+  ok.addEventListener('click', ()=> {
+    const [r,g,b] = hsv2rgb(H,S,V);
+    const hex = rgb2hex(r,g,b);
+    if (targetInput) {
+      targetInput.value = hex;
+      // чтобы твои обработчики 'input' сработали:
+      targetInput.dispatchEvent(new Event('input', { bubbles:true }));
+    }
+    close();
+  });
+
+  // клик по фону — закрыть
+  modal.querySelector('.cp-backdrop').addEventListener('click', close);
+
+  return { open, close };
+})();
+
   // ============== СВЯЗКА UI ==============
   function bindUI() {
     // Показ/скрытие панели
@@ -1583,13 +1699,22 @@ app.ui.flip.addEventListener('click', async () => {
       app.out.style.color = state.color;
       if(app.ui.style){ const m = detectPreset(state.color, state.background); app.ui.style.value = (m==='custom'?'custom':m); }
     });
+    
     app.ui.bg.addEventListener('input', e => {
       state.background = e.target.value;
       app.out.style.backgroundColor = state.background;
       app.stage.style.backgroundColor = state.background;
       if(app.ui.style){ const m = detectPreset(state.color, state.background); app.ui.style.value = (m==='custom'?'custom':m); }
     });
-
+// На Android перехватываем нативный color-picker и открываем наш
+if (/Android/i.test(navigator.userAgent)) {
+  const trap = (el) => {
+    el.addEventListener('pointerdown', (e) => { e.preventDefault(); CP.open(el); }, { passive:false });
+    el.addEventListener('click', (e) => { e.preventDefault(); }, { passive:false });
+  };
+  if (app.ui.fg) trap(app.ui.fg);
+  if (app.ui.bg) trap(app.ui.bg);
+}
 
 // --- Кнопки режимов внизу (с приоритетным вызовом file picker) ---
  app.ui.modeLive.addEventListener('click', () => {
@@ -1848,6 +1973,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
