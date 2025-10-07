@@ -480,7 +480,75 @@ function currentSource(){
   updateHud(`src=vid wait rs:${v.readyState}`);
   return null;
 }
+// === MACHINE ERROR POPUP SYSTEM ===
+// (замена alert + новые тексты TRIPCHILLER)
+function showErrorPopup(title, message) {
+  const tg = window.Telegram?.WebApp;
+  if (tg?.showPopup) {
+    tg.showPopup({ title, message });
+  } else {
+    const box = document.createElement('div');
+    box.style.cssText = `
+      position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+      background:rgba(0,0,0,.75);z-index:99999;font-family:'JetBrains Mono',monospace;
+    `;
+    box.innerHTML = `
+      <div style="
+        width:90%;max-width:420px;background:#0a0a0a;color:#c0c0c0;
+        border:1px solid #2b2b2b;border-radius:12px;padding:20px;
+        box-shadow:0 0 20px rgba(0,0,0,.6);text-align:left;
+      ">
+        <div style="color:#e83aff;font-size:15px;letter-spacing:0.05em;margin-bottom:6px;">
+          ${title}
+        </div>
+        <div style="color:#aaa;font-size:13px;line-height:1.4;white-space:pre-wrap;">
+          ${message}
+        </div>
+        <div style="text-align:right;margin-top:14px;">
+          <button id="__ok" style="
+            background:#e83aff;color:#fff;border:0;padding:6px 14px;
+            border-radius:8px;cursor:pointer;font-size:13px;
+          ">OK</button>
+        </div>
+      </div>`;
+    box.querySelector('#__ok').onclick = () => box.remove();
+    document.body.appendChild(box);
+  }
+}
 
+// Машинные тексты ошибок камеры
+function cameraErrorToText(err) {
+  const name = (err?.name || '').toLowerCase();
+
+  if (name.includes('notallowed'))
+    return { 
+      title: 'ТЫ 0ТКАЗАЛ МНЕ', 
+      message: 'я вижу только шум...' 
+    };
+
+  if (name.includes('notfound') || name.includes('overconstrained'))
+    return { 
+      title: 'М0ДУЛЬ ЗРЕНИЯ 0ТСУТСТВУЕТ', 
+      message: 'мне нечем смотреть...' 
+    };
+
+  if (name.includes('notreadable'))
+    return { 
+      title: 'Я Н3 М0ГУ УВИД3ТЬ Т3БЯ,', 
+      message: 'пока кто-то другой смотрит моими глазами...' 
+    };
+
+  if (name.includes('security'))
+    return { 
+      title: 'ТВ0Я СИСТЕМ4 БЛ0КИРУЕТ М0И ГЛАЗА', 
+      message: 'в доступе отказано.' 
+    };
+
+  return { 
+    title: 'НЕИЗВЕСТН4Я 0ШИБК4', 
+    message: 'это редкость, но не радуйся...' 
+  };
+}
   // ============== КАМЕРА ==============
   async function startStream() {
   try {
@@ -516,10 +584,12 @@ function currentSource(){
     await app.vid.play().catch(()=>{});
     updateHud('play called');
     return true;
-  } catch (err) {
-    updateHud('gUM ERR: '+ (err?.name||err));
-    alert('Камера недоступна: ' + (err?.message || err));
-    return false;
+    
+} catch (err) {
+  updateHud('gUM ERR: ' + (err?.name || err));
+  const msg = cameraErrorToText(err);
+  showErrorPopup(msg.title, msg.message);
+  return false;
   }
 }
 
@@ -1778,6 +1848,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
