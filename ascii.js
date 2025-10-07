@@ -1078,7 +1078,7 @@ async function downloadBlob(blob, filename) {
       if (res.status === 402 || json?.error === 'INSUFFICIENT_FUNDS') {
         tg.showPopup?.({
           title: 'Н̶Е̷Д̶О̵С̷Т̵А̷Т̴О̵Ч̴Н̴О̶ ̸Э̸Н̵Е̶Р̵Г̷И̶И',
-          message: `Требуется: ${json?.need ?? (state.mode==='video'?3:1)}\nТекущий запас: ${json?.balance ?? '—'}`
+          message: `Требуется: ${json?.need ?? (state.mode==='video'?15:5)}\nТекущий запас: ${json?.balance ?? '—'}`
         });
         return; // без локального сохранения
       }
@@ -1988,6 +1988,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
