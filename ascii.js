@@ -169,29 +169,28 @@ function isFullscreenLike() {
   // ===== Стили (палитры) =====
   // Порядок: [тёмный, светлый]; тёмный идёт на ФОН, светлый на ТЕКСТ
   const PRESETS = [
-    { id:'oldlcd',     name:'OLD LCD',           colors:['#000000', '#ffffff'] },
-    { id:'macintosh',  name:'MACINTOSH',         colors:['#333319', '#e5ffff'] },
-    { id:'macpaint',   name:'MAC PAINT',         colors:['#051b2c', '#8bc8fe'] },
-    { id:'zenith',     name:'ZENITH ZVM 1240',   colors:['#3f291e', '#fdca55'] },
-    { id:'obra',       name:'OBRA DINN',         colors:['#000b40', '#ebe1cd'] },
-    { id:'ibm8503',    name:'IBM 8503',          colors:['#2e3037', '#ebe5ce'] },
-    { id:'commodore',  name:'COMMODORE 1084',    colors:['#40318e', '#88d7de'] },
-    { id:'ibm5151',    name:'IBM 5151',          colors:['#25342f', '#01eb5f'] },
-    { id:'matrix',     name:'MATRIX',            colors:['#000000', '#00ff40'] },
-    { id:'casio',      name:'CASIO',             colors:['#000000', '#83b07e'] },
-    { id:'funkyjam',   name:'FUNKY JAM',         colors:['#920244', '#fec28c'] },
-    { id:'cornsole',   name:'CORNSOLE',          colors:['#6495ed', '#fff8dc'] },
-    { id:'postapoc',   name:'POSTAPOC SUNSET',   colors:['#1d0f44', '#f44e38'] },
-    { id:'laughcry',   name:'POP LAUGH CRY',     colors:['#452f47', '#d7bcad'] },
-    { id:'flowers',    name:'FLOWERS AND ASBESTOS', colors:['#c62b69', '#edf4ff'] },
-    { id:'pepper1bit', name:'1BIT PEPPER',       colors:['#100101', '#ebb5b5'] },
-    { id:'shapebit',   name:'SHAPE BIT',         colors:['#200955', '#ff0055'] },
-    { id:'chasing',    name:'CHASING LIGHT',     colors:['#000000', '#ffff02'] },
-    { id:'monsterbit', name:'MONSTER BIT',       colors:['#321632', '#cde9cd'] },
-    { id:'gatoroboto', name:'GATO ROBOTO',       colors:['#2b0000', '#cc0e13'] },
-    { id:'paperback',  name:'PAPERBACK',         colors:['#382b26', '#b8c2b9'] },
+{ id:'oldlcd',     name:'0LD LCD',              colors:['#000000', '#ffffff'] },
+{ id:'macintosh',  name:'M4CINT0SH',            colors:['#333319', '#e5ffff'] },
+{ id:'macpaint',   name:'M4C P4INT',            colors:['#051b2c', '#8bc8fe'] },
+{ id:'zenith',     name:'Z3NITH ZVM 1240',      colors:['#3f291e', '#fdca55'] },
+{ id:'obra',       name:'0BR4 DINN',            colors:['#000b40', '#ebe1cd'] },
+{ id:'ibm8503',    name:'IBM 8503',             colors:['#2e3037', '#ebe5ce'] },
+{ id:'commodore',  name:'C0MM0D0R3 1084',       colors:['#40318e', '#88d7de'] },
+{ id:'ibm5151',    name:'IBM 5151',             colors:['#25342f', '#01eb5f'] },
+{ id:'matrix',     name:'M4TRIX',               colors:['#000000', '#00ff40'] },
+{ id:'casio',      name:'C4SI0',                colors:['#000000', '#83b07e'] },
+{ id:'funkyjam',   name:'FUNKY J4M',            colors:['#920244', '#fec28c'] },
+{ id:'cornsole',   name:'C0RNS0L3',             colors:['#6495ed', '#fff8dc'] },
+{ id:'postapoc',   name:'P0ST4P0C SUNS3T',      colors:['#1d0f44', '#f44e38'] },
+{ id:'laughcry',   name:'P0P L4UGH CRY',        colors:['#452f47', '#d7bcad'] },
+{ id:'flowers',    name:'FL0W3RS 4ND 4SB3ST0S', colors:['#c62b69', '#edf4ff'] },
+{ id:'pepper1bit', name:'1BIT P3PP3R',          colors:['#100101', '#ebb5b5'] },
+{ id:'shapebit',   name:'SH4P3 BIT',            colors:['#200955', '#ff0055'] },
+{ id:'chasing',    name:'CH4SING LIGHT',        colors:['#000000', '#ffff02'] },
+{ id:'monsterbit', name:'M0NST3R BIT',          colors:['#321632', '#cde9cd'] },
+{ id:'paperback',  name:'P4P3RB4CK',            colors:['#382b26', '#b8c2b9'] },
   ];
-  const CUSTOM_LABEL = 'ПОЛЬЗОВАТЕЛЬСКИЙ';
+  const CUSTOM_LABEL = 'П0ЛЬЗ0В4Т3ЛЬСКИЙ';
   const norm = (hex)=> (hex||'').toLowerCase().replace('#','');
   const toHex = v => v && v[0]==='#' ? v : ('#'+v);
   const lum = (hex)=>{ // относительная яркость 0..1
@@ -559,7 +558,7 @@ const WIDTH_START = isMobile ? 75  : 150;
     app.ui.charset.value = state.charset;
     app.ui.invert.checked = state.invert;
 const lbl = document.getElementById('invert_label');
-if (lbl) lbl.textContent = state.invert ? 'ИНВЕРСИЯ: ВКЛ' : 'ИНВЕРСИЯ: ВЫКЛ';
+if (lbl) lbl.textContent = state.invert ? 'ИНВ3РСИЯ: ВКЛ' : 'ИНВ3РСИЯ: ВЫКЛ';
 
     app.out.style.color = state.color;
     app.out.style.backgroundColor = state.background;
@@ -987,7 +986,7 @@ async function downloadBlob(blob, filename) {
       pulse = setInterval(() => {
         dots = (dots + 1) % 4;
         if (app?.ui?.busyText) {
-          app.ui.busyText.textContent = 'ОТПРАВКА ФАЙЛА В ЧАТ' + '.'.repeat(dots);
+          app.ui.busyText.textContent = '0ТПР4ВК4 Ф4ЙЛА В Ч4Т' + '.'.repeat(dots);
         }
       }, 500);
 
@@ -1024,7 +1023,7 @@ async function downloadBlob(blob, filename) {
 
       // успех: файл улетел, бот сам пришлёт его в ЛС
       tg.showPopup?.({
-        title: 'ПРЕОБРАЗОВАНИЕ ЗАВЕРШЕНО',
+        title: 'ПРЕ0БР4З0В4НИЕ З4ВЕРШЕН0',
         message: `Файл отправлен в чат ${(json && typeof json.balance !== 'undefined') ? `\nОсталось импульсов: ${json.balance}` : ''}`
       });
 
@@ -1779,5 +1778,6 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
