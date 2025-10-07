@@ -426,12 +426,12 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 #cp-modal .cp-title{ font-size:18px; margin-bottom:10px; }
 #cp-modal .cp-row{ display:flex; gap:10px; align-items:center; }
 #cp-modal canvas#cp-sv{
-  width:220px; height:160px; border-radius:6px; background:#000; touch-action:none;
+  width:220px; height:190px; border-radius:6px; background:#000; touch-action:none;
 }
 #cp-modal .cp-side{ display:flex; flex-direction:column; gap:10px; align-items:center; }
 #cp-modal #cp-h{
   appearance:none; -webkit-appearance:none; writing-mode: bt-lr;
-  width: 18px; height: 160px; background: linear-gradient(180deg, red, #ff0, #0f0, #0ff, #00f, #f0f, red);
+  width: 18px; height: 190px; background: linear-gradient(180deg, red, #ff0, #0f0, #0ff, #00f, #f0f, red);
   border-radius: 6px; outline:none; border:none;
 }
 #cp-modal #cp-h::-webkit-slider-thumb{ -webkit-appearance:none; width:18px; height:6px; background:#fff; }
@@ -440,3 +440,4 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 #cp-modal #cp-preview-swatch{ display:block; width:32px; height:32px; border-radius:4px; background:#fff; }
 #cp-modal .cp-actions{ margin-top:12px; display:flex; justify-content:flex-end; gap:16px; }
 #cp-modal .cp-actions button{ color:#9bc0ff; background:transparent; border:0; padding:.4rem .6rem; }
+
