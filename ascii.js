@@ -1481,7 +1481,7 @@ const CP = (() => {
   const ctx = sv.getContext('2d');
   let targetInput = null;   // app.ui.fg | app.ui.bg
   let H = 210, S = 0.5, V = 0.6; // старт
-
+  let openedAt = 0;
   function hsv2rgb(h,s,v){
     const f = (n,k=(n+h/60)%6)=> v - v*s*Math.max(Math.min(k,4-k,1),0);
     return [Math.round(f(5)*255), Math.round(f(3)*255), Math.round(f(1)*255)];
@@ -1538,13 +1538,19 @@ const CP = (() => {
   }
 
   function open(targetEl){
-    targetInput = targetEl;
-    // берем стартовое значение из поля
-    [H,S,V] = hex2hsv(targetInput.value || '#8ac7ff');
-    h.value = Math.round(H);
+  targetInput = targetEl;
+  // берём стартовое значение из поля
+  [H,S,V] = hex2hsv(targetInput.value || '#8ac7ff');
+  h.value = Math.round(H);
+
+  openedAt = Date.now();
+  // небольшой defer — чтобы «хвост» клика не закрыл модал мгновенно
+  setTimeout(() => {
     modal.hidden = false;
     repaintSV();
-  }
+  }, 0);
+}
+
   function close(){ modal.hidden = true; }
 
   // события
@@ -1577,7 +1583,11 @@ const CP = (() => {
   });
 
   // клик по фону — закрыть
-  modal.querySelector('.cp-backdrop').addEventListener('click', close);
+  modal.querySelector('.cp-backdrop').addEventListener('click', (ev) => {
+  // игнорируем первый «хвостовой» клик сразу после открытия
+  if (Date.now() - openedAt < 200) return;
+  close();
+});
 
   return { open, close };
 })();
@@ -1708,10 +1718,15 @@ app.ui.flip.addEventListener('click', async () => {
     });
 // На Android перехватываем нативный color-picker и открываем наш
 if (/Android/i.test(navigator.userAgent)) {
-  const trap = (el) => {
-    el.addEventListener('pointerdown', (e) => { e.preventDefault(); CP.open(el); }, { passive:false });
-    el.addEventListener('click', (e) => { e.preventDefault(); }, { passive:false });
-  };
+  
+const trap = (el) => {
+  el.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    CP.open(el);
+  }, { passive:false });
+};
+  
   if (app.ui.fg) trap(app.ui.fg);
   if (app.ui.bg) trap(app.ui.bg);
 }
@@ -1973,6 +1988,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
