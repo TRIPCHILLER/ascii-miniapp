@@ -459,7 +459,8 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   object-fit:contain; 
   pointer-events:none; 
 }
-#camBtnCore{ width:72px; height:72px; }  /* «белая кнопка» внутри обводки */
+#camBtnCore{ width:100%; height:100%; }  /* «белая кнопка» внутри обводки */
 
 /* подсветка нажатия если вдруг понадобится классом */
 #camShutter.active #camBtnCore{ filter:brightness(.6); }
+
