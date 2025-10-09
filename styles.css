@@ -443,25 +443,25 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 
 /* === CAMERA SHUTTER (LIVE only) === */
 #camShutter{
-  position:absolute;
-  left:50%;
-  bottom:62px;                  /* над нижней вкладкой режимов */
-  transform:translateX(-50%);
-  width:75px; height:75px;      /* общий «контур» */
-  display:flex; align-items:center; justify-content:center;
-  z-index: 1;                   /* над #out, под #busy */
-  pointer-events:auto;
-  touch-action: manipulation;
+  position:absolute; left:50%; bottom:62px; transform:translateX(-50%);
+  width:75px; height:75px; display:flex; align-items:center; justify-content:center;
+  z-index:1; pointer-events:auto; touch-action:manipulation;
 }
-#camShutter img{ 
-  position:absolute; 
-  width:100%; height:100%; 
-  object-fit:contain; 
-  pointer-events:none; 
+#camShutter img{
+  position:absolute; width:100%; height:100%; object-fit:contain; pointer-events:none;
 }
-#camBtnCore{ width:85%; height:85%; }  /* «белая кнопка» внутри обводки */
 
-/* подсветка нажатия если вдруг понадобится классом */
+/* Кольцо — поверх */
+#camBtnCircle{ z-index:2; }
+
+/* Ядро — под кольцом и принудительно уменьшено,
+   чтобы зазор был ВСЕГДА (и в белом, и в сером состоянии) */
+#camBtnCore{
+  z-index:1;
+  transform: scale(0.86);      /* подбери 0.84–0.90 под свой зазор */
+  transform-origin: 50% 50%;
+}
+
 #camShutter.active #camBtnCore{ filter:brightness(.6); }
 
 
