@@ -458,10 +458,8 @@ body, .toolbar, .panel, .btn, label, output, select, option {
    чтобы зазор был ВСЕГДА (и в белом, и в сером состоянии) */
 #camBtnCore{
   z-index:1;
-  transform: scale(0.86);      /* подбери 0.84–0.90 под свой зазор */
+  transform: scale(0.85);      /* подбери 0.84–0.90 под свой зазор */
   transform-origin: 50% 50%;
 }
 
 #camShutter.active #camBtnCore{ filter:brightness(.6); }
-
-
