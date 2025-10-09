@@ -447,7 +447,7 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   left:50%;
   bottom:62px;                  /* над нижней вкладкой режимов */
   transform:translateX(-50%);
-  width:84px; height:84px;      /* общий «контур» */
+  width:75px; height:75px;      /* общий «контур» */
   display:flex; align-items:center; justify-content:center;
   z-index: 1;                   /* над #out, под #busy */
   pointer-events:auto;
@@ -459,8 +459,9 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   object-fit:contain; 
   pointer-events:none; 
 }
-#camBtnCore{ width:100%; height:100%; }  /* «белая кнопка» внутри обводки */
+#camBtnCore{ width:85%; height:85%; }  /* «белая кнопка» внутри обводки */
 
 /* подсветка нажатия если вдруг понадобится классом */
 #camShutter.active #camBtnCore{ filter:brightness(.6); }
+
 
