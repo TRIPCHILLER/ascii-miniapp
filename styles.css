@@ -441,4 +441,25 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 #cp-modal .cp-actions{ margin-top:12px; display:flex; justify-content:flex-end; gap:16px; }
 #cp-modal .cp-actions button{ color:#ffffff; background:transparent; border:0; padding:.4rem .6rem; }
 
+/* === CAMERA SHUTTER (LIVE only) === */
+#camShutter{
+  position:absolute;
+  left:50%;
+  bottom:62px;                  /* над нижней вкладкой режимов */
+  transform:translateX(-50%);
+  width:84px; height:84px;      /* общий «контур» */
+  display:flex; align-items:center; justify-content:center;
+  z-index: 1;                   /* над #out, под #busy */
+  pointer-events:auto;
+  touch-action: manipulation;
+}
+#camShutter img{ 
+  position:absolute; 
+  width:100%; height:100%; 
+  object-fit:contain; 
+  pointer-events:none; 
+}
+#camBtnCore{ width:72px; height:72px; }  /* «белая кнопка» внутри обводки */
 
+/* подсветка нажатия если вдруг понадобится классом */
+#camShutter.active #camBtnCore{ filter:brightness(.6); }
