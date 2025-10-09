@@ -51,6 +51,9 @@ function busyHide(force = false){
     fileVideo:   $('#fileVideo'),
     save:        $('#save'),
     placeholder: $('#placeholder'),
+    camShutter:    $('#camShutter'),
+    camBtnCircle:  $('#camBtnCircle'),
+    camBtnCore:    $('#camBtnCore'),
     render:      $('#render'),
     fpsWrap: null, // обёртка для скрытия FPS 
     // overlay
@@ -1426,6 +1429,8 @@ async function setMode(newMode){
   // переключаем видимость верхних кнопок
   if (app.ui.fs)   app.ui.fs.hidden   = (newMode!=='live');
   if (app.ui.save) app.ui.save.hidden = (newMode==='live');
+    // === затвор только в LIVE ===
+  if (app.ui.camShutter) app.ui.camShutter.hidden = (newMode!=='live');
 // Telegram MainButton: показываем только в ФОТО/ВИДЕО, скрываем в LIVE
 if (tg) {
 mainBtnHide();
@@ -1744,6 +1749,37 @@ const trap = (el) => {
    updateModeTabs('video');
    setMode('video');
  });
+// --- Снимок в LIVE (тот же пайплайн, что и ФОТО) ---
+if (app.ui.camShutter && app.ui.camBtnCore) {
+  const pressOn  = () => { app.ui.camBtnCore.src = 'assets/camera_button_active.svg'; app.ui.camShutter.classList.add('active'); };
+  const pressOff = () => { app.ui.camBtnCore.src = 'assets/camera_button.svg';          app.ui.camShutter.classList.remove('active'); };
+
+  let shotLock = false;
+
+  const doShot = async (e) => {
+    e.preventDefault();
+    if (state.mode !== 'live') return;
+    if (shotLock) return;
+    shotLock = true;
+
+    try {
+      pressOn();
+      // 1) формируем PNG из текущего ASCII (без интерфейса — это отрисовка текста в канвас)
+      // 2) внутри savePNG() вызывается downloadBlob(blob, ...) → /api/upload
+      await Promise.resolve(savePNG());
+    } catch (err) {
+      console.error('[camShot]', err);
+    } finally {
+      setTimeout(pressOff, 180);  // короткая «анимация нажатия»
+      setTimeout(() => { shotLock = false; }, 400);
+    }
+  };
+
+  app.ui.camShutter.addEventListener('pointerdown', (e)=>{ if (state.mode==='live'){ e.preventDefault(); pressOn(); } }, {passive:false});
+  app.ui.camShutter.addEventListener('pointerup',   doShot, {passive:false});
+  app.ui.camShutter.addEventListener('click',       doShot, {passive:false});
+  app.ui.camShutter.addEventListener('pointercancel', ()=>pressOff());
+}
 
 // --- Выбор фото из галереи ---
 app.ui.filePhoto.addEventListener('change', (e) => {
@@ -1988,6 +2024,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
