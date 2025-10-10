@@ -1856,36 +1856,37 @@ app._lastImageURL = urlImg;
 
 });
 
-// --- Выбор видео из галереи
+// --- Выбор видео из галереи (рабочий пайплайн + чистим ASCII до готовности)
 app.ui.fileVideo.addEventListener('change', async (e) => {
   const f = e.target.files?.[0];
   if (!f) return;
 
-  // 0) отвязать камеру от <video> (кадры LIVE больше не мешают)
-  try {
-    app.vid.pause?.();
-    app.vid.srcObject = null;           // ключевой момент
-    app.vid.removeAttribute('src');     // на всякий случай
-  } catch(_) {}
-  stopStream(); // твоя функция теперь просто отвязывает и НЕ убивает разрешение
+  // остановим live (и любые старые источники)
+  stopStream();
+  try { app.vid.pause?.(); } catch(_) {}
+  try { app.vid.removeAttribute('src'); } catch(_) {}
+  app.vid.srcObject = null;
 
-  // 1) источник — выбранный файл
+  // пока видео не готово — убираем «застывший» кадр
+  app.out.textContent = '';
+  app.ui.placeholder.hidden = false;
+
+  // освободим старый blob, если был
   if (app._lastVideoURL) { try { URL.revokeObjectURL(app._lastVideoURL); } catch(_) {} }
   const url = URL.createObjectURL(f);
   app._lastVideoURL = url;
-  app.vid.src = url;
 
-  // 2) атрибуты для автозапуска
+  // атрибуты автозапуска/зацикливания
   app.vid.setAttribute('playsinline','');
   app.vid.setAttribute('autoplay','');
   app.vid.setAttribute('muted','');
   app.vid.playsInline = true;
   app.vid.autoplay   = true;
   app.vid.muted      = true;
-
-  // 3) бесконечный цикл просмотра файла (как и было)
-  app.vid.loop = true;
+  app.vid.loop       = true;
   app.vid.setAttribute('loop','');
+
+  // fallback loop для iOS
   if (app._loopFallback) app.vid.removeEventListener('ended', app._loopFallback);
   app._loopFallback = () => {
     if (!state.isRecording && state.mode === 'video' && app.vid.loop) {
@@ -1894,35 +1895,29 @@ app.ui.fileVideo.addEventListener('change', async (e) => {
   };
   app.vid.addEventListener('ended', app._loopFallback);
 
-// 4) когда ролик готов...
-let switched = false;
-const afterReady = () => {
-  if (switched) return;
-  switched = true;
+  // как только метаданные есть — прячем плейсхолдер, подгоняем сетку и всё
+  app.vid.onloadedmetadata = () => {
+    if (app.vid.videoWidth > 0 && app.vid.videoHeight > 0) {
+      app.ui.placeholder.hidden = true;
+      requestAnimationFrame(() => {
+        const { w, h } = updateGridSize(); refitFont(w, h);
+      });
+    }
+  };
 
-  app.ui.placeholder.hidden = true;
-  requestAnimationFrame(() => {
-    const { w, h } = updateGridSize();
-    refitFont(w, h);
-  });
+  app.vid.oncanplay = () => {
+    app.ui.placeholder.hidden = true;
+    requestAnimationFrame(() => {
+      const { w, h } = updateGridSize(); refitFont(w, h);
+    });
+  };
 
-  updateModeTabs('video');
-  setMode('video');
+  // подключаем источник и стартуем
+  app.vid.src = url;
+  try { await app.vid.play?.(); } catch(_) {}
 
-  app.vid.play?.().catch(()=>{});
-  cleanup();
-};
-const cleanup = () => {
-  app.vid.removeEventListener('loadedmetadata', afterReady);
-  app.vid.removeEventListener('canplay',        afterReady);
-};
-// слушатели СНАЧАЛА
-app.vid.addEventListener('loadedmetadata', afterReady);
-app.vid.addEventListener('canplay',        afterReady);
-
-// потом источник и запуск
-app.vid.src = url;
-app.vid.load();          // <— вот это ключ
+  // видео — не зеркалим
+  state.mirror = false;
 });
 
 // --- ЕДИНАЯ функция сохранения ---
@@ -2084,6 +2079,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
