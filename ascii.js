@@ -1780,23 +1780,37 @@ if (app.ui.camShutter && app.ui.camBtnCore) {
   app.ui.camShutter.addEventListener('click',       doShot, {passive:false});
   app.ui.camShutter.addEventListener('pointercancel', ()=>pressOff());
 }
-// === Автовозврат в LIVE, если юзер закрыл окно выбора ===
-function attachCancelFallback(inputEl, modeName){
+// === Guard: если пользователь закрыл диалог выбора файла — вернуться в live ===
+function guardPicker(inputEl, backTo = 'live') {
   if (!inputEl) return;
-  // на Android/iOS отмена просто не триггерит change, поэтому ловим focus
-  inputEl.addEventListener('click', () => {
-    const prevVal = inputEl.value;
-    // через 500мс проверяем: если значение не изменилось — значит, отмена
-    setTimeout(() => {
-      if (inputEl.value === prevVal) {
-        console.log('[cancelled]', modeName, '→ возврат в live');
-        setMode('live');
-      }
-    }, 500);
+  let armed = false;
+
+  // диалог открыт
+  inputEl.addEventListener('click', () => { armed = true; });
+
+  // файл реально выбран — отменяем откат
+  inputEl.addEventListener('change', () => { armed = false; });
+
+  const onFocusBack = () => {
+    // вернулись в приложение после диалога
+    if (!armed) return;             // файл выбран — всё ок
+    armed = false;                  // файл НЕ выбран — откатываемся
+    if (!inputEl.files || inputEl.files.length === 0) {
+      updateModeTabs(backTo);
+      setMode(backTo);
+    }
+  };
+
+  // на мобилках возвращение фиксируем через focus/visibilitychange
+  window.addEventListener('focus', onFocusBack);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) onFocusBack();
   });
 }
-attachCancelFallback(app.ui.filePhoto, 'photo');
-attachCancelFallback(app.ui.fileVideo, 'video');
+
+// ставим сторожей на оба инпута
+guardPicker(app.ui.filePhoto, 'live');
+guardPicker(app.ui.fileVideo, 'live');
 
 // --- Выбор фото из галереи ---
 app.ui.filePhoto.addEventListener('change', (e) => {
@@ -2041,6 +2055,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
