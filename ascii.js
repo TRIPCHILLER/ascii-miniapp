@@ -1894,33 +1894,35 @@ app.ui.fileVideo.addEventListener('change', async (e) => {
   };
   app.vid.addEventListener('ended', app._loopFallback);
 
-  // 4) когда ролик готов — ПЕРЕКЛЮЧАЕМ РЕЖИМ и подсветку (делаем один раз)
-  let switched = false;
-  const afterReady = () => {
-    if (switched) return;
-    switched = true;
+// 4) когда ролик готов...
+let switched = false;
+const afterReady = () => {
+  if (switched) return;
+  switched = true;
 
-    app.ui.placeholder.hidden = true;
-    requestAnimationFrame(() => {
-      const { w, h } = updateGridSize();
-      refitFont(w, h);
-    });
+  app.ui.placeholder.hidden = true;
+  requestAnimationFrame(() => {
+    const { w, h } = updateGridSize();
+    refitFont(w, h);
+  });
 
-    // <<< вот эти две строки раньше и отсутствовали >>>
-    updateModeTabs('video');
-    setMode('video');
+  updateModeTabs('video');
+  setMode('video');
 
-    app.vid.play?.().catch(()=>{});
-    cleanup();
-  };
-  const cleanup = () => {
-    app.vid.removeEventListener('loadeddata', afterReady);
-    app.vid.removeEventListener('canplay',    afterReady);
-  };
+  app.vid.play?.().catch(()=>{});
+  cleanup();
+};
+const cleanup = () => {
+  app.vid.removeEventListener('loadedmetadata', afterReady);
+  app.vid.removeEventListener('canplay',        afterReady);
+};
+// слушатели СНАЧАЛА
+app.vid.addEventListener('loadedmetadata', afterReady);
+app.vid.addEventListener('canplay',        afterReady);
 
-  app.vid.addEventListener('loadeddata', afterReady);
-  app.vid.addEventListener('canplay',    afterReady);
-});
+// потом источник и запуск
+app.vid.src = url;
+app.vid.load();          // <— вот это ключ
 
 // --- ЕДИНАЯ функция сохранения ---
 function doSave() {
@@ -2081,6 +2083,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
