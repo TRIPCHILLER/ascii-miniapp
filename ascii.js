@@ -1367,7 +1367,6 @@ function stopStream(){
     if (app.vid) {
       app.vid.pause?.();
       app.vid.srcObject = null; // отсоединяем, но НЕ stop() у треков
-      app.vid.removeAttribute('src');
     }
   } catch(e){}
 }
@@ -1451,6 +1450,7 @@ mainBtnHide();
   if (newMode === 'live') {
     // LIVE: выключаем возможный файл и включаем камеру
     app.ui.placeholder.hidden = true;
+    try { app.vid.removeAttribute('src'); } catch(e){}
     await startStream();
     updateMirrorForFacing?.();
     return;
@@ -2081,6 +2081,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
