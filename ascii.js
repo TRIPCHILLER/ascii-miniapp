@@ -1780,6 +1780,23 @@ if (app.ui.camShutter && app.ui.camBtnCore) {
   app.ui.camShutter.addEventListener('click',       doShot, {passive:false});
   app.ui.camShutter.addEventListener('pointercancel', ()=>pressOff());
 }
+// === Автовозврат в LIVE, если юзер закрыл окно выбора ===
+function attachCancelFallback(inputEl, modeName){
+  if (!inputEl) return;
+  // на Android/iOS отмена просто не триггерит change, поэтому ловим focus
+  inputEl.addEventListener('click', () => {
+    const prevVal = inputEl.value;
+    // через 500мс проверяем: если значение не изменилось — значит, отмена
+    setTimeout(() => {
+      if (inputEl.value === prevVal) {
+        console.log('[cancelled]', modeName, '→ возврат в live');
+        setMode('live');
+      }
+    }, 500);
+  });
+}
+attachCancelFallback(app.ui.filePhoto, 'photo');
+attachCancelFallback(app.ui.fileVideo, 'video');
 
 // --- Выбор фото из галереи ---
 app.ui.filePhoto.addEventListener('change', (e) => {
@@ -2024,6 +2041,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
