@@ -1923,6 +1923,7 @@ app.vid.addEventListener('canplay',        afterReady);
 // потом источник и запуск
 app.vid.src = url;
 app.vid.load();          // <— вот это ключ
+});
 
 // --- ЕДИНАЯ функция сохранения ---
 function doSave() {
@@ -2083,6 +2084,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
