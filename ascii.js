@@ -1718,35 +1718,30 @@ const trap = (el) => {
    updateModeTabs('live');
    setMode('live');
  });
-// --- Кнопка ФОТО: открываем пикер, режим меняем только если файл выбран
+// --- ФОТО
 app.ui.modePhoto.addEventListener('click', () => {
   if (!app.ui.filePhoto) return;
 
-  // Можно подсветить таб, но режим не трогаем
-  updateModeTabs('photo');
-
-  // очистка, чтобы change сработал даже при выборе того же файла
   app.ui.filePhoto.value = '';
 
   const cleanup = () => {
     app.ui.filePhoto.removeEventListener('change', onChange);
     document.removeEventListener('visibilitychange', onReturn);
+    window.removeEventListener('focus', onReturn);
   };
 
   const onChange = () => {
     cleanup();
-    // теперь реально переходим в фото: твой существующий 'change' обработает файл
+    updateModeTabs('photo');   // подсветка только при реальном выборе
     setMode('photo');
   };
 
   const onReturn = () => {
     if (!document.hidden) {
-      // даём шанс сработать 'change'
       setTimeout(() => {
         if (!app.ui.filePhoto.files || app.ui.filePhoto.files.length === 0) {
           cleanup();
-          // отмена — вернуться в камеру
-          updateModeTabs('live');
+          updateModeTabs('live');   // жёстко вернуть подсветку в LIVE
           setMode('live');
         }
       }, 50);
@@ -1755,24 +1750,26 @@ app.ui.modePhoto.addEventListener('click', () => {
 
   app.ui.filePhoto.addEventListener('change', onChange, { once: true });
   document.addEventListener('visibilitychange', onReturn);
+  window.addEventListener('focus', onReturn);
 
   app.ui.filePhoto.click();
 });
 
-// --- Кнопка ВИДЕО: та же логика
+// --- ВИДЕО (аналогично)
 app.ui.modeVideo.addEventListener('click', () => {
   if (!app.ui.fileVideo) return;
 
-  updateModeTabs('video');
   app.ui.fileVideo.value = '';
 
   const cleanup = () => {
     app.ui.fileVideo.removeEventListener('change', onChange);
     document.removeEventListener('visibilitychange', onReturn);
+    window.removeEventListener('focus', onReturn);
   };
 
   const onChange = () => {
     cleanup();
+    updateModeTabs('video');
     setMode('video');
   };
 
@@ -1790,6 +1787,7 @@ app.ui.modeVideo.addEventListener('click', () => {
 
   app.ui.fileVideo.addEventListener('change', onChange, { once: true });
   document.addEventListener('visibilitychange', onReturn);
+  window.addEventListener('focus', onReturn);
 
   app.ui.fileVideo.click();
 });
@@ -2069,6 +2067,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
