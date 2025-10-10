@@ -147,6 +147,7 @@ let DITHER_ENABLED = true;
     blackPoint: 0.06,   // 0..1 — общий дефолт
     whitePoint: 0.98,   // 0..1 — общий дефолт
     mode: 'live',           // 'live' | 'photo' | 'video'
+    camStream: null,
     imageEl: null,          // <img> для режима ФОТО
     isRecording: false,     // запись видео (экспорт)
     recorder: null,
@@ -552,47 +553,53 @@ function cameraErrorToText(err) {
     message: 'это редкость, но не приятная...' 
   };
 }
-  // ============== КАМЕРА ==============
-  async function startStream() {
+// === ЗАПУСК КАМЕРЫ с переиспользованием уже выданного разрешения ===
+async function startStream() {
   try {
-    // выставляем атрибуты на всякий
-    app.vid.setAttribute('playsinline',''); app.vid.setAttribute('autoplay',''); app.vid.setAttribute('muted','');
-    app.vid.playsInline = true; app.vid.autoplay = true; app.vid.muted = true;
+    // если поток уже есть и активен — просто подключим его к <video>
+    if (state.camStream && state.camStream.active) {
+      const stream = state.camStream;
+      app.vid.setAttribute('playsinline','');
+      app.vid.setAttribute('autoplay','');
+      app.vid.setAttribute('muted','');
+      app.vid.playsInline = true; app.vid.autoplay = true; app.vid.muted = true;
 
+      app.vid.srcObject = stream;
+      await app.vid.play().catch(()=>{});
+
+      app.ui.placeholder.hidden = true;
+      requestAnimationFrame(() => { const { w, h } = updateGridSize(); refitFont(w, h); });
+      return true;
+    }
+
+    // иначе — запрашиваем ОДИН раз
     const constraints = { video: { facingMode: state.facing || 'user' }, audio: false };
-    updateHud('getUserMedia…');
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    state.camStream = stream;  // <-- сохраняем!
+
+    app.vid.setAttribute('playsinline','');
+    app.vid.setAttribute('autoplay','');
+    app.vid.setAttribute('muted','');
+    app.vid.playsInline = true; app.vid.autoplay = true; app.vid.muted = true;
 
     app.vid.srcObject = stream;
 
     app.vid.onloadedmetadata = () => {
-      updateHud('loadedmetadata');
-      if (app.vid.videoWidth > 0 && app.vid.videoHeight > 0) {
-        app.ui.placeholder.hidden = true;
-        requestAnimationFrame(() => {
-          const { w, h } = updateGridSize(); refitFont(w, h);
-          updateHud('ready meta');
-        });
-      }
+      app.ui.placeholder.hidden = true;
+      requestAnimationFrame(() => { const { w, h } = updateGridSize(); refitFont(w, h); });
     };
     app.vid.oncanplay = () => {
       app.ui.placeholder.hidden = true;
-      requestAnimationFrame(() => {
-        const { w, h } = updateGridSize(); refitFont(w, h);
-        updateHud('canplay');
-      });
+      requestAnimationFrame(() => { const { w, h } = updateGridSize(); refitFont(w, h); });
     };
-    app.vid.onerror = (e)=> updateHud('video error');
 
     await app.vid.play().catch(()=>{});
-    updateHud('play called');
     return true;
-    
-} catch (err) {
-  updateHud('gUM ERR: ' + (err?.name || err));
-  const msg = cameraErrorToText(err);
-  showErrorPopup(msg.title, msg.message);
-  return false;
+
+  } catch (err) {
+    const msg = cameraErrorToText(err);
+    showErrorPopup(msg.title, msg.message);
+    return false;
   }
 }
 
@@ -1353,12 +1360,18 @@ function updateMirrorForFacing() {
       if (!state.isFullscreen) enterFullscreen();
     });
   }
-  function stopStream(){
-  const s = app.vid?.srcObject;
-  if (s) { s.getTracks().forEach(t=>t.stop()); app.vid.srcObject = null; }
-  try { app.vid.pause?.(); } catch(e){}
-  app.vid.removeAttribute('src');
+// === Не останавливаем треки — просто отвязываем от <video>
+// (разрешение и сам MediaStream остаются живыми в state.camStream)
+function stopStream(){
+  try {
+    if (app.vid) {
+      app.vid.pause?.();
+      app.vid.srcObject = null; // отсоединяем, но НЕ stop() у треков
+      app.vid.removeAttribute('src');
+    }
+  } catch(e){}
 }
+
 function openFilePicker(el) {
   if (!el) return;
   // Запоминаем стили
@@ -1437,7 +1450,6 @@ mainBtnHide();
 
   if (newMode === 'live') {
     // LIVE: выключаем возможный файл и включаем камеру
-    stopStream();                 // на всякий
     app.ui.placeholder.hidden = true;
     await startStream();
     updateMirrorForFacing?.();
@@ -2067,6 +2079,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
