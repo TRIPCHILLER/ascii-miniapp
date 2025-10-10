@@ -1408,19 +1408,6 @@ function updateModeTabs(newMode){
 }
 
 async function setMode(newMode){
-  if (newMode === state.mode) {
-    if (newMode === 'photo') {
-    app.ui.filePhoto.value = '';
-    openFilePicker(app.ui.filePhoto);
-      return;
-    }
-    if (newMode === 'video') {
-    app.ui.fileVideo.value = '';
-    openFilePicker(app.ui.fileVideo);
-      return;
-    }
-    // для live ничего не делаем
-  }
 
   state.mode = newMode;
   updateModeTabs(newMode);
@@ -1460,16 +1447,6 @@ mainBtnHide();
   // не LIVE → камеру останавливаем
   stopStream();
 
- // PHOTO/VIDEO: сразу просим файл (в той же интеракции, но безопасно через rAF)
- if (newMode === 'photo' && app.ui.filePhoto) {
-   app.ui.filePhoto.value = '';
-   app.ui.placeholder.hidden = !!state.imageEl;
-   requestAnimationFrame(() => app.ui.filePhoto.click());
- }
- if (newMode === 'video' && app.ui.fileVideo) {
-   app.ui.fileVideo.value = '';
-   requestAnimationFrame(() => app.ui.fileVideo.click());
- }
 }
   // === Android ColorPicker override (HSV square + hue slider) ===
 const isAndroid = /Android/i.test(navigator.userAgent);
@@ -2092,6 +2069,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
