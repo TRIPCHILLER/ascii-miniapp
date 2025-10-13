@@ -138,7 +138,7 @@ let DITHER_ENABLED = true;
     widthChars: isMobile ? 75 : 150,
     contrast: 2.00,
     gamma: 0.90,
-    fps: 60,
+    fps: 30,
     color: '#8ac7ff',
     background: '#000000',
     charset: '@%#*+=-:. ',
@@ -2079,6 +2079,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
