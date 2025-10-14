@@ -606,22 +606,37 @@ async function startStream() {
   // ============== РЕНДЕРИНГ ==============
   let raf = null;
   let lastFrameTime = 0;
+// Универсальная установка лимитов ширины с учётом платформы и режима
+function applyWidthLimitsForMode(init = false) {
+  let min, max;
+
+  if (isMobile) {
+    if (state.mode === 'live') {       // КАМЕРА
+      min = 50;  max = 100;
+    } else {                           // ФОТО / ВИДЕО
+      min = 50;  max = 150;            // ← расширили верх до 150 как просил
+    }
+  } else {
+    // Десктоп оставляем как было
+    min = 125; max = 175;
+  }
+
+  app.ui.width.min = min;
+  app.ui.width.max = max;
+
+  // Не сбиваем текущий выбор: мягко зажимаем в новые границы
+  const fallbackStart = isMobile ? 75 : 150;
+  if (init && (state.widthChars == null)) {
+    state.widthChars = fallbackStart;
+  }
+  state.widthChars = Math.max(min, Math.min(max, state.widthChars || fallbackStart));
+
+  app.ui.width.value = state.widthChars;
+  app.ui.widthVal.textContent = state.widthChars;
+}
 
   function setUI() {
-    // разные пределы для мобилы и ПК
-const WIDTH_MIN   = isMobile ? 50  : 125;
-const WIDTH_MAX   = isMobile ? 100 : 175;
-const WIDTH_START = isMobile ? 75  : 150;
-
-    // применяем лимиты и старт
-    app.ui.width.min  = WIDTH_MIN;
-    app.ui.width.max  = WIDTH_MAX;
-
-    // синхронизируем state и UI на старте
-    state.widthChars = WIDTH_START;
-    app.ui.width.value = state.widthChars;
-    app.ui.widthVal.textContent = state.widthChars;
-
+  applyWidthLimitsForMode(true); // ← умные лимиты + мягкий старт
 
     app.ui.contrast.value = state.contrast;
     app.ui.contrastVal.textContent = state.contrast.toFixed(2);
@@ -1420,11 +1435,10 @@ function updateModeTabs(newMode){
 }
 
 async function setMode(newMode){
-
   state.mode = newMode;
   updateModeTabs(newMode);
   syncFpsVisibility(); // переключаем FPS в зависимости от режима
-  
+  applyWidthLimitsForMode();
   // переключаем видимость верхних кнопок
   if (app.ui.fs)   app.ui.fs.hidden   = (newMode!=='live');
   if (app.ui.save) app.ui.save.hidden = (newMode==='live');
@@ -2121,6 +2135,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
