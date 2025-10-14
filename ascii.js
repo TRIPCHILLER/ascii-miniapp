@@ -1564,23 +1564,22 @@ const CP = (() => {
   sv.addEventListener('touchstart', drag(svFromEvent), { passive:false });
 function repaintHue(){
   const hc = h.getContext('2d');
-  const w = h.width, he = h.height;
-  const grd = hc.createLinearGradient(0,0,0,he);
-  grd.addColorStop(0/6, '#ff0000');
-  grd.addColorStop(1/6, '#ffff00');
-  grd.addColorStop(2/6, '#00ff00');
-  grd.addColorStop(3/6, '#00ffff');
-  grd.addColorStop(4/6, '#0000ff');
-  grd.addColorStop(5/6, '#ff00ff');
-  grd.addColorStop(6/6, '#ff0000');
-  hc.fillStyle = grd; hc.fillRect(0,0,w,he);
+  const rect = h.getBoundingClientRect();
+  const W = Math.round(rect.width), Hpx = Math.round(rect.height);
+  if (h.width !== W || h.height !== Hpx){ h.width = W; h.height = Hpx; }
 
-  // маркер текущего H
-  const y = Math.round((H/360) * he);
+  const grd = hc.createLinearGradient(0,0,0,Hpx);
+  grd.addColorStop(0/6,'#f00'); grd.addColorStop(1/6,'#ff0');
+  grd.addColorStop(2/6,'#0f0'); grd.addColorStop(3/6,'#0ff');
+  grd.addColorStop(4/6,'#00f'); grd.addColorStop(5/6,'#f0f');
+  grd.addColorStop(6/6,'#f00');
+  hc.fillStyle = grd; hc.fillRect(0,0,W,Hpx);
+
+  const y = Math.round((H/360) * Hpx);
   hc.strokeStyle = '#fff'; hc.lineWidth = 2;
-  hc.beginPath(); hc.moveTo(0, y+0.5); hc.lineTo(w, y+0.5); hc.stroke();
+  hc.beginPath(); hc.moveTo(0,y+0.5); hc.lineTo(W,y+0.5); hc.stroke();
   hc.strokeStyle = '#000';
-  hc.beginPath(); hc.moveTo(0, y+2.5); hc.lineTo(w, y+2.5); hc.stroke();
+  hc.beginPath(); hc.moveTo(0,y+2.5); hc.lineTo(W,y+2.5); hc.stroke();
 }
 
 function hueFromEvent(e){
@@ -2122,6 +2121,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
