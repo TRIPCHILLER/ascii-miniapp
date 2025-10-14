@@ -618,7 +618,7 @@ function applyWidthLimitsForMode(init = false) {
     }
   } else {
     // Десктоп оставляем как было
-    min = 125; max = 175;
+    min = 75; max = 175;
   }
 
   app.ui.width.min = min;
@@ -2135,6 +2135,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
