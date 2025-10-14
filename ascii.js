@@ -1535,12 +1535,12 @@ const CP = (() => {
   targetInput = targetEl;
   // берём стартовое значение из поля
   [H,S,V] = hex2hsv(targetInput.value || '#8ac7ff');
-  h.value = Math.round(H);
 
   openedAt = Date.now();
   // небольшой defer — чтобы «хвост» клика не закрыл модал мгновенно
   setTimeout(() => {
     modal.hidden = false;
+    repaintHue();      
     repaintSV();
   }, 0);
 }
@@ -1548,7 +1548,6 @@ const CP = (() => {
   function close(){ modal.hidden = true; }
 
   // события
-  h.addEventListener('input', ()=> { H = +h.value; repaintSV(); });
 
   const drag = (on)=> (ev)=>{ ev.preventDefault(); on(ev);
     const move = (e)=> on(e);
@@ -1563,6 +1562,50 @@ const CP = (() => {
   };
   sv.addEventListener('mousedown', drag(svFromEvent), { passive:false });
   sv.addEventListener('touchstart', drag(svFromEvent), { passive:false });
+function repaintHue(){
+  const hc = h.getContext('2d');
+  const w = h.width, he = h.height;
+  const grd = hc.createLinearGradient(0,0,0,he);
+  grd.addColorStop(0/6, '#ff0000');
+  grd.addColorStop(1/6, '#ffff00');
+  grd.addColorStop(2/6, '#00ff00');
+  grd.addColorStop(3/6, '#00ffff');
+  grd.addColorStop(4/6, '#0000ff');
+  grd.addColorStop(5/6, '#ff00ff');
+  grd.addColorStop(6/6, '#ff0000');
+  hc.fillStyle = grd; hc.fillRect(0,0,w,he);
+
+  // маркер текущего H
+  const y = Math.round((H/360) * he);
+  hc.strokeStyle = '#fff'; hc.lineWidth = 2;
+  hc.beginPath(); hc.moveTo(0, y+0.5); hc.lineTo(w, y+0.5); hc.stroke();
+  hc.strokeStyle = '#000';
+  hc.beginPath(); hc.moveTo(0, y+2.5); hc.lineTo(w, y+2.5); hc.stroke();
+}
+
+function hueFromEvent(e){
+  const rect = h.getBoundingClientRect();
+  const cy = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+  const clamped = Math.min(Math.max(cy, 0), rect.height);
+  H = (clamped / rect.height) * 360;
+  repaintHue();
+  repaintSV();
+}
+
+const dragHue = (on) => (ev)=>{ ev.preventDefault();
+  on(ev);
+  const move = (e)=> on(e);
+  const up = ()=>{ window.removeEventListener('mousemove', move);
+                   window.removeEventListener('touchmove', move);
+                   window.removeEventListener('mouseup', up);
+                   window.removeEventListener('touchend', up); };
+  window.addEventListener('mousemove', move, { passive:false });
+  window.addEventListener('touchmove', move, { passive:false });
+  window.addEventListener('mouseup', up);
+  window.addEventListener('touchend', up);
+};
+h.addEventListener('mousedown',  dragHue(hueFromEvent), { passive:false });
+h.addEventListener('touchstart', dragHue(hueFromEvent), { passive:false });
 
   cancel.addEventListener('click', close);
   ok.addEventListener('click', ()=> {
@@ -2079,6 +2122,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
