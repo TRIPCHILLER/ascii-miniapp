@@ -884,10 +884,13 @@ function renderAsciiToCanvas(text, cols, rows, scale = 2){
 
 // PNG (режим ФОТО)
 function savePNG(){
-  const grid = state.lastGrid;
-  const text = app.out.textContent || '';
-  if (!text.trim()) { alert('Нечего сохранять'); return; }
-  renderAsciiToCanvas(text, grid.w, grid.h, 2);
+  const full = app.out.textContent || '';
+  if (!full.trim()) { alert('Нечего сохранять'); return; }
+
+  const crop = getCropWindow();
+  const text = cropAsciiText(full, crop);
+
+  renderAsciiToCanvas(text, crop.cols, crop.rows, 2);
   app.ui.render.toBlob(blob=>{
     if(!blob) { alert('Не удалось сгенерировать PNG'); return; }
     downloadBlob(blob, 'ascii_visor.png');
@@ -934,6 +937,8 @@ function computeRecordDims(cols, rows, scale = 2) {
 // Рендер одного ASCII-кадра в уже зафиксированный канвас (без изменения W/H)
 function renderAsciiFrameLocked(text) {
   const d = state.recordDims;
+  const crop = state._recordCrop || getCropWindow();
+  text = cropAsciiText(text || '', crop);
   if (!d) return;
 
   const cvs = app.ui.render;
@@ -961,11 +966,16 @@ function renderAsciiFrameLocked(text) {
 // Видео (режим ВИДЕО)
 function saveVideo(){
   if (state.mode!=='video') { alert('Видео-экспорт доступен только в режиме ВИДЕО'); return; }
+  const fullNow = app.out.textContent || '';
+  if (!fullNow.trim()) { alert('Нечего сохранять'); return; }
+// зафиксируем «окно» кадрирования на момент старта записи
+  const crop = getCropWindow();
+  state._recordCrop = crop;
   const mime = pickMime();
   if (!mime) { alert('Запись видео не поддерживается на этом устройстве.'); return; }
     // Фиксируем экспортный размер под текущую ASCII-сетку (соотв. исходнику)
-  const grid = state.lastGrid;               // { w: cols, h: rows } — ты уже сохраняешь
-  state.recordDims = computeRecordDims(grid.w, grid.h, 2);   // scale=2 как для PNG
+  const C = state._recordCrop;
+  state.recordDims = computeRecordDims(C.cols, C.rows, 2);
   // задать размер канваса заранее (до captureStream)
   app.ui.render.width  = state.recordDims.W;
   app.ui.render.height = state.recordDims.H;
@@ -1239,6 +1249,42 @@ async function downloadBlob(blob, filename) {
     // применяем
     out.style.transform = `translate(-50%, -50%) scale(${S * state.viewScale})`;
   }
+// --- Crop-логика: преобразуем зум в «окно» по колонкам/строкам ---
+function getCropWindow() {
+  const grid = state.lastGrid || { w: 1, h: 1 };
+  const scale = Math.max(1, state.viewScale || 1);
+
+  // сколько колонок/строк реально попадает в «экран» при текущем зуме
+  const cols = Math.max(1, Math.round(grid.w / scale));
+  const rows = Math.max(1, Math.round(grid.h / scale));
+
+  // центрируем «окно» (как у тебя на сцене — out центрирован)
+  const col0 = Math.max(0, Math.floor((grid.w - cols) / 2));
+  const row0 = Math.max(0, Math.floor((grid.h - rows) / 2));
+
+  return { col0, row0, cols, rows, totalCols: grid.w, totalRows: grid.h };
+}
+
+// вырезаем прямоугольник из готового ASCII-текста (по колонкам/строкам)
+function cropAsciiText(fullText, crop) {
+  const { col0, row0, cols, rows, totalCols } = crop;
+  const lines = (fullText || '').split('\n');
+
+  // гарантируем равную длину строк (добьём пробелами, если что)
+  const norm = (s) => {
+    if (s.length >= totalCols) return s.slice(0, totalCols);
+    return s + ' '.repeat(totalCols - s.length);
+  };
+
+  const out = [];
+  for (let y = 0; y < rows; y++) {
+    const srcY = row0 + y;
+    if (srcY >= lines.length) break;
+    const line = norm(lines[srcY]);
+    out.push(line.substr(col0, cols));
+  }
+  return out.join('\n');
+}
 
   // ============== FULLSCREEN (tap-to-exit) ==============
   // Кросс-браузерные хелперы:
@@ -1700,7 +1746,7 @@ h.addEventListener('touchstart', dragHue(hueFromEvent), { passive:false });
     if (active && pts.size === 2) {
       const d = getDist() || 1;
       const ratio = d / d0;
-      state.viewScale = Math.max(0.5, Math.min(3, s0 * ratio));
+      state.viewScale = Math.max(1, Math.min(3, s0 * ratio));
       fitAsciiToViewport();
     }
   }, { passive:false });
@@ -2149,6 +2195,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
