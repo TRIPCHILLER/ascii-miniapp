@@ -2175,7 +2175,6 @@ if (app.ui.invert) app.ui.invert.checked = false;
 }
 
 bindUI();
-attachDoubleTapEnter();
 
 // 2) Принудительно применяем шрифтовой стек под стартовый режим символов,
 //    чтобы исключить "ложный" первый кадр с некорректным стеком.
@@ -2195,6 +2194,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
