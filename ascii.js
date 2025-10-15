@@ -63,6 +63,19 @@ function busyHide(force = false){
   };
   // ===== Telegram WebApp (если открыто внутри Telegram) =====
 const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
+function expandSheetASAP(){
+  try{
+    tg?.ready?.();         // сигнал Telegram, что всё отрисовано
+    tg?.expand?.();        // развернуть «sheet» на максимум
+    tg?.disableVerticalSwipes?.(); // (если доступно в твоей версии SDK)
+  }catch(_){}
+  // пару повторных попыток — iOS иногда тормозит
+  setTimeout(()=>tg?.expand?.(), 120);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) tg?.expand?.();
+  });
+  tg?.onEvent?.('viewportChanged', ()=>{ if(!tg.isExpanded) tg.expand(); });
+}
 
 function mainBtnHide() {
   try { tg && tg.MainButton.hide(); } catch(_) {}
@@ -2105,7 +2118,7 @@ app.ui.invert.addEventListener('change', e => {
   async function init() {
     fillStyleSelect();
 setUI();
-
+if (tg) expandSheetASAP();
 // 1) Жёстко фиксируем отсутствие инверсии до первого кадра
 state.invert = false;
 if (app.ui.invert) app.ui.invert.checked = false;
@@ -2135,6 +2148,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
