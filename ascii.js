@@ -63,6 +63,7 @@ function busyHide(force = false){
   };
   // ===== Telegram WebApp (если открыто внутри Telegram) =====
 const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
+  
 function expandSheetASAP(){
   try{
     tg?.ready?.();         // сигнал Telegram, что всё отрисовано
@@ -2148,6 +2149,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
