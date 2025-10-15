@@ -261,7 +261,6 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 .body-fullscreen #stage {
   width: 100%;
   height: 100%;
-  touch-action: none; /* сцена должна ловить пинч даже в фоллскрине */
 }
 /* === BUSY OVERLAY === */
 #busy{
@@ -401,8 +400,11 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 .panel { touch-action: manipulation; }
 
 /* сцена берёт все жесты (пинч-зум) */
-#stage {
-  touch-action: none; }
+#stage{
+  touch-action: none;
+  overscroll-behavior: contain;
+  user-select: none;
+}
 
 /* Централизованная подсветка активного режима */
 .modebar .btn { color:#808080; }
@@ -466,6 +468,7 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 }
 
 #camShutter.active #camBtnCore{ filter:brightness(.6); }
+
 
 
 
