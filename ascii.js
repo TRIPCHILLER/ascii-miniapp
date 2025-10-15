@@ -876,7 +876,7 @@ function savePNG(){
   renderAsciiToCanvas(text, grid.w, grid.h, 2);
   app.ui.render.toBlob(blob=>{
     if(!blob) { alert('Не удалось сгенерировать PNG'); return; }
-    downloadBlob(blob, '@tripchiller_ascii_bot.png');
+    downloadBlob(blob, 'ascii_visor.png');
     hudSet('PNG: сохранено/отправлено');
   }, 'image/png');
 }
@@ -982,7 +982,7 @@ state.recorder = new MediaRecorder(stream, {
 
   try {
     if (mime.includes('mp4')) {
-      downloadBlob(blob, '@tripchiller_ascii_bot.mp4');
+      downloadBlob(blob, 'ascii_visor.mp4');
     } else {
       // WebM -> MP4 через ffmpeg.wasm
       const { ff, fetchFile } = await ensureFFmpeg();
@@ -1003,7 +1003,7 @@ state.recorder = new MediaRecorder(stream, {
 );
       const data = ff.FS('readFile', outName);
       const mp4Blob = new Blob([data.buffer], { type: 'video/mp4' });
-      downloadBlob(mp4Blob, '@tripchiller_ascii_bot.mp4');
+      downloadBlob(mp4Blob, 'ascii_visor.mp4');
 
       try { ff.FS('unlink', inName); ff.FS('unlink', outName); } catch(e) {}
     }
@@ -1012,7 +1012,7 @@ console.warn('FFmpeg transcode failed:', e);
 const errMsg = (e && (e.message || e.name)) ? String(e.message || e.name) : 'unknown';
 hudSet('FFmpeg WARN: ' + errMsg);
 // Мягкий фолбэк: просто говорим, что отправляем файл и просим дождаться
-downloadBlob(blob, mime.includes('mp4') ? '@tripchiller_ascii_bot.mp4' : '@tripchiller_ascii_bot.webm');
+downloadBlob(blob, mime.includes('mp4') ? 'ascii_visor.mp4' : 'ascii_visor.webm');
 
 }
 
@@ -2135,6 +2135,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
