@@ -1837,6 +1837,7 @@ if (pts.size === 1 && (state.viewScale > 1.0001)) {
   }, { passive:false });
 
   const up = e => {
+    el.releasePointerCapture?.(e.pointerId);
     pts.delete(e.pointerId);
     if (pts.size < 2) active = false;
     if (pts.size === 0) panActive = false;
@@ -2280,6 +2281,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
