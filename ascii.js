@@ -805,6 +805,7 @@ if (palette && palette.length === K_BINS) {
 
     app.out.textContent = out;
     refitFont(w, h);
+    fitAsciiToViewport();
     if (state.isRecording && state.recordDims) {
   renderAsciiFrameLocked(app.out.textContent || '');
 }
@@ -2245,6 +2246,7 @@ app.ui.invert.addEventListener('change', e => {
     new ResizeObserver(() => {
       const { w, h } = updateGridSize();
       refitFont(w, h);
+      fitAsciiToViewport();
     }).observe(app.stage);
   }
 
@@ -2281,6 +2283,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
