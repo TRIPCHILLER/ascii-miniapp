@@ -1824,6 +1824,16 @@ if (pts.size === 1 && (state.viewScale > 1.0001)) {
       state.viewScale = Math.max(1, Math.min(3, s0 * ratio));
       fitAsciiToViewport();
     }
+    if (!active && panActive && pts.size === 1 && (state.viewScale > 1.0001)) {
+    const cur = pts.get(e.pointerId);
+    if (cur) {
+      const dx = cur.x - panStartX;
+      const dy = cur.y - panStartY;
+      state.viewOffsetX = startOffX + dx;
+      state.viewOffsetY = startOffY + dy;
+      fitAsciiToViewport(); // кламп внутри
+    }
+  }
   }, { passive:false });
 
   const up = e => {
@@ -1834,17 +1844,6 @@ if (pts.size === 1 && (state.viewScale > 1.0001)) {
   el.addEventListener('pointerup', up);
   el.addEventListener('pointercancel', up);
   el.addEventListener('pointerleave', up);
-  // пан одним пальцем
-if (!active && panActive && pts.size === 1 && (state.viewScale > 1.0001)) {
-  const cur = pts.get(e.pointerId);
-  if (cur) {
-    const dx = cur.x - panStartX;
-    const dy = cur.y - panStartY;
-    state.viewOffsetX = startOffX + dx;
-    state.viewOffsetY = startOffY + dy;
-    fitAsciiToViewport(); // кламп произойдёт внутри
-  }
-}
 })();
 
     // Кнопка "Фронт/Тыл"
@@ -2281,6 +2280,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
