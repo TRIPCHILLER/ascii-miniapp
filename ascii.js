@@ -1285,6 +1285,17 @@ async function downloadBlob(blob, filename) {
   // сохраним служебные данные для crop
   state._fit = { S, SZ, wDom, hDom, W, H };
 }
+function normalizeZoomFloor(eps = 0.02) {
+  // если масштаб почти минимальный — защёлкиваемся в 1 и центр
+  if (state.viewScale <= 1 + eps) {
+    state.viewScale = 1;
+    state.viewOffsetX = 0;
+    state.viewOffsetY = 0;
+    fitAsciiToViewport();
+    return true;
+  }
+  return false;
+}
 
 // --- Crop-логика: преобразуем зум в «окно» по колонкам/строкам ---
 function getCropWindow() {
@@ -1777,6 +1788,7 @@ h.addEventListener('touchstart', dragHue(hueFromEvent), { passive:false });
         const { w, h } = updateGridSize();
         refitFont(w, h);
         fitAsciiToViewport();
+        normalizeZoomFloor(); 
       }, 0);
     });
 // --- ПИНЧ-ЗУМ ТОЛЬКО ДЛЯ СЦЕНЫ ---
@@ -1838,11 +1850,12 @@ if (pts.size === 1 && (state.viewScale > 1.0001)) {
   }, { passive:false });
 
   const up = e => {
-    el.releasePointerCapture?.(e.pointerId);
-    pts.delete(e.pointerId);
-    if (pts.size < 2) active = false;
-    if (pts.size === 0) panActive = false;
-  };
+  el.releasePointerCapture?.(e.pointerId);
+  pts.delete(e.pointerId);
+  if (pts.size < 2) active = false;
+  if (pts.size === 0) panActive = false;
+  if (pts.size === 0) normalizeZoomFloor(0.02);
+};
   el.addEventListener('pointerup', up);
   el.addEventListener('pointercancel', up);
   el.addEventListener('pointerleave', up);
@@ -2247,6 +2260,7 @@ app.ui.invert.addEventListener('change', e => {
       const { w, h } = updateGridSize();
       refitFont(w, h);
       fitAsciiToViewport();
+      normalizeZoomFloor(); 
     }).observe(app.stage);
   }
 
@@ -2283,6 +2297,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
