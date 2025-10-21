@@ -168,7 +168,9 @@ let DITHER_ENABLED = true;
     recordChunks: [],
     recordDims: null,       // <— фиксированные размеры экспортного видео (W/H/шаги)
     lastGrid: { w:0, h:0 }, // запоминаем сетку для экспорта
-    viewScale: 1,           // доп. масштаб ASCII внутри #stage
+    viewScale: 1,
+    viewOffsetX: 0,
+    viewOffsetY: 0,
   };
   function updateHud(extra=''){
   const v = app.vid;
@@ -1227,40 +1229,101 @@ async function downloadBlob(blob, filename) {
     refitLock = false;
   }
   // === Вписывание ASCII-блока внутрь stage ===
-  function fitAsciiToViewport(){
-    const out = app.out;
-    const stage = app.stage;
-    if (!out || !stage) return;
+ function fitAsciiToViewport(){
+  const out = app.out;
+  const stage = app.stage;
+  if (!out || !stage) return;
 
-    // сброс масштаба
-    out.style.transform = 'translate(-50%, -50%) scale(1)';
+  // сброс масштаба (без смещения)
+  out.style.transform = 'translate(-50%, -50%) scale(1)';
 
-    // реальные размеры ascii-блока
-    const w = out.scrollWidth;
-    const h = out.scrollHeight;
+  // реальные размеры ascii-блока (DOM, при текущем font-size)
+  const wDom = out.scrollWidth;
+  const hDom = out.scrollHeight;
 
-    // доступные размеры
-    const W = stage.clientWidth;
-    const H = stage.clientHeight;
+  // доступные размеры сцены
+  const W = stage.clientWidth;
+  const H = stage.clientHeight;
 
-    // коэффициент "contain"
-    const S = Math.min(W / w, H / h);
+  // базовый contain-скейл и итоговый скейл с нашим zoom
+  const S  = Math.min(W / wDom, H / hDom);
+  const SZ = S * Math.max(1, state.viewScale || 1);
 
-    // применяем
-    out.style.transform = `translate(-50%, -50%) scale(${S * state.viewScale})`;
+  // кламп пана: чтобы не было пустот по краям
+  // половинки видимой области в координатах контента:
+  const halfViewX = (W / SZ) * 0.5;   // в пикселях контента (до скейла)
+  const halfViewY = (H / SZ) * 0.5;
+
+  // допустимые границы центра в координатах контента:
+  const minCx = halfViewX,       maxCx = Math.max(halfViewX, wDom - halfViewX);
+  const minCy = halfViewY,       maxCy = Math.max(halfViewY, hDom - halfViewY);
+
+  // текущий центр контента с учётом пана:
+  // dx,dy заданы в экранных пикселях → делим на SZ, получаем пиксели контента
+  let cx = (wDom * 0.5) - (state.viewOffsetX / SZ);
+  let cy = (hDom * 0.5) - (state.viewOffsetY / SZ);
+
+  // если зум минимальный — пан ничему не нужен
+  if (state.viewScale <= 1.0001) {
+    state.viewOffsetX = 0;
+    state.viewOffsetY = 0;
+    cx = wDom * 0.5; cy = hDom * 0.5;
   }
+
+  // кламп центра, затем обратно пересчёт dx,dy
+  cx = Math.min(maxCx, Math.max(minCx, cx));
+  cy = Math.min(maxCy, Math.max(minCy, cy));
+  const dx = (wDom * 0.5 - cx) * SZ;   // обратно в экранные пиксели
+  const dy = (hDom * 0.5 - cy) * SZ;
+  state.viewOffsetX = dx;
+  state.viewOffsetY = dy;
+
+  // применяем трансформацию: центр + пан + скейл
+  out.style.transform = `translate(-50%, -50%) translate(${dx}px, ${dy}px) scale(${SZ})`;
+
+  // сохраним служебные данные для crop
+  state._fit = { S, SZ, wDom, hDom, W, H };
+}
+
 // --- Crop-логика: преобразуем зум в «окно» по колонкам/строкам ---
 function getCropWindow() {
-  const grid = state.lastGrid || { w: 1, h: 1 };
-  const scale = Math.max(1, state.viewScale || 1);
+  const grid   = state.lastGrid || { w: 1, h: 1 };
+  const fit    = state._fit || { SZ:1, wDom:1, hDom:1, W:1, H:1 };
+  const scale  = Math.max(1, state.viewScale || 1);
 
-  // сколько колонок/строк реально попадает в «экран» при текущем зуме
+  // сколько колонок/строк попадает в «экран» при текущем зуме
   const cols = Math.max(1, Math.round(grid.w / scale));
   const rows = Math.max(1, Math.round(grid.h / scale));
 
-  // центрируем «окно» (как у тебя на сцене — out центрирован)
-  const col0 = Math.max(0, Math.floor((grid.w - cols) / 2));
-  const row0 = Math.max(0, Math.floor((grid.h - rows) / 2));
+  // геометрия видимой области в координатах контента:
+  const SZ    = fit.SZ || 1;      // итоговый скейл (S * viewScale)
+  const wDom  = fit.wDom || 1;
+  const hDom  = fit.hDom || 1;
+  const W     = fit.W || 1;
+  const H     = fit.H || 1;
+
+  // центр контента с учётом пана:
+  const cx = (wDom * 0.5) - (state.viewOffsetX / SZ);
+  const cy = (hDom * 0.5) - (state.viewOffsetY / SZ);
+
+  // половинки видимой области в контент-пикселях
+  const halfViewX = (W / SZ) * 0.5;
+  const halfViewY = (H / SZ) * 0.5;
+
+  // левый-верхний угол видимой области (контент-пиксели)
+  const leftPx = Math.max(0, cx - halfViewX);
+  const topPx  = Math.max(0, cy - halfViewY);
+
+  // преобразуем пиксели контента в колонки/строки ASCII:
+  const pxPerCol = wDom / Math.max(1, grid.w);
+  const pxPerRow = hDom / Math.max(1, grid.h);
+
+  let col0 = Math.floor(leftPx / pxPerCol);
+  let row0 = Math.floor(topPx  / pxPerRow);
+
+  // кламп, чтобы окно не вылезло за сетку
+  col0 = Math.min(Math.max(0, col0), Math.max(0, grid.w - cols));
+  row0 = Math.min(Math.max(0, row0), Math.max(0, grid.h - rows));
 
   return { col0, row0, cols, rows, totalCols: grid.w, totalRows: grid.h };
 }
@@ -1721,6 +1784,10 @@ h.addEventListener('touchstart', dragHue(hueFromEvent), { passive:false });
   const pts = new Map();
   let active = false;
   let d0 = 0, s0 = 1;
+// Для пана одним пальцем
+let panActive = false;
+let panStartX = 0, panStartY = 0;
+let startOffX = 0, startOffY = 0;
 
   const getDist = () => {
     const a = Array.from(pts.values());
@@ -1733,6 +1800,14 @@ h.addEventListener('touchstart', dragHue(hueFromEvent), { passive:false });
     if (e.pointerType === 'touch') e.preventDefault?.();
     el.setPointerCapture?.(e.pointerId);
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    // одиночный палец → готовим пан, только если есть зум
+if (pts.size === 1 && (state.viewScale > 1.0001)) {
+  panActive = true;
+  panStartX = e.clientX;
+  panStartY = e.clientY;
+  startOffX = state.viewOffsetX || 0;
+  startOffY = state.viewOffsetY || 0;
+}
     if (pts.size === 2) {
       active = true;
       d0 = getDist() || 1;
@@ -1754,10 +1829,22 @@ h.addEventListener('touchstart', dragHue(hueFromEvent), { passive:false });
   const up = e => {
     pts.delete(e.pointerId);
     if (pts.size < 2) active = false;
+    if (pts.size === 0) panActive = false;
   };
   el.addEventListener('pointerup', up);
   el.addEventListener('pointercancel', up);
   el.addEventListener('pointerleave', up);
+  // пан одним пальцем
+if (!active && panActive && pts.size === 1 && (state.viewScale > 1.0001)) {
+  const cur = pts.get(e.pointerId);
+  if (cur) {
+    const dx = cur.x - panStartX;
+    const dy = cur.y - panStartY;
+    state.viewOffsetX = startOffX + dx;
+    state.viewOffsetY = startOffY + dy;
+    fitAsciiToViewport(); // кламп произойдёт внутри
+  }
+}
 })();
 
     // Кнопка "Фронт/Тыл"
@@ -2194,6 +2281,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
