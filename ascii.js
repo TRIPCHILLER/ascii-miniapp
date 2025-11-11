@@ -1572,8 +1572,10 @@ const CP = (() => {
   const cbTransparent  = document.getElementById('cp-transparent');
   // реагируем на нажатие чекбокса "Прозрачный фон"
 cbTransparent?.addEventListener('change', ()=>{
-  modal.classList.toggle('cp-disabled', cbTransparent.checked);
+  const isBG = (targetInput && targetInput.id === 'bg');
+  modal.classList.toggle('cp-disabled', cbTransparent.checked && isBG);
 });
+
   const cancel = document.getElementById('cp-cancel');
   const preview = document.getElementById('cp-preview-swatch');
 
@@ -1645,15 +1647,19 @@ function rgbToHex(rgb){
 
   function open(targetEl){
   targetInput = targetEl;
-    // Показываем чекбокс "Прозрачный фон" только для выбора ФОНА в режиме Фото
+    
+// Показываем чекбокс "Прозрачный фон" только для выбора ФОНА в режиме Фото
 const isBG = (targetInput && targetInput.id === 'bg');
 const isPhotoMode = (state.mode === 'photo') || (app?.ui?.tabPhoto?.classList?.contains('active'));
 rowTransparent.hidden = !(isBG && isPhotoMode);
 
 // Синхронизируем чекбокс и блокируем палитру при включении
 cbTransparent.checked = !!state.transparentBg;
-modal.classList.toggle('cp-disabled', cbTransparent.checked);
+modal.classList.toggle('cp-disabled', cbTransparent.checked && isBG);
 
+// если редактируем НЕ фон — палитра должна быть активной
+if (!isBG) modal.classList.remove('cp-disabled');
+    
   // берём стартовое значение из поля
   [H,S,V] = hex2hsv(targetInput.value || '#8ac7ff');
 
@@ -2284,6 +2290,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
