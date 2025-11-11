@@ -1573,7 +1573,8 @@ const CP = (() => {
   // реагируем на нажатие чекбокса "Прозрачный фон"
 cbTransparent?.addEventListener('change', ()=>{
   const isBG = (targetInput && targetInput.id === 'bg');
-  modal.classList.toggle('cp-disabled', cbTransparent.checked && isBG);
+  const isPhotoMode = (state.mode === 'photo') || (app?.ui?.tabPhoto?.classList?.contains('active'));
+  modal.classList.toggle('cp-disabled', cbTransparent.checked && isBG && isPhotoMode);
 });
 
   const cancel = document.getElementById('cp-cancel');
@@ -1655,9 +1656,7 @@ rowTransparent.hidden = !(isBG && isPhotoMode);
 
 // Синхронизируем чекбокс и блокируем палитру при включении
 cbTransparent.checked = !!state.transparentBg;
-modal.classList.toggle('cp-disabled', cbTransparent.checked && isBG);
-
-// если редактируем НЕ фон — палитра должна быть активной
+modal.classList.toggle('cp-disabled', cbTransparent.checked && isBG && isPhotoMode);
 if (!isBG) modal.classList.remove('cp-disabled');
     
   // берём стартовое значение из поля
@@ -2290,6 +2289,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
