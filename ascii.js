@@ -123,10 +123,11 @@ app.ui.fpsWrap = app.ui.fps?.closest('label') || null;
 function syncBgPaletteLock(){
   const mustLock = (state.mode === 'photo') && !!state.transparentBg;
   if (app?.ui?.bg){
-    app.ui.bg.disabled = mustLock;                 // блокируем клики/нативный пикер
-    app.ui.bg.classList.toggle('is-disabled', mustLock);
+    app.ui.bg.disabled = false; // ← гарантируем, что не disabled
+    app.ui.bg.classList.toggle('is-disabled', mustLock); // только визуальная «серость»
   }
 }
+
 function syncFpsVisibility(){
   if (!app.ui.fpsWrap) return;
   // в режиме ФОТО скрываем, в остальных показываем
@@ -2301,6 +2302,7 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
 
