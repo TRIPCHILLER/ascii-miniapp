@@ -513,3 +513,24 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   box-shadow: inset 0 0 0 7px #fff;
   border-color:#000;
 }
+
+/* === BG palette: disabled look & no clicks (PHOTO + transparent ON) === */
+
+/* обычный color input — делаем серым и не кликабельным */
+.panel .row.colors input[type="color"][disabled]{
+  opacity:.45;
+  filter: grayscale(1);
+  pointer-events: none;
+}
+
+/* Android кастомный пикер: при cp-disabled блокируем холсты и сереем превью */
+#cp-modal.cp-disabled #cp-sv,
+#cp-modal.cp-disabled #cp-h{
+  filter: grayscale(1) brightness(.55);
+  pointer-events: none; /* не даём менять цвет */
+}
+
+#cp-modal.cp-disabled #cp-preview-swatch{
+  filter: grayscale(1) brightness(.75);
+  opacity:.7;
+}
