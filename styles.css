@@ -486,27 +486,30 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 #cp-modal .cp-transparent-row{ margin:10px 0 2px; }
 
 .cp-transparent-check{
-  display:flex; align-items:center; cursor:pointer;
+  display:flex; align-items:center; gap:10px; cursor:pointer;
 }
 
-/* прячем input */
-.cp-transparent-check input{ display:none; }
-
-/* текст + «квадрат» слева */
+/* сам текст */
 .cp-transparent-check span{
-  line-height:20px;                 /* высота строки = размер квадрата */
-  font-family: 'BetterVCR', monospace;
+  position:relative;
+  padding-left:0;               /* убираем старый отступ */
+  line-height:20px;             /* = размер квадратa */
+  font-family: 'betterVCR', monospace;
 }
 
-/* сам квадрат: даём отступ справа и выравнивание по центру строки */
+/* чёрный квадрат */
+.cp-transparent-check input{ display:none; }
 .cp-transparent-check span::before{
-  content:''; display:inline-block;
-  width:20px; height:20px;
+  content:'';
+  width:20px; height:20px;      /* размер квадрата */
   background:#000; border:1px solid #666;
-  vertical-align:middle;
-  margin-right:8px;                 /* ← расстояние от квадрата до текста */
+  display:inline-block;
+  vertical-align:middle;        /* ровно по центру строки */
 }
 
+/* белый внутренний квадратик при активном чекбоксе */
 .cp-transparent-check input:checked + span::before{
-  background:#000; box-shadow: inset 0 0 0 7px #fff; border-color:#000;
+  background:#000;
+  box-shadow: inset 0 0 0 7px #fff;
+  border-color:#000;
 }
