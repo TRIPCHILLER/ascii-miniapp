@@ -486,25 +486,31 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 #cp-modal .cp-transparent-row{ margin:10px 0 2px; }
 
 .cp-transparent-check{
-  display:flex; align-items:center; gap:10px; cursor:pointer;
+  display:inline-flex;
+  align-items:center;    /* выровнять текст по центру чекбокса */
+  cursor:pointer;
+  /* gap не используем, потому что квадрат — это ::before у span */
 }
 
 /* сам текст */
 .cp-transparent-check span{
-  position:relative;
-  padding-left:0;               /* убираем старый отступ */
-  line-height:20px;             /* = размер квадратa */
-  font-family: 'betterVCR', monospace;
+  display:inline-flex;   /* даёт точное выравнивание по центру */
+  align-items:center;
+  line-height:20px;      /* высота текста = высоте квадрата */
+  font-family:'betterVCR', monospace;
 }
 
 /* чёрный квадрат */
 .cp-transparent-check input{ display:none; }
 .cp-transparent-check span::before{
   content:'';
-  width:20px; height:20px;      /* размер квадрата */
-  background:#000; border:1px solid #666;
+  width:20px;
+  height:20px;
+  background:#000;
+  border:1px solid #666;
   display:inline-block;
-  vertical-align:middle;        /* ровно по центру строки */
+  vertical-align:middle;
+  margin-right:10px;   /* ← отступ между квадратом и текстом */
 }
 
 /* белый внутренний квадратик при активном чекбоксе */
@@ -536,3 +542,4 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 #cp-modal.cp-disabled .cp-label {
   opacity: .6;
 }
+
