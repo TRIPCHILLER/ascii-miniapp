@@ -155,6 +155,7 @@ let DITHER_ENABLED = true;
     fps: 30,
     color: '#8ac7ff',
     background: '#000000',
+    transparentBg: false, // «прозрачный фон» для экспорта
     charset: '@%#*+=-:. ',
     invert: false,
     isFullscreen: false,    // наш флаг
@@ -672,7 +673,12 @@ if (lbl) lbl.textContent = state.invert ? 'ИНВ3РСИЯ: ВКЛ' : 'ИНВ3Р
     app.out.style.color = state.color;
     app.out.style.backgroundColor = state.background;
     app.stage.style.backgroundColor = state.background;
-
+// если прозрачный фон включён — подсветим свотч и оставим сцену чёрной
+if (state.transparentBg) {
+  app.ui.bg.classList.add('transparent');
+  app.out.style.backgroundColor = '#000000';
+  app.stage.style.backgroundColor = '#000000';
+}
     // обновим селект стиля
     fillStyleSelect();
     const matched = detectPreset(state.color, state.background);
@@ -870,8 +876,12 @@ function renderAsciiToCanvas(text, cols, rows, scale = 2){
   cvs.height = H;
 
   // фон
+  if (!state.transparentBg) {
   c.fillStyle = state.background;
   c.fillRect(0, 0, W, H);
+} else {
+  c.clearRect(0, 0, W, H); // прозрачный
+}
 
   // текст
   c.fillStyle = state.color;
@@ -943,7 +953,9 @@ function renderAsciiFrameLocked(text) {
 
   const cvs = app.ui.render;
   const c = cvs.getContext('2d');
-
+// видео-кадр — всегда непрозрачный фон
+c.fillStyle = state.background;
+c.fillRect(0, 0, d.W, d.H);
   // держим размер железно (на всякий — если кто-то сбросил)
   if (cvs.width !== d.W || cvs.height !== d.H) {
     cvs.width  = d.W;
@@ -1496,6 +1508,15 @@ function updateModeTabs(newMode){
 
 async function setMode(newMode){
   state.mode = newMode;
+  // если перешли в видео или камеру — сбрасываем прозрачный фон
+if (state.mode === 'video' || state.mode === 'camera') {
+  if (state.transparentBg) {
+    state.transparentBg = false;
+    app.ui.bg.classList.remove('transparent');
+  }
+  app.out.style.backgroundColor   = state.background;
+  app.stage.style.backgroundColor = state.background;
+}
   updateModeTabs(newMode);
   syncFpsVisibility(); // переключаем FPS в зависимости от режима
   applyWidthLimitsForMode();
@@ -1820,12 +1841,22 @@ app.ui.flip.addEventListener('click', async () => {
       if(app.ui.style){ const m = detectPreset(state.color, state.background); app.ui.style.value = (m==='custom'?'custom':m); }
     });
     
-    app.ui.bg.addEventListener('input', e => {
-      state.background = e.target.value;
-      app.out.style.backgroundColor = state.background;
-      app.stage.style.backgroundColor = state.background;
-      if(app.ui.style){ const m = detectPreset(state.color, state.background); app.ui.style.value = (m==='custom'?'custom':m); }
-    });
+app.ui.bg.addEventListener('input', e => {
+  state.background = e.target.value;
+
+  // если прозрачный фон выключен — показываем выбранный цвет как обычно
+  if (!state.transparentBg) {
+    app.out.style.backgroundColor  = state.background;
+    app.stage.style.backgroundColor = state.background;
+  }
+
+  // синхронизация пресета
+  if (app.ui.style){
+    const m = detectPreset(state.color, state.background);
+    app.ui.style.value = (m==='custom'?'custom':m);
+  }
+});
+
 // На Android перехватываем нативный color-picker и открываем наш
 if (/Android/i.test(navigator.userAgent)) {
   
@@ -2194,3 +2225,4 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
