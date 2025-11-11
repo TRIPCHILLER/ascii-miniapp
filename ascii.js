@@ -119,7 +119,14 @@ function mainBtnShow(text, onClick) {
 
 // найдем обертку (label) вокруг ползунка FPS
 app.ui.fpsWrap = app.ui.fps?.closest('label') || null;
-
+// Единственный источник правды: когда блокировать палитру ФОНА
+function syncBgPaletteLock(){
+  const mustLock = (state.mode === 'photo') && !!state.transparentBg;
+  if (app?.ui?.bg){
+    app.ui.bg.disabled = mustLock;                 // блокируем клики/нативный пикер
+    app.ui.bg.classList.toggle('is-disabled', mustLock);
+  }
+}
 function syncFpsVisibility(){
   if (!app.ui.fpsWrap) return;
   // в режиме ФОТО скрываем, в остальных показываем
@@ -681,6 +688,7 @@ if (state.transparentBg) {
 } else {
   app.ui.bg.classList.remove('transparent');
 }
+    syncBgPaletteLock();
     // обновим селект стиля
     fillStyleSelect();
     const matched = detectPreset(state.color, state.background);
@@ -1520,7 +1528,7 @@ if (newMode !== 'photo') {
   app.out.style.backgroundColor   = state.background;
   app.stage.style.backgroundColor = state.background;
 }
-
+syncBgPaletteLock();
   updateModeTabs(newMode);
   syncFpsVisibility(); // переключаем FPS в зависимости от режима
   applyWidthLimitsForMode();
@@ -1755,6 +1763,7 @@ ok.addEventListener('click', ()=> {
       targetInput.value = hex;
       targetInput.dispatchEvent(new Event('input', { bubbles:true }));
     }
+    syncBgPaletteLock();
   } else {
     // Обычная установка цвета
     const [r,g,b] = hsv2rgb(H,S,V);
@@ -1772,6 +1781,7 @@ ok.addEventListener('click', ()=> {
       }
       app.out.style.backgroundColor   = state.background;
       app.stage.style.backgroundColor = state.background;
+      syncBgPaletteLock();
     }
   }
 
@@ -1927,6 +1937,7 @@ if (/Android/i.test(navigator.userAgent)) {
   
 const trap = (el) => {
   el.addEventListener('click', (e) => {
+    if (el.disabled) return;   // не открываем модал, если заблокировано
     e.preventDefault();
     e.stopPropagation();
     CP.open(el);
@@ -2290,5 +2301,6 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
