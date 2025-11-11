@@ -513,24 +513,26 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   box-shadow: inset 0 0 0 7px #fff;
   border-color:#000;
 }
-
-/* === BG palette: disabled look & no clicks (PHOTO + transparent ON) === */
-
-/* обычный color input — делаем серым и не кликабельным */
-.panel .row.colors input[type="color"][disabled]{
-  opacity:.45;
+/* === BG palette: «серость» без отключения кликов === */
+.panel .row.colors input[type="color"].is-disabled{
+  opacity: .45;
   filter: grayscale(1);
-  pointer-events: none;
+  /* НЕ трогаем pointer-events — клик должен открывать модал */
 }
 
-/* Android кастомный пикер: при cp-disabled блокируем холсты и сереем превью */
+/* === Android color modal: реальная блокировка внутри модалки === */
 #cp-modal.cp-disabled #cp-sv,
 #cp-modal.cp-disabled #cp-h{
   filter: grayscale(1) brightness(.55);
-  pointer-events: none; /* не даём менять цвет */
+  pointer-events: none; /* внутри менять цвет нельзя */
 }
 
 #cp-modal.cp-disabled #cp-preview-swatch{
   filter: grayscale(1) brightness(.75);
-  opacity:.7;
+  opacity: .7;
+}
+
+/* опционально — слегка «гасим» заголовок/лейблы внутри модалки, когда заблокировано */
+#cp-modal.cp-disabled .cp-label {
+  opacity: .6;
 }
