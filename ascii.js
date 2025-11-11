@@ -1510,8 +1510,9 @@ function updateModeTabs(newMode){
 
 async function setMode(newMode){
   state.mode = newMode;
-  // если перешли в видео или камеру — сбрасываем прозрачный фон
-if (state.mode === 'video' || state.mode === 'camera') {
+
+// если мы не в режиме Фото → прозрачный фон всегда OFF
+if (newMode !== 'photo') {
   if (state.transparentBg) {
     state.transparentBg = false;
     app.ui.bg.classList.remove('transparent');
@@ -1519,6 +1520,7 @@ if (state.mode === 'video' || state.mode === 'camera') {
   app.out.style.backgroundColor   = state.background;
   app.stage.style.backgroundColor = state.background;
 }
+
   updateModeTabs(newMode);
   syncFpsVisibility(); // переключаем FPS в зависимости от режима
   applyWidthLimitsForMode();
@@ -2282,5 +2284,6 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
 
