@@ -678,6 +678,8 @@ if (state.transparentBg) {
   app.ui.bg.classList.add('transparent');
   app.out.style.backgroundColor = '#000000';
   app.stage.style.backgroundColor = '#000000';
+} else {
+  app.ui.bg.classList.remove('transparent');
 }
     // обновим селект стиля
     fillStyleSelect();
@@ -1564,6 +1566,12 @@ const CP = (() => {
   const sv = document.getElementById('cp-sv');
   const h  = document.getElementById('cp-h');
   const ok = document.getElementById('cp-ok');
+  const rowTransparent = document.getElementById('cp-transparent-row');
+  const cbTransparent  = document.getElementById('cp-transparent');
+  // реагируем на нажатие чекбокса "Прозрачный фон"
+cbTransparent?.addEventListener('change', ()=>{
+  modal.classList.toggle('cp-disabled', cbTransparent.checked);
+});
   const cancel = document.getElementById('cp-cancel');
   const preview = document.getElementById('cp-preview-swatch');
 
@@ -1571,11 +1579,14 @@ const CP = (() => {
   let targetInput = null;   // app.ui.fg | app.ui.bg
   let H = 210, S = 0.5, V = 0.6; // старт
   let openedAt = 0;
+  
   function hsv2rgb(h,s,v){
     const f = (n,k=(n+h/60)%6)=> v - v*s*Math.max(Math.min(k,4-k,1),0);
     return [Math.round(f(5)*255), Math.round(f(3)*255), Math.round(f(1)*255)];
   }
+  
   function rgb2hex(r,g,b){ return '#'+[r,g,b].map(x=>x.toString(16).padStart(2,'0')).join(''); }
+  
   function hex2hsv(hex){
     const m = (hex||'').replace('#','');
     if (m.length<6) return [H,S,V];
@@ -1592,7 +1603,11 @@ const CP = (() => {
     }
     return [h,s,v];
   }
-
+  
+function rgbToHex(rgb){
+  const m = String(rgb).match(/\d+/g)||[0,0,0];
+  return '#'+m.slice(0,3).map(n=>Number(n).toString(16).padStart(2,'0')).join('');
+}
   function repaintSV(){
     // слой 1: чистый цвет по H с полной насыщенностью и яркостью
     const [r,g,b] = hsv2rgb(H,1,1);
@@ -1628,6 +1643,15 @@ const CP = (() => {
 
   function open(targetEl){
   targetInput = targetEl;
+    // Показываем чекбокс "Прозрачный фон" только для выбора ФОНА в режиме Фото
+const isBG = (targetInput && targetInput.id === 'bg');
+const isPhotoMode = (state.mode === 'photo') || (app?.ui?.tabPhoto?.classList?.contains('active'));
+rowTransparent.hidden = !(isBG && isPhotoMode);
+
+// Синхронизируем чекбокс и блокируем палитру при включении
+cbTransparent.checked = !!state.transparentBg;
+modal.classList.toggle('cp-disabled', cbTransparent.checked);
+
   // берём стартовое значение из поля
   [H,S,V] = hex2hsv(targetInput.value || '#8ac7ff');
 
@@ -1702,16 +1726,49 @@ h.addEventListener('mousedown',  dragHue(hueFromEvent), { passive:false });
 h.addEventListener('touchstart', dragHue(hueFromEvent), { passive:false });
 
   cancel.addEventListener('click', close);
-  ok.addEventListener('click', ()=> {
+ok.addEventListener('click', ()=> {
+  const pickedIsBG = (targetInput && targetInput.id === 'bg');
+  const isPhotoMode = (state.mode === 'photo') || (app?.ui?.tabPhoto?.classList?.contains('active'));
+  const wantTransparent = cbTransparent.checked && pickedIsBG && isPhotoMode;
+
+  if (wantTransparent) {
+    // Включаем прозрачный фон только для Фото
+    state.transparentBg = true;
+
+    // В UI показываем "чёрный", а экспорт будет прозрачный
+    app.out.style.backgroundColor   = '#000000';
+    app.stage.style.backgroundColor = '#000000';
+    app.ui.bg.classList.add('transparent');
+
+    // Сохраним текущий выбранный цвет в инпут на будущее
+    const swatch = document.getElementById('cp-preview-swatch'); // если есть превью-свотч
+    const hex = swatch ? rgbToHex(getComputedStyle(swatch).backgroundColor) : targetInput.value;
+    if (targetInput) {
+      targetInput.value = hex;
+      targetInput.dispatchEvent(new Event('input', { bubbles:true }));
+    }
+  } else {
+    // Обычная установка цвета
     const [r,g,b] = hsv2rgb(H,S,V);
     const hex = rgb2hex(r,g,b);
     if (targetInput) {
       targetInput.value = hex;
-      // чтобы твои обработчики 'input' сработали:
       targetInput.dispatchEvent(new Event('input', { bubbles:true }));
     }
-    close();
-  });
+
+    // Если это фон — выключаем прозрачность и возвращаем цвет
+    if (pickedIsBG) {
+      if (state.transparentBg) {
+        state.transparentBg = false;
+        app.ui.bg.classList.remove('transparent');
+      }
+      app.out.style.backgroundColor   = state.background;
+      app.stage.style.backgroundColor = state.background;
+    }
+  }
+
+  close();
+});
 
   // клик по фону — закрыть
   modal.querySelector('.cp-backdrop').addEventListener('click', (ev) => {
@@ -2225,4 +2282,5 @@ refitFont(w, h);
 
   document.addEventListener('DOMContentLoaded', init);
 })();
+
 
