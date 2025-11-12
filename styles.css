@@ -506,24 +506,19 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   content:'';
   width:20px;
   height:20px;
-  background:#000;         /* чисто чёрный */
-  border:1px solid #000;   /* чёрная рамка = не видна */
+  background:#000;
+  border:1px solid #666;
   display:inline-block;
   vertical-align:middle;
-  margin-right:10px;
+  margin-right:10px;   /* ← отступ между квадратом и текстом */
 }
 
-/* АКТИВНЫЙ: чёрный квадрат + белая «точка» по центру */
+/* белый внутренний квадратик при активном чекбоксе */
 .cp-transparent-check input:checked + span::before{
   background:#000;
-  border:1px solid #000;               /* без светлой окантовки */
-  /* второй слой — маленький белый квадрат в центре */
-  background-image: linear-gradient(#fff, #fff);
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 8px 8px;            /* размер точки: 6–10px по вкусу */
+  box-shadow: inset 0 0 0 7px #fff;
+  border-color:#000;
 }
-
 /* === BG palette: «серость» без отключения кликов === */
 .panel .row.colors input[type="color"].is-disabled{
   opacity: .45;
@@ -547,8 +542,4 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 #cp-modal.cp-disabled .cp-label {
   opacity: .6;
 }
-
-
-
-
 
