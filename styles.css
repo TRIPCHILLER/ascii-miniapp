@@ -506,32 +506,23 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   content:'';
   width:20px;
   height:20px;
-  background:#000;
-  border:1px solid #666;
+  background:#000;         /* чисто чёрный */
+  border:1px solid #000;   /* чёрная рамка = не видна */
   display:inline-block;
   vertical-align:middle;
-  margin-right:10px;   /* ← отступ между квадратом и текстом */
+  margin-right:10px;
 }
 
-/* активный чекбокс: чёрный с белой точкой по центру */
+/* АКТИВНЫЙ: чёрный квадрат + белая «точка» по центру */
 .cp-transparent-check input:checked + span::before{
   background:#000;
-  border:1px solid #000;
-  position:relative;
+  border:1px solid #000;               /* без светлой окантовки */
+  /* второй слой — маленький белый квадрат в центре */
+  background-image: linear-gradient(#fff, #fff);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 8px 8px;            /* размер точки: 6–10px по вкусу */
 }
-
-.cp-transparent-check input:checked + span::before::after{
-  content:'o';
-  position:absolute;
-  top:50%;
-  left:50%;
-  width:6px;
-  height:6px;
-  background:#fff;
-  transform:translate(-50%,-50%);
-  border-radius:1px;  /* можно убрать для квадратной точки */
-}
-
 
 /* === BG palette: «серость» без отключения кликов === */
 .panel .row.colors input[type="color"].is-disabled{
@@ -556,6 +547,7 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 #cp-modal.cp-disabled .cp-label {
   opacity: .6;
 }
+
 
 
 
