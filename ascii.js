@@ -1984,31 +1984,6 @@ app.ui.modePhoto.addEventListener('click', () => {
   app.ui.filePhoto.click();
 });
 
-  const onChange = () => {
-    cleanup();
-    updateModeTabs('photo');   // подсветка только при реальном выборе
-    setMode('photo');
-  };
-
-  const onReturn = () => {
-    if (!document.hidden) {
-      setTimeout(() => {
-        if (!app.ui.filePhoto.files || app.ui.filePhoto.files.length === 0) {
-          cleanup();
-          updateModeTabs('live');   // жёстко вернуть подсветку в LIVE
-          setMode('live');
-        }
-      }, 50);
-    }
-  };
-
-  app.ui.filePhoto.addEventListener('change', onChange, { once: true });
-  document.addEventListener('visibilitychange', onReturn);
-  window.addEventListener('focus', onReturn);
-
-  app.ui.filePhoto.click();
-});
-
 // --- ВИДЕО (аналогично)
 app.ui.modeVideo.addEventListener('click', () => {
   if (!app.ui.fileVideo) return;
@@ -2019,31 +1994,6 @@ app.ui.modeVideo.addEventListener('click', () => {
   app.ui.fileVideo.value = '';
   const onChange = () => app.ui.fileVideo.removeEventListener('change', onChange);
   app.ui.fileVideo.addEventListener('change', onChange, { once:true });
-  app.ui.fileVideo.click();
-});
-
-  const onChange = () => {
-    cleanup();
-    updateModeTabs('video');
-    setMode('video');
-  };
-
-  const onReturn = () => {
-    if (!document.hidden) {
-      setTimeout(() => {
-        if (!app.ui.fileVideo.files || app.ui.fileVideo.files.length === 0) {
-          cleanup();
-          updateModeTabs('live');
-          setMode('live');
-        }
-      }, 50);
-    }
-  };
-
-  app.ui.fileVideo.addEventListener('change', onChange, { once: true });
-  document.addEventListener('visibilitychange', onReturn);
-  window.addEventListener('focus', onReturn);
-
   app.ui.fileVideo.click();
 });
 
@@ -2318,6 +2268,18 @@ try {
 } catch(_) {}
 
 await setMode(hasCam ? 'live' : 'photo');
+    // стартуем отрисовку
+    requestAnimationFrame(loop);
+  }
+
+  // ---- BOOTSTRAP ----
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+
 
 
 
