@@ -171,6 +171,7 @@ let DITHER_ENABLED = true;
     whitePoint: 0.98,   // 0..1 — общий дефолт
     mode: 'live',           // 'live' | 'photo' | 'video'
     camStream: null,
+    camBlocked: false,
     imageEl: null,          // <img> для режима ФОТО
     isRecording: false,     // запись видео (экспорт)
     recorder: null,
@@ -620,6 +621,7 @@ async function startStream() {
     return true;
 
   } catch (err) {
+    state.camBlocked = true;
     const msg = cameraErrorToText(err);
     showErrorPopup(msg.title, msg.message);
     return false;
@@ -1462,9 +1464,15 @@ function updateMirrorForFacing() {
 // (разрешение и сам MediaStream остаются живыми в state.camStream)
 function stopStream(){
   try {
+    const s = state.camStream;
+    if (s) {
+      s.getTracks().forEach(t => { try { t.stop(); } catch(_){} });
+    }
+    state.camStream = null;
     if (app.vid) {
       app.vid.pause?.();
-      app.vid.srcObject = null; // отсоединяем, но НЕ stop() у треков
+      app.vid.srcObject = null;
+      app.vid.removeAttribute('src');
     }
   } catch(e){}
 }
@@ -1559,6 +1567,13 @@ mainBtnHide();
     // LIVE: выключаем возможный файл и включаем камеру
     app.ui.placeholder.hidden = true;
     try { app.vid.removeAttribute('src'); } catch(e){}
+    if (state.camBlocked) {
+  // Камера недоступна: держим плейсхолдер и не трогаем getUserMedia
+  app.ui.placeholder.hidden = false;
+  app.out.textContent = '';
+  updateMirrorForFacing?.();
+  return; // выходим без старта камеры
+}
     await startStream();
     updateMirrorForFacing?.();
     return;
@@ -1958,13 +1973,16 @@ const trap = (el) => {
 app.ui.modePhoto.addEventListener('click', () => {
   if (!app.ui.filePhoto) return;
 
-  app.ui.filePhoto.value = '';
+  // СНАЧАЛА выходим из LIVE
+  updateModeTabs('photo');
+  setMode('photo');
 
-  const cleanup = () => {
-    app.ui.filePhoto.removeEventListener('change', onChange);
-    document.removeEventListener('visibilitychange', onReturn);
-    window.removeEventListener('focus', onReturn);
-  };
+  // теперь безопасно открываем диалог
+  app.ui.filePhoto.value = '';
+  const onChange = () => app.ui.filePhoto.removeEventListener('change', onChange);
+  app.ui.filePhoto.addEventListener('change', onChange, { once:true });
+  app.ui.filePhoto.click();
+});
 
   const onChange = () => {
     cleanup();
@@ -1995,13 +2013,14 @@ app.ui.modePhoto.addEventListener('click', () => {
 app.ui.modeVideo.addEventListener('click', () => {
   if (!app.ui.fileVideo) return;
 
-  app.ui.fileVideo.value = '';
+  updateModeTabs('video');
+  setMode('video');
 
-  const cleanup = () => {
-    app.ui.fileVideo.removeEventListener('change', onChange);
-    document.removeEventListener('visibilitychange', onReturn);
-    window.removeEventListener('focus', onReturn);
-  };
+  app.ui.fileVideo.value = '';
+  const onChange = () => app.ui.fileVideo.removeEventListener('change', onChange);
+  app.ui.fileVideo.addEventListener('change', onChange, { once:true });
+  app.ui.fileVideo.click();
+});
 
   const onChange = () => {
     cleanup();
@@ -2292,16 +2311,15 @@ if (app.ui.charset) {
   app.ui.charset.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
-await setMode('live');         // внутри сам вызовется startStream()
-if (raf) cancelAnimationFrame(raf);
-raf = requestAnimationFrame(loop);
+let hasCam = false;
+try {
+  const devs = await navigator.mediaDevices?.enumerateDevices?.() || [];
+  hasCam = devs.some(d => d.kind === 'videoinput');
+} catch(_) {}
 
-const { w, h } = updateGridSize();
-refitFont(w, h);
-  }
+await setMode(hasCam ? 'live' : 'photo');
 
-  document.addEventListener('DOMContentLoaded', init);
-})();
+
 
 
 
