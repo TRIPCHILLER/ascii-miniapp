@@ -513,11 +513,14 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   margin-right:10px;   /* ← отступ между квадратом и текстом */
 }
 
-/* белый маленький квадратик по центру при активном чекбоксе */
+/* активный: маленький БЕЛЫЙ квадратик по центру чёрного */
 .cp-transparent-check input:checked + span::before{
-  background:#000;             /* чёрный квадрат как фон */
-  border-color:#000;
-  position:relative;
+  background: #000;                          /* базовый чёрный фон */
+  background-image: linear-gradient(#fff, #fff); /* второй слой — белый квадрат */
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 8px 8px;                  /* размер «точки» */
+  border-color: #000;                         /* рамка не светлее */
 }
 
 /* создаём белую «точку» в центре */
@@ -554,5 +557,6 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 #cp-modal.cp-disabled .cp-label {
   opacity: .6;
 }
+
 
 
