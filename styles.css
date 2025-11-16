@@ -137,6 +137,26 @@ button:focus, .btn:focus{
   color:#8ac7ff;
   background:#000;
 }
+/* Белое размазанное свечение по краям, когда включена фронтальная вспышка */
+.stage.flash-front::before{
+  content:'';
+  position:absolute;
+  inset:-32px;                 /* чуть заходить за край, чтобы мягко */
+  pointer-events:none;
+  z-index:0;
+
+  /* белая рамка с мягким падением в центр */
+  background:
+    radial-gradient(ellipse at top,    rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.0) 55%),
+    radial-gradient(ellipse at bottom, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.0) 55%),
+    radial-gradient(ellipse at left,   rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.0) 55%),
+    radial-gradient(ellipse at right,  rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.0) 55%);
+  mix-blend-mode:screen;
+  filter:blur(8px);
+}
+
+/* чтобы ASCII всегда был поверх свечения */
+#out{ z-index:1; }
 
 /* ===== RANGE (ползунки) — белый тонкий трек, квадратный белый бегунок ===== */
 input[type="range"]{
@@ -568,5 +588,6 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 #cp-modal.cp-disabled .cp-label {
   opacity: .6;
 }
+
 
 
