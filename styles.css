@@ -143,7 +143,7 @@ button:focus, .btn:focus{
   position:absolute;
   inset:-32px;                 /* чуть заходить за край, чтобы мягко */
   pointer-events:none;
-  z-index:0;
+  z-index:2;
 
   /* белая рамка с мягким падением в центр */
   background:
@@ -287,7 +287,7 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   position:absolute; inset:0;
   display:flex; align-items:center; justify-content:center;
   background:rgba(0,0,0,.75);
-  z-index: 2;           /* поверх #out и #placeholder */
+  z-index: 3;           /* поверх #out и #placeholder */
   backdrop-filter: blur(2px);
 }
 #busy[hidden]{ display:none !important; }
@@ -588,6 +588,7 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 #cp-modal.cp-disabled .cp-label {
   opacity: .6;
 }
+
 
 
 
