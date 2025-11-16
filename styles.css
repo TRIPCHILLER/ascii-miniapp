@@ -494,7 +494,7 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 
 /* === CAMERA SHUTTER (LIVE only) === */
 #camShutter{
-  position:absolute; left:50%; bottom:100px; transform:translateX(-50%);
+  position:absolute; left:50%; bottom:125px; transform:translateX(-50%);
   width:75px; height:75px; display:flex; align-items:center; justify-content:center;
   z-index:1; pointer-events:auto; touch-action:manipulation;
 }
@@ -588,6 +588,7 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 #cp-modal.cp-disabled .cp-label {
   opacity: .6;
 }
+
 
 
 
