@@ -64,6 +64,18 @@ function busyHide(force = false){
     flashOnBtn:   $('#flashOnBtn'),
     flashOffIcon: $('#flashOffIcon'),
     flashOnIcon:  $('#flashOnIcon'),
+
+    // таймер
+    timerOffBtn:  $('#timerOffBtn'),
+    timer3Btn:    $('#timer3Btn'),
+    timer10Btn:   $('#timer10Btn'),
+    timerOffIcon: $('#timerOffIcon'),
+    timer3Icon:   $('#timer3Icon'),
+    timer10Icon:  $('#timer10Icon'),
+
+    // оверлей отсчёта
+    timerOverlay: $('#camTimerOverlay'),
+    timerNumber:  $('#camTimerNumber'),
 }
   };
   // ===== Telegram WebApp (если открыто внутри Telegram) =====
@@ -185,6 +197,7 @@ let DITHER_ENABLED = true;
     lastGrid: { w:0, h:0 }, // запоминаем сетку для экспорта
     viewScale: 1,           // доп. масштаб ASCII внутри #stage
     flashEnabled: false,
+    timerSeconds: 0,
   };
   // ===== ВСПЫШКА (иконки + подсветка фронталки + torch для тыловой) =====
 
@@ -216,8 +229,6 @@ let DITHER_ENABLED = true;
 
     // --- связка иконок ---
     if (app.ui.flashOffIcon && app.ui.flashOnIcon) {
-      // когда вспышка ВКЛ: белая молния, серый "запрет"
-      // когда ВЫКЛ: белый "запрет", серая молния
       app.ui.flashOffIcon.src = flashOn
         ? 'assets/disable_flash_no_active.svg'
         : 'assets/disable_flash_active.svg';
@@ -240,6 +251,26 @@ let DITHER_ENABLED = true;
     // --- тыловая: аппаратная вспышка (torch), если умеет ---
     const isRear = (state.facing === 'environment');
     updateTorch(flashOn && isRear);
+  }
+  function updateTimerUI() {
+    if (!app.ui.timerOffIcon || !app.ui.timer3Icon || !app.ui.timer10Icon) return;
+
+    const t = state.timerSeconds | 0;
+    const offActive = (t === 0);
+    const t3Active  = (t === 3);
+    const t10Active = (t === 10);
+
+    app.ui.timerOffIcon.src = offActive
+      ? 'assets/disable_timer_active.svg'
+      : 'assets/disable_timer_no_active.svg';
+
+    app.ui.timer3Icon.src = t3Active
+      ? 'assets/timer_3sec_active.svg'
+      : 'assets/timer_3sec_no_active.svg';
+
+    app.ui.timer10Icon.src = t10Active
+      ? 'assets/timer_10sec_active.svg'
+      : 'assets/timer_10sec_no_active.svg';
   }
   
   function updateHud(extra=''){
@@ -1608,11 +1639,19 @@ syncBgPaletteLock();
   // переключаем видимость верхних кнопок
   if (app.ui.fs)   app.ui.fs.hidden   = (newMode!=='live');
   if (app.ui.save) app.ui.save.hidden = (newMode==='live');
+  
     // === затвор только в LIVE ===
   if (app.ui.camShutter) app.ui.camShutter.hidden = (newMode!=='live');
     // Новое: ряд иконок (вспышка/таймер) только в режиме КАМЕРА
   if (app.ui.camControls) {
     app.ui.camControls.hidden = (newMode !== 'live');
+  }
+  // таймер-оверлей скрываем, если мы не в live
+  if (app.ui.timerOverlay) {
+    app.ui.timerOverlay.hidden = (newMode !== 'live');
+    if (newMode !== 'live' && app.ui.timerNumber) {
+      app.ui.timerNumber.textContent = '';
+    }
   }
 
   // и пересчитываем визуал вспышки (свечение/torch)
@@ -2088,6 +2127,30 @@ app.ui.modeVideo.addEventListener('click', () => {
         updateFlashUI();
       });
     }
+    // --- ТАЙМЕР: выкл / 3с / 10с ---
+    if (app.ui.timerOffBtn && app.ui.timer3Btn && app.ui.timer10Btn) {
+      // дефолт: таймер выключен
+      state.timerSeconds = 0;
+      updateTimerUI();
+
+      app.ui.timerOffBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        state.timerSeconds = 0;
+        updateTimerUI();
+      });
+
+      app.ui.timer3Btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        state.timerSeconds = 3;
+        updateTimerUI();
+      });
+
+      app.ui.timer10Btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        state.timerSeconds = 10;
+        updateTimerUI();
+      });
+    }
 
 // --- Снимок в LIVE (тот же пайплайн, что и ФОТО) ---
 if (app.ui.camShutter && app.ui.camBtnCore) {
@@ -2104,16 +2167,35 @@ if (app.ui.camShutter && app.ui.camBtnCore) {
 
     try {
       pressOn();
-      // 1) формируем PNG из текущего ASCII (без интерфейса — это отрисовка текста в канвас)
-      // 2) внутри savePNG() вызывается downloadBlob(blob, ...) → /api/upload
+
+      const sec = state.timerSeconds | 0;
+      const hasTimer = sec > 0 && app.ui.timerOverlay && app.ui.timerNumber;
+
+      if (hasTimer) {
+        // показываем крупные цифры по центру
+        app.ui.timerOverlay.hidden = false;
+
+        for (let s = sec; s > 0; s--) {
+          app.ui.timerNumber.textContent = String(s);
+          // ждём 1 секунду
+          // eslint-disable-next-line no-await-in-loop
+          await new Promise(res => setTimeout(res, 1000));
+        }
+
+        // убираем цифры
+        app.ui.timerOverlay.hidden = true;
+        app.ui.timerNumber.textContent = '';
+      }
+
+      // делаем снимок (тот же PNG-пайплайн)
       await Promise.resolve(savePNG());
     } catch (err) {
       console.error('[camShot]', err);
     } finally {
-      setTimeout(pressOff, 180);  // короткая «анимация нажатия»
+      setTimeout(pressOff, 180);
       setTimeout(() => { shotLock = false; }, 400);
     }
-  };
+
 
   app.ui.camShutter.addEventListener('pointerdown', (e)=>{ if (state.mode==='live'){ e.preventDefault(); pressOn(); } }, {passive:false});
   app.ui.camShutter.addEventListener('pointerup',   doShot, {passive:false});
@@ -2372,6 +2454,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
