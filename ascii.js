@@ -2154,8 +2154,14 @@ app.ui.modeVideo.addEventListener('click', () => {
 
 // --- Снимок в LIVE (тот же пайплайн, что и ФОТО) ---
 if (app.ui.camShutter && app.ui.camBtnCore) {
-  const pressOn  = () => { app.ui.camBtnCore.src = 'assets/camera_button_active.svg'; app.ui.camShutter.classList.add('active'); };
-  const pressOff = () => { app.ui.camBtnCore.src = 'assets/camera_button.svg';          app.ui.camShutter.classList.remove('active'); };
+  const pressOn  = () => {
+    app.ui.camBtnCore.src = 'assets/camera_button_active.svg';
+    app.ui.camShutter.classList.add('active');
+  };
+  const pressOff = () => {
+    app.ui.camBtnCore.src = 'assets/camera_button.svg';
+    app.ui.camShutter.classList.remove('active');
+  };
 
   let shotLock = false;
 
@@ -2169,7 +2175,8 @@ if (app.ui.camShutter && app.ui.camBtnCore) {
       pressOn();
 
       const sec = state.timerSeconds | 0;
-      const hasTimer = sec > 0 && app.ui.timerOverlay && app.ui.timerNumber;
+      const hasTimer =
+        sec > 0 && app.ui.timerOverlay && app.ui.timerNumber;
 
       if (hasTimer) {
         // показываем крупные цифры по центру
@@ -2195,13 +2202,24 @@ if (app.ui.camShutter && app.ui.camBtnCore) {
       setTimeout(pressOff, 180);
       setTimeout(() => { shotLock = false; }, 400);
     }
+  };
 
-
-  app.ui.camShutter.addEventListener('pointerdown', (e)=>{ if (state.mode==='live'){ e.preventDefault(); pressOn(); } }, {passive:false});
-  app.ui.camShutter.addEventListener('pointerup',   doShot, {passive:false});
-  app.ui.camShutter.addEventListener('click',       doShot, {passive:false});
-  app.ui.camShutter.addEventListener('pointercancel', ()=>pressOff());
+  // Сами слушатели висят СНАРУЖИ doShot, но внутри if
+  app.ui.camShutter.addEventListener(
+    'pointerdown',
+    (e) => {
+      if (state.mode === 'live') {
+        e.preventDefault();
+        pressOn();
+      }
+    },
+    { passive: false }
+  );
+  app.ui.camShutter.addEventListener('pointerup',   doShot, { passive: false });
+  app.ui.camShutter.addEventListener('click',       doShot, { passive: false });
+  app.ui.camShutter.addEventListener('pointercancel', () => pressOff());
 }
+
 
 // --- Выбор фото из галереи ---
 app.ui.filePhoto.addEventListener('change', (e) => {
@@ -2454,6 +2472,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
