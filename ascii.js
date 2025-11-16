@@ -186,6 +186,62 @@ let DITHER_ENABLED = true;
     viewScale: 1,           // доп. масштаб ASCII внутри #stage
     flashEnabled: false,
   };
+  // ===== ВСПЫШКА (иконки + подсветка фронталки + torch для тыловой) =====
+
+  // Пытаемся включить аппаратную вспышку у активного видео-трека (если поддерживается)
+  function updateTorch(enabled) {
+    try {
+      const s = state.camStream;
+      if (!s) return;
+      const track = s.getVideoTracks && s.getVideoTracks()[0];
+      if (!track) return;
+
+      const caps = track.getCapabilities && track.getCapabilities();
+      if (!caps || !caps.torch) return; // устройство не умеет torch – молча выходим
+
+      track.applyConstraints({
+        advanced: [{ torch: !!enabled }]
+      }).catch(() => {});
+    } catch (_) {
+      // если что-то пошло не так — просто молчим, без падения
+    }
+  }
+
+  function updateFlashUI() {
+    const isLive = (state.mode === 'live');
+    const haveStream = !!state.camStream && !state.camBlocked;
+
+    // реальный флаг "вспышка активна прямо сейчас"
+    const flashOn = !!state.flashEnabled && isLive && haveStream;
+
+    // --- связка иконок ---
+    if (app.ui.flashOffIcon && app.ui.flashOnIcon) {
+      // когда вспышка ВКЛ: белая молния, серый "запрет"
+      // когда ВЫКЛ: белый "запрет", серая молния
+      app.ui.flashOffIcon.src = flashOn
+        ? 'assets/disable_flash_no_active.svg'
+        : 'assets/disable_flash_active.svg';
+
+      app.ui.flashOnIcon.src = flashOn
+        ? 'assets/flash_active.svg'
+        : 'assets/flash_no_active.svg';
+    }
+
+    // --- фронталка: белое размазанное свечение по краям ---
+    if (app.stage) {
+      const isFront = (state.facing === 'user');
+      if (flashOn && isFront) {
+        app.stage.classList.add('flash-front');
+      } else {
+        app.stage.classList.remove('flash-front');
+      }
+    }
+
+    // --- тыловая: аппаратная вспышка (torch), если умеет ---
+    const isRear = (state.facing === 'environment');
+    updateTorch(flashOn && isRear);
+  }
+  
   function updateHud(extra=''){
   const v = app.vid;
   const src = (state.mode==='photo' && state.imageEl) ? 'img'
@@ -2316,6 +2372,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
