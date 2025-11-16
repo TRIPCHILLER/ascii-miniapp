@@ -603,6 +603,27 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   opacity: .6;
 }
 
+/* === Оверлей таймера камеры === */
+#camTimerOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 4; /* выше ASCII-текста, ниже busy-оверлея */
+}
+
+#camTimerNumber {
+  font-family: 'BetterVCR', monospace;
+  font-size: clamp(64px, 20vw, 140px);
+  color: #fff;
+  letter-spacing: 0.12em;
+  text-shadow:
+    0 0 10px rgba(0,0,0,.9),
+    0 0 25px rgba(0,0,0,.9);
+}
+
 
 
 
