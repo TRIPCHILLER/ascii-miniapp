@@ -365,6 +365,32 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 @media (max-width: 360px){
   .panel .row.colors{ flex-direction: column; }
 }
+/* ===== РЯД ИКОНОК КАМЕРЫ (вспышка, таймер) ===== */
+.cam-controls{
+  display:flex;
+  justify-content:center;
+  align-items:flex-end;
+  gap:18px;
+  padding:6px 0 4px;
+  background:#000;             /* как у нижней панели */
+  border-top:1px solid #111;   /* тонкая линия, чтобы не сливалось со сценой */
+}
+
+.cam-icon{
+  padding:0;
+  width:32px;
+  height:32px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.cam-icon img{
+  width:26px;
+  height:26px;
+  object-fit:contain;
+  pointer-events:none;
+}
 
 /* ===== НИЖНИЙ РЯД РЕЖИМОВ ===== */
 .modebar{
@@ -542,4 +568,5 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 #cp-modal.cp-disabled .cp-label {
   opacity: .6;
 }
+
 
