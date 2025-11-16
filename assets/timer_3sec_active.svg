@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="_Слой_1" data-name="Слой_1" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 792 1008">
+  <!-- Generator: Adobe Illustrator 29.8.1, SVG Export Plug-In . SVG Version: 2.1.1 Build 2)  -->
+  <defs>
+    <style>
+      .st0 {
+        fill: #fff;
+      }
+    </style>
+  </defs>
+  <path class="st0" d="M0,504h72.48v-144h72v-72h144v-72h216v72h144v72h72v144h71.52v216h-71.52v144h-72v72h-144v72h-216v-72h-144v-72h-72v-144H0v-216ZM504.48,432h-216v72h144v72h-144v72h144v72h-144v72h216v-360Z"/>
+  <polygon class="st0" points="504.48 0 504.48 72 432.48 72 432.48 144 360.48 144 360.48 72 288.48 72 288.48 0 504.48 0"/>
+  <polygon points="504.48 432 504.48 792 288.48 792 288.48 720 432.48 720 432.48 648 288.48 648 288.48 576 432.48 576 432.48 504 288.48 504 288.48 432 504.48 432"/>
+</svg>
