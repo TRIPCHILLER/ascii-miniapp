@@ -122,6 +122,27 @@
       <div class="busy-text" id="busyText">К0НВЕРТ4ЦИЯ…</div>
     </div>
   </div>
+    <!-- Ряд иконок камеры (вспышка, таймер и т.д.) -->
+    <div class="cam-controls" id="camControls" hidden>
+      <!-- Вспышка выкл -->
+      <button class="cam-icon" id="flashOffBtn" aria-label="Отключить вспышку">
+        <img id="flashOffIcon" src="assets/disable_flash_active.svg" alt="">
+      </button>
+
+      <!-- Вспышка вкл -->
+      <button class="cam-icon" id="flashOnBtn" aria-label="Включить вспышку">
+        <img id="flashOnIcon" src="assets/flash_no_active.svg" alt="">
+      </button>
+
+      <!-- тут потом добавим таймеры -->
+    </div>
+
+    <!-- НИЖНИЙ ряд переключения режимов -->
+    <div class="modebar">
+      <button class="btn ghost" id="modePhoto">Ф0Т0</button>
+      <button class="btn ghost active" id="modeLive">К4МЕР4</button>
+      <button class="btn ghost" id="modeVideo">ВИД30</button>
+    </div>
 
       <!-- НИЖНИЙ ряд переключения режимов -->
 <div class="modebar">
@@ -173,6 +194,7 @@
 <script defer src="ascii.js"></script>
 </body>
 </html>
+
 
 
 
