@@ -95,14 +95,20 @@
     </div>
 
     <!-- Сцена вывода -->
-    <div class="stage" id="stage">
-      <pre id="out"></pre>
-      <!-- Плейсхолдер (иконка «дискета» + текст), показывается, пока фото/видео не выбраны -->
+<div class="stage" id="stage">
+  <pre id="out"></pre>
+  <!-- Плейсхолдер (иконка «дискета» + текст), показывается, пока фото/видео не выбраны -->
   <div id="placeholder" hidden>
     <div class="ph-ico">💾</div>
     <div class="ph-txt">ВЫБ3РИТ3 М0М3НТ ИЗ Г4Л3Р3И</div>
   </div>
- </div>
+
+  <!-- Оверлей таймера: крупные цифры по центру -->
+  <div id="camTimerOverlay" hidden>
+    <div id="camTimerNumber"></div>
+  </div>
+</div>
+
     <!-- === КНОПКА ЗАТВОРА (только для режима КАМЕРА) === -->
 <div id="camShutter" hidden aria-label="Сделать кадр">
   <img id="camBtnCircle" src="assets/camera_button_circle.svg" alt="" />
@@ -123,19 +129,32 @@
     </div>
   </div>
     <!-- Ряд иконок камеры (вспышка, таймер и т.д.) -->
-    <div class="cam-controls" id="camControls" hidden>
-      <!-- Вспышка выкл -->
-      <button class="cam-icon" id="flashOffBtn" aria-label="Отключить вспышку">
-        <img id="flashOffIcon" src="assets/disable_flash_active.svg" alt="">
-      </button>
+<div class="cam-controls" id="camControls" hidden>
+  <!-- Вспышка выкл -->
+  <button class="cam-icon" id="flashOffBtn" aria-label="Отключить вспышку">
+    <img id="flashOffIcon" src="assets/disable_flash_active.svg" alt="">
+  </button>
 
-      <!-- Вспышка вкл -->
-      <button class="cam-icon" id="flashOnBtn" aria-label="Включить вспышку">
-        <img id="flashOnIcon" src="assets/flash_no_active.svg" alt="">
-      </button>
+  <!-- Вспышка вкл -->
+  <button class="cam-icon" id="flashOnBtn" aria-label="Включить вспышку">
+    <img id="flashOnIcon" src="assets/flash_no_active.svg" alt="">
+  </button>
 
-      <!-- тут потом добавим таймеры -->
-    </div>
+  <!-- Таймер выкл -->
+  <button class="cam-icon" id="timerOffBtn" aria-label="Таймер выключен">
+    <img id="timerOffIcon" src="assets/disable_timer_active.svg" alt="">
+  </button>
+
+  <!-- Таймер 3 сек -->
+  <button class="cam-icon" id="timer3Btn" aria-label="Таймер 3 секунды">
+    <img id="timer3Icon" src="assets/timer_3sec_no_active.svg" alt="">
+  </button>
+
+  <!-- Таймер 10 сек -->
+  <button class="cam-icon" id="timer10Btn" aria-label="Таймер 10 секунд">
+    <img id="timer10Icon" src="assets/timer_10sec_no_active.svg" alt="">
+  </button>
+</div>
 
     <!-- НИЖНИЙ ряд переключения режимов -->
     <div class="modebar">
@@ -187,6 +206,7 @@
 <script defer src="ascii.js"></script>
 </body>
 </html>
+
 
 
 
