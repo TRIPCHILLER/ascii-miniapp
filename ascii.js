@@ -59,6 +59,11 @@ function busyHide(force = false){
     // overlay
     busy:        $('#busy'),
     busyText:    $('#busyText'),
+    camControls:  $('#camControls'),
+    flashOffBtn:  $('#flashOffBtn'),
+    flashOnBtn:   $('#flashOnBtn'),
+    flashOffIcon: $('#flashOffIcon'),
+    flashOnIcon:  $('#flashOnIcon'),
 }
   };
   // ===== Telegram WebApp (если открыто внутри Telegram) =====
@@ -179,6 +184,7 @@ let DITHER_ENABLED = true;
     recordDims: null,       // <— фиксированные размеры экспортного видео (W/H/шаги)
     lastGrid: { w:0, h:0 }, // запоминаем сетку для экспорта
     viewScale: 1,           // доп. масштаб ASCII внутри #stage
+    flashEnabled: false,
   };
   function updateHud(extra=''){
   const v = app.vid;
@@ -618,6 +624,7 @@ async function startStream() {
     };
 
     await app.vid.play().catch(()=>{});
+    updateFlashUI();
     return true;
 
   } catch (err) {
@@ -1418,6 +1425,7 @@ function cropAsciiText(fullText, crop) {
 function updateMirrorForFacing() {
   // фронталка = зеркалим, тыловая = не зеркалим
   state.mirror = (state.facing === 'user');
+  updateFlashUI();
 }
     // --- DOUBLE-TAP / DOUBLE-CLICK: вход в fullscreen ---
   let lastTapTs = 0;
@@ -1546,6 +1554,14 @@ syncBgPaletteLock();
   if (app.ui.save) app.ui.save.hidden = (newMode==='live');
     // === затвор только в LIVE ===
   if (app.ui.camShutter) app.ui.camShutter.hidden = (newMode!=='live');
+    // Новое: ряд иконок (вспышка/таймер) только в режиме КАМЕРА
+  if (app.ui.camControls) {
+    app.ui.camControls.hidden = (newMode !== 'live');
+  }
+
+  // и пересчитываем визуал вспышки (свечение/torch)
+  updateFlashUI();
+
 // Telegram MainButton: показываем только в ФОТО/ВИДЕО, скрываем в LIVE
 if (tg) {
 mainBtnHide();
@@ -1996,6 +2012,26 @@ app.ui.modeVideo.addEventListener('click', () => {
   app.ui.fileVideo.addEventListener('change', onChange, { once:true });
   app.ui.fileVideo.click();
 });
+    // --- ВСПЫШКА: выкл / вкл (две иконки) ---
+    if (app.ui.flashOffBtn && app.ui.flashOnBtn) {
+      // дефолт: вспышка выключена
+      state.flashEnabled = false;
+      updateFlashUI();
+
+      // клик по перечеркнутому кругу → выключаем вспышку
+      app.ui.flashOffBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        state.flashEnabled = false;
+        updateFlashUI();
+      });
+
+      // клик по молнии → включаем вспышку
+      app.ui.flashOnBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        state.flashEnabled = true;
+        updateFlashUI();
+      });
+    }
 
 // --- Снимок в LIVE (тот же пайплайн, что и ФОТО) ---
 if (app.ui.camShutter && app.ui.camBtnCore) {
@@ -2269,6 +2305,7 @@ try {
 
 await setMode(hasCam ? 'live' : 'photo');
     // стартуем отрисовку
+    updateFlashUI();
     requestAnimationFrame(loop);
   }
 
@@ -2279,6 +2316,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
