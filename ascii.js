@@ -2152,74 +2152,68 @@ app.ui.modeVideo.addEventListener('click', () => {
       });
     }
 
-// --- Снимок в LIVE (тот же пайплайн, что и ФОТО) ---
-if (app.ui.camShutter && app.ui.camBtnCore) {
-  const pressOn  = () => {
-    app.ui.camBtnCore.src = 'assets/camera_button_active.svg';
-    app.ui.camShutter.classList.add('active');
-  };
-  const pressOff = () => {
-    app.ui.camBtnCore.src = 'assets/camera_button.svg';
-    app.ui.camShutter.classList.remove('active');
-  };
+ // --- Снимок в LIVE (тот же пайплайн, что и ФОТО) ---
+    if (app.ui.camShutter && app.ui.camBtnCore) {
+      const pressOn  = () => {
+        app.ui.camBtnCore.src = 'assets/camera_button_active.svg';
+        app.ui.camShutter.classList.add('active');
+      };
+      const pressOff = () => {
+        app.ui.camBtnCore.src = 'assets/camera_button.svg';
+        app.ui.camShutter.classList.remove('active');
+      };
 
-  let shotLock = false;
+      let shotLock = false;
 
-  const doShot = async (e) => {
-    e.preventDefault();
-    if (state.mode !== 'live') return;
-    if (shotLock) return;
-    shotLock = true;
-
-    try {
-      pressOn();
-
-      const sec = state.timerSeconds | 0;
-      const hasTimer =
-        sec > 0 && app.ui.timerOverlay && app.ui.timerNumber;
-
-      if (hasTimer) {
-        // показываем крупные цифры по центру
-        app.ui.timerOverlay.hidden = false;
-
-        for (let s = sec; s > 0; s--) {
-          app.ui.timerNumber.textContent = String(s);
-          // ждём 1 секунду
-          // eslint-disable-next-line no-await-in-loop
-          await new Promise(res => setTimeout(res, 1000));
-        }
-
-        // убираем цифры
-        app.ui.timerOverlay.hidden = true;
-        app.ui.timerNumber.textContent = '';
-      }
-
-      // делаем снимок (тот же PNG-пайплайн)
-      await Promise.resolve(savePNG());
-    } catch (err) {
-      console.error('[camShot]', err);
-    } finally {
-      setTimeout(pressOff, 180);
-      setTimeout(() => { shotLock = false; }, 400);
-    }
-  };
-
-  // Сами слушатели висят СНАРУЖИ doShot, но внутри if
-  app.ui.camShutter.addEventListener(
-    'pointerdown',
-    (e) => {
-      if (state.mode === 'live') {
+      const doShot = async (e) => {
         e.preventDefault();
-        pressOn();
-      }
-    },
-    { passive: false }
-  );
-  app.ui.camShutter.addEventListener('pointerup',   doShot, { passive: false });
-  app.ui.camShutter.addEventListener('click',       doShot, { passive: false });
-  app.ui.camShutter.addEventListener('pointercancel', () => pressOff());
-}
+        if (state.mode !== 'live') return;
+        if (shotLock) return;
+        shotLock = true;
 
+        try {
+          pressOn();
+
+          const sec = state.timerSeconds | 0;
+          const hasTimer = sec > 0 && app.ui.timerOverlay && app.ui.timerNumber;
+
+          if (hasTimer) {
+            // показываем крупные цифры по центру
+            app.ui.timerOverlay.hidden = false;
+
+            for (let s = sec; s > 0; s--) {
+              app.ui.timerNumber.textContent = String(s);
+              // ждём 1 секунду
+              // eslint-disable-next-line no-await-in-loop
+              await new Promise(res => setTimeout(res, 1000));
+            }
+
+            // убираем цифры
+            app.ui.timerOverlay.hidden = true;
+            app.ui.timerNumber.textContent = '';
+          }
+
+          // делаем снимок (тот же PNG-пайплайн)
+          await Promise.resolve(savePNG());
+        } catch (err) {
+          console.error('[camShot]', err);
+        } finally {
+          setTimeout(pressOff, 180);
+          setTimeout(() => { shotLock = false; }, 400);
+        }
+      }; // ← ВАЖНО: закрываем doShot
+
+      app.ui.camShutter.addEventListener('pointerdown', (e) => {
+        if (state.mode === 'live') {
+          e.preventDefault();
+          pressOn();
+        }
+      }, { passive: false });
+
+      app.ui.camShutter.addEventListener('pointerup',   doShot, { passive: false });
+      app.ui.camShutter.addEventListener('click',       doShot, { passive: false });
+      app.ui.camShutter.addEventListener('pointercancel', () => pressOff());
+    }
 
 // --- Выбор фото из галереи ---
 app.ui.filePhoto.addEventListener('change', (e) => {
@@ -2472,6 +2466,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
