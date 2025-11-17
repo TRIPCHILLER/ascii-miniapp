@@ -1924,21 +1924,47 @@ ok.addEventListener('click', ()=> {
 
   return { open, close };
 })();
+// Выставляем панель настроек ровно под верхним тулбаром
+function layoutSettingsPanel() {
+  const panel   = app.ui.settings;
+  const toolbar = document.querySelector('.toolbar');
+  if (!panel || !toolbar) return;
+
+  // координаты тулбара и родителя панели
+  const tbRect      = toolbar.getBoundingClientRect();
+  const parentRect  = panel.offsetParent
+    ? panel.offsetParent.getBoundingClientRect()
+    : { top: 0 };
+
+  // top = нижняя граница тулбара относительно offsetParent
+  const top = Math.max(0, tbRect.bottom - parentRect.top);
+  panel.style.top = top + 'px';
+
+  // чтобы панель не вылезала за экран — подрежем max-height
+  const free = window.innerHeight - top;
+  panel.style.maxHeight = Math.max(0, free - 24) + 'px';
+}
 
   // ============== СВЯЗКА UI ==============
   function bindUI() {
 // Показ/скрытие панели
+// Показ/скрытие панели
 app.ui.toggle.addEventListener('click', () => {
-  const hidden = app.ui.settings.hasAttribute('hidden');
-  if (hidden) app.ui.settings.removeAttribute('hidden');
-  else app.ui.settings.setAttribute('hidden', '');
+  const panel = app.ui.settings;
+  if (!panel) return;
 
-  // Просто чуть подгоняем ASCII под текущий viewport,
-  // сетку и шрифт не трогаем — 16:9 уже настроен
-  setTimeout(() => {
-    fitAsciiToViewport();
-  }, 0);
+  const hidden = panel.hasAttribute('hidden');
+  if (hidden) {
+    panel.removeAttribute('hidden');  // показываем
+    layoutSettingsPanel();            // сразу клеим к тулбару
+  } else {
+    panel.setAttribute('hidden', ''); // прячем
+  }
+
+  // ВАЖНО: больше НЕ трогаем fitAsciiToViewport здесь,
+  // чтобы не появлялась лишняя рамка вокруг картинки.
 });
+
 
 // --- ПИНЧ-ЗУМ ТОЛЬКО ДЛЯ СЦЕНЫ ---
 (function enableStagePinchZoom(){
@@ -2433,7 +2459,9 @@ if (app.ui.invert) app.ui.invert.checked = false;
 }
 
 bindUI();
-
+window.addEventListener('resize', () => {
+  layoutSettingsPanel();
+});
 // 2) Принудительно применяем шрифтовой стек под стартовый режим символов,
 //    чтобы исключить "ложный" первый кадр с некорректным стеком.
 if (app.ui.charset) {
@@ -2461,6 +2489,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
