@@ -171,6 +171,7 @@ button:focus, .btn:focus{
 
 /* чтобы ASCII всегда был поверх свечения */
 #out{ z-index:1; }
+
 /* === Инверсия UI при вспышке на фронталке === */
 body.flash-front-ui {
   --ui-bg:#ffffff;
@@ -673,6 +674,7 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   max-height: calc(100vh - 80px);
   overflow-y: auto;
 }
+
 
 
 
