@@ -60,11 +60,8 @@ function busyHide(force = false){
     busy:        $('#busy'),
     busyText:    $('#busyText'),
     camControls:  $('#camControls'),
-    flashOffBtn:  $('#flashOffBtn'),
-    flashOnBtn:   $('#flashOnBtn'),
-    flashOffIcon: $('#flashOffIcon'),
-    flashOnIcon:  $('#flashOnIcon'),
-
+    flashBtn:  $('#flashBtn'),
+    flashIcon: $('#flashIcon'),
     // таймер
     timerOffBtn:  $('#timerOffBtn'),
     timer3Btn:    $('#timer3Btn'),
@@ -72,7 +69,6 @@ function busyHide(force = false){
     timerOffIcon: $('#timerOffIcon'),
     timer3Icon:   $('#timer3Icon'),
     timer10Icon:  $('#timer10Icon'),
-
     // оверлей отсчёта
     timerOverlay: $('#camTimerOverlay'),
     timerNumber:  $('#camTimerNumber'),
@@ -228,12 +224,8 @@ let DITHER_ENABLED = true;
     const flashOn = !!state.flashEnabled && isLive && haveStream;
 
     // --- связка иконок ---
-    if (app.ui.flashOffIcon && app.ui.flashOnIcon) {
-      app.ui.flashOffIcon.src = flashOn
-        ? 'assets/disable_flash_no_active.svg'
-        : 'assets/disable_flash_active.svg';
-
-      app.ui.flashOnIcon.src = flashOn
+      if (app.ui.flashIcon) {
+      app.ui.flashIcon.src = flashOn
         ? 'assets/flash_active.svg'
         : 'assets/flash_no_active.svg';
     }
@@ -2107,26 +2099,19 @@ app.ui.modeVideo.addEventListener('click', () => {
   app.ui.fileVideo.addEventListener('change', onChange, { once:true });
   app.ui.fileVideo.click();
 });
-    // --- ВСПЫШКА: выкл / вкл (две иконки) ---
-    if (app.ui.flashOffBtn && app.ui.flashOnBtn) {
-      // дефолт: вспышка выключена
-      state.flashEnabled = false;
-      updateFlashUI();
+    // --- ВСПЫШКА: одна кнопка toggle ---
+if (app.ui.flashBtn) {
+  // дефолт: вспышка выключена
+  state.flashEnabled = false;
+  updateFlashUI();
 
-      // клик по перечеркнутому кругу → выключаем вспышку
-      app.ui.flashOffBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        state.flashEnabled = false;
-        updateFlashUI();
-      });
+  app.ui.flashBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    state.flashEnabled = !state.flashEnabled;
+    updateFlashUI();
+  });
+}
 
-      // клик по молнии → включаем вспышку
-      app.ui.flashOnBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        state.flashEnabled = true;
-        updateFlashUI();
-      });
-    }
     // --- ТАЙМЕР: выкл / 3с / 10с ---
     if (app.ui.timerOffBtn && app.ui.timer3Btn && app.ui.timer10Btn) {
       // дефолт: таймер выключен
@@ -2466,6 +2451,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
