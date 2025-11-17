@@ -216,34 +216,45 @@ let DITHER_ENABLED = true;
     }
   }
 
-  function updateFlashUI() {
-    const isLive = (state.mode === 'live');
-    const haveStream = !!state.camStream && !state.camBlocked;
+ function updateFlashUI() {
+  const isLive      = (state.mode === 'live');
+  const haveStream  = !!state.camStream && !state.camBlocked;
 
-    // реальный флаг "вспышка активна прямо сейчас"
-    const flashOn = !!state.flashEnabled && isLive && haveStream;
+  // реальный флаг "вспышка активна прямо сейчас"
+  const flashOn = !!state.flashEnabled && isLive && haveStream;
+  const isFront = (state.facing === 'user');
+  const isRear  = (state.facing === 'environment');
 
-    // --- связка иконок ---
-      if (app.ui.flashIcon) {
-      app.ui.flashIcon.src = flashOn
-        ? 'assets/flash_active.svg'
-        : 'assets/flash_no_active.svg';
-    }
-
-    // --- фронталка: белое размазанное свечение по краям ---
-    if (app.stage) {
-      const isFront = (state.facing === 'user');
-      if (flashOn && isFront) {
-        app.stage.classList.add('flash-front');
-      } else {
-        app.stage.classList.remove('flash-front');
-      }
-    }
-
-    // --- тыловая: аппаратная вспышка (torch), если умеет ---
-    const isRear = (state.facing === 'environment');
-    updateTorch(flashOn && isRear);
+  // --- иконка вспышки ---
+  if (app.ui.flashIcon) {
+    app.ui.flashIcon.src = flashOn
+      ? 'assets/flash_active.svg'
+      : 'assets/flash_no_active.svg';
   }
+
+  // --- фронталка: размазанное белое свечение по краям ---
+  if (app.stage) {
+    if (flashOn && isFront) {
+      app.stage.classList.add('flash-front');
+    } else {
+      app.stage.classList.remove('flash-front');
+    }
+  }
+
+  // --- фронталка: инверсия ВСЕГО UI (верх/низ/иконки) ---
+  const body = document.body;
+  if (body) {
+    if (flashOn && isFront) {
+      body.classList.add('flash-front-ui');
+    } else {
+      body.classList.remove('flash-front-ui');
+    }
+  }
+
+  // --- тыловая: аппаратная вспышка (torch), если умеет ---
+  updateTorch(flashOn && isRear);
+}
+
   function updateTimerUI() {
     if (!app.ui.timerOffIcon || !app.ui.timer3Icon || !app.ui.timer10Icon) return;
 
@@ -2489,6 +2500,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
