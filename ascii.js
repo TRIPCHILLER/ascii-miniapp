@@ -1927,17 +1927,19 @@ ok.addEventListener('click', ()=> {
 
   // ============== СВЯЗКА UI ==============
   function bindUI() {
-    // Показ/скрытие панели
-    app.ui.toggle.addEventListener('click', () => {
-      const hidden = app.ui.settings.hasAttribute('hidden');
-      if (hidden) app.ui.settings.removeAttribute('hidden');
-      else app.ui.settings.setAttribute('hidden', '');
-      setTimeout(() => {
-        const { w, h } = updateGridSize();
-        refitFont(w, h);
-        fitAsciiToViewport();
-      }, 0);
-    });
+// Показ/скрытие панели
+app.ui.toggle.addEventListener('click', () => {
+  const hidden = app.ui.settings.hasAttribute('hidden');
+  if (hidden) app.ui.settings.removeAttribute('hidden');
+  else app.ui.settings.setAttribute('hidden', '');
+
+  // Просто чуть подгоняем ASCII под текущий viewport,
+  // сетку и шрифт не трогаем — 16:9 уже настроен
+  setTimeout(() => {
+    fitAsciiToViewport();
+  }, 0);
+});
+
 // --- ПИНЧ-ЗУМ ТОЛЬКО ДЛЯ СЦЕНЫ ---
 (function enableStagePinchZoom(){
   const el = app.stage;
@@ -2459,6 +2461,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
