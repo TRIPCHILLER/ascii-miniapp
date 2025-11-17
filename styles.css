@@ -675,6 +675,11 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   overflow-y: auto;
 }
 
+/* Лёгкая тень под кольцом затвора — как у таймера */
+#camBtnCircle {
+  filter: drop-shadow(0 0 6px rgba(0,0,0,0.55));
+}
+
 
 
 
