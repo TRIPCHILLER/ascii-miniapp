@@ -624,6 +624,20 @@ body, .toolbar, .panel, .btn, label, output, select, option {
     0 0 25px rgba(0,0,0,.9);
 }
 
+/* Панель настроек как оверлей: не двигает сцену */
+#settings.panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 52px;             /* примерно под верхней панелью */
+  z-index: 50;
+}
+
+/* Чтобы настройки не вываливались за экран — делаем скролл внутри */
+#settings.panel {
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+}
 
 
 
