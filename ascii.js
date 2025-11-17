@@ -793,13 +793,13 @@ function updateGridSize() {
   const isFsLike = isFullscreenLike();
   const ratioCharWOverH = measureCharAspect(); // W/H
 
-  // базовый H/W источника
-  let sourceHOverW = src.h / src.w;
+// базовый H/W источника
+let sourceHOverW = src.h / src.w;
 
-  // в FS на мобиле — фикс 9:16 ТОЛЬКО для LIVE
-  if (isFsLike && isMobile && state.mode==='live') {
-    sourceHOverW = 16/9;
-  }
+// ФИКС: на мобилках всегда рисуем LIVE в 16:9 (и с панелями, и в режиме «Скрыть»)
+if (isMobile && state.mode === 'live') {
+  sourceHOverW = 16/9;
+}
 
   const w = Math.max(1, Math.round(state.widthChars));
   const targetH = w * (sourceHOverW / (1 / Math.max(1e-6, ratioCharWOverH)));
@@ -827,15 +827,23 @@ function updateGridSize() {
 
     // Подготовка трансформа для зеркала
     // mirror = true ⇒ рисуем с scaleX(-1), чтобы получить НЕ-зеркальную картинку
-// --- FULLSCREEN cover-crop под 16:9 (только для LIVE на мобиле) ---
+    
+// --- LIVE cover-crop под 16:9 на мобилках (и fullscreen, и с панелями) ---
 const isFsLike = isFullscreenLike();
 
 let sx = 0, sy = 0, sw = src.w, sh = src.h;
-if (isFsLike && isMobile && state.mode==='live') {
+// ФИКС: LIVE на мобилках всегда кадрируем под 9:16, даже с открытыми панелями
+if (isMobile && state.mode === 'live') {
   const targetWH = 9/16; // W/H
   const srcWH = src.w / src.h;
-  if (srcWH > targetWH) { sw = Math.round(src.h * targetWH); sx = Math.round((src.w - sw)/2); }
-  else if (srcWH < targetWH) { sh = Math.round(src.w / targetWH); sy = Math.round((src.h - sh)/2); }
+  if (srcWH > targetWH) {
+    sw = Math.round(src.h * targetWH);
+    sx = Math.round((src.w - sw) / 2);
+  } else if (srcWH < targetWH) {
+    sh = Math.round(src.w / targetWH);
+    sy = Math.round((src.h - sh) / 2);
+  }
+  // дальше код оставляешь как был
 }
 
 // зеркалим как и раньше: mirror=true ⇒ scaleX(-1)
@@ -2451,6 +2459,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
