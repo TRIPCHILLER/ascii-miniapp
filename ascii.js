@@ -2,7 +2,25 @@
   // ============== УТИЛИТЫ ==============
   const $ = s => document.querySelector(s);
   const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
-  
+    // Портрет-лок (чтобы не крутилось в горизонталь, где получится каша)
+  let orientationLockRequested = false;
+
+  async function lockPortraitIfSupported() {
+    // API есть только в части браузеров, поэтому всё в try/catch
+    try {
+      if (
+        typeof screen !== 'undefined' &&
+        screen.orientation &&
+        typeof screen.orientation.lock === 'function'
+      ) {
+        await screen.orientation.lock('portrait');
+      }
+    } catch (e) {
+      // На iOS и в части вебвью просто вылетит NotSupportedError — игнорируем
+      console.warn('Orientation lock not supported:', e && e.name);
+    }
+  }
+
 // ==== TEMP HUD (disabled) ====
 function hudSet(txt){ /* HUD отключен */ }
   
@@ -2468,11 +2486,27 @@ if (app.ui.invert) app.ui.invert.checked = false;
   const lbl = document.getElementById('invert_label');
   if (lbl) lbl.textContent = 'ИНВ3РСИЯ: ВЫКЛ';
 }
+    // === Портрет-лок: пробуем залочить ориентацию один раз после первого тапа ===
+    if (isMobile && typeof document !== 'undefined') {
+      const onFirstTap = () => {
+        if (orientationLockRequested) return;
+        orientationLockRequested = true;
+        lockPortraitIfSupported();
+        // после попытки — отписываемся от событий
+        document.removeEventListener('click', onFirstTap);
+        document.removeEventListener('touchstart', onFirstTap);
+      };
+
+      // слушаем и клик, и touchstart — чтобы сработало в WebView/на таче
+      document.addEventListener('click', onFirstTap, { passive: true });
+      document.addEventListener('touchstart', onFirstTap, { passive: true });
+    }
 
 bindUI();
 window.addEventListener('resize', () => {
   layoutSettingsPanel();
 });
+    
 // 2) Принудительно применяем шрифтовой стек под стартовый режим символов,
 //    чтобы исключить "ложный" первый кадр с некорректным стеком.
 if (app.ui.charset) {
@@ -2500,6 +2534,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
