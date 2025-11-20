@@ -976,6 +976,55 @@ async function ensureFFmpeg() {
 }
 
 // ---------- EXPORT HELPERS (PNG/VIDEO) ----------
+// Жёсткая пикселизация ASCII-канваса: убираем антиалиас
+function snapAsciiPixels(ctx, W, H, fgHex, bgHex, transparentBg){
+  const img = ctx.getImageData(0, 0, W, H);
+  const data = img.data;
+
+  const [fr, fg, fb] = hexToRgb(fgHex || '#ffffff');
+  let br = 0, bg = 0, bb = 0;
+
+  if (!transparentBg && bgHex){
+    [br, bg, bb] = hexToRgb(bgHex);
+  }
+
+  for (let i = 0; i < data.length; i += 4){
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    const a = data[i + 3];
+
+    if (transparentBg){
+      // при прозрачном фоне: либо полностью прозрачный, либо полностью цвет текста
+      if (a > 32){          // порог можно подправить (16–64)
+        data[i]     = fr;
+        data[i + 1] = fg;
+        data[i + 2] = fb;
+        data[i + 3] = 255;
+      } else {
+        data[i + 3] = 0;
+      }
+    } else {
+      // непрозрачный фон: выбираем, к какому цвету пиксель ближе — к фону или к тексту
+      const dToBg = Math.abs(r - br) + Math.abs(g - bg) + Math.abs(b - bb);
+      const dToFg = Math.abs(r - fr) + Math.abs(g - fg) + Math.abs(b - fb);
+
+      if (dToFg <= dToBg){
+        data[i]     = fr;
+        data[i + 1] = fg;
+        data[i + 2] = fb;
+        data[i + 3] = 255;
+      } else {
+        data[i]     = br;
+        data[i + 1] = bg;
+        data[i + 2] = bb;
+        data[i + 3] = 255;
+      }
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+}
 
 // Рендер готового ASCII-текста в canvas для экспорта
 // Рендер ASCII-текста в canvas для экспорта — с сохранением исходного соотношения сторон
@@ -1026,6 +1075,10 @@ function renderAsciiToCanvas(text, cols, rows, scale = 2){
   for (let y = 0; y < maxRows; y++) {
     c.fillText(lines[y], 0, y * stepY * scale);
   }
+
+  // 🔧 После отрисовки текста — жёстко «щелкаем» пиксели,
+  // убирая сглаживание и оставляя только фон/текст.
+  snapAsciiPixels(c, W, H, state.color, state.background, state.transparentBg);
 }
 
 // PNG (режим ФОТО)
@@ -1776,6 +1829,23 @@ function rgbToHex(rgb){
   const m = String(rgb).match(/\d+/g)||[0,0,0];
   return '#'+m.slice(0,3).map(n=>Number(n).toString(16).padStart(2,'0')).join('');
 }
+  function hexToRgb(hex){
+  hex = String(hex).trim();
+  if (hex.startsWith('#')) hex = hex.slice(1);
+
+  // поддержка #rgb и #rrggbb
+  if (hex.length === 3){
+    hex = hex.split('').map(ch => ch + ch).join('');
+  }
+
+  const num = parseInt(hex || '000000', 16);
+  return [
+    (num >> 16) & 255,
+    (num >> 8)  & 255,
+    num & 255
+  ];
+}
+
   function repaintSV(){
     // слой 1: чистый цвет по H с полной насыщенностью и яркостью
     const [r,g,b] = hsv2rgb(H,1,1);
@@ -2534,6 +2604,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
