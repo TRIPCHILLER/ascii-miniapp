@@ -1442,29 +1442,16 @@ async function downloadBlob(blob, filename) {
 
     refitLock = false;
   }
-  // === Вписывание ASCII-блока внутрь stage ===
+  
+    // === Вписывание ASCII-блока: теперь только zoom по viewScale ===
   function fitAsciiToViewport(){
     const out = app.out;
-    const stage = app.stage;
-    if (!out || !stage) return;
+    if (!out) return;
 
-    // сброс масштаба
-    out.style.transform = 'translate(-50%, -50%) scale(1)';
-
-    // реальные размеры ascii-блока
-    const w = out.scrollWidth;
-    const h = out.scrollHeight;
-
-    // доступные размеры
-    const W = stage.clientWidth;
-    const H = stage.clientHeight;
-
-    // коэффициент "contain"
-    const S = Math.min(W / w, H / h);
-
-    // применяем
-    out.style.transform = `translate(-50%, -50%) scale(${S * state.viewScale})`;
+    const scale = Math.max(1, Math.min(3, state.viewScale || 1));
+    out.style.transform = `translate(-50%, -50%) scale(${scale})`;
   }
+
 // --- Crop-логика: преобразуем зум в «окно» по колонкам/строкам ---
 function getCropWindow() {
   const grid = state.lastGrid || { w: 1, h: 1 };
@@ -2159,27 +2146,23 @@ app.ui.flip.addEventListener('click', async () => {
       });
     }
 
-        app.ui.width.addEventListener('input', e => {
-      // 1) сохраняем новое число символов
+      app.ui.width.addEventListener('input', e => {
       state.widthChars = +e.target.value;
       app.ui.widthVal.textContent = state.widthChars;
 
-      // 2) каждый раз при смене размера сетки:
-      //    сбрасываем пользовательский зум и пересчитываем под экран
+      // сбрасываем пользовательский зум
       state.viewScale = 1;
 
       const src = currentSource();
       if (src) {
-        // есть источник (фото/видео/камера) → знаем реальный аспект
         const { w, h } = updateGridSize();
-        refitFont(w, h);          // подбираем новый font-size под новые cols/rows
-      } else {
-        // если ещё ничего не выбрано — просто сбросим трансформ
-        if (app.out) {
-          app.out.style.transform = 'translate(-50%, -50%) scale(1)';
-        }
+        refitFont(w, h);      // авто-вписывание через font-size
       }
+
+      // в любом случае обновляем transform под актуальный viewScale
+      fitAsciiToViewport();
     });
+
 
     app.ui.contrast.addEventListener('input', e => {
       state.contrast = +e.target.value;
@@ -2637,6 +2620,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
