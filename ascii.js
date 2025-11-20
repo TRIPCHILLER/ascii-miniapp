@@ -976,6 +976,21 @@ async function ensureFFmpeg() {
 }
 
 // ---------- EXPORT HELPERS (PNG/VIDEO) ----------
+  function hexToRgb(hex){
+  hex = String(hex).trim();
+  if (hex.startsWith('#')) hex = hex.slice(1);
+
+  if (hex.length === 3){
+    hex = hex.split('').map(ch => ch + ch).join('');
+  }
+
+  const num = parseInt(hex || '000000', 16);
+  return [
+    (num >> 16) & 255,
+    (num >> 8)  & 255,
+    num & 255
+  ];
+}
 // Жёсткая пикселизация ASCII-канваса: убираем антиалиас
 function snapAsciiPixels(ctx, W, H, fgHex, bgHex, transparentBg){
   const img = ctx.getImageData(0, 0, W, H);
@@ -1829,6 +1844,7 @@ function rgbToHex(rgb){
   const m = String(rgb).match(/\d+/g)||[0,0,0];
   return '#'+m.slice(0,3).map(n=>Number(n).toString(16).padStart(2,'0')).join('');
 }
+  
   function hexToRgb(hex){
   hex = String(hex).trim();
   if (hex.startsWith('#')) hex = hex.slice(1);
@@ -2604,6 +2620,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
