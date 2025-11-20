@@ -758,7 +758,7 @@ function applyWidthLimitsForMode(init = false) {
     }
   } else {
     // Десктоп оставляем как было
-    min = 75; max = 175;
+    min = 75; max = 150;
   }
 
   app.ui.width.min = min;
@@ -2642,6 +2642,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
