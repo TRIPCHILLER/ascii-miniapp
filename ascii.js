@@ -1444,13 +1444,35 @@ async function downloadBlob(blob, filename) {
   }
   
     // === Вписывание ASCII-блока: теперь только zoom по viewScale ===
-  function fitAsciiToViewport(){
-    const out = app.out;
-    if (!out) return;
+function fitAsciiToViewport(){
+  const out   = app.out;
+  const stage = app.stage;
+  if (!out || !stage) return;
 
-    const scale = Math.max(1, Math.min(3, state.viewScale || 1));
-    out.style.transform = `translate(-50%, -50%) scale(${scale})`;
+  // 1. Сбрасываем transform, чтобы узнать реальный размер ASCII-блока
+  out.style.transform = 'translate(-50%, -50%) scale(1)';
+
+  // 2. Реальные размеры pre c ASCII
+  const w = out.scrollWidth;
+  const h = out.scrollHeight;
+
+  // 3. Доступные размеры сцены
+  const W = stage.clientWidth;
+  const H = stage.clientHeight;
+
+  if (!w || !h || !W || !H) {
+    out.style.transform = 'translate(-50%, -50%) scale(1)';
+    return;
   }
+
+  // 4. Классический "contain": вписать целиком, без обрезки
+  const S = Math.min(W / w, H / h);
+
+  // 5. Применяем базовый масштаб + пользовательский зум
+  const base = S * (state.viewScale || 1);
+
+  out.style.transform = `translate(-50%, -50%) scale(${base})`;
+}
 
 // --- Crop-логика: преобразуем зум в «окно» по колонкам/строкам ---
 function getCropWindow() {
@@ -2620,6 +2642,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
