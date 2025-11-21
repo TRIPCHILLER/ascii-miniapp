@@ -54,8 +54,8 @@ img, video, canvas, pre {
 /* ===== КНОПКИ — полностью прозрачные ===== */
 button, .btn, input[type="button"], input[type="submit"]{
   appearance:none; -webkit-appearance:none; -moz-appearance:none;
-  background:transparent;
-  background-image:none;
+  background:transparent !important;
+  background-image:none !important;
   color:var(--ui-text);
   border:0 !important; outline:none !important; box-shadow:none !important;
   padding:.55rem 1rem; border-radius:0; cursor:pointer;
@@ -793,6 +793,7 @@ body.flash-front-ui input[type="range"]::-ms-thumb {
   margin-top:8px;
   margin-bottom:6px;
 }
+
 
 
 
