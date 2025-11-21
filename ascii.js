@@ -2317,37 +2317,30 @@ if (app.ui.fg) {
 }
 
 // --- Кнопки режимов внизу (с приоритетным вызовом file picker) ---
- app.ui.modeLive.addEventListener('click', () => {
-   updateModeTabs('live');
-   setMode('live');
- });
-// --- ФОТО
+app.ui.modeLive.addEventListener('click', () => {
+  // КАМЕРА — сразу в live
+  updateModeTabs('live');
+  setMode('live');
+});
+
+// --- ФОТО: только открываем диалог, режим пока НЕ трогаем ---
 app.ui.modePhoto.addEventListener('click', () => {
   if (!app.ui.filePhoto) return;
 
-  // СНАЧАЛА выходим из LIVE
-  updateModeTabs('photo');
-  setMode('photo');
-
-  // теперь безопасно открываем диалог
   app.ui.filePhoto.value = '';
-  const onChange = () => app.ui.filePhoto.removeEventListener('change', onChange);
-  app.ui.filePhoto.addEventListener('change', onChange, { once:true });
-  app.ui.filePhoto.click();
+
+  // используем наш helper, который "нормально" открывает input вне экрана
+  openFilePicker(app.ui.filePhoto);
 });
 
-// --- ВИДЕО (аналогично)
+// --- ВИДЕО: аналогично, только открываем диалог ---
 app.ui.modeVideo.addEventListener('click', () => {
   if (!app.ui.fileVideo) return;
 
-  updateModeTabs('video');
-  setMode('video');
-
   app.ui.fileVideo.value = '';
-  const onChange = () => app.ui.fileVideo.removeEventListener('change', onChange);
-  app.ui.fileVideo.addEventListener('change', onChange, { once:true });
-  app.ui.fileVideo.click();
+  openFilePicker(app.ui.fileVideo);
 });
+
     // --- ВСПЫШКА: одна кнопка toggle ---
 if (app.ui.flashBtn) {
   // дефолт: вспышка выключена
@@ -2450,31 +2443,54 @@ if (app.ui.flashBtn) {
     }
 
 // --- Выбор фото из галереи ---
-app.ui.filePhoto.addEventListener('change', (e) => {
+app.ui.filePhoto.addEventListener('change', async (e) => {
   const f = e.target.files?.[0];
+
+  // Юзер закрыл диалог, ничего не выбрал → остаёмся в старом режиме
   if (!f) return;
+
+  // Только сейчас, после реального выбора файла, переключаемся в режим ФОТО
+  if (state.mode !== 'photo') {
+    updateModeTabs('photo');
+    await setMode('photo');
+  }
+
   const img = new Image();
   img.onload = () => {
     state.imageEl = img;
     state.mirror = false;
     app.ui.placeholder.hidden = true;
-    const { w, h } = updateGridSize(); refitFont(w, h);
-    updateHud('img onload');
-    requestAnimationFrame(()=>{}); // разовый тик
-  };
-  if (app._lastImageURL) { try { URL.revokeObjectURL(app._lastImageURL); } catch(_) {} }
-const urlImg = URL.createObjectURL(f);
-img.src = urlImg;
-app._lastImageURL = urlImg;
 
+    const { w, h } = updateGridSize();
+    refitFont(w, h);
+    updateHud('img onload');
+    requestAnimationFrame(() => {}); // разовый тик
+  };
+
+  if (app._lastImageURL) {
+    try { URL.revokeObjectURL(app._lastImageURL); } catch (_) {}
+  }
+
+  const urlImg = URL.createObjectURL(f);
+  img.src = urlImg;
+  app._lastImageURL = urlImg;
 });
+
 
 // --- Выбор видео из галереи (рабочий пайплайн + чистим ASCII до готовности)
 app.ui.fileVideo.addEventListener('change', async (e) => {
   const f = e.target.files?.[0];
+
+  // Ничего не выбрали → не трогаем текущий режим (live/photo/video)
   if (!f) return;
 
-  // остановим live (и любые старые источники)
+  // Только после выбора файла реально переходим в режим ВИДЕО
+  if (state.mode !== 'video') {
+    updateModeTabs('video');
+    await setMode('video');
+  }
+
+  // остановим live (и любые старые источники) — пусть будет на всякий
   stopStream();
   try { app.vid.pause?.(); } catch(_) {}
   try { app.vid.removeAttribute('src'); } catch(_) {}
@@ -2484,8 +2500,10 @@ app.ui.fileVideo.addEventListener('change', async (e) => {
   app.out.textContent = '';
   app.ui.placeholder.hidden = false;
 
-  // освободим старый blob, если был
-  if (app._lastVideoURL) { try { URL.revokeObjectURL(app._lastVideoURL); } catch(_) {} }
+  // освобождаем старый blob, если был
+  if (app._lastVideoURL) {
+    try { URL.revokeObjectURL(app._lastVideoURL); } catch(_) {}
+  }
   const url = URL.createObjectURL(f);
   app._lastVideoURL = url;
 
@@ -2508,7 +2526,7 @@ app.ui.fileVideo.addEventListener('change', async (e) => {
   };
   app.vid.addEventListener('ended', app._loopFallback);
 
-  // как только метаданные есть — прячем плейсхолдер, подгоняем сетку и всё
+  // как только метаданные есть — прячем плейсхолдер, подгоняем сетку
   app.vid.onloadedmetadata = () => {
     if (app.vid.videoWidth > 0 && app.vid.videoHeight > 0) {
       app.ui.placeholder.hidden = true;
@@ -2718,6 +2736,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
