@@ -1801,7 +1801,6 @@ mainBtnHide();
 
 }
   // === Android ColorPicker override (HSV square + hue slider) ===
-const isAndroid = /Android/i.test(navigator.userAgent);
 const CP = (() => {
   const modal = document.getElementById('cp-modal');
   if (!modal) return { open:()=>{}, close:()=>{} };
@@ -1809,33 +1808,41 @@ const CP = (() => {
   const sv = document.getElementById('cp-sv');
   const h  = document.getElementById('cp-h');
   const ok = document.getElementById('cp-ok');
+  const cancel = document.getElementById('cp-cancel');
+
   const rowTransparent = document.getElementById('cp-transparent-row');
   const cbTransparent  = document.getElementById('cp-transparent');
-  // реагируем на нажатие чекбокса "Прозрачный фон"
-cbTransparent?.addEventListener('change', ()=>{
-  const isBG = (targetInput && targetInput.id === 'bg');
-  modal.classList.toggle('cp-disabled', cbTransparent.checked && isBG);
-});
 
-  const cancel = document.getElementById('cp-cancel');
   const preview = document.getElementById('cp-preview-swatch');
 
+  const tabSpectrum  = document.getElementById('cp-tab-spectrum');
+  const tabGrid      = document.getElementById('cp-tab-grid');
+  const bodySpectrum = document.getElementById('cp-body-spectrum');
+  const bodyGrid     = document.getElementById('cp-body-grid');
+  const grid         = document.getElementById('cp-grid');
+
   const ctx = sv.getContext('2d');
-  let targetInput = null;   // app.ui.fg | app.ui.bg
-  let H = 210, S = 0.5, V = 0.6; // старт
+
+  let targetInput = null;
+  let H = 210, S = 0.5, V = 0.6;
   let openedAt = 0;
-  
+  let mode = 'spectrum'; // 'spectrum' | 'grid'
+
   function hsv2rgb(h,s,v){
     const f = (n,k=(n+h/60)%6)=> v - v*s*Math.max(Math.min(k,4-k,1),0);
     return [Math.round(f(5)*255), Math.round(f(3)*255), Math.round(f(1)*255)];
   }
-  
-  function rgb2hex(r,g,b){ return '#'+[r,g,b].map(x=>x.toString(16).padStart(2,'0')).join(''); }
-  
+
+  function rgb2hex(r,g,b){
+    return '#'+[r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('');
+  }
+
   function hex2hsv(hex){
     const m = (hex||'').replace('#','');
-    if (m.length<6) return [H,S,V];
-    let r=parseInt(m.slice(0,2),16)/255, g=parseInt(m.slice(2,4),16)/255, b=parseInt(m.slice(4,6),16)/255;
+    if (m.length < 6) return [H,S,V];
+    let r=parseInt(m.slice(0,2),16)/255,
+        g=parseInt(m.slice(2,4),16)/255,
+        b=parseInt(m.slice(4,6),16)/255;
     const max=Math.max(r,g,b), min=Math.min(r,g,b), d=max-min;
     let h=0, s=max? d/max:0, v=max;
     if(d){
@@ -1848,31 +1855,27 @@ cbTransparent?.addEventListener('change', ()=>{
     }
     return [h,s,v];
   }
-  
-function rgbToHex(rgb){
-  const m = String(rgb).match(/\d+/g)||[0,0,0];
-  return '#'+m.slice(0,3).map(n=>Number(n).toString(16).padStart(2,'0')).join('');
-}
-  
-  function hexToRgb(hex){
-  hex = String(hex).trim();
-  if (hex.startsWith('#')) hex = hex.slice(1);
 
-  // поддержка #rgb и #rrggbb
-  if (hex.length === 3){
-    hex = hex.split('').map(ch => ch + ch).join('');
+  function rgbToHex(rgb){
+    const m = String(rgb).match(/\d+/g)||[0,0,0];
+    return '#'+m.slice(0,3).map(n=>Number(n).toString(16).padStart(2,'0')).join('');
   }
 
-  const num = parseInt(hex || '000000', 16);
-  return [
-    (num >> 16) & 255,
-    (num >> 8)  & 255,
-    num & 255
-  ];
-}
+  function hexToRgb(hex){
+    hex = String(hex).trim();
+    if (hex.startsWith('#')) hex = hex.slice(1);
+    if (hex.length === 3){
+      hex = hex.split('').map(ch => ch + ch).join('');
+    }
+    const num = parseInt(hex || '000000', 16);
+    return [
+      (num >> 16) & 255,
+      (num >> 8)  & 255,
+      num & 255
+    ];
+  }
 
   function repaintSV(){
-    // слой 1: чистый цвет по H с полной насыщенностью и яркостью
     const [r,g,b] = hsv2rgb(H,1,1);
     const grdX = ctx.createLinearGradient(0,0,sv.width,0);
     grdX.addColorStop(0, 'rgb(255,255,255)');
@@ -1884,7 +1887,6 @@ function rgbToHex(rgb){
     grdY.addColorStop(1, 'rgba(0,0,0,1)');
     ctx.fillStyle = grdY; ctx.fillRect(0,0,sv.width,sv.height);
 
-    // курсор
     const x = Math.round(S * sv.width);
     const y = Math.round((1 - V) * sv.height);
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
@@ -1904,36 +1906,34 @@ function rgbToHex(rgb){
     repaintSV();
   }
 
-  function open(targetEl){
-  targetInput = targetEl;
-    
-// Показываем чекбокс "Прозрачный фон" только для выбора ФОНА в режиме Фото
-const isBG = (targetInput && targetInput.id === 'bg');
-const isPhotoMode = (state.mode === 'photo') || (app?.ui?.tabPhoto?.classList?.contains('active'));
-rowTransparent.hidden = !(isBG && isPhotoMode);
+  function repaintHue(){
+    const hc = h.getContext('2d');
+    const rect = h.getBoundingClientRect();
+    const W = Math.round(rect.width), Hpx = Math.round(rect.height);
+    if (h.width !== W || h.height !== Hpx){ h.width = W; h.height = Hpx; }
 
-// Синхронизируем чекбокс и блокируем палитру при включении
-cbTransparent.checked = !!state.transparentBg;
-modal.classList.toggle('cp-disabled', cbTransparent.checked && isBG);
+    const grd = hc.createLinearGradient(0,0,0,Hpx);
+    grd.addColorStop(0/6,'#f00'); grd.addColorStop(1/6,'#ff0');
+    grd.addColorStop(2/6,'#0f0'); grd.addColorStop(3/6,'#0ff');
+    grd.addColorStop(4/6,'#00f'); grd.addColorStop(5/6,'#f0f');
+    grd.addColorStop(6/6,'#f00');
+    hc.fillStyle = grd; hc.fillRect(0,0,W,Hpx);
 
-// если редактируем НЕ фон — палитра должна быть активной
-if (!isBG) modal.classList.remove('cp-disabled');
-    
-  // берём стартовое значение из поля
-  [H,S,V] = hex2hsv(targetInput.value || '#8ac7ff');
+    const y = Math.round((H/360) * Hpx);
+    hc.strokeStyle = '#fff'; hc.lineWidth = 2;
+    hc.beginPath(); hc.moveTo(0,y+0.5); hc.lineTo(W,y+0.5); hc.stroke();
+    hc.strokeStyle = '#000';
+    hc.beginPath(); hc.moveTo(0,y+2.5); hc.lineTo(W,y+2.5); hc.stroke();
+  }
 
-  openedAt = Date.now();
-  // небольшой defer — чтобы «хвост» клика не закрыл модал мгновенно
-  setTimeout(() => {
-    modal.hidden = false;
-    repaintHue();      
+  function hueFromEvent(e){
+    const rect = h.getBoundingClientRect();
+    const cy = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+    const clamped = Math.min(Math.max(cy, 0), rect.height);
+    H = (clamped / rect.height) * 360;
+    repaintHue();
     repaintSV();
-  }, 0);
-}
-
-  function close(){ modal.hidden = true; }
-
-  // события
+  }
 
   const drag = (on)=> (ev)=>{ ev.preventDefault(); on(ev);
     const move = (e)=> on(e);
@@ -1946,108 +1946,177 @@ if (!isBG) modal.classList.remove('cp-disabled');
     window.addEventListener('mouseup', up);
     window.addEventListener('touchend', up);
   };
+
   sv.addEventListener('mousedown', drag(svFromEvent), { passive:false });
   sv.addEventListener('touchstart', drag(svFromEvent), { passive:false });
-function repaintHue(){
-  const hc = h.getContext('2d');
-  const rect = h.getBoundingClientRect();
-  const W = Math.round(rect.width), Hpx = Math.round(rect.height);
-  if (h.width !== W || h.height !== Hpx){ h.width = W; h.height = Hpx; }
 
-  const grd = hc.createLinearGradient(0,0,0,Hpx);
-  grd.addColorStop(0/6,'#f00'); grd.addColorStop(1/6,'#ff0');
-  grd.addColorStop(2/6,'#0f0'); grd.addColorStop(3/6,'#0ff');
-  grd.addColorStop(4/6,'#00f'); grd.addColorStop(5/6,'#f0f');
-  grd.addColorStop(6/6,'#f00');
-  hc.fillStyle = grd; hc.fillRect(0,0,W,Hpx);
+  const dragHue = (on)=> (ev)=>{ ev.preventDefault(); on(ev);
+    const move = (e)=> on(e);
+    const up = ()=>{ window.removeEventListener('mousemove', move);
+                     window.removeEventListener('touchmove', move);
+                     window.removeEventListener('mouseup', up);
+                     window.removeEventListener('touchend', up); };
+    window.addEventListener('mousemove', move, { passive:false });
+    window.addEventListener('touchmove', move, { passive:false });
+    window.addEventListener('mouseup', up);
+    window.addEventListener('touchend', up);
+  };
 
-  const y = Math.round((H/360) * Hpx);
-  hc.strokeStyle = '#fff'; hc.lineWidth = 2;
-  hc.beginPath(); hc.moveTo(0,y+0.5); hc.lineTo(W,y+0.5); hc.stroke();
-  hc.strokeStyle = '#000';
-  hc.beginPath(); hc.moveTo(0,y+2.5); hc.lineTo(W,y+2.5); hc.stroke();
-}
+  h.addEventListener('mousedown',  dragHue(hueFromEvent), { passive:false });
+  h.addEventListener('touchstart', dragHue(hueFromEvent), { passive:false });
 
-function hueFromEvent(e){
-  const rect = h.getBoundingClientRect();
-  const cy = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
-  const clamped = Math.min(Math.max(cy, 0), rect.height);
-  H = (clamped / rect.height) * 360;
-  repaintHue();
-  repaintSV();
-}
+  // ---------- СЕТКА ГОТОВЫХ ЦВЕТОВ ----------
+  const GRID_COLORS = [
+    // сверху — серый градиент
+    ['#ffffff','#f2f2f2','#e0e0e0','#c8c8c8','#a8a8a8','#8a8a8a','#6b6b6b','#4a4a4a','#2a2a2a','#000000'],
+    // синие / фиолетовые
+    ['#dfe9ff','#b0c5ff','#809fff','#4f78ff','#2850ff','#182fdb','#131f9f','#0e1566','#090b33','#050614'],
+    // фиолет / розовый
+    ['#f7e4ff','#e7c0ff','#d79bff','#c774ff','#b54dff','#952edc','#7315aa','#540b75','#360648','#1a021f'],
+    // холодные зелёные / бирюза
+    ['#e4fff8','#b9fff0','#8bf7e5','#5de4d3','#34c7b8','#1fa497','#158075','#0f5b54','#093633','#041614'],
+    // тёплые зелёные / жёлтые
+    ['#f7ffe4','#ebffbf','#e1ff95','#d2f468','#c0db3d','#a0b526','#7e8f18','#59650f','#353d08','#151804'],
+    // оранж / красные
+    ['#fff2e0','#ffd4b0','#ffb380','#ff9150','#ff6e29','#e04c14','#b53509','#802305','#4c1402','#1e0700']
+  ];
 
-const dragHue = (on) => (ev)=>{ ev.preventDefault();
-  on(ev);
-  const move = (e)=> on(e);
-  const up = ()=>{ window.removeEventListener('mousemove', move);
-                   window.removeEventListener('touchmove', move);
-                   window.removeEventListener('mouseup', up);
-                   window.removeEventListener('touchend', up); };
-  window.addEventListener('mousemove', move, { passive:false });
-  window.addEventListener('touchmove', move, { passive:false });
-  window.addEventListener('mouseup', up);
-  window.addEventListener('touchend', up);
-};
-h.addEventListener('mousedown',  dragHue(hueFromEvent), { passive:false });
-h.addEventListener('touchstart', dragHue(hueFromEvent), { passive:false });
+  function ensureGrid(){
+    if (!grid || grid.childElementCount) return;
+    GRID_COLORS.forEach(row => {
+      const rowEl = document.createElement('div');
+      rowEl.className = 'cp-grid-row';
+      row.forEach(hex => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'cp-grid-swatch';
+        btn.style.backgroundColor = hex;
+        btn.dataset.hex = hex;
+        btn.addEventListener('click', () => {
+          [H,S,V] = hex2hsv(hex);
+          repaintHue();
+          repaintSV();
+        });
+        rowEl.appendChild(btn);
+      });
+      grid.appendChild(rowEl);
+    });
+  }
 
-  cancel.addEventListener('click', close);
-ok.addEventListener('click', ()=> {
-  const pickedIsBG = (targetInput && targetInput.id === 'bg');
-  const isPhotoMode = (state.mode === 'photo') || (app?.ui?.tabPhoto?.classList?.contains('active'));
-  const wantTransparent = cbTransparent.checked && pickedIsBG && isPhotoMode;
+  function setMode(newMode){
+    mode = newMode === 'grid' ? 'grid' : 'spectrum';
 
-  if (wantTransparent) {
-    // Включаем прозрачный фон только для Фото
-    state.transparentBg = true;
+    if (bodySpectrum) bodySpectrum.hidden = (mode !== 'spectrum');
+    if (bodyGrid)     bodyGrid.hidden     = (mode !== 'grid');
 
-    // В UI показываем "чёрный", а экспорт будет прозрачный
-    app.out.style.backgroundColor   = '#000000';
-    app.stage.style.backgroundColor = '#000000';
-    app.ui.bg.classList.add('transparent');
-
-    // Сохраним текущий выбранный цвет в инпут на будущее
-    const swatch = document.getElementById('cp-preview-swatch'); // если есть превью-свотч
-    const hex = swatch ? rgbToHex(getComputedStyle(swatch).backgroundColor) : targetInput.value;
-    if (targetInput) {
-      targetInput.value = hex;
-      targetInput.dispatchEvent(new Event('input', { bubbles:true }));
+    if (tabSpectrum) {
+      tabSpectrum.classList.toggle('cp-tab-active', mode === 'spectrum');
     }
-    syncBgPaletteLock();
-  } else {
-    // Обычная установка цвета
-    const [r,g,b] = hsv2rgb(H,S,V);
-    const hex = rgb2hex(r,g,b);
-    if (targetInput) {
-      targetInput.value = hex;
-      targetInput.dispatchEvent(new Event('input', { bubbles:true }));
-    }
-
-    // Если это фон — выключаем прозрачность и возвращаем цвет
-    if (pickedIsBG) {
-      if (state.transparentBg) {
-        state.transparentBg = false;
-        app.ui.bg.classList.remove('transparent');
-      }
-      app.out.style.backgroundColor   = state.background;
-      app.stage.style.backgroundColor = state.background;
-      syncBgPaletteLock();
+    if (tabGrid) {
+      tabGrid.classList.toggle('cp-tab-active', mode === 'grid');
     }
   }
 
-  close();
-});
+  tabSpectrum?.addEventListener('click', () => setMode('spectrum'));
+  tabGrid?.addEventListener('click',     () => setMode('grid'));
 
-  // клик по фону — закрыть
+  // --- ПРОЗРАЧНЫЙ ФОН: блокируем палитру, когда он включён ---
+  cbTransparent?.addEventListener('change', ()=>{
+    const isBG = (targetInput && targetInput.id === 'bg');
+    modal.classList.toggle('cp-disabled', cbTransparent.checked && isBG);
+  });
+
+  function open(targetEl){
+    targetInput = targetEl;
+
+    // Показываем чекбокс только для ФОНА в режиме ФОТО
+    const isBG = (targetInput && targetInput.id === 'bg');
+    const isPhotoMode = (state.mode === 'photo') ||
+      (app?.ui?.tabPhoto?.classList?.contains('active'));
+
+    rowTransparent.hidden = !(isBG && isPhotoMode);
+
+    cbTransparent.checked = !!state.transparentBg;
+    modal.classList.toggle('cp-disabled', cbTransparent.checked && isBG);
+    if (!isBG) modal.classList.remove('cp-disabled');
+
+    // стартовый цвет берём из инпута
+    [H,S,V] = hex2hsv(targetInput.value || '#8ac7ff');
+
+    ensureGrid();       // создаём сетку при первом открытии
+    setMode(mode);      // оставляем последний выбранный режим
+
+    openedAt = Date.now();
+    setTimeout(() => {
+      modal.hidden = false;
+      repaintHue();
+      repaintSV();
+    }, 0);
+  }
+
+  function close(){
+    modal.hidden = true;
+  }
+
+  cancel.addEventListener('click', close);
+
+  ok.addEventListener('click', ()=> {
+    const pickedIsBG  = (targetInput && targetInput.id === 'bg');
+    const isPhotoMode = (state.mode === 'photo') ||
+      (app?.ui?.tabPhoto?.classList?.contains('active'));
+    const wantTransparent = cbTransparent.checked && pickedIsBG && isPhotoMode;
+
+    if (wantTransparent) {
+      // включаем прозрачный фон
+      state.transparentBg = true;
+
+      app.out.style.backgroundColor   = '#000000';
+      app.stage.style.backgroundColor = '#000000';
+      app.ui.bg.classList.add('transparent');
+
+      const swatch = document.getElementById('cp-preview-swatch');
+      const hex = swatch
+        ? rgbToHex(getComputedStyle(swatch).backgroundColor)
+        : (targetInput.value || '#000000');
+
+      if (targetInput) {
+        targetInput.value = hex;
+        targetInput.dispatchEvent(new Event('input', { bubbles:true }));
+      }
+      syncBgPaletteLock();
+    } else {
+      // обычная установка цвета
+      const [r,g,b] = hsv2rgb(H,S,V);
+      const hex = rgb2hex(r,g,b);
+
+      if (targetInput) {
+        targetInput.value = hex;
+        targetInput.dispatchEvent(new Event('input', { bubbles:true }));
+      }
+
+      if (pickedIsBG) {
+        if (state.transparentBg) {
+          state.transparentBg = false;
+          app.ui.bg.classList.remove('transparent');
+        }
+        app.out.style.backgroundColor   = state.background;
+        app.stage.style.backgroundColor = state.background;
+        syncBgPaletteLock();
+      }
+    }
+
+    close();
+  });
+
+  // клик по фону — закрыть (кроме «хвоста» первого тапа)
   modal.querySelector('.cp-backdrop').addEventListener('click', (ev) => {
-  // игнорируем первый «хвостовой» клик сразу после открытия
-  if (Date.now() - openedAt < 200) return;
-  close();
-});
+    if (Date.now() - openedAt < 200) return;
+    close();
+  });
 
   return { open, close };
 })();
+
 // Выставляем панель настроек ровно под верхним тулбаром
 function layoutSettingsPanel() {
   const panel   = app.ui.settings;
@@ -2242,8 +2311,8 @@ if (app.ui.bg) {
   trap(app.ui.bg);
 }
 
-// ТЕКСТ — кастомная палитра только на Android
-if (app.ui.fg && isAndroid) {
+// ТЕКСТ — теперь тоже всегда через наш кастомный picker
+if (app.ui.fg) {
   trap(app.ui.fg);
 }
 
@@ -2649,6 +2718,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
