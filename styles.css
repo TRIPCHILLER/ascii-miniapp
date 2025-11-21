@@ -64,8 +64,8 @@ button, .btn, input[type="button"], input[type="submit"]{
 button:hover, .btn:hover,
 button:active, .btn:active,
 button:focus, .btn:focus{
-  background:transparent !important;
-  border:0 !important; outline:none !important; box-shadow:none !important;
+  background:transparent 
+  border:0; outline:none; box-shadow:none; 
 }
 
 /* ===== ПАНЕЛЬ ===== */
@@ -792,5 +792,6 @@ body.flash-front-ui input[type="range"]::-ms-thumb {
   margin-top:8px;
   margin-bottom:6px;
 }
+
 
 
