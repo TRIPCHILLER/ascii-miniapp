@@ -2224,20 +2224,27 @@ app.ui.bg.addEventListener('input', e => {
   }
 });
 
-// На Android перехватываем нативный color-picker и открываем наш
-if (/Android/i.test(navigator.userAgent)) {
-  
+// Перехватываем нативный color-picker и открываем наш кастомный:
+//
+// — для ФОНА (bg) на всех платформах (нужно ради "ПРОЗРАЧНЫЙ ФОН")
+// — для ТЕКСТА (fg) только на Android, чтобы на ПК остался системный пикер
 const trap = (el) => {
   el.addEventListener('click', (e) => {
-    if (el.disabled) return;   // не открываем модал, если заблокировано
+    if (el.disabled) return;      // не открываем модал, если заблокировано
     e.preventDefault();
     e.stopPropagation();
-    CP.open(el);
+    CP.open(el);                  // вызываем наш HSV-пикер с чекбоксом
   }, { passive:false });
 };
-  
-  if (app.ui.fg) trap(app.ui.fg);
-  if (app.ui.bg) trap(app.ui.bg);
+
+// ФОН — всегда кастомная палитра (ПК + мобилки)
+if (app.ui.bg) {
+  trap(app.ui.bg);
+}
+
+// ТЕКСТ — кастомная палитра только на Android
+if (app.ui.fg && isAndroid) {
+  trap(app.ui.fg);
 }
 
 // --- Кнопки режимов внизу (с приоритетным вызовом file picker) ---
@@ -2642,6 +2649,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
