@@ -61,11 +61,12 @@ button, .btn, input[type="button"], input[type="submit"]{
   padding:.55rem 1rem; border-radius:0; cursor:pointer;
   -webkit-tap-highlight-color:transparent;
 }
+
 button:hover, .btn:hover,
 button:active, .btn:active,
 button:focus, .btn:focus{
   background:transparent;
-  border:0; outline:none; box-shadow:none; 
+  border:0 !important; outline:none !important; box-shadow:none !important; 
 }
 
 /* ===== ПАНЕЛЬ ===== */
@@ -792,6 +793,7 @@ body.flash-front-ui input[type="range"]::-ms-thumb {
   margin-top:8px;
   margin-bottom:6px;
 }
+
 
 
 
