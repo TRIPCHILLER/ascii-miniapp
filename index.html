@@ -173,26 +173,44 @@
 <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
 <!-- Telegram WebApp API (нужно для MainButton) -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <!-- Custom Color Picker (Android override) -->
+  
+<!-- Custom Color Picker (универсальный) -->
 <div id="cp-modal" hidden>
   <div class="cp-backdrop"></div>
   <div class="cp-card">
 
-    <div class="cp-row">
-      <canvas id="cp-sv" width="220" height="190"></canvas>
-      <div class="cp-side">
-        <canvas id="cp-h" width="24" height="190"></canvas>
-        <div class="cp-preview"><span id="cp-preview-swatch"></span></div>
+    <!-- Вкладки -->
+    <div class="cp-tabs">
+      <button type="button" id="cp-tab-spectrum" class="cp-tab cp-tab-active">Спектр</button>
+      <button type="button" id="cp-tab-grid" class="cp-tab">Сетка</button>
+    </div>
+
+    <!-- Режим СПЕКТР (текущая палитра) -->
+    <div class="cp-body cp-body-spectrum" id="cp-body-spectrum">
+      <div class="cp-row">
+        <canvas id="cp-sv" width="220" height="190"></canvas>
+        <div class="cp-side">
+          <canvas id="cp-h" width="24" height="190"></canvas>
+          <div class="cp-preview">
+            <span id="cp-preview-swatch"></span>
+          </div>
+        </div>
       </div>
     </div>
-    
-<div class="cp-transparent-row" id="cp-transparent-row" hidden>
-  <label class="cp-transparent-check">
-    <input type="checkbox" id="cp-transparent" />
-    <span>ПРОЗРАЧНЫЙ ФОН</span>
-  </label>
-</div>
-    
+
+    <!-- Режим СЕТКА (готовые квадратики) -->
+    <div class="cp-body cp-body-grid" id="cp-body-grid" hidden>
+      <div id="cp-grid"></div>
+    </div>
+
+    <!-- Чекбокс ПРОЗРАЧНЫЙ ФОН (только для ФОНА в режиме фото) -->
+    <div class="cp-transparent-row" id="cp-transparent-row" hidden>
+      <label class="cp-transparent-check">
+        <input type="checkbox" id="cp-transparent" />
+        <span>ПРОЗРАЧНЫЙ ФОН</span>
+      </label>
+    </div>
+
     <div class="cp-actions">
       <button id="cp-cancel">ОТМЕНА</button>
       <button id="cp-ok">УСТАНОВИТЬ</button>
@@ -202,17 +220,3 @@
 <script defer src="ascii.js"></script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
