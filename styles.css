@@ -764,13 +764,17 @@ body.flash-front-ui input[type="range"]::-ms-thumb {
 }
 
 .cp-grid-swatch{
-  width:18px;
-  height:18px;
+  width:22px;
+  height:22px;
   border-radius:2px;
-  border:0;
   padding:0;
+  margin:0;
+  border:1px solid #000;        /* чёрная сетка вокруг квадратиков */
+  display:block;                /* чтобы точно занял всю область */
+  box-sizing:border-box;
   cursor:pointer;
   outline:none;
+  background-clip:padding-box;  /* цвет не «уползёт» под границу */
 }
 
 .cp-grid-swatch:focus-visible{
@@ -788,3 +792,4 @@ body.flash-front-ui input[type="range"]::-ms-thumb {
   margin-top:8px;
   margin-bottom:6px;
 }
+
