@@ -664,6 +664,13 @@ background:#fff; }
   opacity: .6;
 }
 
+/* + Сетка: приглушаем квадраты и блокируем клики, когда фон прозрачный */
+#cp-modal.cp-disabled #cp-grid .cp-grid-swatch{
+  filter: grayscale(1) brightness(.65);
+  opacity: .8;          /* лёгкое «затухание», как у айфона */
+  pointer-events: none; /* нельзя нажать на цвет, пока фон прозрачный */
+}
+
 /* === Оверлей таймера камеры === */
 #camTimerOverlay {
   position: absolute;
@@ -841,4 +848,5 @@ body.flash-front-ui input[type="range"]::-ms-thumb {
 #cp-grid{
   margin: 0 auto;
 }
+
 
