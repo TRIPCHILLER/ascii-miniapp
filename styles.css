@@ -825,17 +825,18 @@ body.flash-front-ui input[type="range"]::-ms-thumb {
   margin-bottom:6px;
 }
 
+/* === FIX: компактная карточка цветового пикера === */
+#cp-modal .cp-card{
+  width: auto;         /* не 92vw, а по содержимому */
+  max-width: 360px;    /* как на макете */
+}
 
+/* выравниваем контент по центру, чтобы не было ощущения полосы справа */
+#cp-modal .cp-row{
+  justify-content: center;
+}
 
-
-
-
-
-
-
-
-
-
-
-
-
+/* сетку тоже центруем внутри карточки */
+#cp-grid{
+  margin: 0 auto;
+}
