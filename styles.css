@@ -547,13 +547,11 @@ height:32px;
 border-radius:4px;
 background:#fff; }
 
-#cp-modal .cp-actions{ 
-margin-top:12px;
-display:flex;
-justify-content:space-between;
-gap:0;
-padding:0 16px;
+#cp-modal .cp-actions{
+  margin-top:12px;
+  display:flex;
 }
+
 
 #cp-modal .cp-actions button{
   color:#ffffff;
@@ -561,11 +559,13 @@ padding:0 16px;
   border:0;
   padding:.4rem .6rem;
   font-family:'BetterVCR', monospace;
-  font-size:14px;
+  font-size:14px;              /* тот же размер, что и у вкладок */
   text-transform:uppercase;
   letter-spacing:0.06em;
-}
 
+  flex:1 1 50%;                /* каждая кнопка занимает свою половину */
+  text-align:center;           /* текст ровно по центру своей половины */
+}
 
 /* === CAMERA SHUTTER (LIVE only) === */
 #camShutter{
@@ -824,6 +824,7 @@ body.flash-front-ui input[type="range"]::-ms-thumb {
   margin-top:8px;
   margin-bottom:6px;
 }
+
 
 
 
