@@ -541,7 +541,17 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 #cp-modal .cp-preview{ width:42px; height:42px; border:1px solid #444; border-radius:6px; display:flex; align-items:center; justify-content:center; }
 #cp-modal #cp-preview-swatch{ display:block; width:32px; height:32px; border-radius:4px; background:#fff; }
 #cp-modal .cp-actions{ margin-top:12px; display:flex; justify-content:flex-end; gap:16px; }
-#cp-modal .cp-actions button{ color:#ffffff; background:transparent; border:0; padding:.4rem .6rem; }
+#cp-modal .cp-actions button{
+  color:#ffffff;
+  background:transparent;
+  border:0;
+  padding:.4rem .6rem;
+  font-family:'BetterVCR', monospace;
+  font-size:18px;
+  text-transform:uppercase;
+  letter-spacing:0.06em;
+}
+
 
 /* === CAMERA SHUTTER (LIVE only) === */
 #camShutter{
@@ -793,6 +803,7 @@ body.flash-front-ui input[type="range"]::-ms-thumb {
   margin-top:8px;
   margin-bottom:6px;
 }
+
 
 
 
