@@ -2322,25 +2322,35 @@ app.ui.bg.addEventListener('input', e => {
 
 // Перехватываем нативный color-picker и открываем наш кастомный:
 //
-// — для ФОНА (bg) на всех платформах (нужно ради "ПРОЗРАЧНЫЙ ФОН")
-// — для ТЕКСТА (fg) только на Android, чтобы на ПК остался системный пикер
-const trap = (el) => {
-  el.addEventListener('click', (e) => {
-    if (el.disabled) return;      // не открываем модал, если заблокировано
+// — для ФОНА (bg) и ТЕКСТА (fg) всегда через нашу модалку
+// — клики ловим на label, а не на самом <input type="color">,
+//   чтобы iOS вообще не узнал, что это color-инпут.
+const trapColorInput = (inputEl) => {
+  if (!inputEl) return;
+
+  // Пытаемся найти родительский <label class="color">
+  const label = inputEl.closest('label') || inputEl;
+  label.addEventListener('click', (e) => {
+    // если инпут реально задизейблен — ничего не делаем
+    if (inputEl.disabled) return;
+
     e.preventDefault();
     e.stopPropagation();
-    CP.open(el);                  // вызываем наш HSV-пикер с чекбоксом
-  }, { passive:false });
+
+    // открываем кастомный picker именно для ИНПУТА,
+    // чтобы CP.open знал, кому потом писать .value
+    CP.open(inputEl);
+  }, { passive: false });
 };
 
-// ФОН — всегда кастомная палитра (ПК + мобилки)
+// ФОН — всегда через кастомную палитру (ПК + мобилки)
 if (app.ui.bg) {
-  trap(app.ui.bg);
+  trapColorInput(app.ui.bg);
 }
 
 // ТЕКСТ — теперь тоже всегда через наш кастомный picker
 if (app.ui.fg) {
-  trap(app.ui.fg);
+  trapColorInput(app.ui.fg);
 }
 
 // --- Кнопки режимов внизу (с приоритетным вызовом file picker) ---
@@ -2763,6 +2773,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
