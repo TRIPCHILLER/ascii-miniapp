@@ -849,4 +849,7 @@ body.flash-front-ui input[type="range"]::-ms-thumb {
   margin: 0 auto;
 }
 
-
+/* Полный запрет на вызов iOS color picker */
+input[type="color"] {
+  pointer-events: none !important;
+}
