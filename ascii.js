@@ -1043,12 +1043,12 @@ function snapAsciiPixels(ctx, W, H, fgHex, bgHex, transparentBg){
 
 // Рендер готового ASCII-текста в canvas для экспорта
 // Рендер ASCII-текста в canvas для экспорта — с сохранением исходного соотношения сторон
-function renderAsciiToCanvas(text, cols, rows, scale = 2){
+function renderAsciiToCanvas(text, cols, rows, scale = 2.5){
   const cvs = app.ui.render;
   const c = cvs.getContext('2d');
 
   const ff   = getComputedStyle(app.out).fontFamily || 'monospace';
-  const fsPx = 12;  // базовый размер для экспорта
+  const fsPx = 14;  // базовый размер для экспорта
   c.font = `${fsPx}px ${ff}`;
   c.textBaseline = 'top';
 
@@ -1104,7 +1104,7 @@ function savePNG(){
   const crop = getCropWindow();
   const text = cropAsciiText(full, crop);
 
-  renderAsciiToCanvas(text, crop.cols, crop.rows, 2);
+  renderAsciiToCanvas(text, crop.cols, crop.rows, 2.5);
   app.ui.render.toBlob(blob=>{
     if(!blob) { alert('Не удалось сгенерировать PNG'); return; }
     downloadBlob(blob, 'ascii_visor.png');
@@ -2773,6 +2773,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
