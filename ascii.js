@@ -987,6 +987,35 @@ async function ensureFFmpeg() {
   _ffLoaded = true;
   return { ff: _ff, fetchFile };
 }
+// Конвертация GIF → MP4 на клиенте через ffmpeg.wasm
+async function convertGifToMp4(file){
+  const { ff, fetchFile } = await ensureFFmpeg();
+
+  const inName  = 'gif_in.gif';
+  const outName = 'gif_out.mp4';
+
+  // подчистим остатки прошлых запусков
+  try { ff.FS('unlink', inName); } catch(e){}
+  try { ff.FS('unlink', outName); } catch(e){}
+
+  // кладём GIF в виртуальную ФС ffmpeg
+  ff.FS('writeFile', inName, await fetchFile(file));
+
+  // простая конвертация GIF → MP4 с нормальным плеем
+  await ff.run(
+    '-i', inName,
+    '-movflags', 'faststart',
+    '-pix_fmt', 'yuv420p',
+    '-c:v', 'libx264',
+    '-preset', 'veryfast',
+    '-crf', '18',
+    '-an',
+    outName
+  );
+
+  const data = ff.FS('readFile', outName);
+  return new Blob([data.buffer], { type: 'video/mp4' });
+}
 
 // ---------- EXPORT HELPERS (PNG/VIDEO) ----------
   function hexToRgb(hex){
@@ -2558,27 +2587,48 @@ app.ui.filePhoto.addEventListener('change', async (e) => {
 
 
 // --- Выбор видео из галереи (включая GIF как «видео») ---
-app.ui.fileVideo.addEventListener('change', async (e) => {
-  const f = e.target.files?.[0];
+fileVideo.addEventListener('change', async (e) => {
+  const original = e.target.files?.[0];
 
   // Ничего не выбрали → не трогаем текущий режим (live/photo/video)
-  if (!f) return;
+  if (!original) return;
 
   // Определяем, GIF ли это
-  const isGif = (f.type === 'image/gif') || /\.gif$/i.test(f.name || '');
+  const isGif = (original.type === 'image/gif') || /\.gif$/i.test(original.name || '');
 
-  // В любом случае — очищаем предыдущий GIF
+  // В любом случае — очищаем предыдущий GIF-состояние
   if (state.gifImage && state.gifImage.parentNode) {
     state.gifImage.parentNode.removeChild(state.gifImage);
   }
   state.gifImage = null;
-
   if (app._lastGifURL) {
     try { URL.revokeObjectURL(app._lastGifURL); } catch(_) {}
     app._lastGifURL = null;
   }
 
-  // Только после выбора файла реально переходим в режим ВИДЕО
+  // Файл, с которым реально будем работать как с ВИДЕО
+  let fileForVideo = original;
+
+  // Если это GIF — сначала конвертируем его в MP4
+  if (isGif) {
+    busyShow('Конвертация GIF → видео…');
+    try {
+      const mp4Blob = await convertGifToMp4(original);
+      fileForVideo = new File(
+        [mp4Blob],
+        (original.name || 'gif') + '.mp4',
+        { type: 'video/mp4' }
+      );
+    } catch (err) {
+      console.error('GIF→MP4 failed', err);
+      busyHide();
+      alert('Не удалось конвертировать GIF в видео.');
+      return;
+    }
+    busyHide();
+  }
+
+  // Только после выбора/подготовки файла реально переходим в режим ВИДЕО
   if (state.mode !== 'video') {
     updateModeTabs('video');
     await setMode('video');
@@ -2594,57 +2644,13 @@ app.ui.fileVideo.addEventListener('change', async (e) => {
   app.out.textContent = '';
   app.ui.placeholder.hidden = false;
 
-  // --- ВЕТКА GIF: грузим как <img>, но остаёмся в режиме ВИДЕО ---
-    if (isGif) {
-    // старый video-URL при GIF нам не нужен
-    if (app._lastVideoURL) {
-      try { URL.revokeObjectURL(app._lastVideoURL); } catch(_) {}
-      app._lastVideoURL = null;
-    }
-
-    const url = URL.createObjectURL(f);
-    app._lastGifURL = url;
-
-    const img = new Image();
-
-    // Делаем GIF «живым» для движка: вешаем в DOM, но далеко за экраном
-   img.style.position = 'absolute';
-  img.style.left = '0';
-  img.style.top = '0';
-  img.style.width = '1px';
-  img.style.height = '1px';
-  img.style.opacity = '0';
-  img.style.pointerEvents = 'none';
-  document.body.appendChild(img);
-
-    img.onload = () => {
-      state.gifImage = img;
-      state.mirror = false;
-      app.ui.placeholder.hidden = true;
-
-      const { w, h } = updateGridSize();
-      refitFont(w, h);
-      updateHud('gif onload');
-    };
-
-    img.onerror = () => {
-      if (img.parentNode) img.parentNode.removeChild(img);
-      state.gifImage = null;
-      app.ui.placeholder.hidden = false;
-      updateHud('gif error');
-    };
-
-    img.src = url;
-    return; // дальше обычный video-пайплайн уже НЕ нужен
-  }
-
   // --- Обычное видео (mp4 и т.п.) — старый рабочий код ниже ---
 
   // освобождаем старый blob, если был
   if (app._lastVideoURL) {
     try { URL.revokeObjectURL(app._lastVideoURL); } catch(_) {}
   }
-  const url = URL.createObjectURL(f);
+  const url = URL.createObjectURL(fileForVideo);
   app._lastVideoURL = url;
 
   // атрибуты автозапуска/зацикливания
@@ -2877,6 +2883,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
