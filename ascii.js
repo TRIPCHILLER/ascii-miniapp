@@ -204,6 +204,7 @@ let DITHER_ENABLED = true;
     camStream: null,
     camBlocked: false,
     imageEl: null,          // <img> для режима ФОТО
+    gifImage: null,
     isRecording: false,     // запись видео (экспорт)
     recorder: null,
     recordChunks: [],
@@ -603,8 +604,8 @@ function measureCharAspect() {
   return charW / charH; // W/H
 }
 // Универсальный источник кадра для всех режимов
-// Универсальный источник кадра для всех режимов (терпимо ждём видео)
 function currentSource(){
+  // Фото: обычный <img>
   if (state.mode === 'photo' && state.imageEl) {
     const el = state.imageEl;
     const w = el.naturalWidth || el.width || 1;
@@ -612,8 +613,20 @@ function currentSource(){
     updateHud(`src=img ${w}x${h}`);
     return { el, w, h, kind:'image' };
   }
+
+  // ВИДЕО + GIF: тоже берём <img>, но считаем это video-потоком
+  if (state.mode === 'video' && state.gifImage) {
+    const el = state.gifImage;
+    const w = el.naturalWidth || el.width || 1;
+    const h = el.naturalHeight || el.height || 1;
+    updateHud(`src=gif ${w}x${h}`);
+    return { el, w, h, kind:'gifvideo' };
+  }
+
+  // Обычное видео через <video>
   const v = app.vid;
   if (!v) return null;
+  
   // ждём реальные размеры, чтобы не рисовать мусор 2×2
   if (v.readyState >= 1 && v.videoWidth > 2 && v.videoHeight > 2) {
     updateHud(`src=vid ${v.videoWidth}x${v.videoHeight}`);
@@ -1776,8 +1789,21 @@ mainBtnHide();
   if (newMode !== 'photo') state.imageEl = null;
 
   // если уходим из VIDEO — убираем файл-источник (но не камеру)
+    // если уходим из VIDEO — убираем файл-источник (но не камеру)
   if (newMode !== 'video') {
-    try { if (app.vid && !app.vid.srcObject) { app.vid.pause?.(); app.vid.removeAttribute('src'); } } catch(e){}
+    try {
+      if (app.vid && !app.vid.srcObject) {
+        app.vid.pause?.();
+        app.vid.removeAttribute('src');
+      }
+    } catch(e){}
+
+    // чистим GIF-режим
+    state.gifImage = null;
+    if (app._lastGifURL) {
+      try { URL.revokeObjectURL(app._lastGifURL); } catch(_) {}
+      app._lastGifURL = null;
+    }
   }
 
   if (newMode === 'live') {
@@ -2514,12 +2540,22 @@ app.ui.filePhoto.addEventListener('change', async (e) => {
 });
 
 
-// --- Выбор видео из галереи (рабочий пайплайн + чистим ASCII до готовности)
+// --- Выбор видео из галереи (включая GIF как «видео») ---
 app.ui.fileVideo.addEventListener('change', async (e) => {
   const f = e.target.files?.[0];
 
   // Ничего не выбрали → не трогаем текущий режим (live/photo/video)
   if (!f) return;
+
+  // Определяем, GIF ли это
+  const isGif = (f.type === 'image/gif') || /\.gif$/i.test(f.name || '');
+
+  // В любом случае — очищаем предыдущий GIF
+  state.gifImage = null;
+  if (app._lastGifURL) {
+    try { URL.revokeObjectURL(app._lastGifURL); } catch(_) {}
+    app._lastGifURL = null;
+  }
 
   // Только после выбора файла реально переходим в режим ВИДЕО
   if (state.mode !== 'video') {
@@ -2527,15 +2563,48 @@ app.ui.fileVideo.addEventListener('change', async (e) => {
     await setMode('video');
   }
 
-  // остановим live (и любые старые источники) — пусть будет на всякий
+  // остановим live (и любые старые источники) — на всякий
   stopStream();
   try { app.vid.pause?.(); } catch(_) {}
   try { app.vid.removeAttribute('src'); } catch(_) {}
   app.vid.srcObject = null;
 
-  // пока видео не готово — убираем «застывший» кадр
+  // пока источник не готов — убираем «застывший» кадр
   app.out.textContent = '';
   app.ui.placeholder.hidden = false;
+
+  // --- ВЕТКА GIF: грузим как <img>, но остаёмся в режиме ВИДЕО ---
+  if (isGif) {
+    // старый video-URL при GIF нам не нужен
+    if (app._lastVideoURL) {
+      try { URL.revokeObjectURL(app._lastVideoURL); } catch(_) {}
+      app._lastVideoURL = null;
+    }
+
+    const url = URL.createObjectURL(f);
+    app._lastGifURL = url;
+
+    const img = new Image();
+    img.onload = () => {
+      state.gifImage = img;
+      state.mirror = false;
+      app.ui.placeholder.hidden = true;
+
+      const { w, h } = updateGridSize();
+      refitFont(w, h);
+      updateHud('gif onload');
+    };
+    img.onerror = () => {
+      state.gifImage = null;
+      app.ui.placeholder.hidden = false;
+      updateHud('gif error');
+    };
+
+    img.src = url;
+    return; // важное: дальше обычный video-пайплайн уже НЕ нужен
+  }
+
+  // --- Обычное видео (mp4 и т.п.) — старый рабочий код ниже ---
 
   // освобождаем старый blob, если был
   if (app._lastVideoURL) {
@@ -2773,6 +2842,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
