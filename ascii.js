@@ -2660,51 +2660,96 @@ app.ui.filePhoto.addEventListener('change', async (e) => {
 // === Подготовка GIF-кадров из gifuct-js ===
 function setupGifFromFrames(rawFrames) {
   if (!rawFrames || !rawFrames.length) {
-    state.gifFrames = null;
+    state.gifFrames   = null;
     state.gifDuration = 0;
     return;
   }
 
+  // 1) Определяем "глобальные" размеры всего GIF
+  let globalW = 0;
+  let globalH = 0;
+  for (const f of rawFrames) {
+    const d = f.dims || {};
+    const w = (d.width  || 0) + (d.left || 0);
+    const h = (d.height || 0) + (d.top  || 0);
+    if (w > globalW) globalW = w;
+    if (h > globalH) globalH = h;
+  }
+  if (!globalW || !globalH) {
+    // на всякий случай — fallback на первый кадр
+    const d0 = rawFrames[0].dims || {};
+    globalW = d0.width  || 1;
+    globalH = d0.height || 1;
+  }
+
   const frames = [];
   const delays = [];
+  let prevFullData = null; // Uint8ClampedArray для предыдущего полного кадра
 
   for (const f of rawFrames) {
     const dims = f.dims || {};
-    const w = dims.width  || 1;
-    const h = dims.height || 1;
+    const frameW = dims.width  || globalW;
+    const frameH = dims.height || globalH;
+    const left   = dims.left   || 0;
+    const top    = dims.top    || 0;
 
-    // rawDelay — то, что отдаёт библиотека
+    // --- задержка кадра ---
     let rawDelay = Number(f.delay) || 0;
-
-    // Защита от нулей
     if (rawDelay <= 0) rawDelay = 10;
-
-    // ⚠️ Нормализация:
-    // gifuct-js в большинстве сборок уже отдаёт задержку в МИЛЛИСЕКУНДАХ.
-    // Поэтому НИЧЕГО не умножаем на 10.
-    let delayMs = rawDelay;
-
-    // Минимальный интервал кадра (чтобы не было >60 fps и странных нулей)
-    if (delayMs < 16) delayMs = 16;   // ~60 fps
-    if (delayMs > 200) delayMs = 200; // ~5 fps
-
+    let delayMs = rawDelay;              // gifuct обычно даёт уже мс
+    if (delayMs < 16)  delayMs = 16;     // ~60 fps
+    if (delayMs > 200) delayMs = 200;    // ~5 fps
     delays.push(delayMs);
 
-    const patch = f.patch; // Uint8ClampedArray с RGBA
-    const data = (patch instanceof Uint8ClampedArray)
+    // --- patch текущего кадра ---
+    const patch = f.patch;
+    const patchData = (patch instanceof Uint8ClampedArray)
       ? patch
       : new Uint8ClampedArray(patch);
 
-    const imageData = new ImageData(data, w, h);
+    // Если patch уже полноразмерный и без смещения — можно использовать прямо его
+    const isFullFrame =
+      frameW === globalW &&
+      frameH === globalH &&
+      left   === 0 &&
+      top    === 0 &&
+      patchData.length === globalW * globalH * 4;
+
+    let fullData;
+
+    if (isFullFrame) {
+      fullData = patchData;
+    } else {
+      // Собираем полный кадр: копируем предыдущий и накладываем patch
+      fullData = new Uint8ClampedArray(globalW * globalH * 4);
+
+      if (prevFullData && prevFullData.length === fullData.length) {
+        fullData.set(prevFullData);
+      }
+
+      // Накладываем patch построчно с учётом left/top
+      for (let y = 0; y < frameH; y++) {
+        const srcRowStart = y * frameW * 4;
+        const dstRowStart = ((top + y) * globalW + left) * 4;
+
+        fullData.set(
+          patchData.subarray(srcRowStart, srcRowStart + frameW * 4),
+          dstRowStart
+        );
+      }
+    }
+
+    const imageData = new ImageData(fullData, globalW, globalH);
+    prevFullData = fullData; // запоминаем для следующего кадра
+
     frames.push({ delay: delayMs, imageData });
   }
 
-  // Возьмём медиану задержек, чтобы сгладить возможные выбросы
+  // Нормализуем задержки (медиана, как было)
   delays.sort((a, b) => a - b);
   const median = delays[Math.floor(delays.length / 2)] || 100;
-  const frameDelay = Math.min(200, Math.max(16, median)); // 16–200 мс
+  const frameDelay = Math.min(200, Math.max(16, median));
 
-  // Перезапишем delay всех кадров единым нормализованным значением
   let total = 0;
   for (const fr of frames) {
     fr.delay = frameDelay;
@@ -2712,7 +2757,7 @@ function setupGifFromFrames(rawFrames) {
   }
 
   state.gifFrames     = frames;
-  state.gifDuration   = total;        // полная длительность в мс
+  state.gifDuration   = total;
   state.gifFrameIndex = 0;
   state.gifTime       = 0;
   state._gifLastTs    = 0;
@@ -2722,13 +2767,11 @@ function setupGifFromFrames(rawFrames) {
     state.gifCtx    = state.gifCanvas.getContext('2d');
   }
 
-  // Нарисуем первый кадр сразу
   const fr0 = frames[0];
   state.gifCanvas.width  = fr0.imageData.width;
   state.gifCanvas.height = fr0.imageData.height;
   state.gifCtx.putImageData(fr0.imageData, 0, 0);
 
-  // Подгоним ASCII-сетку под размеры GIF
   const { w, h } = updateGridSize();
   refitFont(w, h);
   app.ui.placeholder.hidden = true;
@@ -3071,6 +3114,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
