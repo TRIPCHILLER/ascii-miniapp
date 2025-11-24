@@ -2608,12 +2608,14 @@ app.ui.fileVideo.addEventListener('change', async (e) => {
     const img = new Image();
 
     // Делаем GIF «живым» для движка: вешаем в DOM, но далеко за экраном
-    img.style.position = 'fixed';
-    img.style.left = '-99999px';
-    img.style.top = '-99999px';
-    img.style.opacity = '0';
-    img.style.pointerEvents = 'none';
-    document.body.appendChild(img);
+   img.style.position = 'absolute';
+  img.style.left = '0';
+  img.style.top = '0';
+  img.style.width = '1px';
+  img.style.height = '1px';
+  img.style.opacity = '0';
+  img.style.pointerEvents = 'none';
+  document.body.appendChild(img);
 
     img.onload = () => {
       state.gifImage = img;
@@ -2875,6 +2877,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
