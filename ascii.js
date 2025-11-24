@@ -1276,115 +1276,132 @@ c.fillRect(0, 0, d.W, d.H);
     c.fillText(lines[y], 0, y * d.stepY);  // без измерений/смещений — фиксированная сетка
   }
 }
-// Видео (режим ВИДЕО)
 function saveVideo(){
-  if (state.mode!=='video') { alert('Видео-экспорт доступен только в режиме ВИДЕО'); return; }
+  if (state.mode !== 'video') {
+    alert('Видео-экспорт доступен только в режиме ВИДЕО');
+    return;
+  }
+
   const fullNow = app.out.textContent || '';
-  if (!fullNow.trim()) { alert('Нечего сохранять'); return; }
-// зафиксируем «окно» кадрирования на момент старта записи
+  if (!fullNow.trim()) {
+    alert('Нечего сохранять');
+    return;
+  }
+
+  // фиксируем «окно» кадрирования на момент старта записи
   const crop = getCropWindow();
   state._recordCrop = crop;
+
   const mime = pickMime();
-  if (!mime) { alert('Запись видео не поддерживается на этом устройстве.'); return; }
-    // Фиксируем экспортный размер под текущую ASCII-сетку (соотв. исходнику)
+  if (!mime) {
+    alert('Запись видео не поддерживается на этом устройстве.');
+    return;
+  }
+
+  // Фиксируем экспортный размер под текущую ASCII-сетку
   const C = state._recordCrop;
   state.recordDims = computeRecordDims(C.cols, C.rows, 2);
-  // задать размер канваса заранее (до captureStream)
+
+  // задаём размер канваса заранее (до captureStream)
   app.ui.render.width  = state.recordDims.W;
   app.ui.render.height = state.recordDims.H;
-    // >>> На время записи выключаем loop, чтобы поймать 'ended'
-  const wasLoop = app.vid.loop === true;
-  app.vid.loop = false;
-  app.vid.removeAttribute('loop');
+
   const fps = Math.max(5, Math.min(60, state.fps));
   const stream = app.ui.render.captureStream(fps);
   state.recordChunks = [];
 
+  // создаём MediaRecorder с очень высоким битрейтом
+  let recorder;
   try {
-const bpp = 0.07; // эмпирически норм для «чистого» ASCII-видео
-const vbr = Math.round((state.recordDims?.W || 1280) * (state.recordDims?.H || 720) * fps * bpp);
-state.recorder = new MediaRecorder(stream, {
-  mimeType: mime,
-  videoBitsPerSecond: Math.max(4_000_000, Math.min(12_000_000, vbr))
-});
-  } catch(e) {
-    alert('MediaRecorder недоступен: ' + (e.message||e));
+    const bpp = 0.07; // эмпирически норм для «чистого» ASCII-видео
+    const vbr = Math.round(
+      (state.recordDims.W || 1280) *
+      (state.recordDims.H || 720) *
+      fps * bpp
+    );
+
+    recorder = new MediaRecorder(stream, {
+      mimeType: mime,
+      videoBitsPerSecond: Math.max(4_000_000, Math.min(20_000_000, vbr))
+    });
+  } catch (e) {
+    console.warn('MediaRecorder error:', e);
+    alert('Браузер не дал записать видео. Попробуй другой браузер или устройство.');
     return;
   }
 
-      state.recorder.ondataavailable = e => { if (e.data && e.data.size) state.recordChunks.push(e.data); };
-      state.recorder.onstop = async () => {
-      busyShow('Подготовка файла…');
-      const blob = new Blob(state.recordChunks, { type: mime });
+  state.recorder = recorder;
 
-  try {
-    if (mime.includes('mp4')) {
-      downloadBlob(blob, 'ascii_visor.mp4');
-    } else {
-      // WebM -> MP4 через ffmpeg.wasm
-      const { ff, fetchFile } = await ensureFFmpeg();
-      const inName  = 'in.webm';
-      const outName = 'out.mp4';
-
-      ff.FS('writeFile', inName, await fetchFile(blob));
-      await ff.run(
-  '-i', inName,
-  // ↓ фиксируем ЧАСТОТУ КАДРОВ ВЫХОДА под текущий fps из настроек
-  '-r', String(fps),
-  '-c:v', 'libx264',
-  '-pix_fmt', 'yuv420p',
-  '-movflags', 'faststart',
-  '-preset', 'veryfast',
-  '-crf', '18',
-  outName
-);
-      const data = ff.FS('readFile', outName);
-      const mp4Blob = new Blob([data.buffer], { type: 'video/mp4' });
-      downloadBlob(mp4Blob, 'ascii_visor.mp4');
-
-      try { ff.FS('unlink', inName); ff.FS('unlink', outName); } catch(e) {}
-    }
-  } catch (e) {
-console.warn('FFmpeg transcode failed:', e);
-const errMsg = (e && (e.message || e.name)) ? String(e.message || e.name) : 'unknown';
-hudSet('FFmpeg WARN: ' + errMsg);
-// Мягкий фолбэк: просто говорим, что отправляем файл и просим дождаться
-downloadBlob(blob, mime.includes('mp4') ? 'ascii_visor.mp4' : 'ascii_visor.webm');
-
-}
-
-  // восстановление state
-  if (wasLoop) {
-    app.vid.loop = true;
-    app.vid.setAttribute('loop','');
+  // временно отключаем loop у <video>, чтобы поймать ended
+  const wasLoop = !!(app.vid && app.vid.loop === true);
+  if (app.vid) {
+    try {
+      app.vid.loop = false;
+      app.vid.removeAttribute('loop');
+    } catch (_) {}
   }
-  state.isRecording = false;
-  state.recordDims = null;
-  hudSet('VIDEO: сохранено/отправлено');
-};
 
-  try { app.vid.currentTime = 0; } catch(e){}
-  app.vid.play?.();
-
-    state.isRecording = true;
-  busyShow('ЗАПИСЬ ASCII-ВИДЕ0…');
-  state.recorder.start(200);
-
-  const onEnded = () => {
-    try { state.recorder.stop(); } catch(e){}
-    if (app.vid && app._loopFallback) {
-      app.vid.removeEventListener('ended', app._loopFallback);
+  recorder.ondataavailable = (ev) => {
+    if (ev.data && ev.data.size) {
+      state.recordChunks.push(ev.data);
     }
   };
 
-  if (state.gifImage) {
-    // для GIF нет события ended – просто пишем фиксированное время
-    const GIF_DURATION_MS = 5000; // можешь поставить 3000 / 5000 по вкусу
+  recorder.onstop = async () => {
+    busyHide();
+
+    const blob = new Blob(state.recordChunks, { type: mime });
+    state.recordChunks = [];
+
+    const filename = mime.includes('mp4')
+      ? 'ascii_visor.mp4'
+      : 'ascii_visor.webm';
+
+    await downloadBlob(blob, filename);
+
+    // восстанавливаем loop у видео, если он был
+    if (app.vid && wasLoop) {
+      try {
+        app.vid.loop = true;
+        app.vid.setAttribute('loop','');
+      } catch (_) {}
+    }
+
+    state.isRecording = false;
+    state.recordDims = null;
+    hudSet('VIDEO: сохранено/отправлено');
+  };
+
+  // сбрасываем видео к началу и запускаем (для обычного видео)
+  if (app.vid && app.vid.readyState >= 2) {
+    try { app.vid.currentTime = 0; } catch (_) {}
+    try { app.vid.play?.(); } catch (_) {}
+  }
+
+  state.isRecording = true;
+  busyShow('ЗАПИСЬ ASCII-ВИДЕО…');
+  recorder.start(200);
+
+  const onEnded = () => {
+    try { recorder.stop(); } catch (_) {}
+  };
+
+  // источник — GIF или обычное видео?
+  const isGifSource = !!(state.gifFrames && state.gifFrames.length);
+
+  if (isGifSource) {
+    // Пишем ролик длиной ≈ полная длительность GIF (но не более 15 сек)
+    const totalMs = (state.gifDuration && state.gifDuration > 0)
+      ? state.gifDuration
+      : 5000;
+    const maxMs = 15000;
+    const dur = Math.min(totalMs, maxMs);
+
     setTimeout(() => {
       if (state.isRecording) onEnded();
-    }, GIF_DURATION_MS);
-  } else {
-    // обычное видео – останавливаем по окончанию файла
+    }, dur);
+  } else if (app.vid) {
+    // Обычное видео — останавливаем по окончанию файла
     app.vid.addEventListener('ended', onEnded, { once:true });
   }
 }
@@ -3003,6 +3020,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
