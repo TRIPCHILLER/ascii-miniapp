@@ -2860,10 +2860,16 @@ function doSave() {
     hudSet('PNG: экспорт…');
     savePNG();
 } else if (state.mode === 'video') {
-  if (!state.gifImage && (!app.vid || (!app.vid.src && !app.vid.srcObject))) {
+  // GIF-источник: есть расчитанные кадры
+  const hasGif   = !!(state.gifFrames && state.gifFrames.length);
+  // Обычное видео-источник: <video> с src или srcObject
+  const hasVideo = !!(app.vid && (app.vid.src || app.vid.srcObject));
+
+  if (!hasGif && !hasVideo) {
     alert('Нет выбранного видео.');
     return;
   }
+
   hudSet('VIDEO: запись… (дождитесь окончания)');
   saveVideo();
 }
@@ -3040,6 +3046,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
