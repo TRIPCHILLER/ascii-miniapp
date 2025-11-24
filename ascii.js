@@ -2666,16 +2666,29 @@ function setupGifFromFrames(rawFrames) {
   }
 
   const frames = [];
-  let total = 0;
+  const delays = [];
 
   for (const f of rawFrames) {
     const dims = f.dims || {};
     const w = dims.width  || 1;
     const h = dims.height || 1;
 
-    // delay в GIF обычно в 1/100 сек → переводим в миллисекунды
-    const delay = Math.max(10, (f.delay || 10) * 10);
-    total += delay;
+    // rawDelay — то, что отдаёт библиотека
+    let rawDelay = Number(f.delay) || 0;
+
+    // Защита от нулей
+    if (rawDelay <= 0) rawDelay = 10;
+
+    // ⚠️ Нормализация:
+    // gifuct-js в большинстве сборок уже отдаёт задержку в МИЛЛИСЕКУНДАХ.
+    // Поэтому НИЧЕГО не умножаем на 10.
+    let delayMs = rawDelay;
+
+    // Минимальный интервал кадра (чтобы не было >60 fps и странных нулей)
+    if (delayMs < 16) delayMs = 16;   // ~60 fps
+    if (delayMs > 200) delayMs = 200; // ~5 fps
+
+    delays.push(delayMs);
 
     const patch = f.patch; // Uint8ClampedArray с RGBA
     const data = (patch instanceof Uint8ClampedArray)
@@ -2683,11 +2696,23 @@ function setupGifFromFrames(rawFrames) {
       : new Uint8ClampedArray(patch);
 
     const imageData = new ImageData(data, w, h);
-    frames.push({ delay, imageData });
+    frames.push({ delay: delayMs, imageData });
   }
 
-  state.gifFrames    = frames;
-  state.gifDuration  = total;
+  // Возьмём медиану задержек, чтобы сгладить возможные выбросы
+  delays.sort((a, b) => a - b);
+  const median = delays[Math.floor(delays.length / 2)] || 100;
+  const frameDelay = Math.min(200, Math.max(16, median)); // 16–200 мс
+
+  // Перезапишем delay всех кадров единым нормализованным значением
+  let total = 0;
+  for (const fr of frames) {
+    fr.delay = frameDelay;
+    total += frameDelay;
+  }
+
+  state.gifFrames     = frames;
+  state.gifDuration   = total;        // полная длительность в мс
   state.gifFrameIndex = 0;
   state.gifTime       = 0;
   state._gifLastTs    = 0;
@@ -3046,6 +3071,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
