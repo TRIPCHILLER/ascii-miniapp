@@ -2751,20 +2751,36 @@ fileVideo.addEventListener('change', async (e) => {
   app.ui.placeholder.hidden = false;
 
   if (isGif) {
-    // ====== ВЕТКА GIF: парсим в кадры через gifuct-js ======
+    
+        // ====== ВЕТКА GIF: парсим в кадры через gifuct-js / GIF ======
     try {
       const buf = await original.arrayBuffer();
 
-      const gifLib = window.gifuct || window.gifuctJs || window;
-      const parseGIF         = gifLib.parseGIF;
-      const decompressFrames = gifLib.decompressFrames;
+      let frames = null;
 
-      if (typeof parseGIF !== 'function' || typeof decompressFrames !== 'function') {
-        throw new Error('gifuct-js не найден (parseGIF/decompressFrames отсутствуют)');
+      // 1) Пытаемся использовать современный API parseGIF / decompressFrames
+      try {
+        const gifLib = window.gifuct || window.gifuctJs || window;
+        const parseGIF         = gifLib && gifLib.parseGIF;
+        const decompressFrames = gifLib && gifLib.decompressFrames;
+
+        if (typeof parseGIF === 'function' && typeof decompressFrames === 'function') {
+          const gifParsed = parseGIF(buf);
+          frames = decompressFrames(gifParsed, true); // true = собрать RGBA patch
+        }
+      } catch (_) {
+        // молча переходим к fallback'у
       }
 
-      const gif    = parseGIF(buf);
-      const frames = decompressFrames(gif, true); // true = собрать RGBA patch
+      // 2) Fallback для старой версии: глобальный конструктор window.GIF
+      if (!frames || !frames.length) {
+        const GIF = window.GIF;
+        if (typeof GIF !== 'function') {
+          throw new Error('gifuct-js не найден ни как parseGIF/decompressFrames, ни как window.GIF');
+        }
+        const gifObj = new GIF(buf);
+        frames = gifObj.decompressFrames(true); // true = собрать RGBA patch
+      }
 
       if (!frames || !frames.length) {
         throw new Error('GIF не содержит кадров');
@@ -2774,13 +2790,17 @@ fileVideo.addEventListener('change', async (e) => {
       state.mirror = false; // GIF не зеркалим
     } catch (err) {
       console.error('GIF decode failed', err);
-      showErrorPopup?.('Н̷Е̷ ̵У̵Д̷А̴Л̵О̶С̸Ь ̶П̴Р̶О̸Ч̵Е̵С̷Т̶Ь ̴GIF', String(err && err.message || err) || 'неизвестная ошибка');
+      showErrorPopup?.(
+        'Н̷Е̷ ̵У̵Д̷А̴Л̵О̶С̸Ь ̶П̴Р̶О̸Ч̵Е̵С̷Т̶Ь ̴GIF',
+        String(err && (err.message || err.name) || err || 'неизвестная ошибка')
+      );
       app.ui.placeholder.hidden = false;
       state.gifFrames = null;
-      return;
+      return; // при ошибке сразу выходим из обработчика
     }
 
-    return; // дальше видео-ветка не нужна
+    // GIF успешно разобран → выходим, НЕ идём в ветку обычного видео
+    return;
   }
 
   // ====== ВЕТКА ОБЫЧНОГО ВИДЕО (mp4, webm и т.п.) ======
@@ -3020,6 +3040,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
