@@ -973,7 +973,7 @@ async function ensureFFmpeg() {
   const { createFFmpeg, fetchFile } = FFmpeg;
   _ff = createFFmpeg({
     log: false, // поставь true, если хочешь логи в консоль
-    corePath: 'https://unpkg.com/@ffmpeg/core@0.11.6/dist/ffmpeg-core.js'
+    corePath: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js'
   });
 
   try {
@@ -2883,6 +2883,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
