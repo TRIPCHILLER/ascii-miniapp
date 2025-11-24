@@ -204,7 +204,17 @@ let DITHER_ENABLED = true;
     camStream: null,
     camBlocked: false,
     imageEl: null,          // <img> для режима ФОТО
-    gifImage: null,
+    
+      // ===== GIF-анимация без видео-тегов =====
+    gifImage: null,         // (оставляем на всякий, но больше не используем)
+    gifFrames: null,        // массив { delay, imageData }
+    gifDuration: 0,         // полная длительность GIF в мс
+    gifFrameIndex: 0,       // текущий индекс кадра
+    gifTime: 0,             // накапливаем время внутри цикла
+    gifCanvas: null,        // offscreen-canvas для текущего кадра
+    gifCtx: null,           // контекст для gifCanvas
+    _gifLastTs: 0,          // последний ts из loop()
+    
     isRecording: false,     // запись видео (экспорт)
     recorder: null,
     recordChunks: [],
@@ -378,6 +388,9 @@ function isFullscreenLike() {
   // Вспомогательные канвасы
   const off = document.createElement('canvas');
   const ctx = off.getContext('2d', { willReadFrequently: true });
+// Отдельный canvas под GIF-кадры
+state.gifCanvas = document.createElement('canvas');
+state.gifCtx    = state.gifCanvas.getContext('2d');
 
   // ==== measurePre + applyFontStack (замена) ====
 const measurePre = document.createElement('pre');
@@ -614,11 +627,11 @@ function currentSource(){
     return { el, w, h, kind:'image' };
   }
 
-  // ВИДЕО + GIF: тоже берём <img>, но считаем это video-потоком
-  if (state.mode === 'video' && state.gifImage) {
-    const el = state.gifImage;
-    const w = el.naturalWidth || el.width || 1;
-    const h = el.naturalHeight || el.height || 1;
+  // ВИДЕО + GIF: берём offscreen-canvas с текущим кадром
+  if (state.mode === 'video' && state.gifFrames && state.gifCanvas && state.gifFrames.length) {
+    const el = state.gifCanvas;
+    const w = el.width  || 1;
+    const h = el.height || 1;
     updateHud(`src=gif ${w}x${h}`);
     return { el, w, h, kind:'gifvideo' };
   }
@@ -853,6 +866,46 @@ if (isMobile && state.mode === 'live') {
   state.lastGrid = { w, h };
   return { w, h };
 }
+// Обновление текущего кадра GIF по времени ts
+function updateGifFrame(ts) {
+  if (state.mode !== 'video') return;
+  if (!state.gifFrames || !state.gifFrames.length) return;
+  if (!state.gifCanvas || !state.gifCtx) return;
+
+  if (!state._gifLastTs) state._gifLastTs = ts;
+  const dt = ts - state._gifLastTs;
+  state._gifLastTs = ts;
+
+  state.gifTime = (state.gifTime || 0) + dt;
+
+  const total = state.gifDuration || 0;
+  if (total <= 0) return;
+
+  const frames = state.gifFrames;
+  let t = state.gifTime % total;
+  let acc = 0;
+  let idx = 0;
+
+  for (let i = 0; i < frames.length; i++) {
+    acc += frames[i].delay;
+    if (t < acc) { idx = i; break; }
+  }
+
+  if (idx === state.gifFrameIndex && state.gifCanvas.width) {
+    return; // кадр не сменился — ничего не перерисовываем
+  }
+
+  state.gifFrameIndex = idx;
+  const fr = frames[idx];
+  const W = fr.imageData.width;
+  const H = fr.imageData.height;
+
+  if (state.gifCanvas.width !== W || state.gifCanvas.height !== H) {
+    state.gifCanvas.width  = W;
+    state.gifCanvas.height = H;
+  }
+  state.gifCtx.putImageData(fr.imageData, 0, 0);
+}
 
   function loop(ts) {
     raf = requestAnimationFrame(loop);
@@ -861,6 +914,8 @@ if (isMobile && state.mode === 'live') {
     const frameInterval = 1000 / state.fps;
     if (ts - lastFrameTime < frameInterval) return;
     lastFrameTime = ts;
+    // если активен GIF — обновляем его кадр
+    updateGifFrame(ts);
 
     const src = currentSource();
     if (!src) return;
@@ -2585,6 +2640,57 @@ app.ui.filePhoto.addEventListener('change', async (e) => {
   app._lastImageURL = urlImg;
 });
 
+// === Подготовка GIF-кадров из gifuct-js ===
+function setupGifFromFrames(rawFrames) {
+  if (!rawFrames || !rawFrames.length) {
+    state.gifFrames = null;
+    state.gifDuration = 0;
+    return;
+  }
+
+  const frames = [];
+  let total = 0;
+
+  for (const f of rawFrames) {
+    const dims = f.dims || {};
+    const w = dims.width  || 1;
+    const h = dims.height || 1;
+
+    // delay в GIF обычно в 1/100 сек → переводим в миллисекунды
+    const delay = Math.max(10, (f.delay || 10) * 10);
+    total += delay;
+
+    const patch = f.patch; // Uint8ClampedArray с RGBA
+    const data = (patch instanceof Uint8ClampedArray)
+      ? patch
+      : new Uint8ClampedArray(patch);
+
+    const imageData = new ImageData(data, w, h);
+    frames.push({ delay, imageData });
+  }
+
+  state.gifFrames    = frames;
+  state.gifDuration  = total;
+  state.gifFrameIndex = 0;
+  state.gifTime       = 0;
+  state._gifLastTs    = 0;
+
+  if (!state.gifCanvas) {
+    state.gifCanvas = document.createElement('canvas');
+    state.gifCtx    = state.gifCanvas.getContext('2d');
+  }
+
+  // Нарисуем первый кадр сразу
+  const fr0 = frames[0];
+  state.gifCanvas.width  = fr0.imageData.width;
+  state.gifCanvas.height = fr0.imageData.height;
+  state.gifCtx.putImageData(fr0.imageData, 0, 0);
+
+  // Подгоним ASCII-сетку под размеры GIF
+  const { w, h } = updateGridSize();
+  refitFont(w, h);
+  app.ui.placeholder.hidden = true;
+}
 
 // --- Выбор видео из галереи (включая GIF как «видео») ---
 fileVideo.addEventListener('change', async (e) => {
@@ -2593,64 +2699,81 @@ fileVideo.addEventListener('change', async (e) => {
   // Ничего не выбрали → не трогаем текущий режим (live/photo/video)
   if (!original) return;
 
-  // Определяем, GIF ли это
   const isGif = (original.type === 'image/gif') || /\.gif$/i.test(original.name || '');
 
-  // В любом случае — очищаем предыдущий GIF-состояние
+  // В любом случае — очищаем предыдущее GIF-состояние
+  state.gifFrames   = null;
+  state.gifDuration = 0;
+  state.gifFrameIndex = 0;
+  state.gifTime       = 0;
+  state._gifLastTs    = 0;
+
   if (state.gifImage && state.gifImage.parentNode) {
     state.gifImage.parentNode.removeChild(state.gifImage);
   }
   state.gifImage = null;
+
   if (app._lastGifURL) {
     try { URL.revokeObjectURL(app._lastGifURL); } catch(_) {}
     app._lastGifURL = null;
   }
 
-  // Файл, с которым реально будем работать как с ВИДЕО
-  let fileForVideo = original;
-
-  // Если это GIF — сначала конвертируем его в MP4
-  if (isGif) {
-    busyShow('Конвертация GIF → видео…');
-    try {
-      const mp4Blob = await convertGifToMp4(original);
-      fileForVideo = new File(
-        [mp4Blob],
-        (original.name || 'gif') + '.mp4',
-        { type: 'video/mp4' }
-      );
-    } catch (err) {
-      console.error('GIF→MP4 failed', err);
-      busyHide();
-      alert('Не удалось конвертировать GIF в видео.');
-      return;
-    }
-    busyHide();
-  }
-
-  // Только после выбора/подготовки файла реально переходим в режим ВИДЕО
+  // Всегда переключаемся в режим ВИДЕО только ПОСЛЕ выбора файла
   if (state.mode !== 'video') {
     updateModeTabs('video');
     await setMode('video');
   }
 
-  // остановим live (и любые старые источники) — на всякий
+  // На всякий — глушим камеру и старые источники
   stopStream();
   try { app.vid.pause?.(); } catch(_) {}
   try { app.vid.removeAttribute('src'); } catch(_) {}
   app.vid.srcObject = null;
 
-  // пока источник не готов — убираем «застывший» кадр
   app.out.textContent = '';
   app.ui.placeholder.hidden = false;
 
-  // --- Обычное видео (mp4 и т.п.) — старый рабочий код ниже ---
+  if (isGif) {
+    // ====== ВЕТКА GIF: парсим в кадры через gifuct-js ======
+    try {
+      const buf = await original.arrayBuffer();
+
+      const gifLib = window.gifuct || window.gifuctJs || window;
+      const parseGIF         = gifLib.parseGIF;
+      const decompressFrames = gifLib.decompressFrames;
+
+      if (typeof parseGIF !== 'function' || typeof decompressFrames !== 'function') {
+        throw new Error('gifuct-js не найден (parseGIF/decompressFrames отсутствуют)');
+      }
+
+      const gif    = parseGIF(buf);
+      const frames = decompressFrames(gif, true); // true = собрать RGBA patch
+
+      if (!frames || !frames.length) {
+        throw new Error('GIF не содержит кадров');
+      }
+
+      setupGifFromFrames(frames);
+      state.mirror = false; // GIF не зеркалим
+    } catch (err) {
+      console.error('GIF decode failed', err);
+      showErrorPopup?.('Н̷Е̷ ̵У̵Д̷А̴Л̵О̶С̸Ь ̶П̴Р̶О̸Ч̵Е̵С̷Т̶Ь ̴GIF', String(err && err.message || err) || 'неизвестная ошибка');
+      app.ui.placeholder.hidden = false;
+      state.gifFrames = null;
+      return;
+    }
+
+    return; // дальше видео-ветка не нужна
+  }
+
+  // ====== ВЕТКА ОБЫЧНОГО ВИДЕО (mp4, webm и т.п.) ======
 
   // освобождаем старый blob, если был
   if (app._lastVideoURL) {
     try { URL.revokeObjectURL(app._lastVideoURL); } catch(_) {}
   }
-  const url = URL.createObjectURL(fileForVideo);
+
+  const url = URL.createObjectURL(original);
   app._lastVideoURL = url;
 
   // атрибуты автозапуска/зацикливания
@@ -2672,7 +2795,6 @@ fileVideo.addEventListener('change', async (e) => {
   };
   app.vid.addEventListener('ended', app._loopFallback);
 
-  // как только метаданные есть — прячем плейсхолдер, подгоняем сетку
   app.vid.onloadedmetadata = () => {
     if (app.vid.videoWidth > 0 && app.vid.videoHeight > 0) {
       app.ui.placeholder.hidden = true;
@@ -2689,12 +2811,10 @@ fileVideo.addEventListener('change', async (e) => {
     });
   };
 
-  // подключаем источник и стартуем
   app.vid.src = url;
   try { await app.vid.play?.(); } catch(_) {}
 
-  // видео — не зеркалим
-  state.mirror = false;
+  state.mirror = false; // видео не зеркалим
 });
 
 // --- ЕДИНАЯ функция сохранения ---
@@ -2883,6 +3003,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
