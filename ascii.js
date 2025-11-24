@@ -1282,16 +1282,29 @@ downloadBlob(blob, mime.includes('mp4') ? 'ascii_visor.mp4' : 'ascii_visor.webm'
   try { app.vid.currentTime = 0; } catch(e){}
   app.vid.play?.();
 
-  state.isRecording = true;
+    state.isRecording = true;
   busyShow('ЗАПИСЬ ASCII-ВИДЕ0…');
   state.recorder.start(200);
 
   const onEnded = () => {
     try { state.recorder.stop(); } catch(e){}
-    app.vid.removeEventListener('ended', onEnded);
+    if (app.vid && app._loopFallback) {
+      app.vid.removeEventListener('ended', app._loopFallback);
+    }
   };
-  app.vid.addEventListener('ended', onEnded, { once:true });
+
+  if (state.gifImage) {
+    // для GIF нет события ended – просто пишем фиксированное время
+    const GIF_DURATION_MS = 5000; // можешь поставить 3000 / 5000 по вкусу
+    setTimeout(() => {
+      if (state.isRecording) onEnded();
+    }, GIF_DURATION_MS);
+  } else {
+    // обычное видео – останавливаем по окончанию файла
+    app.vid.addEventListener('ended', onEnded, { once:true });
+  }
 }
+  
 let uploadInFlight = false;
 
 // Универсальная отправка: в Telegram → на сервер; иначе → локальная загрузка
@@ -2662,14 +2675,15 @@ function doSave() {
   if (state.mode === 'photo') {
     hudSet('PNG: экспорт…');
     savePNG();
-  } else if (state.mode === 'video') {
-    if (!app.vid || (!app.vid.src && !app.vid.srcObject)) {
-      alert('Нет выбранного видео.');
-      return;
-    }
-    hudSet('VIDEO: запись… (дождитесь окончания)');
-    saveVideo();
+} else if (state.mode === 'video') {
+  if (!state.gifImage && (!app.vid || (!app.vid.src && !app.vid.srcObject))) {
+    alert('Нет выбранного видео.');
+    return;
   }
+  hudSet('VIDEO: запись… (дождитесь окончания)');
+  saveVideo();
+}
+
 }
 
 // Кнопка в тулбаре
@@ -2842,6 +2856,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
