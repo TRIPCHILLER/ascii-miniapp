@@ -1803,7 +1803,7 @@ mainBtnHide();
 
   // если уходим из VIDEO — убираем файл-источник (но не камеру)
     // если уходим из VIDEO — убираем файл-источник (но не камеру)
-  if (newMode !== 'video') {
+    if (newMode !== 'video') {
     try {
       if (app.vid && !app.vid.srcObject) {
         app.vid.pause?.();
@@ -1811,8 +1811,12 @@ mainBtnHide();
       }
     } catch(e){}
 
-    // чистим GIF-режим
+    // чистим GIF-режим: убираем картинку и из DOM, и из state
+    if (state.gifImage && state.gifImage.parentNode) {
+      state.gifImage.parentNode.removeChild(state.gifImage);
+    }
     state.gifImage = null;
+
     if (app._lastGifURL) {
       try { URL.revokeObjectURL(app._lastGifURL); } catch(_) {}
       app._lastGifURL = null;
@@ -2564,7 +2568,11 @@ app.ui.fileVideo.addEventListener('change', async (e) => {
   const isGif = (f.type === 'image/gif') || /\.gif$/i.test(f.name || '');
 
   // В любом случае — очищаем предыдущий GIF
+  if (state.gifImage && state.gifImage.parentNode) {
+    state.gifImage.parentNode.removeChild(state.gifImage);
+  }
   state.gifImage = null;
+
   if (app._lastGifURL) {
     try { URL.revokeObjectURL(app._lastGifURL); } catch(_) {}
     app._lastGifURL = null;
@@ -2587,7 +2595,7 @@ app.ui.fileVideo.addEventListener('change', async (e) => {
   app.ui.placeholder.hidden = false;
 
   // --- ВЕТКА GIF: грузим как <img>, но остаёмся в режиме ВИДЕО ---
-  if (isGif) {
+    if (isGif) {
     // старый video-URL при GIF нам не нужен
     if (app._lastVideoURL) {
       try { URL.revokeObjectURL(app._lastVideoURL); } catch(_) {}
@@ -2598,6 +2606,15 @@ app.ui.fileVideo.addEventListener('change', async (e) => {
     app._lastGifURL = url;
 
     const img = new Image();
+
+    // Делаем GIF «живым» для движка: вешаем в DOM, но далеко за экраном
+    img.style.position = 'fixed';
+    img.style.left = '-99999px';
+    img.style.top = '-99999px';
+    img.style.opacity = '0';
+    img.style.pointerEvents = 'none';
+    document.body.appendChild(img);
+
     img.onload = () => {
       state.gifImage = img;
       state.mirror = false;
@@ -2607,14 +2624,16 @@ app.ui.fileVideo.addEventListener('change', async (e) => {
       refitFont(w, h);
       updateHud('gif onload');
     };
+
     img.onerror = () => {
+      if (img.parentNode) img.parentNode.removeChild(img);
       state.gifImage = null;
       app.ui.placeholder.hidden = false;
       updateHud('gif error');
     };
 
     img.src = url;
-    return; // важное: дальше обычный video-пайплайн уже НЕ нужен
+    return; // дальше обычный video-пайплайн уже НЕ нужен
   }
 
   // --- Обычное видео (mp4 и т.п.) — старый рабочий код ниже ---
@@ -2856,6 +2875,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
