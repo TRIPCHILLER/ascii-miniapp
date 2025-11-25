@@ -28,8 +28,18 @@ function hudSet(txt){ /* HUD отключен */ }
 let busyLock = false; // <— не даём спрятать overlay, пока true
 
 function busyShow(msg){
-  if (app.ui.busyText) app.ui.busyText.textContent = msg || 'Пожалуйста, подождите…';
-  if (app.ui.busy) app.ui.busy.hidden = false;
+  // как только показываем рендер/аплоад-оверлей — сразу прячем панель настроек,
+  // чтобы она не нависала над логотипом и блюром
+  if (app?.ui?.settings) {
+    app.ui.settings.setAttribute('hidden', '');
+  }
+
+  if (app.ui.busyText) {
+    app.ui.busyText.textContent = msg || 'Пожалуйста, подождите…';
+  }
+  if (app.ui.busy) {
+    app.ui.busy.hidden = false;
+  }
 }
 
 function busyHide(force = false){
@@ -3114,6 +3124,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
