@@ -412,9 +412,20 @@ body, .toolbar, .panel, .btn, label, output, select, option {
     font-size: 14px;
   }
 
-  /* Кнопки и панель */
-  .toolbar { gap: 6px; padding: 6px; flex-wrap: wrap; }
-  .btn { padding: .4rem .6rem; }
+  /* Кнопки и панель (мобилка — всё в одну строку) */
+  .toolbar {
+    gap: 4px;
+    padding: 4px;
+    flex-wrap: nowrap;              /* запрещаем перенос */
+  }
+
+  /* Ужимаем только верхние кнопки */
+  .toolbar .btn {
+    padding: .30rem .35rem;         /* меньше горизонтальные отступы */
+    font-size: 13px;                /* чуть меньше кегль, чтобы “С0ХР4НИТЬ” влезло */
+    letter-spacing: 0.04em;         /* немного меньше разрядка */
+  }
+
   .panel { gap: 8px; padding: 6px; }
   .panel label { gap: 6px; padding: 4px 6px; }
 
@@ -853,3 +864,4 @@ body.flash-front-ui input[type="range"]::-ms-thumb {
 input[type="color"] {
   pointer-events: none !important;
 }
+
