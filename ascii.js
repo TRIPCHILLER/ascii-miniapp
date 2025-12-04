@@ -1803,10 +1803,9 @@ function updateMirrorForFacing() {
 function stopStream(){
   try {
     const s = state.camStream;
-    if (s) {
-      s.getTracks().forEach(t => { try { t.stop(); } catch(_){} });
-    }
-    state.camStream = null;
+    // Не убиваем треки и не чистим state.camStream —
+    // просто отвязываем поток от <video>, чтобы при повторном
+    // входе в КАМЕРУ не запрашивать разрешение заново в рамках сессии.
     if (app.vid) {
       app.vid.pause?.();
       app.vid.srcObject = null;
@@ -3124,6 +3123,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
