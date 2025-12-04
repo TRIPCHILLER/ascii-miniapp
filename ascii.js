@@ -228,9 +228,11 @@ let DITHER_ENABLED = true;
     isRecording: false,     // запись видео (экспорт)
     recorder: null,
     recordChunks: [],
-    recordDims: null,       // <— фиксированные размеры экспортного видео (W/H/шаги)
+        recordDims: null,       // <— фиксированные размеры экспортного видео (W/H/шаги)
     lastGrid: { w:0, h:0 }, // запоминаем сетку для экспорта
     viewScale: 1,           // доп. масштаб ASCII внутри #stage
+    viewX: 0.5,             // центр «окна» по X (0..1)
+    viewY: 0.5,             // центр «окна» по Y (0..1)
     flashEnabled: false,
     timerSeconds: 0,
   };
@@ -1586,8 +1588,10 @@ function fitAsciiToViewport(){
   const stage = app.stage;
   if (!out || !stage) return;
 
-  // 1. Сбрасываем transform, чтобы узнать реальный размер ASCII-блока
+  // 1. Сбрасываем transform/позицию, чтобы узнать реальный размер ASCII-блока
   out.style.transform = 'translate(-50%, -50%) scale(1)';
+  out.style.left = '50%';
+  out.style.top  = '50%';
 
   // 2. Реальные размеры pre c ASCII
   const w = out.scrollWidth;
@@ -1599,6 +1603,8 @@ function fitAsciiToViewport(){
 
   if (!w || !h || !W || !H) {
     out.style.transform = 'translate(-50%, -50%) scale(1)';
+    out.style.left = '50%';
+    out.style.top  = '50%';
     return;
   }
 
@@ -1608,6 +1614,17 @@ function fitAsciiToViewport(){
   // 5. Применяем базовый масштаб + пользовательский зум
   const base = S * (state.viewScale || 1);
 
+  // 6. Дополнительный сдвиг в зависимости от центра «окна» (viewX/viewY)
+  const vx = (typeof state.viewX === 'number') ? state.viewX : 0.5;
+  const vy = (typeof state.viewY === 'number') ? state.viewY : 0.5;
+
+  // dx/dy — смещение центра ASCII относительно центра сцены в пикселях
+  const dxPx = (0.5 - vx) * w * base;
+  const dyPx = (0.5 - vy) * h * base;
+
+  // Двигаем сам #out, а transform оставляем центрирующим
+  out.style.left = `calc(50% + ${dxPx}px)`;
+  out.style.top  = `calc(50% + ${dyPx}px)`;
   out.style.transform = `translate(-50%, -50%) scale(${base})`;
 }
 
@@ -1616,15 +1633,42 @@ function getCropWindow() {
   const grid = state.lastGrid || { w: 1, h: 1 };
   const scale = Math.max(1, state.viewScale || 1);
 
+  const totalCols = Math.max(1, grid.w || 1);
+  const totalRows = Math.max(1, grid.h || 1);
+
   // сколько колонок/строк реально попадает в «экран» при текущем зуме
-  const cols = Math.max(1, Math.round(grid.w / scale));
-  const rows = Math.max(1, Math.round(grid.h / scale));
+  const cols = Math.max(1, Math.round(totalCols / scale));
+  const rows = Math.max(1, Math.round(totalRows / scale));
 
-  // центрируем «окно» (как у тебя на сцене — out центрирован)
-  const col0 = Math.max(0, Math.floor((grid.w - cols) / 2));
-  const row0 = Math.max(0, Math.floor((grid.h - rows) / 2));
+  // текущий центр «окна» в нормированных координатах (0..1)
+  let vx = (typeof state.viewX === 'number') ? state.viewX : 0.5;
+  let vy = (typeof state.viewY === 'number') ? state.viewY : 0.5;
 
-  return { col0, row0, cols, rows, totalCols: grid.w, totalRows: grid.h };
+  // превращаем в центр окна в индексах символов
+  let centerCol = vx * totalCols;
+  let centerRow = vy * totalRows;
+
+  let col0 = Math.round(centerCol - cols / 2);
+  let row0 = Math.round(centerRow - rows / 2);
+
+  const maxCol0 = totalCols - cols;
+  const maxRow0 = totalRows - rows;
+
+  if (maxCol0 <= 0) {
+    col0 = 0;
+  } else {
+    if (col0 < 0) col0 = 0;
+    else if (col0 > maxCol0) col0 = maxCol0;
+  }
+
+  if (maxRow0 <= 0) {
+    row0 = 0;
+  } else {
+    if (row0 < 0) row0 = 0;
+    else if (row0 > maxRow0) row0 = maxRow0;
+  }
+
+  return { col0, row0, cols, rows, totalCols, totalRows };
 }
 
 // вырезаем прямоугольник из готового ASCII-текста (по колонкам/строкам)
@@ -1906,6 +1950,8 @@ mainBtnHide();
 
   // общий сброс зума/плейсхолдера
   state.viewScale = 1;
+  state.viewX = 0.5;
+  state.viewY = 0.5;
   fitAsciiToViewport();
 
   // если уходим из PHOTO — очищаем картинку
@@ -2338,13 +2384,17 @@ app.ui.toggle.addEventListener('click', () => {
   // чтобы не появлялась лишняя рамка вокруг картинки.
 });
 
-
-// --- ПИНЧ-ЗУМ ТОЛЬКО ДЛЯ СЦЕНЫ ---
+// --- ПИНЧ-ЗУМ + ПАНОРАМИРОВАНИЕ ДЛЯ СЦЕНЫ ---
 (function enableStagePinchZoom(){
   const el = app.stage;
   const pts = new Map();
-  let active = false;
+
+  let pinchActive = false;
   let d0 = 0, s0 = 1;
+
+  let panId = null;
+  let panStartX = 0, panStartY = 0;
+  let viewStartX = 0.5, viewStartY = 0.5;
 
   const getDist = () => {
     const a = Array.from(pts.values());
@@ -2353,31 +2403,80 @@ app.ui.toggle.addEventListener('click', () => {
     return Math.hypot(dx, dy);
   };
 
+  const resetPanIf = (id) => {
+    if (panId === id) panId = null;
+  };
+
   el.addEventListener('pointerdown', e => {
     if (e.pointerType === 'touch') e.preventDefault?.();
     el.setPointerCapture?.(e.pointerId);
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
     if (pts.size === 2) {
-      active = true;
+      // старт пинча
+      pinchActive = true;
       d0 = getDist() || 1;
-      s0 = state.viewScale;
+      s0 = state.viewScale || 1;
+      panId = null; // при двух пальцах — только зум
+    } else if (pts.size === 1) {
+      // возможный старт панорамирования
+      panId = e.pointerId;
+      panStartX = e.clientX;
+      panStartY = e.clientY;
+      viewStartX = (typeof state.viewX === 'number') ? state.viewX : 0.5;
+      viewStartY = (typeof state.viewY === 'number') ? state.viewY : 0.5;
     }
   }, { passive:false });
 
   el.addEventListener('pointermove', e => {
     if (!pts.has(e.pointerId)) return;
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (active && pts.size === 2) {
+
+    // пинч-зум двумя пальцами
+    if (pinchActive && pts.size === 2) {
       const d = getDist() || 1;
       const ratio = d / d0;
       state.viewScale = Math.max(1, Math.min(3, s0 * ratio));
+      fitAsciiToViewport();
+      return;
+    }
+
+    // панорамирование одним пальцем
+    if (panId === e.pointerId && pts.size === 1) {
+      const out = app.out;
+      const stage = app.stage;
+      if (!out || !stage) return;
+
+      const w = out.scrollWidth;
+      const h = out.scrollHeight;
+      const W = stage.clientWidth;
+      const H = stage.clientHeight;
+      if (!w || !h || !W || !H) return;
+
+      const S = Math.min(W / w, H / h);
+      const base = S * (state.viewScale || 1);
+
+      const dx = e.clientX - panStartX;
+      const dy = e.clientY - panStartY;
+
+      // dx>0 (палец вправо) → центр окна смещаем влево (картинка едет за пальцем)
+      let vx = viewStartX - dx / (w * base);
+      let vy = viewStartY - dy / (h * base);
+
+      // грубое ограничение в пределах 0..1, дальше подрежет getCropWindow()
+      vx = Math.max(0, Math.min(1, vx));
+      vy = Math.max(0, Math.min(1, vy));
+
+      state.viewX = vx;
+      state.viewY = vy;
       fitAsciiToViewport();
     }
   }, { passive:false });
 
   const up = e => {
     pts.delete(e.pointerId);
-    if (pts.size < 2) active = false;
+    resetPanIf(e.pointerId);
+    if (pts.size < 2) pinchActive = false;
   };
   el.addEventListener('pointerup', up);
   el.addEventListener('pointercancel', up);
@@ -2423,6 +2522,8 @@ app.ui.flip.addEventListener('click', async () => {
 
       // сбрасываем пользовательский зум
       state.viewScale = 1;
+      state.viewX = 0.5;
+      state.viewY = 0.5;
 
       const src = currentSource();
       if (src) {
@@ -3123,6 +3224,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
