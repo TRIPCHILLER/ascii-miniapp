@@ -1583,6 +1583,7 @@ async function downloadBlob(blob, filename) {
   }
   
     // === Вписывание ASCII-блока: теперь только zoom по viewScale ===
+// === Вписывание ASCII-блока: теперь только zoom по viewScale ===
 function fitAsciiToViewport(){
   const out   = app.out;
   const stage = app.stage;
@@ -1614,11 +1615,13 @@ function fitAsciiToViewport(){
   // 5. Применяем базовый масштаб + пользовательский зум
   const base = S * (state.viewScale || 1);
 
+  // 5.1. Жёстко ограничиваем центр «окна» так, чтобы кадр не выходил за экран
+  clampViewToBounds(w, h, W, H, base);
+
   // 6. Дополнительный сдвиг в зависимости от центра «окна» (viewX/viewY)
   const vx = (typeof state.viewX === 'number') ? state.viewX : 0.5;
   const vy = (typeof state.viewY === 'number') ? state.viewY : 0.5;
 
-  // dx/dy — смещение центра ASCII относительно центра сцены в пикселях
   const dxPx = (0.5 - vx) * w * base;
   const dyPx = (0.5 - vy) * h * base;
 
@@ -1626,6 +1629,46 @@ function fitAsciiToViewport(){
   out.style.left = `calc(50% + ${dxPx}px)`;
   out.style.top  = `calc(50% + ${dyPx}px)`;
   out.style.transform = `translate(-50%, -50%) scale(${base})`;
+}
+
+// Ограничиваем viewX/viewY так, чтобы при текущем масштабе кадр нельзя было утащить
+// за пределы видимой области (никакого чёрного фона по краям)
+function clampViewToBounds(w, h, W, H, base){
+  if (!w || !h || !W || !H || !base) return;
+
+  const visW = w * base;
+  const visH = h * base;
+
+  let vx = (typeof state.viewX === 'number') ? state.viewX : 0.5;
+  let vy = (typeof state.viewY === 'number') ? state.viewY : 0.5;
+
+  // Горизонталь
+  if (visW <= W + 1) {
+    // Кадр уже меньше окна — центрируем, таскать нечего
+    vx = 0.5;
+  } else {
+    const maxShiftX = (visW - W) / 2;      // максимальное смещение центра в пикселях
+    const minVx = 0.5 - maxShiftX / visW;  // левый предел viewX
+    const maxVx = 0.5 + maxShiftX / visW;  // правый предел viewX
+
+    if (vx < minVx) vx = minVx;
+    else if (vx > maxVx) vx = maxVx;
+  }
+
+  // Вертикаль
+  if (visH <= H + 1) {
+    vy = 0.5;
+  } else {
+    const maxShiftY = (visH - H) / 2;
+    const minVy = 0.5 - maxShiftY / visH;
+    const maxVy = 0.5 + maxShiftY / visH;
+
+    if (vy < minVy) vy = minVy;
+    else if (vy > maxVy) vy = maxVy;
+  }
+
+  state.viewX = vx;
+  state.viewY = vy;
 }
 
 // --- Crop-логика: преобразуем зум в «окно» по колонкам/строкам ---
@@ -2432,29 +2475,44 @@ app.ui.toggle.addEventListener('click', () => {
     if (!pts.has(e.pointerId)) return;
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
+    const out   = app.out;
+    const stage = app.stage;
+    if (!out || !stage) return;
+
+    const w = out.scrollWidth;
+    const h = out.scrollHeight;
+    const W = stage.clientWidth;
+    const H = stage.clientHeight;
+    if (!w || !h || !W || !H) return;
+
+    const S = Math.min(W / w, H / h);
+
     // пинч-зум двумя пальцами
     if (pinchActive && pts.size === 2) {
       const d = getDist() || 1;
       const ratio = d / d0;
+
+      // ограничиваем общий масштаб
       state.viewScale = Math.max(1, Math.min(3, s0 * ratio));
+
+      const base = S * (state.viewScale || 1);
+      clampViewToBounds(w, h, W, H, base);
       fitAsciiToViewport();
       return;
     }
 
     // панорамирование одним пальцем
     if (panId === e.pointerId && pts.size === 1) {
-      const out = app.out;
-      const stage = app.stage;
-      if (!out || !stage) return;
+      const scale = Math.max(1, state.viewScale || 1);
+      const base  = S * scale;
 
-      const w = out.scrollWidth;
-      const h = out.scrollHeight;
-      const W = stage.clientWidth;
-      const H = stage.clientHeight;
-      if (!w || !h || !W || !H) return;
-
-      const S = Math.min(W / w, H / h);
-      const base = S * (state.viewScale || 1);
+      // если зума нет (scale ~ 1) — двигать нечего, держим центр
+      if (base * w <= W + 1 && base * h <= H + 1) {
+        state.viewX = 0.5;
+        state.viewY = 0.5;
+        fitAsciiToViewport();
+        return;
+      }
 
       const dx = e.clientX - panStartX;
       const dy = e.clientY - panStartY;
@@ -2463,12 +2521,14 @@ app.ui.toggle.addEventListener('click', () => {
       let vx = viewStartX - dx / (w * base);
       let vy = viewStartY - dy / (h * base);
 
-      // грубое ограничение в пределах 0..1, дальше подрежет getCropWindow()
-      vx = Math.max(0, Math.min(1, vx));
-      vy = Math.max(0, Math.min(1, vy));
+      // грубая нормализация, потом подрежет clampViewToBounds
+      if (!Number.isFinite(vx)) vx = 0.5;
+      if (!Number.isFinite(vy)) vy = 0.5;
 
       state.viewX = vx;
       state.viewY = vy;
+
+      clampViewToBounds(w, h, W, H, base);
       fitAsciiToViewport();
     }
   }, { passive:false });
@@ -3224,6 +3284,7 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
 
