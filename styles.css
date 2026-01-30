@@ -867,4 +867,40 @@ input[type="color"] {
   pointer-events: none !important;
 }
 
+/* стартовый выбор режима */
+.mode-gate{
+  position:fixed;
+  inset:0;
+  z-index:999999;
+  display:flex;
+  background:#000;
+}
+.mode-gate__half{
+  flex:1;
+  border:0;
+  background:#000;
+  color:#fff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-weight:700;
+  letter-spacing:0.12em;
+  font-size:18px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+}
+.mode-gate__half--text{ opacity:0.92; }
+.mode-gate__half:active{ transform:scale(0.995); }
+.mode-gate[hidden]{ display:none; }
+
+/* серый “disabled” вид (работает и для кнопок, и для input color) */
+.is-disabled,
+.btn.is-disabled,
+.btn:disabled,
+input:disabled{
+  opacity:0.35;
+  pointer-events:none;
+  filter:grayscale(1);
+}
+
 
