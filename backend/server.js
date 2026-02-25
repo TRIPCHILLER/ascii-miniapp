@@ -842,8 +842,58 @@ if (msg.successful_payment) {
 }
     const fromId = string(msg.from.id || '');
     const text   = string((msg.text || '').trim());
-    // TEMP DEBUG
-    console.log('[dbg] incoming text:', JSON.stringify(text));
+    const textTrim = (text || '').trim();
+
+    // /say — отправить произвольный текст пользователю (только для админа)
+    if (/^\/say(?:@[\w_]+)?(\s|$)/i.test(textTrim)) {
+      if (String(fromId) !== String(ADMIN_ID)) {
+        await sendMessage(fromId, 'Хуя ты хитрый! Только Создатель может использовать эту команду.');
+        return res.json({ ok: true });
+      }
+
+      const m = textTrim.match(/^\/say(?:@[\w_]+)?\s+(.+)$/i);
+      if (!m) {
+        await sendMessage(fromId, '/say <@username|user_id> <text>');
+        return res.json({ ok: true });
+      }
+
+      const args = String(m[1] || '').trim();
+      const mm = args.match(/^(\S+)\s+([\s\S]+)$/);
+      if (!mm) {
+        await sendMessage(fromId, '/say <@username|user_id> <text>');
+        return res.json({ ok: true });
+      }
+
+      const targetToken = String(mm[1] || '').trim();
+      const messageText = String(mm[2] || '').trim();
+      if (!targetToken || !messageText) {
+        await sendMessage(fromId, '/say <@username|user_id> <text>');
+        return res.json({ ok: true });
+      }
+
+      let resolvedChatId = null;
+      if (/^\d+$/.test(targetToken)) {
+        resolvedChatId = targetToken;
+      } else {
+        const uname = targetToken.replace(/^@/, '');
+        const id = findIdByUsername(uname);
+        if (!id) {
+          await sendMessage(fromId, `❌ Unknown user: @${uname} (user must have started the bot)`);
+          return res.json({ ok: true });
+        }
+        resolvedChatId = String(id);
+      }
+
+      try {
+        await sendMessage(resolvedChatId, messageText);
+        await sendMessage(fromId, `✅ Sent to ${resolvedChatId}`);
+      } catch (e) {
+        const err = String(e?.response?.data?.description || e?.message || 'send failed').slice(0, 180);
+        await sendMessage(fromId, `❌ Failed to send: ${err}`);
+      }
+
+      return res.json({ ok: true });
+    }
 
     // кешируем username для /send @username
     if (msg.from) setUsername(fromId, msg.from.username || '');
@@ -1135,57 +1185,6 @@ if (/^\/send(\s|$)/i.test(text)) {
   return res.json({ ok: true });
 }
 
-// /say — отправить произвольный текст пользователю (только для админа)
-if (/^\/say(?:@[\w_]+)?(\s|$)/i.test(text)) {
-  if (String(fromId) !== String(ADMIN_ID)) {
-    await sendMessage(fromId, 'Хуя ты хитрый! Только Создатель может использовать эту команду.');
-    return res.json({ ok: true });
-  }
-
-  const m = text.match(/^\/say(?:@[\w_]+)?\s+(.+)$/i);
-  if (!m) {
-    await sendMessage(fromId, '/say <@username|user_id> <text>');
-    return res.json({ ok: true });
-  }
-
-  const args = String(m[1] || '').trim();
-  const mm = args.match(/^(\S+)\s+([\s\S]+)$/);
-  if (!mm) {
-    await sendMessage(fromId, '/say <@username|user_id> <text>');
-    return res.json({ ok: true });
-  }
-
-  const targetToken = String(mm[1] || '').trim();
-  const messageText = String(mm[2] || '').trim();
-  if (!targetToken || !messageText) {
-    await sendMessage(fromId, '/say <@username|user_id> <text>');
-    return res.json({ ok: true });
-  }
-
-  let resolvedChatId = null;
-  if (/^\d+$/.test(targetToken)) {
-    resolvedChatId = targetToken;
-  } else {
-    const uname = targetToken.replace(/^@/, '');
-    const id = findIdByUsername(uname);
-    if (!id) {
-      await sendMessage(fromId, `❌ Unknown user: @${uname} (user must have started the bot)`);
-      return res.json({ ok: true });
-    }
-    resolvedChatId = String(id);
-  }
-
-  try {
-    await sendMessage(resolvedChatId, messageText);
-    await sendMessage(fromId, `✅ Sent to ${resolvedChatId}`);
-  } catch (e) {
-    const err = String(e?.response?.data?.description || e?.message || 'send failed').slice(0, 180);
-    await sendMessage(fromId, `❌ Failed to send: ${err}`);
-  }
-
-  return res.json({ ok: true });
-}
-
 // КОМАНДА HELP
 if (text === '/help') {
   const html = HELP_HTML();
@@ -1194,8 +1193,6 @@ if (text === '/help') {
 }
 
 if (!firstUnknownShown.has(fromId)) {
-  // TEMP DEBUG
-  console.log('[dbg] fallback hit:', JSON.stringify(text));
   firstUnknownShown.add(fromId);
   await sendMessage(
     fromId,
@@ -1203,8 +1200,6 @@ if (!firstUnknownShown.has(fromId)) {
     { parse_mode: 'HTML', disable_web_page_preview: true }
   );
 } else {
-  // TEMP DEBUG
-  console.log('[dbg] fallback hit:', JSON.stringify(text));
   await sendMessage(
     fromId,
     rnd(UNKNOWN_LINES),
