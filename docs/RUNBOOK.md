@@ -1,28 +1,24 @@
 # ASCII MINIAPP — Runbook (Deploy / Ops)
 
-Этот документ отвечает на вопросы:
-- как запустить/перезапустить backend (Telegram bot)
-- где смотреть логи
-- где лежат env-переменные (BOT_TOKEN / TG_SECRET)
-- как безопасно обновлять код
+Этот документ — короткая шпаргалка по серверу и перезапуску бота.
 
 ---
 
-## 0) Что где лежит
+## 0) Наши реальные параметры
 
-Repo:
-- Frontend: `index.html`, `styles.css`, `ascii.js`, `assets/`
-- Backend: `backend/server.js`, `backend/store.js`
+VPS: Timecloud  
+Путь проекта на сервере:
+- `/opt/trip-bot`
 
-Server (Timecloud VPS):
-- Node.js
-- PM2 (процессы)
-- (опционально) Nginx reverse proxy
+PM2 процесс:
+- `ascii-uploader`
+
+Бот работает через:
+- Webhook
 
 ---
 
-## 1) Подключение к серверу (SSH)
+## 1) Подключение к серверу
 
-Обычно:
 ```bash
-ssh root@YOUR_SERVER_IP
+ssh root@<YOUR_SERVER_IP>
