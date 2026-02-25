@@ -1,19 +1,25 @@
 (() => {
   
-  /* NAV: search "@section "
-     @section UTILS
-     @section BOOTSTRAP_INIT
-     @section STATE_CONFIG
-     @section UI_BINDINGS
-     @section TELEGRAM_WEBAPP_API
-     @section MODE_PHOTO
-     @section MODE_LIVE_CAMERA
-     @section MODE_VIDEO
-     @section ASCII_RENDER_ENGINE
-     @section COLOR_PALETTES_PICKER
-     @section EXPORT_SAVE_SHARE
-     @section HELPERS_UTILS
-  */
+/* NAV: search "@section "
+   @section UTILS
+   @section STATE_CONFIG
+   @section STYLE_PRESETS_FONTS
+   @section TELEGRAM_WEBAPP_API
+   @section UI_INTERACTION_GUARDS
+   @section MODE_LIVE_CAMERA
+   @section CAMERA_STREAM_LIFECYCLE
+   @section ASCII_RENDER_ENGINE
+   @section VIEWPORT_CROP_FULLSCREEN
+   @section FULLSCREEN_CONTROLS
+   @section UI_BINDINGS
+   @section STAGE_GESTURES
+   @section MODE_SWITCHING
+   @section MODE_PHOTO
+   @section MODE_VIDEO_GIF
+   @section COLOR_PALETTES_PICKER
+   @section EXPORT_SAVE_SHARE
+   @section BOOTSTRAP_INIT
+*/
   
   // ============== УТИЛИТЫ ==============
   // @section UTILS
@@ -121,6 +127,7 @@ function busyHide(force = false){
 }
   };
   // ===== Telegram WebApp (если открыто внутри Telegram) =====
+  // @section TELEGRAM_WEBAPP_API
 const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
   
 function expandSheetASAP(){
@@ -153,6 +160,7 @@ function mainBtnShow(text, onClick) {
 }
 
   // ===== Блок нежелательного выделения/контекстного меню в UI =====
+  // @section UI_INTERACTION_GUARDS
 (() => {
   const root = document.getElementById('app');
   if (!root) return;
@@ -193,6 +201,7 @@ function syncFpsVisibility(){
   app.ui.fpsWrap.hidden = (state.mode === 'photo');
 }
   // ==== FONT STACKS (добавлено) ====
+  // @section STYLE_PRESETS_FONTS
 const FONT_STACK_MAIN = `"BetterVCR",monospace`;
 
 const FONT_STACK_CJK =
@@ -256,7 +265,7 @@ let DITHER_ENABLED = true;
     timerSeconds: 0,
   };
   // ===== ВСПЫШКА (иконки + подсветка фронталки + torch для тыловой) =====
-
+// @section MODE_LIVE_CAMERA
   // Пытаемся включить аппаратную вспышку у активного видео-трека (если поддерживается)
   function updateTorch(enabled) {
     try {
@@ -749,6 +758,7 @@ function cameraErrorToText(err) {
   };
 }
 // === ЗАПУСК КАМЕРЫ с переиспользованием уже выданного разрешения ===
+  // @section CAMERA_STREAM_LIFECYCLE
 async function startStream() {
   try {
     // если поток уже есть и активен — просто подключим его к <video>
@@ -801,6 +811,7 @@ async function startStream() {
 }
 
   // ============== РЕНДЕРИНГ ==============
+  // @section ASCII_RENDER_ENGINE
   let raf = null;
   let lastFrameTime = 0;
 // Универсальная установка лимитов ширины с учётом платформы и режима
@@ -1691,6 +1702,7 @@ function clampViewToBounds(w, h, W, H, base){
 }
 
 // --- Crop-логика: преобразуем зум в «окно» по колонкам/строкам ---
+// @section VIEWPORT_CROP_FULLSCREEN
 function getCropWindow() {
   const grid = state.lastGrid || { w: 1, h: 1 };
   const scale = Math.max(1, state.viewScale || 1);
@@ -1755,6 +1767,7 @@ function cropAsciiText(fullText, crop) {
 }
 
   // ============== FULLSCREEN (tap-to-exit) ==============
+  // @section FULLSCREEN_CONTROLS
   // Кросс-браузерные хелперы:
   function inNativeFullscreen() {
     return !!(document.fullscreenElement || document.webkitFullscreenElement);
@@ -2062,6 +2075,7 @@ mainBtnHide();
 
 }
   // === Android ColorPicker override (HSV square + hue slider) ===
+  // @section COLOR_PALETTES_PICKER
 const CP = (() => {
   const modal = document.getElementById('cp-modal');
   if (!modal) return { open:()=>{}, close:()=>{} };
@@ -2427,6 +2441,7 @@ function layoutSettingsPanel() {
 }
 
   // ============== СВЯЗКА UI ==============
+  // @section UI_BINDINGS
   function bindUI() {
 // Показ/скрытие панели
 // Показ/скрытие панели
@@ -2447,6 +2462,7 @@ app.ui.toggle.addEventListener('click', () => {
 });
 
 // --- ПИНЧ-ЗУМ + ПАНОРАМИРОВАНИЕ ДЛЯ СЦЕНЫ ---
+// @section STAGE_GESTURES
 (function enableStagePinchZoom(){
   const el = app.stage;
   const pts = new Map();
@@ -2687,6 +2703,7 @@ if (app.ui.fg) {
 }
 
 // --- Кнопки режимов внизу (с приоритетным вызовом file picker) ---
+// @section MODE_SWITCHING
 app.ui.modeLive.addEventListener('click', () => {
   // КАМЕРА — сразу в live
   updateModeTabs('live');
@@ -2813,6 +2830,7 @@ if (app.ui.flashBtn) {
     }
 
 // --- Выбор фото из галереи ---
+// @section MODE_PHOTO
 app.ui.filePhoto.addEventListener('change', async (e) => {
   const f = e.target.files?.[0];
 
@@ -2967,6 +2985,7 @@ function setupGifFromFrames(rawFrames) {
 }
 
 // --- Выбор видео из галереи (включая GIF как «видео») ---
+// @section MODE_VIDEO_GIF
 fileVideo.addEventListener('change', async (e) => {
   const original = e.target.files?.[0];
 
@@ -3112,6 +3131,7 @@ fileVideo.addEventListener('change', async (e) => {
 });
 
 // --- ЕДИНАЯ функция сохранения ---
+// @section EXPORT_SAVE_SHARE
 function doSave() {
   if (state.mode === 'photo') {
     hudSet('PNG: экспорт…');
@@ -3244,6 +3264,7 @@ app.ui.invert.addEventListener('change', e => {
   }
 
   // ============== СТАРТ ==============
+  // @section BOOTSTRAP_INIT
   async function init() {
     fillStyleSelect();
 setUI();
@@ -3303,5 +3324,6 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
 
