@@ -16,6 +16,7 @@
   */
   
   // ============== УТИЛИТЫ ==============
+  // @section UTILS
   const $ = s => document.querySelector(s);
   const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
     // Портрет-лок (чтобы не крутилось в горизонталь, где получится каша)
@@ -41,6 +42,7 @@
 function hudSet(txt){ /* HUD отключен */ }
   
 // ---- BUSY overlay helpers ----
+// @section HELPERS_UTILS
 let busyLock = false; // <— не даём спрятать overlay, пока true
 
 function busyShow(msg){
@@ -210,7 +212,8 @@ const BAYER8 = [
   42,26,38,22, 41,25,37,21
 ];
 let DITHER_ENABLED = true;
-// =========================================
+// ============== STATE / DEFAULT CONFIG ==============
+// @section STATE_CONFIG
   const state = {
     facing: 'user',         // какая камера для мобилок
     mirror: true,           // режим рисования: true = отразить по X (НЕ-зеркало)
@@ -3300,4 +3303,5 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
 
