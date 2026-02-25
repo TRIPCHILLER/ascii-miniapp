@@ -1,4 +1,20 @@
 (() => {
+  
+  /* NAV: search "@section "
+     @section UTILS
+     @section BOOTSTRAP_INIT
+     @section STATE_CONFIG
+     @section UI_BINDINGS
+     @section TELEGRAM_WEBAPP_API
+     @section MODE_PHOTO
+     @section MODE_LIVE_CAMERA
+     @section MODE_VIDEO
+     @section ASCII_RENDER_ENGINE
+     @section COLOR_PALETTES_PICKER
+     @section EXPORT_SAVE_SHARE
+     @section HELPERS_UTILS
+  */
+  
   // ============== УТИЛИТЫ ==============
   const $ = s => document.querySelector(s);
   const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
@@ -3284,3 +3300,4 @@ await setMode(hasCam ? 'live' : 'photo');
     init();
   }
 })();
+
