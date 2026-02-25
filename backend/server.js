@@ -1140,6 +1140,9 @@ if (/^\/say(?:@[\w_]+)?(\s|$)/i.test(text)) {
     return res.json({ ok: true });
   }
 
+  // TEMP DEBUG
+  await sendMessage(fromId, 'DEBUG: /say handler reached');
+
   const m = text.match(/^\/say(?:@[\w_]+)?\s+(.+)$/i);
   if (!m) {
     await sendMessage(fromId, '/say <@username|user_id> <text>');
@@ -1155,6 +1158,8 @@ if (/^\/say(?:@[\w_]+)?(\s|$)/i.test(text)) {
 
   const targetToken = String(mm[1] || '').trim();
   const messageText = String(mm[2] || '').trim();
+  // TEMP DEBUG
+  console.log('[say] fromId=', fromId, 'targetToken=', targetToken, 'textLen=', messageText.length);
   if (!targetToken || !messageText) {
     await sendMessage(fromId, '/say <@username|user_id> <text>');
     return res.json({ ok: true });
