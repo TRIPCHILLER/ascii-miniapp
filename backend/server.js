@@ -842,6 +842,8 @@ if (msg.successful_payment) {
 }
     const fromId = string(msg.from.id || '');
     const text   = string((msg.text || '').trim());
+    // TEMP DEBUG
+    console.log('[dbg] incoming text:', JSON.stringify(text));
 
     // кешируем username для /send @username
     if (msg.from) setUsername(fromId, msg.from.username || '');
@@ -1140,9 +1142,6 @@ if (/^\/say(?:@[\w_]+)?(\s|$)/i.test(text)) {
     return res.json({ ok: true });
   }
 
-  // TEMP DEBUG
-  await sendMessage(fromId, 'DEBUG: /say handler reached');
-
   const m = text.match(/^\/say(?:@[\w_]+)?\s+(.+)$/i);
   if (!m) {
     await sendMessage(fromId, '/say <@username|user_id> <text>');
@@ -1158,8 +1157,6 @@ if (/^\/say(?:@[\w_]+)?(\s|$)/i.test(text)) {
 
   const targetToken = String(mm[1] || '').trim();
   const messageText = String(mm[2] || '').trim();
-  // TEMP DEBUG
-  console.log('[say] fromId=', fromId, 'targetToken=', targetToken, 'textLen=', messageText.length);
   if (!targetToken || !messageText) {
     await sendMessage(fromId, '/say <@username|user_id> <text>');
     return res.json({ ok: true });
@@ -1197,6 +1194,8 @@ if (text === '/help') {
 }
 
 if (!firstUnknownShown.has(fromId)) {
+  // TEMP DEBUG
+  console.log('[dbg] fallback hit:', JSON.stringify(text));
   firstUnknownShown.add(fromId);
   await sendMessage(
     fromId,
@@ -1204,6 +1203,8 @@ if (!firstUnknownShown.has(fromId)) {
     { parse_mode: 'HTML', disable_web_page_preview: true }
   );
 } else {
+  // TEMP DEBUG
+  console.log('[dbg] fallback hit:', JSON.stringify(text));
   await sendMessage(
     fromId,
     rnd(UNKNOWN_LINES),
