@@ -37,6 +37,7 @@
 - поведение конвертации/камера/рендер: ascii.js
 - списания/баланс/команды: backend/store.js + backend/server.js
 
-## ANSWERS
-All human-facing explanations, PR descriptions and summaries must be written in Russian.
-Code remains in English as usual.
+## Language
+- All PR descriptions, summaries, and human-facing explanations MUST be in Russian.
+- If the user prompt is in English, still write PR text in Russian.
+- Code identifiers stay in English.
