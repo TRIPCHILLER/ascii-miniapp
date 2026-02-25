@@ -12,7 +12,26 @@ const { execFile } = require('child_process');
 const { promisify } = require('util');
 const exec = promisify(execFile);
 
+// @nav sections:
+// @section IMPORTS_AND_PROCESS_BOOTSTRAP
+// @section REFERRAL_DATABASE_LAYER
+// @section RATE_LIMITER_GUARDS
+// @section STORE_INTEGRATION_AND_FFMPEG_RUNNER
+// @section TEXT_UTILS_AND_COPYWRITING
+// @section EXPRESS_BOOTSTRAP_AND_CORS
+// @section MEDIA_CONVERSION_PIPELINE
+// @section TELEGRAM_INITDATA_VALIDATION
+// @section MINIAPP_HTTP_API_ROUTES
+// @section ADMIN_HTTP_ROUTES
+// @section TELEGRAM_BILLING_AND_MESSAGE_UTILS
+// @section TELEGRAM_WEBHOOK_HANDLER
+// @section FALLBACK_AND_SERVER_START
+
+// ==== IMPORTS / BOOTSTRAP ====
+// @section IMPORTS_AND_PROCESS_BOOTSTRAP
+
 // ==== РЕФЕРАЛЬНАЯ СИСТЕМА (файл referrals.json) ====
+// @section REFERRAL_DATABASE_LAYER
 const REF_DB_PATH = path.join(__dirname, 'referrals.json');
 
 function loadRefDb() {
@@ -76,6 +95,7 @@ function addReferralEarning(inviterId, amount) {
 }
 
 // ==== ПРОСТАЯ АНТИ-СПАМ ЗАЩИТА ====
+// @section RATE_LIMITER_GUARDS
 const RATE_LIMIT = { photo: { limit: 60, windowMs: 60*60*1000 }, video: { limit: 20, windowMs: 60*60*1000 } };
 const userBuckets = new Map(); // userId -> { kind -> [timestamps] }
 
@@ -110,6 +130,9 @@ const {
 } = require('./store');
 
 const { spawn } = require('child_process');
+
+// ==== STORE / FFMPEG INTEGRATION ====
+// @section STORE_INTEGRATION_AND_FFMPEG_RUNNER
 function runFfmpeg(args) {
   return new Promise((resolve, reject) => {
     const p = spawn('ffmpeg', args, { stdio: ['ignore', 'ignore', 'pipe'] });
@@ -120,6 +143,7 @@ function runFfmpeg(args) {
 }
 
 // ==== Русское склонение для "импульса" ====
+// @section TEXT_UTILS_AND_COPYWRITING
 function pluralRu(n, one, few, many) {
   const n10 = n % 10, n100 = n % 100;
   if (n10 === 1 && n100 !== 11) return one;                               // 1, 21, 31...
@@ -137,6 +161,7 @@ const TG_SECRET = String(process.env.TG_WEBHOOK_SECRET || '');
 const app = express();
 
 // ---- CORS (единственный блок) ----
+// @section EXPRESS_BOOTSTRAP_AND_CORS
 const allowList = [/https:\/\/t\.me$/, /https:\/\/web\.telegram\.org/];
 app.use(cors({
   origin(origin, cb) {
@@ -284,6 +309,7 @@ const TARGET_W = 1080;
 const TARGET_H = 1920;
 
 // Конвертация видео в MP4 с оптимизацией под ASCII
+// @section MEDIA_CONVERSION_PIPELINE
 async function convertToMp4(inPath, outPath, opts = {}) {
   const fps = Number(opts.fps || 30);
 
@@ -411,6 +437,7 @@ app.get('/__debug', (_req, res) => res.type('text').send(`root=${PORT}`));
 // ============================================================
 
 // ВАЛИДАЦИЯ Telegram WebApp initData (RFC 2104 / sha256)
+// @section TELEGRAM_INITDATA_VALIDATION
 function validateInitData(initData) {
   try {
     if (!initData || !process.env.BOT_TOKEN) return null;
@@ -443,6 +470,7 @@ function validateInitData(initData) {
 }
 
 // Текущий баланс (из мини-аппа можно дергать GET /api/balance?telegramId=...)
+// @section MINIAPP_HTTP_API_ROUTES
 app.get('/api/balance', (req, res) => {
   logReq(req);
   const telegramId = string(req.query.telegramId || '');
@@ -632,6 +660,7 @@ try { await fs.promises.rm(path.dirname(outPath), { recursive: true, force: true
 // ============================================================
 // ===============   Админские HTTP ручки   ===================
 // ============================================================
+// @section ADMIN_HTTP_ROUTES
 
 app.post('/admin/grant', (req, res) => {
   logReq(req);
@@ -676,6 +705,9 @@ async function sendMessage(chatId, text, extra = {}) {
   const url = `https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`;
   await axios.post(url, { chat_id: String(chatId), text, ...extra });
 }
+
+// ==== TELEGRAM MESSAGING / BILLING HELPERS ====
+// @section TELEGRAM_BILLING_AND_MESSAGE_UTILS
 // ==== ПРОСТОЕ ФОРМАТИРОВАНИЕ [b] [i] [c] [q] [link] → HTML ====
 function applyMiniFormatting(text) {
   if (!text) return '';
@@ -726,6 +758,7 @@ async function sendInvoice(chatId, pack) {
 }
 
 // /tg/webhook (команды, баланс, /send и т.п.)
+// @section TELEGRAM_WEBHOOK_HANDLER
 app.post('/tg/webhook', async (req, res) => {
   try {
     // Защита секретом Telegram
@@ -1131,10 +1164,10 @@ return res.json({ ok: true });
 });
 
 // 404
+// @section FALLBACK_AND_SERVER_START
 app.use((req, res) => {
   res.type('text').status(404).send('fallback 404 ' + req.method + ' ' + req.url);
 });
 
 // Run
 app.listen(PORT, () => console.log(`[BOOT] API listening on ${PORT}`));
-

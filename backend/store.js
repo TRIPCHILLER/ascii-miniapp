@@ -20,7 +20,24 @@ const CLI_VIDEO_ARGS = process.env.CLI_VIDEO_ARGS;
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const TG_BASE = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
+// @nav sections:
+// @section IMPORTS_AND_RUNTIME_CONFIG
+// @section PERSISTENCE_FILES_AND_LOADERS
+// @section BALANCE_STATE_API
+// @section USERNAME_INDEX_API
+// @section LOCAL_HELPERS
+// @section CONVERSION_EXECUTION
+// @section TELEGRAM_DOCUMENT_UPLOAD_PRIMARY
+// @section TELEGRAM_DOCUMENT_UPLOAD_LEGACY_DUPLICATE
+// @section VIDEO_PROBE_METADATA
+// @section TELEGRAM_VIDEO_UPLOAD
+// @section MODULE_EXPORTS
+
+// ==== BOOTSTRAP / CONFIG ====
+// @section IMPORTS_AND_RUNTIME_CONFIG
+
 // ==== PERSISTENCE (balances + usernames) ====
+// @section PERSISTENCE_FILES_AND_LOADERS
 const DATA_DIR = path.join(__dirname, 'data');
 const BAL_FILE = path.join(DATA_DIR, 'balances.json');
 const UNAME_FILE = path.join(DATA_DIR, 'usernames.json');
@@ -53,6 +70,7 @@ loadBalances();
 loadUsernames();
 
 // ==== BALANCE API ====
+// @section BALANCE_STATE_API
 function ensureUser(userId) {
   const uid = String(userId);
   if (!balances.has(uid)) {
@@ -90,6 +108,7 @@ function deduct(userId, amount) {
 }
 
 // ==== USERNAME CACHE ====
+// @section USERNAME_INDEX_API
 function setUsername(userId, username) {
   const u = (username || '').trim();
   if (!u) return;
@@ -104,6 +123,7 @@ function findIdByUsername(username) {
 }
 
 // ==== HELPERS ====
+// @section LOCAL_HELPERS
 function ensureDir(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
@@ -116,6 +136,7 @@ function buildArgs(template, inputPath, outputPath) {
 }
 
 // ==== CONVERT ====
+// @section CONVERSION_EXECUTION
 async function convertAndSave(assetId, type, inputPath) {
   ensureDir(TMP_DIR);
   ensureDir(path.join(TMP_DIR, 'in'));
@@ -139,6 +160,7 @@ async function convertAndSave(assetId, type, inputPath) {
 }
 
 // ==== SEND FILE TO TELEGRAM ====
+// @section TELEGRAM_DOCUMENT_UPLOAD_PRIMARY
 async function sendFileToUser(telegramId, filePath, caption) {
   if (!BOT_TOKEN) throw new Error('BOT_TOKEN is empty');
   if (!fs.existsSync(filePath)) throw new Error(`File not found: ${filePath}`);
@@ -163,6 +185,7 @@ async function sendFileToUser(telegramId, filePath, caption) {
   return data;
 }
 // ==== SEND FILE TO TELEGRAM ====
+// @section TELEGRAM_DOCUMENT_UPLOAD_LEGACY_DUPLICATE
 async function sendFileToUser(telegramId, filePath, caption) {
   if (!BOT_TOKEN) throw new Error('BOT_TOKEN is empty');
   if (!fs.existsSync(filePath)) throw new Error(`File not found: ${filePath}`);
@@ -186,6 +209,9 @@ async function sendFileToUser(telegramId, filePath, caption) {
   if (!data.ok) throw new Error(`Telegram API error: ${JSON.stringify(data)}`);
   return data;
 }
+
+// ==== VIDEO PROBE ====
+// @section VIDEO_PROBE_METADATA
 async function probeVideo(filePath) {
   try {
     const { stdout } = await execFileAsync('ffprobe', [
@@ -207,6 +233,8 @@ async function probeVideo(filePath) {
   }
 }
 
+// ==== SEND VIDEO TO TELEGRAM ====
+// @section TELEGRAM_VIDEO_UPLOAD
 async function sendVideoToUser(telegramId, filePath, { caption } = {}) {
   if (!BOT_TOKEN) throw new Error('BOT_TOKEN is empty');
   if (!fs.existsSync(filePath)) throw new Error(`File not found: ${filePath}`);
@@ -238,6 +266,7 @@ async function sendVideoToUser(telegramId, filePath, { caption } = {}) {
 }
 
 // ==== EXPORTS ====
+// @section MODULE_EXPORTS
 module.exports = {
   ensureUser,
   userExists,
