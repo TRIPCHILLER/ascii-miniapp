@@ -36,3 +36,7 @@
 - UI/кнопки/режимы: index.html + styles.css
 - поведение конвертации/камера/рендер: ascii.js
 - списания/баланс/команды: backend/store.js + backend/server.js
+
+## ANSWERS
+All human-facing explanations, PR descriptions and summaries must be written in Russian.
+Code remains in English as usual.
