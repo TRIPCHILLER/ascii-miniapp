@@ -1133,6 +1133,62 @@ if (/^\/send(\s|$)/i.test(text)) {
   return res.json({ ok: true });
 }
 
+// /say — отправить произвольный текст пользователю (только для админа)
+if (/^\/say(?:@[\w_]+)?(\s|$)/i.test(text)) {
+  if (String(fromId) !== String(ADMIN_ID)) {
+    await sendMessage(fromId, 'Хуя ты хитрый! Только Создатель может использовать эту команду.');
+    return res.json({ ok: true });
+  }
+
+  // TEMP DEBUG
+  await sendMessage(fromId, 'DEBUG: /say handler reached');
+
+  const m = text.match(/^\/say(?:@[\w_]+)?\s+(.+)$/i);
+  if (!m) {
+    await sendMessage(fromId, '/say <@username|user_id> <text>');
+    return res.json({ ok: true });
+  }
+
+  const args = String(m[1] || '').trim();
+  const mm = args.match(/^(\S+)\s+([\s\S]+)$/);
+  if (!mm) {
+    await sendMessage(fromId, '/say <@username|user_id> <text>');
+    return res.json({ ok: true });
+  }
+
+  const targetToken = String(mm[1] || '').trim();
+  const messageText = String(mm[2] || '').trim();
+  // TEMP DEBUG
+  console.log('[say] fromId=', fromId, 'targetToken=', targetToken, 'textLen=', messageText.length);
+  if (!targetToken || !messageText) {
+    await sendMessage(fromId, '/say <@username|user_id> <text>');
+    return res.json({ ok: true });
+  }
+
+  let resolvedChatId = null;
+  if (/^\d+$/.test(targetToken)) {
+    resolvedChatId = targetToken;
+  } else {
+    const uname = targetToken.replace(/^@/, '');
+    const id = findIdByUsername(uname);
+    if (!id) {
+      await sendMessage(fromId, `❌ Unknown user: @${uname} (user must have started the bot)`);
+      return res.json({ ok: true });
+    }
+    resolvedChatId = String(id);
+  }
+
+  try {
+    await sendMessage(resolvedChatId, messageText);
+    await sendMessage(fromId, `✅ Sent to ${resolvedChatId}`);
+  } catch (e) {
+    const err = String(e?.response?.data?.description || e?.message || 'send failed').slice(0, 180);
+    await sendMessage(fromId, `❌ Failed to send: ${err}`);
+  }
+
+  return res.json({ ok: true });
+}
+
 // КОМАНДА HELP
 if (text === '/help') {
   const html = HELP_HTML();
