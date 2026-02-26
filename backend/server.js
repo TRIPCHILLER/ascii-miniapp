@@ -727,6 +727,21 @@ async function sendMessage(chatId, text, extra = {}) {
   await axios.post(url, { chat_id: String(chatId), text, ...extra });
 }
 
+async function getChatSafe(chatId) {
+  try {
+    const url = `https://api.telegram.org/bot${process.env.BOT_TOKEN}/getChat`;
+    const { data } = await axios.post(url, { chat_id: String(chatId) });
+    if (data && data.ok && data.result) return data.result;
+  } catch (e) {}
+  return null;
+}
+
+async function getActualUsername(userId) {
+  const chat = await getChatSafe(userId);
+  if (chat && chat.username) return String(chat.username);
+  return null;
+}
+
 // ==== TELEGRAM MESSAGING / BILLING HELPERS ====
 // @section TELEGRAM_BILLING_AND_MESSAGE_UTILS
 // ==== ПРОСТОЕ ФОРМАТИРОВАНИЕ [b] [i] [c] [q] [link] → HTML ====
@@ -1122,13 +1137,19 @@ if (/^\/stats(?:@[\w_]+)?$/i.test(text)) {
     idToUsername[String(uid)] = String(uname);
   }
 
-  const top10 = entries
+  const topRows = entries
     .sort((a, b) => b.balance - a.balance)
-    .slice(0, 10)
-    .map((row, idx) => {
-      const name = idToUsername[row.userId] ? `@${idToUsername[row.userId]}` : row.userId;
-      return `${idx + 1}) ${name} — ${row.balance}`;
-    });
+    .slice(0, 10);
+
+  const top10 = [];
+  for (let idx = 0; idx < topRows.length; idx += 1) {
+    const row = topRows[idx];
+    const actualUsername = await getActualUsername(row.userId);
+    const name = actualUsername
+      ? `@${actualUsername}`
+      : (idToUsername[row.userId] ? `@${idToUsername[row.userId]}` : row.userId);
+    top10.push(`${idx + 1}) ${name} — ${row.balance}`);
+  }
 
   const now = new Date().toISOString();
   const report = [
@@ -1189,6 +1210,9 @@ if (/^\/who(?:@[\w_]+)?\s+(.+)$/i.test(text)) {
     await sendMessage(fromId, applyMiniFormatting('[q]Пользователь не найден.[/q]'), { parse_mode: 'HTML', disable_web_page_preview: true });
     return res.json({ ok:true });
   }
+
+  const actualUsername = await getActualUsername(targetId);
+  if (actualUsername) username = actualUsername;
 
   const idToUsername = {};
   for (const [uname, uid] of Object.entries(usernamesObj)) {
