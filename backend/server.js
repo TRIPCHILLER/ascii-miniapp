@@ -736,9 +736,40 @@ async function getChatSafe(chatId) {
   return null;
 }
 
+function updateUsernameCache(userId, actualUsername) {
+  const usernamesObj = readJsonObjectSafe(UNAME_FILE);
+
+  let changed = false;
+
+  // удалить старый username этого userId
+  for (const [uname, uid] of Object.entries(usernamesObj)) {
+    if (String(uid) === String(userId) && uname !== actualUsername) {
+      delete usernamesObj[uname];
+      changed = true;
+    }
+  }
+
+  // если username есть — записать/обновить
+  if (actualUsername) {
+    if (usernamesObj[actualUsername] !== String(userId)) {
+      usernamesObj[actualUsername] = String(userId);
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    fs.writeFileSync(UNAME_FILE, JSON.stringify(usernamesObj, null, 2), 'utf-8');
+  }
+}
+
 async function getActualUsername(userId) {
   const chat = await getChatSafe(userId);
-  if (chat && chat.username) return String(chat.username);
+  if (chat && chat.username) {
+    const actualUsername = String(chat.username);
+    updateUsernameCache(userId, actualUsername);
+    return actualUsername;
+  }
+  if (chat) updateUsernameCache(userId, null);
   return null;
 }
 
