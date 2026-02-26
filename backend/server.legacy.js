@@ -878,7 +878,7 @@ if (msg.successful_payment) {
         const uname = targetToken.replace(/^@/, '');
         const id = findIdByUsername(uname);
         if (!id) {
-          await sendMessage(fromId, `Пользователь @${uname} ещё ни разу не запускал бота`);
+          await sendMessage(fromId, `Пользователь @${uname} не существует или ещё ни разу не запускал бота`);
           return res.json({ ok: true });
         }
         resolvedChatId = String(id);
