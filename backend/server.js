@@ -32,7 +32,7 @@ const exec = promisify(execFile);
 
 // ==== РЕФЕРАЛЬНАЯ СИСТЕМА (файл referrals.json) ====
 // @section REFERRAL_DATABASE_LAYER
-const REF_DB_PATH = path.join(__dirname, 'referrals.json');
+const REF_DB_PATH = path.join(__dirname, '..', 'referrals.json');
 
 function loadRefDb() {
   try {
