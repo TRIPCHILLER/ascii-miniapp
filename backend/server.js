@@ -795,6 +795,10 @@ if (pc) {
     const msg = upd.message || upd.edited_message;
     if (!msg) return res.sendStatus(200);
 
+    if (String(msg?.chat?.type || '') !== 'private') {
+      return res.json({ ok: true });
+    }
+
 // успешный платёж → начисляем импульсы
 if (msg.successful_payment) {
   const fromId = String(msg.from.id || '');
