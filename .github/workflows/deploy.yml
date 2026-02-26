@@ -1,0 +1,36 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: ["main"]
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          script: |
+            set -e
+            cd "${{ secrets.DEPLOY_PATH }}"
+            git fetch --all --prune
+            git checkout main
+            git pull --ff-only
+
+            node --check backend/server.js
+            node --check backend/store.js
+
+            pm2 restart ascii-uploader
+            pm2 save
+
+            pm2 status
+            git rev-parse --short HEAD
