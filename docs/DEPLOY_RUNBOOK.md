@@ -20,3 +20,21 @@ cd /opt/trip-bot
 git pull --ff-only
 pm2 restart ascii-uploader
 pm2 save
+Если “изменения не применились” (проверки)
+1) Сервер на нужном коммите?
+cd /opt/trip-bot
+git rev-parse --short HEAD
+git log -1 --oneline
+2) PM2 запускает правильный файл?
+pm2 describe ascii-uploader | sed -n '1,160p'
+
+Ищем script path → должно быть /opt/trip-bot/backend/server.js.
+
+3) Есть ли правка в прод-файле?
+grep -n "УНИКАЛЬНАЯ_ФРАЗА_ИЛИ_МЕТКА" /opt/trip-bot/backend/server.js
+4) Логи после рестарта
+pm2 logs ascii-uploader --lines 200
+Правило безопасности
+
+Правим только tracked-файлы проекта (server.js/store.js/фронт).
+Никакие .env, node_modules, локальные бэкапы и логи в git не коммитим.
