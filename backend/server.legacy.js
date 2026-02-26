@@ -878,7 +878,7 @@ if (msg.successful_payment) {
         const uname = targetToken.replace(/^@/, '');
         const id = findIdByUsername(uname);
         if (!id) {
-          await sendMessage(fromId, `❌ Unknown user: @${uname} (user must have started the bot)`);
+          await sendMessage(fromId, `Пользователь @${uname} ещё ни разу не запускал бота`);
           return res.json({ ok: true });
         }
         resolvedChatId = String(id);
@@ -886,10 +886,10 @@ if (msg.successful_payment) {
 
       try {
         await sendMessage(resolvedChatId, messageText);
-        await sendMessage(fromId, `✅ Sent to ${resolvedChatId}`);
+        await sendMessage(fromId, `Ядро написало пользователю ${resolvedChatId}`);
       } catch (e) {
         const err = String(e?.response?.data?.description || e?.message || 'send failed').slice(0, 180);
-        await sendMessage(fromId, `❌ Failed to send: ${err}`);
+        await sendMessage(fromId, `Не удалось отправить послание: ${err}`);
       }
 
       return res.json({ ok: true });
