@@ -38,7 +38,7 @@ const TG_BASE = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
 // ==== PERSISTENCE (balances + usernames) ====
 // @section PERSISTENCE_FILES_AND_LOADERS
-const DATA_DIR = path.join(__dirname, 'data');
+const DATA_DIR = path.join(__dirname, '..', 'data');
 const BAL_FILE = path.join(DATA_DIR, 'balances.json');
 const UNAME_FILE = path.join(DATA_DIR, 'usernames.json');
 
