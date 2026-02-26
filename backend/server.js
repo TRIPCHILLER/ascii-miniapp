@@ -889,7 +889,8 @@ if (msg.successful_payment) {
       }
 
       try {
-        await sendMessage(resolvedChatId, messageText);
+        const formatted = applyMiniFormatting(messageText);
+        await sendMessage(resolvedChatId, formatted, { parse_mode: 'HTML' });
         await sendMessage(fromId, `Ядро написало пользователю ${resolvedChatId}`);
       } catch (e) {
         const err = String(e?.response?.data?.description || e?.message || 'send failed').slice(0, 180);
