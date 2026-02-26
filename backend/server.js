@@ -851,7 +851,7 @@ if (msg.successful_payment) {
         return res.json({ ok: true });
       }
 
-      const m = textTrim.match(/^\/say(?:@[\w_]+)?\s+(.+)$/i);
+      const m = textTrim.match(/^\/say(?:@[\w_]+)?\s+([\s\S]+)$/i);
       if (!m) {
         await sendMessage(fromId, '/say <@username|user_id> <text>');
         return res.json({ ok: true });
@@ -872,7 +872,7 @@ if (msg.successful_payment) {
       }
 
       let resolvedChatId = null;
-      if (/^\d+$/.test(targetToken)) {
+      if (/^-?\d+$/.test(targetToken)) {
         resolvedChatId = targetToken;
       } else {
         const uname = targetToken.replace(/^@/, '');
