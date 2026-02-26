@@ -32,7 +32,9 @@ const exec = promisify(execFile);
 
 // ==== РЕФЕРАЛЬНАЯ СИСТЕМА (файл referrals.json) ====
 // @section REFERRAL_DATABASE_LAYER
-const REF_DB_PATH = path.join(__dirname, 'referrals.json');
+const REF_DB_PATH = path.join(__dirname, '..', 'referrals.json');
+const BAL_FILE = path.join(__dirname, '..', 'data', 'balances.json');
+const UNAME_FILE = path.join(__dirname, '..', 'data', 'usernames.json');
 
 function loadRefDb() {
   try {
@@ -92,6 +94,25 @@ function addReferralEarning(inviterId, amount) {
   const u = db.users[inviterId];
   u.totalFromRefills = (u.totalFromRefills || 0) + amount;
   saveRefDb(db);
+}
+
+function getReferralsOf(inviterId) {
+  const db = loadRefDb();
+  const users = (db && db.users) || {};
+  const iid = String(inviterId);
+  return Object.entries(users)
+    .filter(([, info]) => String(info?.invitedBy || '') === iid)
+    .map(([uid]) => String(uid));
+}
+
+function readJsonObjectSafe(filePath) {
+  try {
+    const raw = fs.readFileSync(filePath, 'utf8');
+    const obj = JSON.parse(raw);
+    return (obj && typeof obj === 'object') ? obj : {};
+  } catch {
+    return {};
+  }
 }
 
 // ==== ПРОСТАЯ АНТИ-СПАМ ЗАЩИТА ====
@@ -724,13 +745,15 @@ function applyMiniFormatting(text) {
   out = out.replace(/\[c\](.+?)\[\/c\]/gis, '<code>$1</code>');
 
   // цитата
-  out = out.replace(/\[q\](.+?)\[\/q\]/gis, '<blockquote>$1</blockquote>');
+  out = out.replace(/\[q\](.+?)\[\/q\]/gis, '<blockquote expandable>$1</blockquote>');
 
   // гиперссылка: [link]текст|https://url[/link]
   out = out.replace(/\[link\](.+?)\|(.+?)\[\/link\]/gis, '<a href="$2">$1</a>');
 
   return out;
 }
+
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function sendInvoice(chatId, pack) {
   const title = `${pack} ИМПУЛЬСОВ`;
@@ -1071,6 +1094,162 @@ if (/^\/balance(?:@[\w_]+)?\s+@?([A-Za-z0-9_]+)\b/i.test(text)) {
   await sendMessage(fromId, `💠 У @${uname}: ${bal} ${impulseWord(bal)}.`);
   return res.json({ ok:true });
 }
+
+// --------- /stats (только для админа) ---------
+if (/^\/stats(?:@[\w_]+)?$/i.test(text)) {
+  if (String(fromId) !== String(ADMIN_ID)) {
+    await sendMessage(fromId, applyMiniFormatting('[q]Отказано.[/q]'), { parse_mode: 'HTML', disable_web_page_preview: true });
+    return res.json({ ok:true });
+  }
+
+  const balancesObj = readJsonObjectSafe(BAL_FILE);
+  const usernamesObj = readJsonObjectSafe(UNAME_FILE);
+
+  const userIds = Object.keys(balancesObj);
+  const usersTotal = userIds.length;
+  const usernamesIndexed = Object.keys(usernamesObj).length;
+
+  const entries = userIds.map((uid) => ({
+    userId: String(uid),
+    balance: Number(balancesObj[uid] || 0)
+  }));
+
+  const totalImpulses = entries.reduce((sum, row) => sum + row.balance, 0);
+  const avgBalance = usersTotal > 0 ? (totalImpulses / usersTotal).toFixed(2) : '0.00';
+
+  const idToUsername = {};
+  for (const [uname, uid] of Object.entries(usernamesObj)) {
+    idToUsername[String(uid)] = String(uname);
+  }
+
+  const top10 = entries
+    .sort((a, b) => b.balance - a.balance)
+    .slice(0, 10)
+    .map((row, idx) => {
+      const name = idToUsername[row.userId] ? `@${idToUsername[row.userId]}` : row.userId;
+      return `${idx + 1}) ${name} — ${row.balance}`;
+    });
+
+  const now = new Date().toISOString();
+  const report = [
+    '[b]STATS[/b]',
+    '[q]',
+    `users total: ${usersTotal}`,
+    `usernames indexed: ${usernamesIndexed}`,
+    `total impulses: ${totalImpulses}`,
+    `avg balance: ${avgBalance}`,
+    'top 10 by balance:',
+    ...(top10.length ? top10 : ['нет данных']),
+    `server time: ${now}`,
+    '[/q]'
+  ].join('\n');
+
+  await sendMessage(fromId, applyMiniFormatting(report), { parse_mode: 'HTML', disable_web_page_preview: true });
+  return res.json({ ok:true });
+}
+
+// --------- /who (только для админа) ---------
+if (/^\/who(?:@[\w_]+)?\s+(.+)$/i.test(text)) {
+  if (String(fromId) !== String(ADMIN_ID)) {
+    await sendMessage(fromId, applyMiniFormatting('[q]Отказано.[/q]'), { parse_mode: 'HTML', disable_web_page_preview: true });
+    return res.json({ ok:true });
+  }
+
+  const targetToken = String(text.match(/^\/who(?:@[\w_]+)?\s+(.+)$/i)[1] || '').trim();
+  if (!targetToken) {
+    await sendMessage(fromId, applyMiniFormatting('[q]Формат: /who @username или /who <user_id>[/q]'), { parse_mode: 'HTML', disable_web_page_preview: true });
+    return res.json({ ok:true });
+  }
+
+  const usernamesObj = readJsonObjectSafe(UNAME_FILE);
+  let targetId = null;
+  let username = '';
+  let known = false;
+
+  if (/^-?\d+$/.test(targetToken)) {
+    targetId = String(targetToken);
+    for (const [uname, uid] of Object.entries(usernamesObj)) {
+      if (String(uid) === targetId) {
+        username = String(uname);
+        known = true;
+        break;
+      }
+    }
+  } else {
+    const uname = targetToken.replace(/^@/, '').toLowerCase();
+    const id = findIdByUsername(uname);
+    if (id) {
+      targetId = String(id);
+      username = uname;
+      known = true;
+    }
+  }
+
+  if (!targetId) {
+    await sendMessage(fromId, applyMiniFormatting('[q]Пользователь не найден.[/q]'), { parse_mode: 'HTML', disable_web_page_preview: true });
+    return res.json({ ok:true });
+  }
+
+  const idToUsername = {};
+  for (const [uname, uid] of Object.entries(usernamesObj)) {
+    idToUsername[String(uid)] = String(uname);
+  }
+
+  const referrals = getReferralsOf(targetId);
+  const refsLines = referrals.length
+    ? referrals.map((rid) => idToUsername[rid] ? `@${idToUsername[rid]} (${rid})` : rid)
+    : ['рефералов нет'];
+
+  const whoMsg = [
+    '[b]WHO[/b]',
+    `username: ${username ? '@' + username : '-'}`,
+    `user_id: ${targetId}`,
+    `chat_id: ${targetId}`,
+    `known: ${known ? 'yes' : 'no'}`,
+    'referrals:',
+    '[q]',
+    ...refsLines,
+    '[/q]'
+  ].join('\n');
+
+  await sendMessage(fromId, applyMiniFormatting(whoMsg), { parse_mode: 'HTML', disable_web_page_preview: true });
+  return res.json({ ok:true });
+}
+
+// --------- /all (только для админа) ---------
+if (/^\/all(?:@[\w_]+)?\s+([\s\S]+)$/i.test(text)) {
+  if (String(fromId) !== String(ADMIN_ID)) {
+    await sendMessage(fromId, applyMiniFormatting('[q]Отказано.[/q]'), { parse_mode: 'HTML', disable_web_page_preview: true });
+    return res.json({ ok:true });
+  }
+
+  const broadcastText = String(text.match(/^\/all(?:@[\w_]+)?\s+([\s\S]+)$/i)[1] || '');
+  const formattedText = applyMiniFormatting(broadcastText);
+  const balancesObj = readJsonObjectSafe(BAL_FILE);
+  const recipients = Object.keys(balancesObj);
+
+  let successCount = 0;
+  let failCount = 0;
+
+  for (const uid of recipients) {
+    try {
+      await sendMessage(String(uid), formattedText, { parse_mode: 'HTML', disable_web_page_preview: true });
+      successCount += 1;
+    } catch (e) {
+      failCount += 1;
+    }
+    await sleep(34);
+  }
+
+  await sendMessage(
+    fromId,
+    applyMiniFormatting(`Рассылка завершена: ✅ ${successCount} | ❌ ${failCount}`),
+    { parse_mode: 'HTML', disable_web_page_preview: true }
+  );
+
+  return res.json({ ok:true });
+}
+
     // /buy_energy — показать пакеты
     if (text === '/buy_energy') {
       const kb = {
