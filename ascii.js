@@ -270,7 +270,7 @@ let DITHER_ENABLED = true;
     flashEnabled: false,
     timerSeconds: 0,
     visorMode: 'image',
-    textSize: 'm',
+    textSize: 82,
   };
 
   const TEXT_CHARSETS = {
@@ -3320,10 +3320,12 @@ async function sendAsciiTextToBot() {
   form.append('initdata', tgWebApp.initData || '');
   form.append('charsetPreset', app.ui.charset.value || TEXT_CHARSETS.DOTS);
   const n = Number(state.textSize);
+  const cols = Math.max(20, Math.min(160, Math.round(Number.isFinite(n) ? n : 82)));
   let preset = 'm';
-  if (Number.isFinite(n) && n <= 35) preset = 's';
-  else if (Number.isFinite(n) && n <= 80) preset = 'm';
-  else if (Number.isFinite(n)) preset = 'l';
+  if (cols <= 74) preset = 's';
+  else if (cols <= 88) preset = 'm';
+  else preset = 'l';
+  form.append('cols', String(cols));
   form.append('sizePreset', preset);
   const textEndpointUrl = `${API_BASE}/api/ascii-text`;
   dbgState('sendAsciiTextToBot.request', { url: textEndpointUrl, isTextMode: isTextMode(), visorMode: state.visorMode, mode: state.mode });
@@ -3371,7 +3373,10 @@ async function routeTextSaveIfNeeded() {
   return true;
 }
 if (app.ui.textSizePreset) {
-  app.ui.textSizePreset.addEventListener('change', (e) => { state.textSize = e.target.value || 'm'; });
+  app.ui.textSizePreset.addEventListener('change', (e) => {
+    const n = Number(e.target.value);
+    state.textSize = Number.isFinite(n) ? n : 82;
+  });
 }
 
 // Выбираем реально «чёрный» символ под текущий стек шрифтов

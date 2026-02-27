@@ -353,6 +353,11 @@ function clampInt(v, min, max, def) {
 }
 const ASCII_TEXT_LIMIT = 3800;
 const TEXT_MODE_COST = 1;
+const TEXT_COLS_MIN = 20;
+const TEXT_COLS_MAX = 160;
+const TEXT_ROWS_MIN = 12;
+const TEXT_ROWS_MAX = 96;
+const TEXT_CHAR_ASPECT = 0.55;
 const TEXT_SIZE_PRESETS = {
   s: { cols: 68, rows: 40 },
   m: { cols: 82, rows: 48 },
@@ -373,14 +378,38 @@ function pickTextCharset(v) {
   return TEXT_CHARSETS.DOTS;
 }
 function normalizeGrid({ cols, rows }) {
-  let c = Math.max(16, Math.min(140, Math.round(cols || 80)));
-  let r = Math.max(12, Math.min(90, Math.round(rows || 48)));
+  let c = Math.max(TEXT_COLS_MIN, Math.min(TEXT_COLS_MAX, Math.round(cols || 80)));
+  let r = Math.max(TEXT_ROWS_MIN, Math.min(TEXT_ROWS_MAX, Math.round(rows || 48)));
   while (((c + 1) * r) > ASCII_TEXT_LIMIT) {
-    c = Math.max(16, Math.floor(c * 0.94));
-    r = Math.max(12, Math.floor(r * 0.94));
-    if (c <= 16 && r <= 12) break;
+    c = Math.max(TEXT_COLS_MIN, Math.floor(c * 0.94));
+    r = Math.max(TEXT_ROWS_MIN, Math.floor(r * 0.94));
+    if (c <= TEXT_COLS_MIN && r <= TEXT_ROWS_MIN) break;
   }
   return { cols: c, rows: r };
+}
+function parseTextCols(v) {
+  const n = parseInt(String(v ?? ''), 10);
+  if (!Number.isFinite(n)) return null;
+  return Math.max(TEXT_COLS_MIN, Math.min(TEXT_COLS_MAX, n));
+}
+async function probeImageSize(inputPath) {
+  try {
+    const ffArgs = [
+      '-v', 'error',
+      '-select_streams', 'v:0',
+      '-show_entries', 'stream=width,height',
+      '-of', 'csv=p=0:s=x',
+      inputPath
+    ];
+    const { stdout } = await exec('ffprobe', ffArgs, { encoding: 'utf8' });
+    const [wRaw, hRaw] = String(stdout || '').trim().split('x');
+    const w = parseInt(wRaw, 10);
+    const h = parseInt(hRaw, 10);
+    if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return null;
+    return { width: w, height: h };
+  } catch (_) {
+    return null;
+  }
 }
 function asciiFromGrayBuffer(buffer, cols, rows, charset) {
   const chars = Array.from(charset || TEXT_CHARSETS.DOTS);
@@ -397,10 +426,18 @@ function asciiFromGrayBuffer(buffer, cols, rows, charset) {
   }
   return lines.join('\n');
 }
-async function renderAsciiTextFromImage(inputPath, preset = 'm', charsetInput = 'DOTS') {
+async function renderAsciiTextFromImage(inputPath, options = {}) {
+  const preset = String(options.preset || 'm').toLowerCase();
+  const requestedCols = parseTextCols(options.cols);
   const base = TEXT_SIZE_PRESETS[preset] || TEXT_SIZE_PRESETS.m;
+  const imageSize = await probeImageSize(inputPath);
   let grid = normalizeGrid(base);
-  const charset = pickTextCharset(charsetInput);
+  if (requestedCols) {
+    const aspect = (imageSize?.width && imageSize?.height) ? (imageSize.height / imageSize.width) : (base.rows / base.cols);
+    const rowsByCols = Math.round(requestedCols * aspect * TEXT_CHAR_ASPECT);
+    grid = normalizeGrid({ cols: requestedCols, rows: rowsByCols });
+  }
+  const charset = pickTextCharset(options.charsetInput);
   for (let attempt = 0; attempt < 4; attempt++) {
     const ffArgs = [
       '-hide_banner', '-loglevel', 'error',
@@ -415,7 +452,16 @@ async function renderAsciiTextFromImage(inputPath, preset = 'm', charsetInput = 
     const buf = Buffer.isBuffer(stdout) ? stdout.subarray(0, need) : Buffer.from(stdout || '').subarray(0, need);
     const asciiText = asciiFromGrayBuffer(buf, grid.cols, grid.rows, charset);
     if (asciiText.length <= ASCII_TEXT_LIMIT) {
-      return { asciiText, cols: grid.cols, rows: grid.rows, charset };
+      return {
+        asciiText,
+        cols: grid.cols,
+        rows: grid.rows,
+        charset,
+        preset,
+        requestedCols: requestedCols || null,
+        imageWidth: imageSize?.width || null,
+        imageHeight: imageSize?.height || null
+      };
     }
     grid = normalizeGrid({ cols: Math.floor(grid.cols * 0.88), rows: Math.floor(grid.rows * 0.88) });
   }
@@ -610,8 +656,20 @@ app.post('/api/ascii-text', upload.any(), async (req, res) => {
       return res.status(402).json({ ok:false, error:'INSUFFICIENT_FUNDS', need:TEXT_MODE_COST, balance:bal });
     }
     const sizePreset = String(req.body?.sizePreset || 'm').toLowerCase();
+    const cols = parseTextCols(req.body?.cols);
     const charsetPreset = req.body?.charsetPreset || 'DOTS';
-    const result = await renderAsciiTextFromImage(f.path, sizePreset, charsetPreset);
+    const result = await renderAsciiTextFromImage(f.path, { preset: sizePreset, cols, charsetInput: charsetPreset });
+    console.debug('[ascii-text] applied params', {
+      userId,
+      preset: sizePreset,
+      requestedCols: req.body?.cols ?? null,
+      parsedCols: cols,
+      finalCols: result.cols,
+      finalRows: result.rows,
+      imageWidth: result.imageWidth,
+      imageHeight: result.imageHeight,
+      charsetPreset
+    });
     const safeText = escapeHtml(result.asciiText);
     await sendMessage(userId, `<pre>${safeText}</pre>`, { parse_mode: 'HTML', disable_web_page_preview: true });
     deduct(userId, TEXT_MODE_COST);
