@@ -15,6 +15,11 @@
   <link rel="stylesheet" href="styles.css?v=fit1" />
 </head>
 <body class="theme-dark">
+  <div id="modeChooser" class="mode-chooser" hidden>
+    <button type="button" class="mode-choice mode-choice-image" data-visor-mode="image">ИЗОБРАЖЕНИЕ</button>
+    <button type="button" class="mode-choice mode-choice-text" data-visor-mode="text">ТЕКСТ</button>
+  </div>
+
   <div class="wrap" id="app">
 
     <!-- Верхняя панель -->
@@ -46,6 +51,17 @@
       </label>
 
       <!-- 2) РАЗМЕР -->
+      <label id="textSizeWrap" hidden>
+        <span>ТЕКСТ-Р4ЗМЕР</span>
+        <select id="textSizePreset">
+          <option value="s">S</option>
+          <option value="m" selected>M</option>
+          <option value="l">L</option>
+        </select>
+      </label>
+
+      <button class="btn ghost" id="resetModeBtn" type="button">СМЕНИТЬ РЕЖИМ</button>
+
       <label>
         <span>Р4ЗМЕР</span>
         <input id="width" type="range" min="50" max="175" step="5" />
@@ -73,7 +89,7 @@
       </label>
 
       <!-- 6) ОТДЕЛЬНАЯ СТРОКА — ТЕКСТ + ФОН -->
-      <div class="row colors">
+      <div class="row colors" id="colorRow">
         <label class="color">
           <span>Т3КСТ</span>
           <input id="fg" type="color" />
@@ -160,7 +176,7 @@
     <div class="modebar">
       <button class="btn ghost" id="modePhoto">Ф0Т0</button>
       <button class="btn ghost active" id="modeLive">К4МЕР4</button>
-      <button class="btn ghost" id="modeVideo">ВИД30</button>
+      <button class="btn ghost" id="modeVideo" data-mode="video">ВИД30</button>
     </div>
 
 <!-- Скрытые инпуты для выбора из галереи -->

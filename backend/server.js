@@ -1,5 +1,4 @@
 require('dotenv').config();
-
 const express    = require('express');
 const bodyParser = require('body-parser');
 const fs         = require('fs');
@@ -11,7 +10,6 @@ const cors       = require('cors');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const exec = promisify(execFile);
-
 // @nav sections:
 // @section IMPORTS_AND_PROCESS_BOOTSTRAP
 // @section REFERRAL_DATABASE_LAYER
@@ -26,16 +24,13 @@ const exec = promisify(execFile);
 // @section TELEGRAM_BILLING_AND_MESSAGE_UTILS
 // @section TELEGRAM_WEBHOOK_HANDLER
 // @section FALLBACK_AND_SERVER_START
-
 // ==== IMPORTS / BOOTSTRAP ====
 // @section IMPORTS_AND_PROCESS_BOOTSTRAP
-
 // ==== РЕФЕРАЛЬНАЯ СИСТЕМА (файл referrals.json) ====
 // @section REFERRAL_DATABASE_LAYER
 const REF_DB_PATH = path.join(__dirname, '..', 'referrals.json');
 const BAL_FILE = path.join(__dirname, '..', 'data', 'balances.json');
 const UNAME_FILE = path.join(__dirname, '..', 'data', 'usernames.json');
-
 function loadRefDb() {
   try {
     const raw = fs.readFileSync(REF_DB_PATH, 'utf8');
@@ -46,7 +41,6 @@ function loadRefDb() {
     return { users: {} };
   }
 }
-
 function saveRefDb(db) {
   try {
     fs.writeFileSync(REF_DB_PATH, JSON.stringify(db, null, 2));
@@ -54,40 +48,32 @@ function saveRefDb(db) {
     console.error('[ref] save error:', e);
   }
 }
-
 // регистрируем факт, что userId пришёл по ссылке inviterId
 function registerReferral(userId, inviterId) {
   if (!userId || !inviterId || userId === inviterId) return null;
-
   const db = loadRefDb();
   if (!db.users) db.users = {};
-
   // уже есть — считаем, что реферал был учтён ранее
   if (db.users[userId]) return null;
-
   db.users[userId] = {
     invitedBy: String(inviterId),
     joinedAt: Date.now(),
     bonusGiven: false,
     totalFromRefills: 0
   };
-
   saveRefDb(db);
   return db.users[userId];
 }
-
 function getRefInfo(userId) {
   const db = loadRefDb();
   return (db.users && db.users[userId]) || null;
 }
-
 function markReferralBonusGiven(userId) {
   const db = loadRefDb();
   if (!db.users || !db.users[userId]) return;
   db.users[userId].bonusGiven = true;
   saveRefDb(db);
 }
-
 function addReferralEarning(inviterId, amount) {
   const db = loadRefDb();
   if (!db.users || !db.users[inviterId]) return;
@@ -95,7 +81,6 @@ function addReferralEarning(inviterId, amount) {
   u.totalFromRefills = (u.totalFromRefills || 0) + amount;
   saveRefDb(db);
 }
-
 function getReferralsOf(inviterId) {
   const db = loadRefDb();
   const users = (db && db.users) || {};
@@ -104,7 +89,6 @@ function getReferralsOf(inviterId) {
     .filter(([, info]) => String(info?.invitedBy || '') === iid)
     .map(([uid]) => String(uid));
 }
-
 function readJsonObjectSafe(filePath) {
   try {
     const raw = fs.readFileSync(filePath, 'utf8');
@@ -114,28 +98,22 @@ function readJsonObjectSafe(filePath) {
     return {};
   }
 }
-
 // ==== ПРОСТАЯ АНТИ-СПАМ ЗАЩИТА ====
 // @section RATE_LIMITER_GUARDS
 const RATE_LIMIT = { photo: { limit: 60, windowMs: 60*60*1000 }, video: { limit: 20, windowMs: 60*60*1000 } };
 const userBuckets = new Map(); // userId -> { kind -> [timestamps] }
-
 function canProceed(userId, kind) {
   const rules = RATE_LIMIT[kind] || RATE_LIMIT.photo;
   const now = Date.now();
   const from = now - rules.windowMs;
-
   if (!userBuckets.has(userId)) userBuckets.set(userId, {});
   const bucket = userBuckets.get(userId);
   if (!bucket[kind]) bucket[kind] = [];
-
   bucket[kind] = bucket[kind].filter(ts => ts >= from);
-
   if (bucket[kind].length >= rules.limit) return false;
   bucket[kind].push(now);
   return true;
 }
-
 const {
   ensureUser,
   userExists,
@@ -149,9 +127,7 @@ const {
   sendVideoToUser,
   probeVideo
 } = require('./store');
-
 const { spawn } = require('child_process');
-
 // ==== STORE / FFMPEG INTEGRATION ====
 // @section STORE_INTEGRATION_AND_FFMPEG_RUNNER
 function runFfmpeg(args) {
@@ -162,7 +138,6 @@ function runFfmpeg(args) {
     p.on('close', code => code === 0 ? resolve() : reject(new Error(err || `ffmpeg exit ${code}`)));
   });
 }
-
 // ==== Русское склонение для "импульса" ====
 // @section TEXT_UTILS_AND_COPYWRITING
 function pluralRu(n, one, few, many) {
@@ -174,13 +149,10 @@ function pluralRu(n, one, few, many) {
 const IMPULSE_FORMS = ['импульс', 'импульса', 'импульсов'];
 const impulseWord = (n) => pluralRu(n, ...IMPULSE_FORMS);
 // ==== /pluralRu ====
-
 const PORT      = process.env.PORT || 8080;
 const ADMIN_ID  = String(process.env.ADMIN_TELEGRAM_ID || '');
 const TG_SECRET = String(process.env.TG_WEBHOOK_SECRET || '');
-
 const app = express();
-
 // ---- CORS (единственный блок) ----
 // @section EXPRESS_BOOTSTRAP_AND_CORS
 const allowList = [/https:\/\/t\.me$/, /https:\/\/web\.telegram\.org/];
@@ -194,66 +166,49 @@ app.use(cors({
   allowedHeaders: ['Content-Type','initdata','initData','X-Requested-With'],
   maxAge: 86400,
 }));
-
 // парсинг json после CORS
 app.use(bodyParser.json());
-
 // (оставь свой логгер, если нужен)
 app.use((req, res, next) => {
   console.log('[REQ]', req.method, req.path, 'Origin:', req.headers.origin || 'none');
   next();
 });
-
 // HTML-экранирование для безопасной подстановки имени
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
-
 // Одноразовый привет (первый /start)
 function WELCOME_HTML(name) {
   return (
 `<blockquote><b>ДОБРО ПОЖАЛОВАТЬ В СИСТЕМУ, ${esc(name) || 'ТРИПОНАВТ'}</b></blockquote>
-
 В левом нижнем углу расположена кнопка запуска ядра. <b>Относись к нему с уважением.</b>
-
 Каждое преобразование расходует энергию:
-
 <blockquote><b>ФОТО = 5 импульсов | ВИДЕО = 15 импульсов</b></blockquote>
-
 Изменяй параметры и режимы отображения реальности панелями сверху и снизу.
-
 <blockquote expandable="true"><b>Узнать больше о работе ядра и дополнительные команды:</b>
-
 <b>/balance</b> — доступная энергия
 <b>/help</b> — манифест по управлению ядром
 <b>/buy_energy</b> — пополнить запасы энергии
 <b>/referal</b> — заработать импульсы</blockquote>`
   );
 }
-
 // Повторный /start
 function WELCOME_BACK_HTML(name) {
   return (
 `<blockquote><b>С ВОЗВРАЩЕНИЕМ, ${esc(name) || 'ТРИПОНАВТ'}</b></blockquote>
-
 Помни:
-
 <b>ФОТО = 5 импульсов | ВИДЕО = 15 импульсов</b>
-
 <blockquote expandable="true"><b>Взаимодействие с Ядром:</b>
-
 <b>/balance</b> — доступная энергия
 <b>/help</b> — манифест по управлению ядром
 <b>/buy_energy</b> — пополнить запасы энергии
 <b>/referal</b> — заработать импульсы</blockquote>`
   );
 }
-
 // простейшее «поминание» первого старта (сбросится при рестарте pm2)
 const greeted = new Set();
 const firstUnknownShown = new Set(); // userId -> уже показали "ЯДРО — НЕ ПОМОЙКА"
 const FIRST_UNKNOWN_LINE = '<b>ЯДРО — НЕ ПОМОЙКА.</b> Относись к нему с уважением.';
-
 // === RANDOM UNKNOWN REPLIES ===
 const UNKNOWN_LINES = [
   '<b>ЯДРО — НЕ ПОМОЙКА.</b> Относись к нему с уважением.',
@@ -272,92 +227,63 @@ const UNKNOWN_LINES = [
   '<b>Запрос отклонён в связи с отсутствием ценности.</b>',
 ];
 const rnd = arr => arr[Math.floor(Math.random() * arr.length)];
-
 function HELP_HTML() {
   return (
 `<b>: : 𝗛𝗘𝗟𝗣 ⛶ 𝗜𝗡𝗙𝗢 : :</b>
-
 <blockquote expandable="true">
 <b>«П0В3РНУТЬ»</b> — смена вывода: <b>фронтальная / основная</b> камера
-
 *при наличии единственного источника вывода или внутри режима <b>«Ф0Т0» / «ВИД30»</b> работает как «отзеркаливание»</blockquote>
-
 <blockquote expandable="true">
 <b>: : ПАНЕЛЬ НАСТРОЕК : :</b>
-
-
 <b>«Н4Б0Р»</b> — формирует алфавит символов;
-
 *помимо готовых пресетов доступен <b>«ручной ввод»</b> — инновация, позволяющая ядру собирать изображение из введённых символов на основе алгоритма градации яркости. Используй пробелы и знаки пунктуации для детализации изображения
-
 <b>«Р4ЗМЕР»</b> — определяет количество символов (чем выше, тем чётче детали);
-
 <b>«К0НТР4СТ»</b> — усиливает разницу между светом и тенью;
-
 <b>«Г4ММ4»</b> — управляет мягкостью переходов, влияя на глубину изображения;
-
 <b>«СТИЛЬ»</b> — раздел готовых цветовых пресетов;
-
 <b>«Т3КСТ» / «Ф0Н»</b> — задают цвет текста и фона (в <b>RGB / HSL / HEX</b>-коде);
-
 <b>«ИНВ3РСИЯ»</b> — меняет полярность вывода: «СВЕТ = ТЬМА», и наоборот;
-
 <b>«FPS»</b> — регулирует частоту обновления кадров: скорость, с которой Ядро реагирует на мир
 </blockquote>
 <blockquote><b>«СКРЫТЬ»</b> — прячет интерфейс, оставляя чистый поток данных</blockquote>
-
 <blockquote><b>«С0ХР4НИТЬ» </b> — запускает преобразование и отправляет результат в чат</blockquote>
-
 <blockquote expandable="true">
 <b>: : ПАНЕЛЬ РЕЖИМОВ : :</b>
-
-
 <b>«Ф0Т0»</b> = разовый оттиск реальности
-
 <b>«К4М3Р4»</b> = непрерывное наблюдение
-
 <b>«В1Д30»</b> = запись последовательности
 </blockquote>
 <code>01000111 01001111 01001111 01000100 00100000 01001100 01010101 01000011 01001011</code>`
   );
 }
-
 // ---------- Мелкие утилиты ----------
 const string = (v) => (v == null ? '' : String(v));
 function logReq(req){ console.log(`[REQ] ${req.method} ${req.url} Origin: ${req.headers.origin||'-'}`); }
-
 const TARGET_W = 1080;
 const TARGET_H = 1920;
-
 // Конвертация видео в MP4 с оптимизацией под ASCII
 // @section MEDIA_CONVERSION_PIPELINE
 async function convertToMp4(inPath, outPath, opts = {}) {
   const fps = Number(opts.fps || 30);
-
   // Баланс качества / производительности
   const crfValue = fps > 30 ? 20 : 18;        // <30fps — почти без потерь, >30fps — чуть компрессии
   const presetValue = fps > 30 ? 'veryfast' : 'fast'; // Быстрее кодирование для высоких fps
-
   // Масштабирование с сохранением пропорций
 const scaleExpr =
   `scale='min(${TARGET_W},iw)':'min(${TARGET_H},ih)':` +
   `force_original_aspect_ratio=decrease:flags=neighbor+bitexact,` +
   `fps=${fps}:round=down,setsar=1,format=yuv420p,` +
   `pad=ceil(iw/2)*2:ceil(ih/2)*2`;
-
   // Аргументы для ffmpeg
   const args = [
     '-hide_banner', '-loglevel', 'error',
-
     // Анализ потока для .MOV и тяжёлых файлов
     '-analyzeduration', '200M',
     '-probesize', '200M',
     '-sws_flags', 'neighbor+full_chroma_int+full_chroma_inp+accurate_rnd',
     '-i', inPath,
-
     // Основные фильтры и масштабирование
     '-vf', scaleExpr,
-
     // Кодек и параметры
     '-c:v', 'libx264',
     '-profile:v', 'high',
@@ -366,7 +292,6 @@ const scaleExpr =
     '-crf', String(crfValue),
     '-vsync', 'cfr',
     '-video_track_timescale', String(fps * 1000),
-
     // Чёткое ключевание без b-frames и дрожания
     '-x264-params', [
       `keyint=${fps}`,
@@ -382,26 +307,21 @@ const scaleExpr =
   '-maxrate', '12M',
   '-bufsize', '24M',
   '-movflags', '+faststart',
-
     outPath,
   ];
-
   await runFfmpeg(args);
   return outPath;
 }
-
 async function convertAndSaveVideo(inPath, tmpdir, opts = {}) {
   const path = require('path');
   const outMp4 = path.join(tmpdir, `out_${Date.now()}.mp4`);
   const fps = clampInt(opts.fps, 5, 60, 30);
-
   try {
     // Попытка #1 — профиль выше
     await convertToMp4(inPath, outMp4, { fps });
     return { path: outMp4, mime: 'video/mp4', ext: 'mp4' };
   } catch (e1) {
     console.warn('[video] mp4 attempt#1 failed:', String(e1).slice(0, 500));
-
     // Попытка #2 — ультра-простой (часто «лечит» нестандартные входы)
     const args2 = [
       '-hide_banner', '-y', '-loglevel', 'error',
@@ -426,17 +346,84 @@ async function convertAndSaveVideo(inPath, tmpdir, opts = {}) {
     }
   }
 }
-
 function clampInt(v, min, max, def) {
   const n = parseInt(String(v), 10);
   if (!Number.isFinite(n)) return def;
   return Math.min(max, Math.max(min, n));
 }
-
+const ASCII_TEXT_LIMIT = 3800;
+const TEXT_MODE_COST = 1;
+const TEXT_SIZE_PRESETS = {
+  s: { cols: 68, rows: 40 },
+  m: { cols: 82, rows: 48 },
+  l: { cols: 96, rows: 56 }
+};
+const TEXT_CHARSETS = {
+  DOTS: ' .,:;i1tfLCG08@',
+  PIXEL: ' .:-=+*#%@',
+  MICRO: ' .·•*'
+};
+function escapeHtml(s='') {
+  return String(s).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+}
+function pickTextCharset(v) {
+  const val = String(v || 'DOTS').trim();
+  if (TEXT_CHARSETS[val]) return TEXT_CHARSETS[val];
+  if (Object.values(TEXT_CHARSETS).includes(val)) return val;
+  return TEXT_CHARSETS.DOTS;
+}
+function normalizeGrid({ cols, rows }) {
+  let c = Math.max(16, Math.min(140, Math.round(cols || 80)));
+  let r = Math.max(12, Math.min(90, Math.round(rows || 48)));
+  while (((c + 1) * r) > ASCII_TEXT_LIMIT) {
+    c = Math.max(16, Math.floor(c * 0.94));
+    r = Math.max(12, Math.floor(r * 0.94));
+    if (c <= 16 && r <= 12) break;
+  }
+  return { cols: c, rows: r };
+}
+function asciiFromGrayBuffer(buffer, cols, rows, charset) {
+  const chars = Array.from(charset || TEXT_CHARSETS.DOTS);
+  const shades = chars.length > 1 ? chars.length - 1 : 1;
+  const lines = [];
+  for (let y = 0; y < rows; y++) {
+    let row = '';
+    for (let x = 0; x < cols; x++) {
+      const lum = buffer[y * cols + x] ?? 0;
+      const idx = Math.max(0, Math.min(shades, Math.round((lum / 255) * shades)));
+      row += chars[idx] || ' ';
+    }
+    lines.push(row.replace(/\t/g, ' '));
+  }
+  return lines.join('\n');
+}
+async function renderAsciiTextFromImage(inputPath, preset = 'm', charsetInput = 'DOTS') {
+  const base = TEXT_SIZE_PRESETS[preset] || TEXT_SIZE_PRESETS.m;
+  let grid = normalizeGrid(base);
+  const charset = pickTextCharset(charsetInput);
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const ffArgs = [
+      '-hide_banner', '-loglevel', 'error',
+      '-i', inputPath,
+      '-vf', `scale=${grid.cols}:${grid.rows}:flags=area,format=gray`,
+      '-f', 'rawvideo',
+      '-pix_fmt', 'gray',
+      'pipe:1'
+    ];
+    const { stdout } = await exec('ffmpeg', ffArgs, { encoding: 'buffer', maxBuffer: 10 * 1024 * 1024 });
+    const need = grid.cols * grid.rows;
+    const buf = Buffer.isBuffer(stdout) ? stdout.subarray(0, need) : Buffer.from(stdout || '').subarray(0, need);
+    const asciiText = asciiFromGrayBuffer(buf, grid.cols, grid.rows, charset);
+    if (asciiText.length <= ASCII_TEXT_LIMIT) {
+      return { asciiText, cols: grid.cols, rows: grid.rows, charset };
+    }
+    grid = normalizeGrid({ cols: Math.floor(grid.cols * 0.88), rows: Math.floor(grid.rows * 0.88) });
+  }
+  throw new Error('ASCII_TEXT_TOO_LARGE');
+}
 // Папка для временных загрузок (поддержим из .env TMP_DIR)
 const TMP_DIR = process.env.TMP_DIR || '/tmp/ascii';
 fs.mkdirSync(TMP_DIR, { recursive: true });
-
 // Multer: сохраняем во временный каталог
 const upload = multer({
   storage: multer.diskStorage({
@@ -449,14 +436,11 @@ const upload = multer({
   }),
   limits: { fileSize: 1024 * 1024 * 1024 } // до ~1 ГБ на всякий
 });
-
 // ---------- Debug ----------
 app.get('/__debug', (_req, res) => res.type('text').send(`root=${PORT}`));
-
 // ============================================================
 // ===============  HTTP API из мини-аппа  ====================
 // ============================================================
-
 // ВАЛИДАЦИЯ Telegram WebApp initData (RFC 2104 / sha256)
 // @section TELEGRAM_INITDATA_VALIDATION
 function validateInitData(initData) {
@@ -466,30 +450,24 @@ function validateInitData(initData) {
     const params = new URLSearchParams(initData);
     const hash   = params.get('hash') || '';
     params.delete('hash');
-
     // Делаем data-check-string
     const pairs = [];
     for (const [k, v] of params.entries()) pairs.push(`${k}=${v}`);
     pairs.sort();
     const dataCheckStr = pairs.join('\n');
-
     const secret   = crypto.createHmac('sha256', 'WebAppData').update(process.env.BOT_TOKEN).digest();
     const calcHash = crypto.createHmac('sha256', secret).update(dataCheckStr).digest('hex');
-
     if (calcHash !== hash) return null;
-
     // user (json)
     const userStr = params.get('user');
     const user = userStr ? JSON.parse(userStr) : null;
     const userId = user?.id ? String(user.id) : '';
-
     return userId || null;
   } catch (e) {
     console.error('[initData] validate error:', e);
     return null;
   }
 }
-
 // Текущий баланс (из мини-аппа можно дергать GET /api/balance?telegramId=...)
 // @section MINIAPP_HTTP_API_ROUTES
 app.get('/api/balance', (req, res) => {
@@ -499,24 +477,20 @@ app.get('/api/balance', (req, res) => {
   ensureUser(telegramId);
   return res.json({ ok:true, balance: getBalance(telegramId) });
 });
-
 // === ОБНОВЛЁННЫЙ ХЕНДЛЕР ДЛЯ /api/upload и /upload ===
 // Принимаем любой из ключей: file ИЛИ document, а также initdata ИЛИ initData, mediatype ИЛИ mediaType
 const uploadHandler = [
   // 1) принимаем любые поля multipart (без "Unexpected field")
   upload.any(),
-
   // 2) основной обработчик
   async (req, res) => {
     try {
-
       // --- ФАЙЛ ---
       const files = Array.isArray(req.files) ? req.files : [];
       const f =
         files.find(x => x.fieldname === 'file') ||
         files.find(x => x.fieldname === 'document') ||
         files[0];
-
       if (!f) {
         return res.status(400).json({ ok: false, error: 'NO_FILE' });
       }
@@ -524,31 +498,24 @@ const uploadHandler = [
       const originalName = f.originalname || '';
       const ext = path.extname(originalName).toLowerCase();
       const mimeType = String(f.mimetype || '').toLowerCase();
-
       // --- initData (любая форма) ---
       const rawInit =
         (req.headers['x-telegram-init-data'] || '').trim() ||
         (req.body?.initData || '').trim() ||
         (req.body?.initdata || '').trim();
-
       const userId = validateInitData(rawInit);
       if (!userId) {
-
         // подчистим файл на диске, если был сохранён
         try { if (f.path) require('fs').unlinkSync(f.path); } catch {}
         return res.status(401).json({ ok: false, error: 'INITDATA_INVALID' });
       }
-
       // --- тип медиа (любая форма ключа) ---
       let mediatype = String(req.body?.mediatype || req.body?.mediaType || 'photo').toLowerCase();
-
       // если пришёл GIF — всегда считаем его «видео»
       if (ext === '.gif' || mimeType === 'image/gif') {
         mediatype = 'video';
       }
-
       const cost = mediatype === 'video' ? 15 : 5;
-
 // Проверим длительность (для видео)
 if (mediatype === 'video') {
   const { duration } = await probeVideo(f.path); // у тебя эта функция уже есть в store.js
@@ -557,7 +524,6 @@ if (mediatype === 'video') {
     return res.status(400).json({ ok:false, error:'TOO_LONG', message:'Макс. длительность видео — 10 секунд' });
   }
 }
-
       // --- баланс / списание ---
       ensureUser(userId);
       const bal = getBalance(userId);
@@ -565,22 +531,18 @@ if (mediatype === 'video') {
         try { if (f.path) require('fs').unlinkSync(f.path); } catch {}
         return res.status(402).json({ ok: false, error: 'INSUFFICIENT_FUNDS', need: cost, balance: bal });
       }
-
 // --- отправка в ЛС бота ---
 if (mediatype === 'video') {
   const os = require('os');
   const path = require('path');
-
   const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), 'trip-vid-'));
   const userFps = clampInt(req.body.fps, 5, 60, 30);
-
   let result;
   try {
     result = await convertAndSaveVideo(f.path, tmpdir, { fps: userFps });
   } catch (e) {
     console.warn('[video] convert failed:', e?.message || e);
   }
-
   try {
     // ВСЕГДА sendVideo — никаких sendDocument/animation
     if (result?.ext === 'mp4') {
@@ -590,27 +552,21 @@ if (mediatype === 'video') {
       await sendFileToUser(userId, f.path || f.buffer, '#ascii_video (webm)');
     }
   } finally {
-
   try { await fs.promises.rm(tmpdir, { recursive: true, force: true }); } catch {}
   }
-
 } else {
   await sendFileToUser(userId, f.path || f.buffer, '#ascii_photo');
 }
-
 // --- РЕФЕРАЛЬНЫЙ БОНУС ЗА ПЕРВУЮ АКТИВАЦИЮ ЯДРА ---
       try {
         const ref = getRefInfo(String(userId));
         if (ref && !ref.bonusGiven && ref.invitedBy) {
           const inviterId = String(ref.invitedBy);
           const BONUS = 15;
-
           ensureUser(inviterId);
           add(inviterId, BONUS);
           const inviterBal = getBalance(inviterId);
-
           markReferralBonusGiven(String(userId));
-
           await sendMessage(
             inviterId,
             `<b>Приведённый тобою адепт впервые активировал Ядро.</b>\n` +
@@ -622,22 +578,51 @@ if (mediatype === 'video') {
       } catch (e) {
         console.warn('[ref] first-use bonus error:', e?.message || e);
       }
-
       // --- финал ---
       deduct(userId, cost);
       return res.json({ ok: true, balance: getBalance(userId) });
-
     } catch (e) {
       console.error('[ERR] /api/upload', e);
       return res.status(500).json({ ok: false, error: 'UPLOAD_FAILED', detail: String(e?.message || e) });
     }
   }
 ];
-
 // Регистрируем один и тот же обработчик на оба пути (как у тебя было)
 app.post('/api/upload', ...uploadHandler);
 app.post('/upload', ...uploadHandler);
-
+app.post('/api/ascii-text', upload.any(), async (req, res) => {
+  const files = Array.isArray(req.files) ? req.files : [];
+  const f = files.find(x => x.fieldname === 'file') || files.find(x => x.fieldname === 'document') || files[0];
+  if (!f) return res.status(400).json({ ok:false, error:'NO_FILE' });
+  const rawInit =
+    (req.headers['x-telegram-init-data'] || '').trim() ||
+    (req.body?.initData || '').trim() ||
+    (req.body?.initdata || '').trim();
+  const userId = validateInitData(rawInit);
+  if (!userId) {
+    try { if (f.path) fs.unlinkSync(f.path); } catch {}
+    return res.status(401).json({ ok:false, error:'INITDATA_INVALID' });
+  }
+  try {
+    ensureUser(userId);
+    const bal = getBalance(userId);
+    if (bal < TEXT_MODE_COST) {
+      return res.status(402).json({ ok:false, error:'INSUFFICIENT_FUNDS', need:TEXT_MODE_COST, balance:bal });
+    }
+    const sizePreset = String(req.body?.sizePreset || 'm').toLowerCase();
+    const charsetPreset = req.body?.charsetPreset || 'DOTS';
+    const result = await renderAsciiTextFromImage(f.path, sizePreset, charsetPreset);
+    const safeText = escapeHtml(result.asciiText);
+    await sendMessage(userId, `<pre>${safeText}</pre>`, { parse_mode: 'HTML', disable_web_page_preview: true });
+    deduct(userId, TEXT_MODE_COST);
+    return res.json({ ok:true, balance:getBalance(userId), asciiText: result.asciiText, cols: result.cols, rows: result.rows });
+  } catch (e) {
+    console.error('[ERR] /api/ascii-text', e);
+    return res.status(500).json({ ok:false, error:'ASCII_TEXT_FAILED', message:String(e?.message || e) });
+  } finally {
+    try { if (f.path) fs.unlinkSync(f.path); } catch {}
+  }
+});
 // ОСТАВЛЯЕМ: старый основной save (если где-то используется)
 // ожидает { telegramId, assetId, type } и работает через convertAndSave → sendFileToUser
 app.post('/api/save', async (req, res) => {
@@ -647,7 +632,6 @@ app.post('/api/save', async (req, res) => {
     if (!telegramId || !assetId || !type) {
       return res.status(400).json({ ok:false, message:'telegramId, assetId, type required' });
     }
-
     ensureUser(telegramId);
     const cost = (type === 'video') ? 15 : 5;
     const balance = getBalance(telegramId);
@@ -659,9 +643,7 @@ const kind = type === 'video' ? 'video' : 'photo';
 if (!canProceed(telegramId, kind)) {
   return res.status(429).json({ ok: false, error: 'Too many requests, попробуй через час' });
 }
-
     console.log('[REQ] /api/save BODY:', { telegramId, assetId, type });
-
     const outPath = await convertAndSave({ assetId, type });
     
 await sendFileToUser(telegramId, outPath, `#${assetId}`);
@@ -669,7 +651,6 @@ await sendFileToUser(telegramId, outPath, `#${assetId}`);
 try { await fs.promises.rm(outPath, { force: true }); } catch {}
 try { await fs.promises.rm(path.dirname(outPath), { recursive: true, force: true }); } catch {}
     try { fs.unlinkSync(outPath); } catch(_) {}
-
     deduct(telegramId, cost);
     res.json({ ok:true, balance: getBalance(telegramId), message: 'File processed and sent' });
   } catch (err) {
@@ -677,56 +658,43 @@ try { await fs.promises.rm(path.dirname(outPath), { recursive: true, force: true
     res.status(500).json({ ok:false, message: err.message });
   }
 });
-
 // ============================================================
 // ===============   Админские HTTP ручки   ===================
 // ============================================================
 // @section ADMIN_HTTP_ROUTES
-
 app.post('/admin/grant', (req, res) => {
   logReq(req);
   const { secret, telegramId, username, amount } = req.body || {};
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ ok:false, message:'forbidden' });
-
   const amt = Number(amount);
   if (!Number.isFinite(amt)) return res.status(400).json({ ok:false, message:'amount must be number' });
-
   const targetId = telegramId ? String(telegramId) : findIdByUsername(username);
   if (!targetId) return res.status(400).json({ ok:false, message:'telegramId or known username required' });
-
   ensureUser(targetId);
   add(targetId, amt);
   res.json({ ok:true, balance: getBalance(targetId), targetId });
 });
-
 app.post('/admin/set', (req, res) => {
   logReq(req);
   const { secret, telegramId, username, balance } = req.body || {};
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ ok:false, message:'forbidden' });
-
   const val = Number(balance);
   if (!Number.isFinite(val)) return res.status(400).json({ ok:false, message:'balance must be number' });
-
   const targetId = telegramId ? String(telegramId) : findIdByUsername(username);
   if (!targetId) return res.status(400).json({ ok:false, message:'telegramId or known username required' });
-
   ensureUser(targetId);
   const curr = getBalance(targetId);
   deduct(targetId, curr);
   add(targetId, val);
-
   res.json({ ok:true, balance: getBalance(targetId), targetId });
 });
-
 // ============================================================
 // ===============         Telegram webhook       =============
 // ============================================================
-
 async function sendMessage(chatId, text, extra = {}) {
   const url = `https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`;
   await axios.post(url, { chat_id: String(chatId), text, ...extra });
 }
-
 async function getChatSafe(chatId) {
   try {
     const url = `https://api.telegram.org/bot${process.env.BOT_TOKEN}/getChat`;
@@ -735,12 +703,9 @@ async function getChatSafe(chatId) {
   } catch (e) {}
   return null;
 }
-
 function updateUsernameCache(userId, actualUsername) {
   const usernamesObj = readJsonObjectSafe(UNAME_FILE);
-
   let changed = false;
-
   // удалить старый username этого userId
   for (const [uname, uid] of Object.entries(usernamesObj)) {
     if (String(uid) === String(userId) && uname !== actualUsername) {
@@ -748,7 +713,6 @@ function updateUsernameCache(userId, actualUsername) {
       changed = true;
     }
   }
-
   // если username есть — записать/обновить
   if (actualUsername) {
     if (usernamesObj[actualUsername] !== String(userId)) {
@@ -756,12 +720,10 @@ function updateUsernameCache(userId, actualUsername) {
       changed = true;
     }
   }
-
   if (changed) {
     fs.writeFileSync(UNAME_FILE, JSON.stringify(usernamesObj, null, 2), 'utf-8');
   }
 }
-
 async function getActualUsername(userId) {
   const chat = await getChatSafe(userId);
   if (chat && chat.username) {
@@ -772,45 +734,33 @@ async function getActualUsername(userId) {
   if (chat) updateUsernameCache(userId, null);
   return null;
 }
-
 // ==== TELEGRAM MESSAGING / BILLING HELPERS ====
 // @section TELEGRAM_BILLING_AND_MESSAGE_UTILS
 // ==== ПРОСТОЕ ФОРМАТИРОВАНИЕ [b] [i] [c] [q] [link] → HTML ====
 function applyMiniFormatting(text) {
   if (!text) return '';
-
   let out = String(text);
-
   // жирный
   out = out.replace(/\[b\](.+?)\[\/b\]/gis, '<b>$1</b>');
-
   // курсив
   out = out.replace(/\[i\](.+?)\[\/i\]/gis, '<i>$1</i>');
-
   // "код" / моноширинный блок
   out = out.replace(/\[c\](.+?)\[\/c\]/gis, '<code>$1</code>');
-
   // цитата
   out = out.replace(/\[q\](.+?)\[\/q\]/gis, '<blockquote expandable>$1</blockquote>');
-
   // гиперссылка: [link]текст|https://url[/link]
   out = out.replace(/\[link\](.+?)\|(.+?)\[\/link\]/gis, '<a href="$2">$1</a>');
-
   return out;
 }
-
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
 async function sendInvoice(chatId, pack) {
   const title = `${pack} ИМПУЛЬСОВ`;
   const description =
 'ПОДТВЕРДИ СВОЁ НАМЕРЕНИЕ:';
   // payload сохраняем в том же формате, ты уже его парсишь в successful_payment
   const payload = `buy:${pack}:${Date.now()}`;
-
   // ВАЖНО: для Stars суммы — это ЦЕЛОЕ число звёзд
   const prices = [{ label: `${pack} ИМПУЛЬСОВ`, amount: pack }];
-
   const url = `https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendInvoice`;
   await axios.post(url, {
     chat_id: String(chatId),
@@ -825,7 +775,6 @@ async function sendInvoice(chatId, pack) {
     is_flexible: false
   });
 }
-
 // /tg/webhook (команды, баланс, /send и т.п.)
 // @section TELEGRAM_WEBHOOK_HANDLER
 app.post('/tg/webhook', async (req, res) => {
@@ -836,7 +785,6 @@ app.post('/tg/webhook', async (req, res) => {
       console.log('[TG] invalid secret');
       return res.sendStatus(401);
     }
-
     const upd = req.body;
     // inline-кнопки оплаты
     const cb = upd.callback_query;
@@ -853,21 +801,17 @@ app.post('/tg/webhook', async (req, res) => {
         return res.json({ ok: true });
       }
     }
-
 const pc = upd.pre_checkout_query;
 if (pc) {
   const url = `https://api.telegram.org/bot${process.env.BOT_TOKEN}/answerPreCheckoutQuery`;
   await axios.post(url, { pre_checkout_query_id: pc.id, ok: true });
   return res.json({ ok: true });
 }
-
     const msg = upd.message || upd.edited_message;
     if (!msg) return res.sendStatus(200);
-
     if (String(msg?.chat?.type || '') !== 'private') {
       return res.json({ ok: true });
     }
-
 // успешный платёж → начисляем импульсы
 if (msg.successful_payment) {
   const fromId = String(msg.from.id || '');
@@ -878,7 +822,6 @@ if (msg.successful_payment) {
   if (Number.isFinite(pack) && pack > 0) {
     ensureUser(fromId);
     add(fromId, pack);
-
     // --- реферальный бонус 20% от пополнения ---
     try {
       const info = getRefInfo(fromId);
@@ -889,7 +832,6 @@ if (msg.successful_payment) {
           ensureUser(inviterId);
           add(inviterId, bonus);
           addReferralEarning(inviterId, bonus);
-
           const invBal = getBalance(inviterId);
           await sendMessage(
             inviterId,
@@ -903,7 +845,6 @@ if (msg.successful_payment) {
     } catch (e) {
       console.error('[ref] bonus error:', e);
     }
-
     const bal = getBalance(fromId);
     await sendMessage(fromId, `<b>ЗАЧИСЛЕНО:</b> [${pack}] ИМПУЛЬСОВ.\n<b>В ХРАНИЛИЩЕ:</b> ${bal} ${impulseWord(bal)}`,
 { parse_mode: 'HTML', disable_web_page_preview: true }
@@ -916,34 +857,29 @@ if (msg.successful_payment) {
     const fromId = string(msg.from.id || '');
     const text   = string((msg.text || '').trim());
     const textTrim = (text || '').trim();
-
     // /say — отправить произвольный текст пользователю (только для админа)
     if (/^\/say(?:@[\w_]+)?(\s|$)/i.test(textTrim)) {
       if (String(fromId) !== String(ADMIN_ID)) {
         await sendMessage(fromId, 'Хуя ты хитрый! Только Создатель может использовать эту команду.');
         return res.json({ ok: true });
       }
-
       const m = textTrim.match(/^\/say(?:@[\w_]+)?\s+([\s\S]+)$/i);
       if (!m) {
         await sendMessage(fromId, '/say <@username|user_id> <text>');
         return res.json({ ok: true });
       }
-
       const args = String(m[1] || '').trim();
       const mm = args.match(/^(\S+)\s+([\s\S]+)$/);
       if (!mm) {
         await sendMessage(fromId, '/say <@username|user_id> <text>');
         return res.json({ ok: true });
       }
-
       const targetToken = String(mm[1] || '').trim();
       const messageText = String(mm[2] || '').trim();
       if (!targetToken || !messageText) {
         await sendMessage(fromId, '/say <@username|user_id> <text>');
         return res.json({ ok: true });
       }
-
       let resolvedChatId = null;
       if (/^-?\d+$/.test(targetToken)) {
         resolvedChatId = targetToken;
@@ -956,7 +892,6 @@ if (msg.successful_payment) {
         }
         resolvedChatId = String(id);
       }
-
       try {
         const formatted = applyMiniFormatting(messageText);
         await sendMessage(resolvedChatId, formatted, { parse_mode: 'HTML' });
@@ -965,10 +900,8 @@ if (msg.successful_payment) {
         const err = String(e?.response?.data?.description || e?.message || 'send failed').slice(0, 180);
         await sendMessage(fromId, `Не удалось отправить послание: ${err}`);
       }
-
       return res.json({ ok: true });
     }
-
     // кешируем username для /send @username
     if (msg.from) setUsername(fromId, msg.from.username || '');
 // --------- /penalise (alias /punish) ---------
@@ -978,14 +911,12 @@ if (/^\/(penalise|punish)(?:@[\w_]+)?(\s|$)/i.test(text)) {
     await sendMessage(fromId, 'Хуя ты хитрый! Только Создатель может использовать эту команду.');
     return res.json({ ok:true });
   }
-
   // Форматы:
   // /penalise @username 100 причина...
   // или ответ на сообщение юзера: /penalise 100 причина...
   let targetId = null;
   let amount = null;
   let reason = '';
-
   const userMentionMatch = text.match(/^\/(penalise|punish)\s+@([A-Za-z0-9_]+)\s+(\d+)(?:\s+(.+))?/i);
   if (userMentionMatch) {
     const uname = userMentionMatch[2];
@@ -1009,45 +940,35 @@ if (/^\/(penalise|punish)(?:@[\w_]+)?(\s|$)/i.test(text)) {
     await sendMessage(fromId, 'Формат: /penalise @username 100 причина... или ответ на сообщение пользователя: /penalise 100 причина...');
     return res.json({ ok:true });
   }
-
   if (!Number.isFinite(amount) || amount <= 0) {
     await sendMessage(fromId, 'Неверная сумма для списания.');
     return res.json({ ok:true });
   }
-
   ensureUser(targetId); // гарантируем запись в хранилище
   const curr = getBalance(targetId); // функция из store.js
-
   if (curr < amount) {
     await sendMessage(fromId, `У пользователя недостаточно импульсов: есть ${curr}, требуется ${amount}. Списание отменено.`);
     return res.json({ ok:true });
   }
-
   // безопасное списание (не уходит в минус)
   deduct(targetId, amount); // или add(targetId, -amount) если у тебя так реализовано
   const newBal = getBalance(targetId);
-
   // лог
   try { fs.appendFileSync(path.join(__dirname,'penalties.log'), `${new Date().toISOString()} TG_PENALIZE admin=${fromId} target=${targetId} amt=${amount} reason=${reason}\n`); } catch(e){}
-
   // уведомления
 await sendMessage(
   targetId,
   `⚠️  ШТРАФ СИСТЕМЫ : ${amount} ${impulseWord(amount)}.\nПричина: ${reason || 'Нарушение правил обращения с Ядром'}.\nБаланс: ${newBal} ${impulseWord(newBal)}`
 );
-
   await sendMessage(fromId, `Готово. Списано ${amount}. Баланс пользователя: ${newBal}`);
-
   return res.json({ ok:true });
 }
-
 // /start (с поддержкой рефералок: /start ref_123456)
 if (/^\/start(?:@[\w_]+)?/.test(text)) {
   const name  = string(msg.from.first_name || msg.from.username || '');
   const first = !greeted.has(fromId);
   const username = (msg.from.username || '').trim();
   const isAnonymousUser = !username; // нет username → не считаем рефералом
-
   // пробуем вытащить параметр после /start
   let inviterId = null;
   const m = text.match(/^\/start(?:@[\w_]+)?\s+(.+)$/);
@@ -1058,120 +979,92 @@ if (/^\/start(?:@[\w_]+)?/.test(text)) {
       inviterId = param.slice(4); // всё после 'ref_'
     }
   }
-
   // 🔹 КЛЮЧ: проверяем, был ли юзер уже в базе ДО создания записи
   const wasKnownBefore = userExists(fromId);
-
   // создаём/гарантируем запись юзера
   ensureUser(fromId);
-
   // Регистрируем факт прихода по рефке, Но БЕЗ бонуса
   if (inviterId && inviterId !== fromId && !wasKnownBefore && !isAnonymousUser) {
     registerReferral(fromId, inviterId);
   }
-
   greeted.add(fromId);
   const html = first ? WELCOME_HTML(name) : WELCOME_BACK_HTML(name);
   await sendMessage(fromId, html, { parse_mode: 'HTML', disable_web_page_preview: true });
-
   return res.json({ ok:true });
 }
-
     // /balance
 if (text === '/balance') {
   ensureUser(fromId);
   const bal = getBalance(fromId);
-
   const msgHtml = `
 <b>В ЭНЕРГО-ХРАНИЛИЩЕ:</b> <code>[${bal}]</code> ${impulseWord(bal)}
 `;
-
   await sendMessage(
     fromId,
     msgHtml,
     { parse_mode: 'HTML', disable_web_page_preview: true }
   );
-
   return res.json({ ok:true });
 }
-
 // /referal — личная реферальная ссылка
 if (text === '/referal' || text === '/referral') {
   const botUsername = 'ascii_visor_bot';
   const link = `https://t.me/${botUsername}?start=ref_${fromId}`;
-
   const msgHtml = 
 `<b>РАСПРОСТРАНЯЙ ЯДРО:</b>
-
 <code>${link}</code>
-
 За каждого приведённого адепта, который активирует ядро по твоей ссылке и впервые сгенерирует файл/видео:
-
 <blockquote>— система выдаст тебе <code>+[15]</code> импульсов сразу
-
 — будет выдавать по 20% от всех его пополнений энергии</blockquote>
 `;
-
   await sendMessage(
     fromId,
     msgHtml,
     { parse_mode: 'HTML', disable_web_page_preview: false }
   );
-
   return res.json({ ok:true });
 }
-
 // --------- /balance @username (только для админа) ---------
 if (/^\/balance(?:@[\w_]+)?\s+@?([A-Za-z0-9_]+)\b/i.test(text)) {
   if (String(fromId) !== String(ADMIN_ID)) {
     await sendMessage(fromId, 'Ты хочешь знать больше, чем нужно.');
     return res.json({ ok:true });
   }
-
   const uname = text.match(/^\/balance(?:@[\w_]+)?\s+@?([A-Za-z0-9_]+)\b/i)[1];
   const targetId = findIdByUsername(uname);
   if (!targetId) {
     await sendMessage(fromId, `Пользователь @${uname} ещё не запускал бота или не найден.`);
     return res.json({ ok:true });
   }
-
   ensureUser(targetId);
   const bal = getBalance(targetId);
   await sendMessage(fromId, `💠 У @${uname}: ${bal} ${impulseWord(bal)}.`);
   return res.json({ ok:true });
 }
-
 // --------- /stats (только для админа) ---------
 if (/^\/stats(?:@[\w_]+)?$/i.test(text)) {
   if (String(fromId) !== String(ADMIN_ID)) {
     await sendMessage(fromId, applyMiniFormatting('[q]Отказано.[/q]'), { parse_mode: 'HTML', disable_web_page_preview: true });
     return res.json({ ok:true });
   }
-
   const balancesObj = readJsonObjectSafe(BAL_FILE);
   const usernamesObj = readJsonObjectSafe(UNAME_FILE);
-
   const userIds = Object.keys(balancesObj);
   const usersTotal = userIds.length;
   const usernamesIndexed = Object.keys(usernamesObj).length;
-
   const entries = userIds.map((uid) => ({
     userId: String(uid),
     balance: Number(balancesObj[uid] || 0)
   }));
-
   const totalImpulses = entries.reduce((sum, row) => sum + row.balance, 0);
   const avgBalance = usersTotal > 0 ? (totalImpulses / usersTotal).toFixed(2) : '0.00';
-
   const idToUsername = {};
   for (const [uname, uid] of Object.entries(usernamesObj)) {
     idToUsername[String(uid)] = String(uname);
   }
-
   const topRows = entries
     .sort((a, b) => b.balance - a.balance)
     .slice(0, 10);
-
   const top10 = [];
   for (let idx = 0; idx < topRows.length; idx += 1) {
     const row = topRows[idx];
@@ -1181,7 +1074,6 @@ if (/^\/stats(?:@[\w_]+)?$/i.test(text)) {
       : (idToUsername[row.userId] ? `@${idToUsername[row.userId]}` : row.userId);
     top10.push(`${idx + 1}) ${name} — ${row.balance}`);
   }
-
   const now = new Date().toISOString();
   const report = [
     '[b]STATS[/b]',
@@ -1195,29 +1087,24 @@ if (/^\/stats(?:@[\w_]+)?$/i.test(text)) {
     `server time: ${now}`,
     '[/q]'
   ].join('\n');
-
   await sendMessage(fromId, applyMiniFormatting(report), { parse_mode: 'HTML', disable_web_page_preview: true });
   return res.json({ ok:true });
 }
-
 // --------- /who (только для админа) ---------
 if (/^\/who(?:@[\w_]+)?\s+(.+)$/i.test(text)) {
   if (String(fromId) !== String(ADMIN_ID)) {
     await sendMessage(fromId, applyMiniFormatting('[q]Отказано.[/q]'), { parse_mode: 'HTML', disable_web_page_preview: true });
     return res.json({ ok:true });
   }
-
   const targetToken = String(text.match(/^\/who(?:@[\w_]+)?\s+(.+)$/i)[1] || '').trim();
   if (!targetToken) {
     await sendMessage(fromId, applyMiniFormatting('[q]Формат: /who @username или /who <user_id>[/q]'), { parse_mode: 'HTML', disable_web_page_preview: true });
     return res.json({ ok:true });
   }
-
   const usernamesObj = readJsonObjectSafe(UNAME_FILE);
   let targetId = null;
   let username = '';
   let known = false;
-
   if (/^-?\d+$/.test(targetToken)) {
     targetId = String(targetToken);
     for (const [uname, uid] of Object.entries(usernamesObj)) {
@@ -1236,25 +1123,20 @@ if (/^\/who(?:@[\w_]+)?\s+(.+)$/i.test(text)) {
       known = true;
     }
   }
-
   if (!targetId) {
     await sendMessage(fromId, applyMiniFormatting('[q]Пользователь не найден.[/q]'), { parse_mode: 'HTML', disable_web_page_preview: true });
     return res.json({ ok:true });
   }
-
   const actualUsername = await getActualUsername(targetId);
   if (actualUsername) username = actualUsername;
-
   const idToUsername = {};
   for (const [uname, uid] of Object.entries(usernamesObj)) {
     idToUsername[String(uid)] = String(uname);
   }
-
   const referrals = getReferralsOf(targetId);
   const refsLines = referrals.length
     ? referrals.map((rid) => idToUsername[rid] ? `@${idToUsername[rid]} (${rid})` : rid)
     : ['рефералов нет'];
-
   const whoMsg = [
     '[b]WHO[/b]',
     `username: ${username ? '@' + username : '-'}`,
@@ -1266,26 +1148,21 @@ if (/^\/who(?:@[\w_]+)?\s+(.+)$/i.test(text)) {
     ...refsLines,
     '[/q]'
   ].join('\n');
-
   await sendMessage(fromId, applyMiniFormatting(whoMsg), { parse_mode: 'HTML', disable_web_page_preview: true });
   return res.json({ ok:true });
 }
-
 // --------- /all (только для админа) ---------
 if (/^\/all(?:@[\w_]+)?\s+([\s\S]+)$/i.test(text)) {
   if (String(fromId) !== String(ADMIN_ID)) {
     await sendMessage(fromId, applyMiniFormatting('[q]Отказано.[/q]'), { parse_mode: 'HTML', disable_web_page_preview: true });
     return res.json({ ok:true });
   }
-
   const broadcastText = String(text.match(/^\/all(?:@[\w_]+)?\s+([\s\S]+)$/i)[1] || '');
   const formattedText = applyMiniFormatting(broadcastText);
   const balancesObj = readJsonObjectSafe(BAL_FILE);
   const recipients = Object.keys(balancesObj);
-
   let successCount = 0;
   let failCount = 0;
-
   for (const uid of recipients) {
     try {
       await sendMessage(String(uid), formattedText, { parse_mode: 'HTML', disable_web_page_preview: true });
@@ -1295,16 +1172,13 @@ if (/^\/all(?:@[\w_]+)?\s+([\s\S]+)$/i.test(text)) {
     }
     await sleep(34);
   }
-
   await sendMessage(
     fromId,
     applyMiniFormatting(`Рассылка завершена: ✅ ${successCount} | ❌ ${failCount}`),
     { parse_mode: 'HTML', disable_web_page_preview: true }
   );
-
   return res.json({ ok:true });
 }
-
     // /buy_energy — показать пакеты
     if (text === '/buy_energy') {
       const kb = {
@@ -1316,23 +1190,17 @@ if (/^\/all(?:@[\w_]+)?\s+([\s\S]+)$/i.test(text)) {
       };
      await sendMessage(fromId, `
     <b>ЯДРО ПИТАЕТСЯ ЭНЕРГИЕЙ:</b>
-
 <blockquote><b>ИМПУJIЬС = ЗВЕЗДА</b>
-
 <b>Ф0Т0 = 5 ИМПУJIЬС0В</b>
-
 <b>ВИД30 = 15 ИМПУJIЬС0В</b></blockquote>`,
     { parse_mode: 'HTML', reply_markup: JSON.stringify(kb) });
       return res.json({ ok: true });
     }
-
-
     // служебная /whoami
     if (text === '/whoami') {
       await sendMessage(fromId, `fromId=${fromId}\nADMIN_ID=${ADMIN_ID}`);
       return res.json({ ok:true });
     }
-
 // /send — награда от Создателя (аналог /penalise, но с плюсом)
 if (/^\/send(\s|$)/i.test(text)) {
   // только админ
@@ -1340,18 +1208,15 @@ if (/^\/send(\s|$)/i.test(text)) {
     await sendMessage(fromId, 'Хуя ты хитрый! Выдавать баланс может только Создатель.');
     return res.json({ ok: true });
   }
-
   let targetId = null;
   let amount = null;
   let reason = '';
-
   // Вариант 1: /send @username 100 комментарий...
   const byUsername = text.match(/^\/send\s+@([A-Za-z0-9_]+)\s+(\d+)(?:\s+(.+))?/i);
   if (byUsername) {
     const uname = byUsername[1];
     amount = Number(byUsername[2]);
     reason = byUsername[3] || '';
-
     const id = findIdByUsername(uname);
     if (!id) {
       await sendMessage(fromId, `Пользователь @${uname} ещё ни разу не запускал бота.`);
@@ -1359,7 +1224,6 @@ if (/^\/send(\s|$)/i.test(text)) {
     }
     targetId = String(id);
   }
-
   // Вариант 2: ответ на сообщение — /send 100 комментарий...
   else if (msg.reply_to_message && msg.reply_to_message.from) {
     const m = text.match(/^\/send\s+(\d+)(?:\s+(.+))?/i);
@@ -1372,12 +1236,10 @@ if (/^\/send(\s|$)/i.test(text)) {
       );
       return res.json({ ok: true });
     }
-
     amount = Number(m[1]);
     reason = m[2] || '';
     targetId = String(msg.reply_to_message.from.id);
   }
-
   // Ничего не подошло — подсказываем формат
   else {
     await sendMessage(
@@ -1388,31 +1250,25 @@ if (/^\/send(\s|$)/i.test(text)) {
     );
     return res.json({ ok: true });
   }
-
   if (!Number.isFinite(amount) || amount <= 0) {
     await sendMessage(fromId, 'Сумма должна быть положительным числом.');
     return res.json({ ok: true });
   }
-
   ensureUser(targetId);
   add(targetId, amount);
   const newBal = getBalance(targetId);
-
   // Сообщение пользователю
   let userMsg = `[b]ПОСЛАНИЕ СВЫШЕ:[/b] [c]+[${amount}][/c] ${impulseWord(amount)}.`;
   if (reason) {
     userMsg += `\n\n${reason}`;
   }
-
   // применяем нашу мини-разметку
   userMsg = applyMiniFormatting(userMsg);
-
   try {
     await sendMessage(targetId, userMsg, { parse_mode: 'HTML' });
   } catch (e) {
     console.warn('[send] failed to notify user:', e?.message || e);
   }
-
   // Ответ админу
   await sendMessage(
     fromId,
@@ -1420,17 +1276,14 @@ if (/^\/send(\s|$)/i.test(text)) {
     `Новый баланс: ${newBal} ${impulseWord(newBal)}` +
     (reason ? `\nСистема: ${reason}` : '')
   );
-
   return res.json({ ok: true });
 }
-
 // КОМАНДА HELP
 if (text === '/help') {
   const html = HELP_HTML();
   await sendMessage(fromId, html, { parse_mode: 'HTML', disable_web_page_preview: true });
   return res.json({ ok:true });
 }
-
 if (!firstUnknownShown.has(fromId)) {
   firstUnknownShown.add(fromId);
   await sendMessage(
@@ -1446,19 +1299,16 @@ if (!firstUnknownShown.has(fromId)) {
   );
 }
 return res.json({ ok: true });
-
   } catch (e) {
     console.error('[TG webhook error]', e);
     // Telegram ждёт 200 ОК
     res.sendStatus(200);
   }
 });
-
 // 404
 // @section FALLBACK_AND_SERVER_START
 app.use((req, res) => {
   res.type('text').status(404).send('fallback 404 ' + req.method + ' ' + req.url);
 });
-
 // Run
 app.listen(PORT, () => console.log(`[BOOT] API listening on ${PORT}`));
