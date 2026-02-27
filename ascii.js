@@ -96,6 +96,11 @@ function busyHide(force = false){
       invert:   $('#invert'),
       fs:       $('#fs'),
       style:    $('#stylePreset'),
+      modeChooser: $('#modeChooser'),
+      colorRow: $('#colorRow'),
+      resetModeBtn: $('#resetModeBtn'),
+      textSizeWrap: $('#textSizeWrap'),
+      textSizePreset: $('#textSizePreset'),
     modePhoto:   $('#modePhoto'),
     modeLive:    $('#modeLive'),
     modeVideo:   $('#modeVideo'),
@@ -263,7 +268,85 @@ let DITHER_ENABLED = true;
     viewY: 0.5,             // центр «окна» по Y (0..1)
     flashEnabled: false,
     timerSeconds: 0,
+    visorMode: 'image',
+    textSize: 'm',
   };
+
+  const TEXT_CHARSETS = {
+    DOTS: ' .,:;i1tfLCG08@',
+    PIXEL: ' .:-=+*#%@',
+    MICRO: ' .:*'
+  };
+
+  function isTextMode(){ return state.visorMode === 'text'; }
+
+  function applyVisorModeUi() {
+    document.body.classList.toggle('visor-text', isTextMode());
+    if (isTextMode()) {
+      state.mode = (state.mode === 'video') ? 'live' : state.mode;
+      state.color = '#ffffff';
+      state.background = '#000000';
+      state.transparentBg = false;
+      app.out.style.color = '#ffffff';
+      app.out.style.backgroundColor = '#000000';
+      app.stage.style.backgroundColor = '#000000';
+      if (app.ui.fg) app.ui.fg.value = '#ffffff';
+      if (app.ui.bg) app.ui.bg.value = '#000000';
+      if (app.ui.colorRow) app.ui.colorRow.hidden = true;
+      if (app.ui.textSizeWrap) app.ui.textSizeWrap.hidden = false;
+    } else {
+      if (app.ui.colorRow) app.ui.colorRow.hidden = false;
+      if (app.ui.textSizeWrap) app.ui.textSizeWrap.hidden = true;
+    }
+    rebuildCharsetOptions();
+  }
+
+  function rebuildCharsetOptions(){
+    if (!app.ui.charset) return;
+    const oldVal = app.ui.charset.value;
+    if (isTextMode()) {
+      app.ui.charset.innerHTML = `
+        <option value="${TEXT_CHARSETS.DOTS}">DOTS</option>
+        <option value="${TEXT_CHARSETS.PIXEL}">PIXEL</option>
+        <option value="${TEXT_CHARSETS.MICRO}">MICRO</option>
+        <option value="CUSTOM">(РУЧН0Й ВВ0Д)</option>`;
+      const val = [TEXT_CHARSETS.DOTS, TEXT_CHARSETS.PIXEL, TEXT_CHARSETS.MICRO, 'CUSTOM'].includes(oldVal) ? oldVal : TEXT_CHARSETS.DOTS;
+      app.ui.charset.value = val;
+      state.charset = autoSortCharset(val === 'CUSTOM' ? (app.ui.customCharset.value || TEXT_CHARSETS.DOTS) : val);
+    } else {
+      if (!app.ui.charset.dataset.imageModeOptions) {
+        app.ui.charset.dataset.imageModeOptions = app.ui.charset.innerHTML;
+      }
+      app.ui.charset.innerHTML = app.ui.charset.dataset.imageModeOptions;
+      app.ui.charset.value = oldVal || app.ui.charset.options[0]?.value || '@%#*+=-:. ';
+      state.charset = autoSortCharset(app.ui.charset.value);
+    }
+    app.ui.charset.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  function chooseVisorMode(mode){
+    state.visorMode = (mode === 'text') ? 'text' : 'image';
+    localStorage.setItem('visorMode', state.visorMode);
+    if (app.ui.modeChooser) app.ui.modeChooser.hidden = true;
+    applyVisorModeUi();
+  }
+
+  function initVisorMode(){
+    const saved = localStorage.getItem('visorMode');
+    if (saved === 'image' || saved === 'text') {
+      chooseVisorMode(saved);
+      return;
+    }
+    if (app.ui.modeChooser) {
+      app.ui.modeChooser.hidden = false;
+      app.ui.modeChooser.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-visor-mode]');
+        if (!btn) return;
+        chooseVisorMode(btn.dataset.visorMode);
+      });
+    }
+  }
+
   // ===== ВСПЫШКА (иконки + подсветка фронталки + torch для тыловой) =====
 // @section MODE_LIVE_CAMERA
   // Пытаемся включить аппаратную вспышку у активного видео-трека (если поддерживается)
@@ -819,10 +902,10 @@ function applyWidthLimitsForMode(init = false) {
   let min, max;
 
   if (isMobile) {
-    if (state.mode === 'live') {       // КАМЕРА
-      min = 50;  max = 100;
-    } else {                           // ФОТО / ВИДЕО
-      min = 50;  max = 150;            // ← расширили верх до 150 как просил
+    if (state.mode === 'live') {
+      min = 50;  max = isTextMode() ? 110 : 100;
+    } else {
+      min = 50;  max = isTextMode() ? 130 : 150;
     }
   } else {
     // Десктоп оставляем как было
@@ -1982,6 +2065,7 @@ function updateModeTabs(newMode){
 }
 
 async function setMode(newMode){
+  if (isTextMode() && newMode === 'video') newMode = 'live';
   state.mode = newMode;
 
 // если мы не в режиме Фото → прозрачный фон всегда OFF
@@ -2722,6 +2806,7 @@ app.ui.modePhoto.addEventListener('click', () => {
 
 // --- ВИДЕО: аналогично, только открываем диалог ---
 app.ui.modeVideo.addEventListener('click', () => {
+  if (isTextMode()) return;
   if (!app.ui.fileVideo) return;
 
   app.ui.fileVideo.value = '';
@@ -3133,28 +3218,97 @@ fileVideo.addEventListener('change', async (e) => {
 // --- ЕДИНАЯ функция сохранения ---
 // @section EXPORT_SAVE_SHARE
 function doSave() {
+  if (isTextMode()) {
+    sendAsciiTextToBot();
+    return;
+  }
   if (state.mode === 'photo') {
     hudSet('PNG: экспорт…');
     savePNG();
-} else if (state.mode === 'video') {
-  // GIF-источник: есть расчитанные кадры
-  const hasGif   = !!(state.gifFrames && state.gifFrames.length);
-  // Обычное видео-источник: <video> с src или srcObject
-  const hasVideo = !!(app.vid && (app.vid.src || app.vid.srcObject));
-
-  if (!hasGif && !hasVideo) {
-    alert('Нет выбранного видео.');
-    return;
+  } else if (state.mode === 'video') {
+    const hasGif = !!(state.gifFrames && state.gifFrames.length);
+    const hasVideo = !!(app.vid && (app.vid.src || app.vid.srcObject));
+    if (!hasGif && !hasVideo) {
+      alert('Нет выбранного видео.');
+      return;
+    }
+    hudSet('VIDEO: запись… (дождитесь окончания)');
+    saveVideo();
   }
-
-  hudSet('VIDEO: запись… (дождитесь окончания)');
-  saveVideo();
 }
 
+async function frameBlobForTextMode() {
+  const src = currentSource();
+  if (!src || !src.el) return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, src.w || 1);
+  canvas.height = Math.max(1, src.h || 1);
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (state.mode === 'live' && state.mirror) {
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+  }
+  ctx.drawImage(src.el, 0, 0, canvas.width, canvas.height);
+  return await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+}
+
+async function sendAsciiTextToBot() {
+  if (uploadInFlight) return;
+  const blob = await frameBlobForTextMode();
+  if (!blob) {
+    alert('Нет кадра для отправки');
+    return;
+  }
+  const tgWebApp = window.Telegram?.WebApp;
+  if (!tgWebApp?.initData) {
+    alert('Режим ТЕКСТ доступен только внутри Telegram');
+    return;
+  }
+  uploadInFlight = true;
+  const form = new FormData();
+  form.append('file', blob, 'ascii_text.jpg');
+  form.append('initData', tgWebApp.initData || '');
+  form.append('initdata', tgWebApp.initData || '');
+  form.append('charsetPreset', app.ui.charset.value || TEXT_CHARSETS.DOTS);
+  form.append('sizePreset', state.textSize || 'm');
+  busyLock = true;
+  busyShow('0ТПР4ВК4 ТЕКСТ-АРТА…');
+  try {
+    const res = await fetch('/api/ascii-text', { method:'POST', body: form });
+    const json = await res.json().catch(() => ({}));
+    if (res.status === 402 || json?.error === 'INSUFFICIENT_FUNDS') {
+      tgWebApp.showPopup?.({ title:'НЕД0СТ4Т0ЧН0 ИМПУЛЬС0В', message:`Нужно: ${json?.need ?? 1}
+Баланс: ${json?.balance ?? '—'}` });
+      return;
+    }
+    if (!res.ok) {
+      tgWebApp.showPopup?.({ title:'ОШИБКА', message: json?.message || json?.error || `Статус ${res.status}` });
+      return;
+    }
+    tgWebApp.showPopup?.({ title:'Г0Т0В0', message:`ASCII-арт отправлен в чат.${typeof json.balance !== 'undefined' ? `
+Осталось: ${json.balance}` : ''}` });
+  } catch (e) {
+    tgWebApp.showPopup?.({ title:'СЕТЕВАЯ ОШИБКА', message: e?.message || 'Не удалось отправить запрос' });
+  } finally {
+    uploadInFlight = false;
+    busyLock = false;
+    busyHide(true);
+  }
 }
 
 // Кнопка в тулбаре
 app.ui.save.addEventListener('click', doSave);
+if (app.ui.resetModeBtn) {
+  app.ui.resetModeBtn.addEventListener('click', () => {
+    localStorage.removeItem('visorMode');
+    state.visorMode = 'image';
+    applyVisorModeUi();
+    if (app.ui.modeChooser) app.ui.modeChooser.hidden = false;
+  });
+}
+if (app.ui.textSizePreset) {
+  app.ui.textSizePreset.addEventListener('change', (e) => { state.textSize = e.target.value || 'm'; });
+}
 
 // Выбираем реально «чёрный» символ под текущий стек шрифтов
 function pickDarkGlyph() {
@@ -3293,6 +3447,8 @@ if (app.ui.invert) app.ui.invert.checked = false;
     }
 
 bindUI();
+initVisorMode();
+applyVisorModeUi();
 window.addEventListener('resize', () => {
   layoutSettingsPanel();
 });
@@ -3311,7 +3467,7 @@ try {
   hasCam = devs.some(d => d.kind === 'videoinput');
 } catch(_) {}
 
-await setMode(hasCam ? 'live' : 'photo');
+await setMode(isTextMode() ? (hasCam ? 'live' : 'photo') : (hasCam ? 'live' : 'photo'));
     // стартуем отрисовку
     updateFlashUI();
     requestAnimationFrame(loop);

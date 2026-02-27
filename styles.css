@@ -866,3 +866,12 @@ body.flash-front-ui input[type="range"]::-ms-thumb {
 input[type="color"] {
   pointer-events: none !important;
 }
+
+
+.mode-chooser{position:fixed;inset:0;z-index:120000;display:flex;flex-direction:column;background:#000;}
+.mode-choice{flex:1;border:0;background:#000;color:#fff;font-family:'BetterVCR',monospace;font-size:clamp(24px,6vw,48px);letter-spacing:.08em;}
+.mode-choice + .mode-choice{border-top:1px solid #222;}
+body.visor-text #modeVideo{display:none !important;}
+body.visor-text #colorRow{display:none !important;}
+body.visor-text #textSizeWrap{display:flex !important;}
+#resetModeBtn{margin-left:auto;}
