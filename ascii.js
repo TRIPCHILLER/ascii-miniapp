@@ -26,15 +26,6 @@
   const $ = s => document.querySelector(s);
   const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
   const API_BASE = 'https://api.tripchiller.com';
-  const DEBUG_TEXT = /(?:\?|&)DEBUG_TEXT=1(?:&|$)/.test(window.location.search) || window.DEBUG_TEXT === 1;
-
-  function apiUrl(path) {
-    const cleanPath = `/${String(path || '').replace(/^\/+/, '')}`;
-    const base = String(API_BASE || window.location.origin).replace(/\/+$/, '');
-    const normalizedBase = base.replace(/\/api$/i, '');
-    const normalizedPath = cleanPath.replace(/^\/api\//i, '/');
-    return `${normalizedBase}/api${normalizedPath}`;
-  }
     // Портрет-лок (чтобы не крутилось в горизонталь, где получится каша)
   let orientationLockRequested = false;
 
@@ -1333,11 +1324,7 @@ function renderAsciiToCanvas(text, cols, rows, scale = 2.5){
 }
 
 // PNG (режим ФОТО)
-async function savePNG(){
-  if (isTextMode()) {
-    await sendAsciiTextToBot();
-    return;
-  }
+function savePNG(){
   const full = app.out.textContent || '';
   if (!full.trim()) { alert('Нечего сохранять'); return; }
 
@@ -1419,11 +1406,7 @@ c.fillRect(0, 0, d.W, d.H);
     c.fillText(lines[y], 0, y * d.stepY);  // без измерений/смещений — фиксированная сетка
   }
 }
-async function saveVideo(){
-  if (isTextMode()) {
-    await sendAsciiTextToBot();
-    return;
-  }
+function saveVideo(){
   if (state.mode !== 'video') {
     alert('Видео-экспорт доступен только в режиме ВИДЕО');
     return;
@@ -1602,7 +1585,7 @@ async function downloadBlob(blob, filename) {
       // общий таймаут (120s)
       to = setTimeout(() => ctrl.abort(), 120000);
 
-      const res = await fetch(apiUrl('/api/upload'), {
+      const res = await fetch(`${API_BASE}/api/upload`, {
         method: 'POST',
         body: form,
         signal: ctrl.signal,
@@ -2888,10 +2871,6 @@ if (app.ui.flashBtn) {
 
       const doShot = async (e) => {
         e.preventDefault();
-        if (isTextMode()) {
-          await sendAsciiTextToBot();
-          return;
-        }
         if (state.mode !== 'live') return;
         if (shotLock) return;
         shotLock = true;
@@ -3243,14 +3222,14 @@ fileVideo.addEventListener('change', async (e) => {
 
 // --- ЕДИНАЯ функция сохранения ---
 // @section EXPORT_SAVE_SHARE
-async function doSave() {
+function doSave() {
   if (isTextMode()) {
-    await sendAsciiTextToBot();
+    sendAsciiTextToBot();
     return;
   }
   if (state.mode === 'photo') {
     hudSet('PNG: экспорт…');
-    await savePNG();
+    savePNG();
   } else if (state.mode === 'video') {
     const hasGif = !!(state.gifFrames && state.gifFrames.length);
     const hasVideo = !!(app.vid && (app.vid.src || app.vid.srcObject));
@@ -3259,7 +3238,7 @@ async function doSave() {
       return;
     }
     hudSet('VIDEO: запись… (дождитесь окончания)');
-    await saveVideo();
+    saveVideo();
   }
 }
 
@@ -3299,23 +3278,15 @@ async function sendAsciiTextToBot() {
   form.append('sizePreset', state.textSize || 'm');
   busyLock = true;
   busyShow('0ТПР4ВК4 ТЕКСТ-АРТА…');
-  const textApiUrl = apiUrl('/api/ascii-text');
   try {
-    const res = await fetch(textApiUrl, { method:'POST', body: form });
-    const raw = await res.text();
-    const json = (() => {
-      try { return JSON.parse(raw || '{}'); } catch (_) { return {}; }
-    })();
+    const res = await fetch(`${API_BASE}/api/ascii-text`, { method:'POST', body: form });
+    const json = await res.json().catch(() => ({}));
     if (res.status === 402 || json?.error === 'INSUFFICIENT_FUNDS') {
       tgWebApp.showPopup?.({ title:'НЕД0СТ4Т0ЧН0 ИМПУЛЬС0В', message:`Нужно: ${json?.need ?? 1}
 Баланс: ${json?.balance ?? '—'}` });
       return;
     }
     if (!res.ok) {
-      if (DEBUG_TEXT) {
-        const bodyPreview = (raw || '').slice(0, 200);
-        alert(`TEXT SAVE ERROR: ${res.status} ${textApiUrl}${bodyPreview ? `\n${bodyPreview}` : ''}`);
-      }
       tgWebApp.showPopup?.({ title:'ОШИБКА', message: json?.message || json?.error || `Статус ${res.status}` });
       return;
     }
