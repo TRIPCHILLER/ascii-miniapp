@@ -2897,10 +2897,11 @@ if (app.ui.flashBtn) {
             app.ui.timerNumber.textContent = '';
           }
 
-          // единая маршрутизация: в ТЕКСТ-режиме всегда отправляем текст
-          if (await routeTextSaveIfNeeded()) return;
-
-          // делаем снимок (PNG-пайплайн только вне text-mode)
+          dbgState('doShot.enter', { isTextMode: isTextMode(), visorMode: state.visorMode, mode: state.mode });
+          const shotTextHandled = await routeTextSaveIfNeeded();
+          dbgState('doShot.routeTextSaveIfNeeded', { handled: shotTextHandled, mode: state.mode });
+          if (shotTextHandled) { dbgLine('doShot.return:text-mode'); return; }
+          dbgLine('doShot.branch:png');
           await Promise.resolve(savePNG());
         } catch (err) {
           console.error('[camShot]', err);
@@ -3225,8 +3226,39 @@ fileVideo.addEventListener('change', async (e) => {
 
 // --- ЕДИНАЯ функция сохранения ---
 // @section EXPORT_SAVE_SHARE
+// --- DEBUG OVERLAY (минимальный локальный лог для Telegram WebApp) ---
+let debugOverlayEl = null;
+function ensureDebugOverlay() {
+  if (debugOverlayEl) return debugOverlayEl;
+  if (!document.body) return null;
+  debugOverlayEl = document.createElement('div');
+  debugOverlayEl.id = 'debugOverlay';
+  debugOverlayEl.style.cssText = 'position:fixed;left:8px;right:8px;bottom:8px;max-height:35vh;overflow:auto;z-index:2147483647;background:rgba(0,0,0,.82);color:#7CFF7C;font:11px/1.35 monospace;padding:8px;border-radius:8px;white-space:pre-wrap;word-break:break-word;pointer-events:none;';
+  document.body.appendChild(debugOverlayEl);
+  return debugOverlayEl;
+}
+function dbgLine(msg) {
+  const el = ensureDebugOverlay();
+  const line = `[${new Date().toISOString().slice(11, 19)}] ${String(msg)}`;
+  if (!el) { console.log('[DBG]', line); return; }
+  el.textContent += (el.textContent ? '\n' : '') + line;
+  const lines = el.textContent.split('\n');
+  if (lines.length > 28) el.textContent = lines.slice(lines.length - 28).join('\n');
+  el.scrollTop = el.scrollHeight;
+}
+function dbgState(tag, data) {
+  try {
+    dbgLine(`${tag} ${JSON.stringify(data)}`);
+  } catch (_) {
+    dbgLine(`${tag} [unserializable]`);
+  }
+}
 async function doSave() {
-  if (await routeTextSaveIfNeeded()) return;
+  dbgState('doSave.enter', { isTextMode: isTextMode(), visorMode: state.visorMode, mode: state.mode });
+  const saveTextHandled = await routeTextSaveIfNeeded();
+  dbgState('doSave.routeTextSaveIfNeeded', { handled: saveTextHandled, mode: state.mode });
+  if (saveTextHandled) { dbgLine('doSave.return:text-mode'); return; }
+  dbgLine(`doSave.branch:${state.mode}`);
   if (state.mode === 'photo') {
     hudSet('PNG: экспорт…');
     savePNG();
@@ -3277,6 +3309,7 @@ async function sendAsciiTextToBot() {
   form.append('charsetPreset', app.ui.charset.value || TEXT_CHARSETS.DOTS);
   form.append('sizePreset', state.textSize || 'm');
   const textEndpointUrl = `${API_BASE}/api/ascii-text`;
+  dbgState('sendAsciiTextToBot.request', { url: textEndpointUrl, isTextMode: isTextMode(), visorMode: state.visorMode, mode: state.mode });
   busyLock = true;
   busyShow('0ТПР4ВК4 ТЕКСТ-АРТА…');
   try {
@@ -3289,14 +3322,14 @@ async function sendAsciiTextToBot() {
     }
     if (!res.ok) {
       const bodyText = await res.clone().text().catch(() => '');
-      alert(`TEXT SAVE HTTP ${res.status}\nURL=${textEndpointUrl}\nBODY=${String(bodyText || '').slice(0, 200)}`);
+      dbgState('sendAsciiTextToBot.http_error', { status: res.status, url: textEndpointUrl, body: String(bodyText || '').slice(0, 200) });
       tgWebApp.showPopup?.({ title:'ОШИБКА', message: json?.message || json?.error || `Статус ${res.status}` });
       return;
     }
     tgWebApp.showPopup?.({ title:'Г0Т0В0', message:`ASCII-арт отправлен в чат.${typeof json.balance !== 'undefined' ? `
 Осталось: ${json.balance}` : ''}` });
   } catch (e) {
-    alert(`TEXT SAVE FAILED: ${e?.message || e}\nURL=${textEndpointUrl}`);
+    dbgState('sendAsciiTextToBot.exception', { url: textEndpointUrl, error: String(e?.message || e || '').slice(0, 200) });
     tgWebApp.showPopup?.({ title:'СЕТЕВАЯ ОШИБКА', message: e?.message || 'Не удалось отправить запрос' });
   } finally {
     uploadInFlight = false;
