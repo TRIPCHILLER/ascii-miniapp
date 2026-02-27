@@ -26,13 +26,14 @@
   const $ = s => document.querySelector(s);
   const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
   const API_BASE = 'https://api.tripchiller.com';
-  const UPLOAD_API_PATH = '/upload';
-  const ASCII_TEXT_API_PATH = '/ascii-text';
+  const DEBUG_TEXT = /(?:\?|&)DEBUG_TEXT=1(?:&|$)/.test(window.location.search) || window.DEBUG_TEXT === 1;
 
   function apiUrl(path) {
     const cleanPath = `/${String(path || '').replace(/^\/+/, '')}`;
     const base = String(API_BASE || window.location.origin).replace(/\/+$/, '');
-    return `${base}${cleanPath}`;
+    const normalizedBase = base.replace(/\/api$/i, '');
+    const normalizedPath = cleanPath.replace(/^\/api\//i, '/');
+    return `${normalizedBase}/api${normalizedPath}`;
   }
     // Портрет-лок (чтобы не крутилось в горизонталь, где получится каша)
   let orientationLockRequested = false;
@@ -302,7 +303,7 @@ let DITHER_ENABLED = true;
       if (app.ui.fg) app.ui.fg.value = '#ffffff';
       if (app.ui.bg) app.ui.bg.value = '#000000';
       if (app.ui.colorRow) app.ui.colorRow.hidden = true;
-      if (app.ui.textSizeWrap) app.ui.textSizeWrap.hidden = true;
+      if (app.ui.textSizeWrap) app.ui.textSizeWrap.hidden = false;
     } else {
       if (app.ui.colorRow) app.ui.colorRow.hidden = false;
       if (app.ui.textSizeWrap) app.ui.textSizeWrap.hidden = true;
@@ -1601,7 +1602,7 @@ async function downloadBlob(blob, filename) {
       // общий таймаут (120s)
       to = setTimeout(() => ctrl.abort(), 120000);
 
-      const res = await fetch(apiUrl(UPLOAD_API_PATH), {
+      const res = await fetch(apiUrl('/api/upload'), {
         method: 'POST',
         body: form,
         signal: ctrl.signal,
@@ -3298,7 +3299,7 @@ async function sendAsciiTextToBot() {
   form.append('sizePreset', state.textSize || 'm');
   busyLock = true;
   busyShow('0ТПР4ВК4 ТЕКСТ-АРТА…');
-  const textApiUrl = apiUrl(ASCII_TEXT_API_PATH);
+  const textApiUrl = apiUrl('/api/ascii-text');
   try {
     const res = await fetch(textApiUrl, { method:'POST', body: form });
     const raw = await res.text();
@@ -3311,8 +3312,10 @@ async function sendAsciiTextToBot() {
       return;
     }
     if (!res.ok) {
-      const bodyPreview = (raw || '').slice(0, 200);
-      alert(`TEXT SAVE ERROR: ${res.status} ${textApiUrl}${bodyPreview ? `\n${bodyPreview}` : ''}`);
+      if (DEBUG_TEXT) {
+        const bodyPreview = (raw || '').slice(0, 200);
+        alert(`TEXT SAVE ERROR: ${res.status} ${textApiUrl}${bodyPreview ? `\n${bodyPreview}` : ''}`);
+      }
       tgWebApp.showPopup?.({ title:'ОШИБКА', message: json?.message || json?.error || `Статус ${res.status}` });
       return;
     }

@@ -873,5 +873,5 @@ input[type="color"] {
 .mode-choice + .mode-choice{border-top:1px solid #222;}
 body.visor-text #modeVideo{display:none !important;}
 body.visor-text #colorRow{display:none !important;}
-body.visor-text #textSizeWrap{display:none !important;}
+body.visor-text #textSizeWrap{display:flex !important;}
 #resetModeBtn{display:block;width:100%;margin-top:8px;margin-left:0;}
