@@ -2897,7 +2897,10 @@ if (app.ui.flashBtn) {
             app.ui.timerNumber.textContent = '';
           }
 
-          // делаем снимок (тот же PNG-пайплайн)
+          // единая маршрутизация: в ТЕКСТ-режиме всегда отправляем текст
+          if (await routeTextSaveIfNeeded()) return;
+
+          // делаем снимок (PNG-пайплайн только вне text-mode)
           await Promise.resolve(savePNG());
         } catch (err) {
           console.error('[camShot]', err);
@@ -3222,11 +3225,8 @@ fileVideo.addEventListener('change', async (e) => {
 
 // --- ЕДИНАЯ функция сохранения ---
 // @section EXPORT_SAVE_SHARE
-function doSave() {
-  if (isTextMode()) {
-    sendAsciiTextToBot();
-    return;
-  }
+async function doSave() {
+  if (await routeTextSaveIfNeeded()) return;
   if (state.mode === 'photo') {
     hudSet('PNG: экспорт…');
     savePNG();
@@ -3276,10 +3276,11 @@ async function sendAsciiTextToBot() {
   form.append('initdata', tgWebApp.initData || '');
   form.append('charsetPreset', app.ui.charset.value || TEXT_CHARSETS.DOTS);
   form.append('sizePreset', state.textSize || 'm');
+  const textEndpointUrl = `${API_BASE}/api/ascii-text`;
   busyLock = true;
   busyShow('0ТПР4ВК4 ТЕКСТ-АРТА…');
   try {
-    const res = await fetch(`${API_BASE}/api/ascii-text`, { method:'POST', body: form });
+    const res = await fetch(textEndpointUrl, { method:'POST', body: form });
     const json = await res.json().catch(() => ({}));
     if (res.status === 402 || json?.error === 'INSUFFICIENT_FUNDS') {
       tgWebApp.showPopup?.({ title:'НЕД0СТ4Т0ЧН0 ИМПУЛЬС0В', message:`Нужно: ${json?.need ?? 1}
@@ -3287,12 +3288,15 @@ async function sendAsciiTextToBot() {
       return;
     }
     if (!res.ok) {
+      const bodyText = await res.clone().text().catch(() => '');
+      alert(`TEXT SAVE HTTP ${res.status}\nURL=${textEndpointUrl}\nBODY=${String(bodyText || '').slice(0, 200)}`);
       tgWebApp.showPopup?.({ title:'ОШИБКА', message: json?.message || json?.error || `Статус ${res.status}` });
       return;
     }
     tgWebApp.showPopup?.({ title:'Г0Т0В0', message:`ASCII-арт отправлен в чат.${typeof json.balance !== 'undefined' ? `
 Осталось: ${json.balance}` : ''}` });
   } catch (e) {
+    alert(`TEXT SAVE FAILED: ${e?.message || e}\nURL=${textEndpointUrl}`);
     tgWebApp.showPopup?.({ title:'СЕТЕВАЯ ОШИБКА', message: e?.message || 'Не удалось отправить запрос' });
   } finally {
     uploadInFlight = false;
@@ -3308,6 +3312,12 @@ if (app.ui.resetModeBtn) {
     bindModeChooserOnce();
     if (app.ui.modeChooser) app.ui.modeChooser.hidden = false;
   });
+}
+
+async function routeTextSaveIfNeeded() {
+  if (!isTextMode()) return false;
+  await sendAsciiTextToBot();
+  return true;
 }
 if (app.ui.textSizePreset) {
   app.ui.textSizePreset.addEventListener('change', (e) => { state.textSize = e.target.value || 'm'; });
