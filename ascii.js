@@ -3314,19 +3314,22 @@ async function sendAsciiTextToBot() {
   busyShow('0ТПР4ВК4 ТЕКСТ-АРТА…');
   try {
     const res = await fetch(textEndpointUrl, { method:'POST', body: form });
-    const json = await res.json().catch(() => ({}));
+    const raw = await res.text();
+    let json = null;
+    try { json = JSON.parse(raw || '{}'); } catch (_) { json = null; }
     if (res.status === 402 || json?.error === 'INSUFFICIENT_FUNDS') {
       tgWebApp.showPopup?.({ title:'НЕД0СТ4Т0ЧН0 ИМПУЛЬС0В', message:`Нужно: ${json?.need ?? 1}
 Баланс: ${json?.balance ?? '—'}` });
       return;
     }
     if (!res.ok) {
-      const bodyText = await res.clone().text().catch(() => '');
-      dbgState('sendAsciiTextToBot.http_error', { status: res.status, url: textEndpointUrl, body: String(bodyText || '').slice(0, 200) });
-      tgWebApp.showPopup?.({ title:'ОШИБКА', message: json?.message || json?.error || `Статус ${res.status}` });
+      const rawHead = String(raw || '').slice(0, 200);
+      dbgState('sendAsciiTextToBot.http_error', { status: res.status, url: textEndpointUrl, body: rawHead });
+      tgWebApp.showPopup?.({ title:'ОШИБКА', message: `Статус ${res.status}\n${textEndpointUrl}\n${rawHead}` });
       return;
     }
-    tgWebApp.showPopup?.({ title:'Г0Т0В0', message:`ASCII-арт отправлен в чат.${typeof json.balance !== 'undefined' ? `
+    const okText = typeof json?.message === 'string' ? json.message : raw;
+    tgWebApp.showPopup?.({ title:'Г0Т0В0', message:`${okText ? `${okText}\n` : ''}ASCII-арт отправлен в чат.${typeof json?.balance !== 'undefined' ? `
 Осталось: ${json.balance}` : ''}` });
   } catch (e) {
     dbgState('sendAsciiTextToBot.exception', { url: textEndpointUrl, error: String(e?.message || e || '').slice(0, 200) });
