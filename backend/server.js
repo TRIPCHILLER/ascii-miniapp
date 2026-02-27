@@ -590,7 +590,7 @@ if (mediatype === 'video') {
 // Регистрируем один и тот же обработчик на оба пути (как у тебя было)
 app.post('/api/upload', ...uploadHandler);
 app.post('/upload', ...uploadHandler);
-app.post('/api/ascii-text', upload.any(), async (req, res) => {
+const asciiTextHandler = async (req, res) => {
   const files = Array.isArray(req.files) ? req.files : [];
   const f = files.find(x => x.fieldname === 'file') || files.find(x => x.fieldname === 'document') || files[0];
   if (!f) return res.status(400).json({ ok:false, error:'NO_FILE' });
@@ -617,12 +617,14 @@ app.post('/api/ascii-text', upload.any(), async (req, res) => {
     deduct(userId, TEXT_MODE_COST);
     return res.json({ ok:true, balance:getBalance(userId), asciiText: result.asciiText, cols: result.cols, rows: result.rows });
   } catch (e) {
-    console.error('[ERR] /api/ascii-text', e);
+    console.error('[ERR] /api/ascii-text|/ascii-text', e);
     return res.status(500).json({ ok:false, error:'ASCII_TEXT_FAILED', message:String(e?.message || e) });
   } finally {
     try { if (f.path) fs.unlinkSync(f.path); } catch {}
   }
-});
+};
+app.post('/api/ascii-text', upload.any(), asciiTextHandler);
+app.post('/ascii-text', upload.any(), asciiTextHandler);
 // ОСТАВЛЯЕМ: старый основной save (если где-то используется)
 // ожидает { telegramId, assetId, type } и работает через convertAndSave → sendFileToUser
 app.post('/api/save', async (req, res) => {
