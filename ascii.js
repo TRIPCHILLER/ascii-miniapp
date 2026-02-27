@@ -3290,15 +3290,27 @@ async function frameBlobForTextMode() {
 }
 
 async function sendAsciiTextToBot() {
+  const tgWebApp = window.Telegram?.WebApp;
+  const tgPopup = (title, message) => {
+    const safeTitle = String(title || '').slice(0, 32);
+    const safeMessage = String(message || '').slice(0, 220);
+    try {
+      if (tgWebApp?.showPopup) {
+        tgWebApp.showPopup({ title: safeTitle, message: safeMessage });
+        return;
+      }
+    } catch (_) {}
+    alert([safeTitle, safeMessage].filter(Boolean).join('\n'));
+  };
+
   if (uploadInFlight) return;
   const blob = await frameBlobForTextMode();
   if (!blob) {
-    alert('Нет кадра для отправки');
+    tgPopup('ОШИБКА', 'Нет кадра для отправки');
     return;
   }
-  const tgWebApp = window.Telegram?.WebApp;
   if (!tgWebApp?.initData) {
-    alert('Режим ТЕКСТ доступен только внутри Telegram');
+    tgPopup('ОШИБКА', 'Режим ТЕКСТ доступен только внутри Telegram');
     return;
   }
   uploadInFlight = true;
@@ -3307,7 +3319,12 @@ async function sendAsciiTextToBot() {
   form.append('initData', tgWebApp.initData || '');
   form.append('initdata', tgWebApp.initData || '');
   form.append('charsetPreset', app.ui.charset.value || TEXT_CHARSETS.DOTS);
-  form.append('sizePreset', state.textSize || 'm');
+  const n = Number(state.textSize);
+  let preset = 'm';
+  if (Number.isFinite(n) && n <= 35) preset = 's';
+  else if (Number.isFinite(n) && n <= 80) preset = 'm';
+  else if (Number.isFinite(n)) preset = 'l';
+  form.append('sizePreset', preset);
   const textEndpointUrl = `${API_BASE}/api/ascii-text`;
   dbgState('sendAsciiTextToBot.request', { url: textEndpointUrl, isTextMode: isTextMode(), visorMode: state.visorMode, mode: state.mode });
   busyLock = true;
@@ -3318,22 +3335,20 @@ async function sendAsciiTextToBot() {
     let json = null;
     try { json = JSON.parse(raw || '{}'); } catch (_) { json = null; }
     if (res.status === 402 || json?.error === 'INSUFFICIENT_FUNDS') {
-      tgWebApp.showPopup?.({ title:'НЕД0СТ4Т0ЧН0 ИМПУЛЬС0В', message:`Нужно: ${json?.need ?? 1}
-Баланс: ${json?.balance ?? '—'}` });
+      const rawHead = String(raw || '').slice(0, 200);
+      tgPopup('НЕД0СТ4Т0ЧН0 ИМПУЛЬС0В', `Нужно: ${json?.need ?? 1}\nБаланс: ${json?.balance ?? '—'}${rawHead ? `\n${rawHead}` : ''}`);
       return;
     }
     if (!res.ok) {
       const rawHead = String(raw || '').slice(0, 200);
       dbgState('sendAsciiTextToBot.http_error', { status: res.status, url: textEndpointUrl, body: rawHead });
-      tgWebApp.showPopup?.({ title:'ОШИБКА', message: `Статус ${res.status}\n${textEndpointUrl}\n${rawHead}` });
+      tgPopup('ОШИБКА', `Статус ${res.status}\n${textEndpointUrl}\n${rawHead}`);
       return;
     }
-    const okText = typeof json?.message === 'string' ? json.message : raw;
-    tgWebApp.showPopup?.({ title:'Г0Т0В0', message:`${okText ? `${okText}\n` : ''}ASCII-арт отправлен в чат.${typeof json?.balance !== 'undefined' ? `
-Осталось: ${json.balance}` : ''}` });
+    tgPopup('Г0Т0В0', `ASCII-арт отправлен в чат.${typeof json?.balance !== 'undefined' ? `\nОсталось: ${json.balance}` : ''}`);
   } catch (e) {
     dbgState('sendAsciiTextToBot.exception', { url: textEndpointUrl, error: String(e?.message || e || '').slice(0, 200) });
-    tgWebApp.showPopup?.({ title:'СЕТЕВАЯ ОШИБКА', message: e?.message || 'Не удалось отправить запрос' });
+    tgPopup('СЕТЕВАЯ ОШИБКА', String(e?.message || 'Не удалось отправить запрос').slice(0, 200));
   } finally {
     uploadInFlight = false;
     busyLock = false;
