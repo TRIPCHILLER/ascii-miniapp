@@ -25,6 +25,7 @@
   // @section UTILS
   const $ = s => document.querySelector(s);
   const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
+  const API_BASE = 'https://api.tripchiller.com';
     // Портрет-лок (чтобы не крутилось в горизонталь, где получится каша)
   let orientationLockRequested = false;
 
@@ -298,7 +299,19 @@ let DITHER_ENABLED = true;
       if (app.ui.colorRow) app.ui.colorRow.hidden = false;
       if (app.ui.textSizeWrap) app.ui.textSizeWrap.hidden = true;
     }
+    applyWidthLimitsForMode();
     rebuildCharsetOptions();
+  }
+
+  let modeChooserListenerBound = false;
+  function bindModeChooserOnce() {
+    if (!app.ui.modeChooser || modeChooserListenerBound) return;
+    app.ui.modeChooser.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-visor-mode]');
+      if (!btn) return;
+      chooseVisorMode(btn.dataset.visorMode);
+    });
+    modeChooserListenerBound = true;
   }
 
   function rebuildCharsetOptions(){
@@ -332,19 +345,8 @@ let DITHER_ENABLED = true;
   }
 
   function initVisorMode(){
-    const saved = localStorage.getItem('visorMode');
-    if (saved === 'image' || saved === 'text') {
-      chooseVisorMode(saved);
-      return;
-    }
-    if (app.ui.modeChooser) {
-      app.ui.modeChooser.hidden = false;
-      app.ui.modeChooser.addEventListener('click', (e) => {
-        const btn = e.target.closest('[data-visor-mode]');
-        if (!btn) return;
-        chooseVisorMode(btn.dataset.visorMode);
-      });
-    }
+    bindModeChooserOnce();
+    if (app.ui.modeChooser) app.ui.modeChooser.hidden = false;
   }
 
   // ===== ВСПЫШКА (иконки + подсветка фронталки + torch для тыловой) =====
@@ -901,11 +903,14 @@ async function startStream() {
 function applyWidthLimitsForMode(init = false) {
   let min, max;
 
-  if (isMobile) {
+  if (isTextMode()) {
+    min = 25;
+    max = 75;
+  } else if (isMobile) {
     if (state.mode === 'live') {
-      min = 50;  max = isTextMode() ? 110 : 100;
+      min = 50;  max = 100;
     } else {
-      min = 50;  max = isTextMode() ? 130 : 150;
+      min = 50;  max = 150;
     }
   } else {
     // Десктоп оставляем как было
@@ -1580,7 +1585,7 @@ async function downloadBlob(blob, filename) {
       // общий таймаут (120s)
       to = setTimeout(() => ctrl.abort(), 120000);
 
-      const res = await fetch('https://api.tripchiller.com/api/upload', {
+      const res = await fetch(`${API_BASE}/api/upload`, {
         method: 'POST',
         body: form,
         signal: ctrl.signal,
@@ -3274,7 +3279,7 @@ async function sendAsciiTextToBot() {
   busyLock = true;
   busyShow('0ТПР4ВК4 ТЕКСТ-АРТА…');
   try {
-    const res = await fetch('/api/ascii-text', { method:'POST', body: form });
+    const res = await fetch(`${API_BASE}/api/ascii-text`, { method:'POST', body: form });
     const json = await res.json().catch(() => ({}));
     if (res.status === 402 || json?.error === 'INSUFFICIENT_FUNDS') {
       tgWebApp.showPopup?.({ title:'НЕД0СТ4Т0ЧН0 ИМПУЛЬС0В', message:`Нужно: ${json?.need ?? 1}
@@ -3300,9 +3305,7 @@ async function sendAsciiTextToBot() {
 app.ui.save.addEventListener('click', doSave);
 if (app.ui.resetModeBtn) {
   app.ui.resetModeBtn.addEventListener('click', () => {
-    localStorage.removeItem('visorMode');
-    state.visorMode = 'image';
-    applyVisorModeUi();
+    bindModeChooserOnce();
     if (app.ui.modeChooser) app.ui.modeChooser.hidden = false;
   });
 }

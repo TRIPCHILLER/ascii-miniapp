@@ -874,4 +874,4 @@ input[type="color"] {
 body.visor-text #modeVideo{display:none !important;}
 body.visor-text #colorRow{display:none !important;}
 body.visor-text #textSizeWrap{display:flex !important;}
-#resetModeBtn{margin-left:auto;}
+#resetModeBtn{display:block;width:100%;margin-top:8px;margin-left:0;}
