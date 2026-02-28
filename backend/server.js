@@ -364,7 +364,7 @@ const TEXT_SIZE_PRESETS = {
   l: { cols: 96, rows: 56 }
 };
 const TEXT_CHARSETS = {
-  DOTS: ' .,:;i1tfLCG08@',
+  DOTS: ' .,:;-=+*#%@',
   PIXEL: ' .:-=+*#%@',
   MICRO: ' .·•*',
   SIMPLE_RAMP: ' .:-=+*#%@'
@@ -374,7 +374,7 @@ function escapeHtml(s='') {
 }
 function resolveTextCharset({ charsetInput, charsetPreset, cols }) {
   const inputRaw = String(charsetInput || '').trim();
-  if (inputRaw) {
+  if (Array.from(inputRaw).length >= 2) {
     if (TEXT_CHARSETS[inputRaw]) {
       return { charset: TEXT_CHARSETS[inputRaw], source: 'input', presetName: inputRaw };
     }
@@ -392,9 +392,9 @@ function resolveTextCharset({ charsetInput, charsetPreset, cols }) {
   }
 
   if (Number.isFinite(cols) && cols < 34) {
-    return { charset: TEXT_CHARSETS.SIMPLE_RAMP, source: 'fallback', presetName: 'SIMPLE_RAMP' };
+    return { charset: TEXT_CHARSETS.SIMPLE_RAMP, source: 'default', presetName: 'SIMPLE_RAMP' };
   }
-  return { charset: TEXT_CHARSETS.DOTS, source: 'fallback', presetName: 'DOTS' };
+  return { charset: TEXT_CHARSETS.DOTS, source: 'default', presetName: 'DOTS' };
 }
 function normalizeGrid({ cols, rows }) {
   let c = Math.max(TEXT_COLS_MIN, Math.min(TEXT_COLS_MAX, Math.round(cols || 80)));
@@ -480,8 +480,11 @@ async function renderAsciiTextFromImage(inputPath, options = {}) {
         asciiText,
         cols: grid.cols,
         rows: grid.rows,
+        finalCols: grid.cols,
+        finalRows: grid.rows,
         charset,
         preset,
+        selectedCharset: charset,
         selectedCharsetSource: charsetResolved.source,
         selectedCharsetPreset: charsetResolved.presetName,
         requestedCols: requestedCols || null,
@@ -693,7 +696,7 @@ app.post('/api/ascii-text', upload.any(), async (req, res) => {
     const charsetPreset = pickField('charsetPreset', null);
     const charsetInput = pickField('charsetInput', null);
     const result = await renderAsciiTextFromImage(f.path, { preset: sizePreset, cols, charsetInput, charsetPreset });
-    console.debug(`[ascii-text] requestedCols=${requestedColsRaw ?? 'null'}, parsedCols=${cols ?? 'null'}, preset=${sizePreset}, finalCols=${result.cols}, finalRows=${result.rows}, selectedCharsetSource=${result.selectedCharsetSource}, selectedCharsetPreset=${result.selectedCharsetPreset ?? 'null'}`);
+    console.debug(`[ascii-text] requestedCols=${requestedColsRaw ?? 'null'}, parsedCols=${cols ?? 'null'}, preset=${sizePreset}, finalCols=${result.finalCols}, finalRows=${result.finalRows}, selectedCharset=${JSON.stringify(result.selectedCharset)}, selectedCharsetSource=${result.selectedCharsetSource}`);
     const safeText = escapeHtml(result.asciiText);
     await sendMessage(userId, `<pre>${safeText}</pre>`, { parse_mode: 'HTML', disable_web_page_preview: true });
     deduct(userId, TEXT_MODE_COST);
@@ -703,6 +706,9 @@ app.post('/api/ascii-text', upload.any(), async (req, res) => {
       asciiText: result.asciiText,
       cols: result.cols,
       rows: result.rows,
+      finalCols: result.finalCols,
+      finalRows: result.finalRows,
+      selectedCharset: result.selectedCharset,
       selectedCharsetSource: result.selectedCharsetSource,
       selectedCharsetPreset: result.selectedCharsetPreset
     });
