@@ -238,6 +238,7 @@ let DITHER_ENABLED = true;
     background: '#000000',
     transparentBg: false, // «прозрачный фон» для экспорта
     charset: '@%#*+=-:. ',
+    renderCharset10: '@%#*+=-:. ',
     invert: false,
     isFullscreen: false,    // наш флаг
     blackPoint: 0.06,   // 0..1 — общий дефолт
@@ -648,11 +649,41 @@ function pickPalette(_bins, fixedByBinArr = []) {
     // из остальных избегаем фиксированных символов
     const pool = bucket.filter(ch => !fixedChars.includes(ch));
     const src = pool.length ? pool : bucket;
-    return src[Math.floor(Math.random() * src.length)];
+    return src[0] || ' ';
   });
 }
 
+function rebuildRenderCharset10() {
+  const densSorted = computeDensities(state.charset || '');
+  if (!densSorted.length) {
+    state.renderCharset10 = '';
+    return;
+  }
+  if (densSorted.length <= 10) {
+    state.renderCharset10 = densSorted.map(x => x.ch).join('');
+    return;
+  }
+
+  const picked = [];
+  const used = new Set();
+  for (let i = 0; i < 10; i++) {
+    const pos = Math.round((i * (densSorted.length - 1)) / 9);
+    let j = pos;
+    while (j < densSorted.length && used.has(densSorted[j].ch)) j++;
+    if (j >= densSorted.length) {
+      j = pos;
+      while (j >= 0 && used.has(densSorted[j].ch)) j--;
+    }
+    if (j >= 0 && j < densSorted.length) {
+      used.add(densSorted[j].ch);
+      picked.push(densSorted[j].ch);
+    }
+  }
+  state.renderCharset10 = picked.join('');
+}
+
 function updateBinsForCurrentCharset() {
+  rebuildRenderCharset10();
   // включаем «умное сужение» только для длинных наборов
   if (state.charset && state.charset.length > K_BINS) {
     // 1) тёмные → светлые, без дублей
@@ -682,28 +713,9 @@ try {
     bins = buildBinsFromChars(state.charset, K_BINS);
     palette = pickPalette(bins, fixedByBin);
 
-    // 4) ротация похожих символов ТОЛЬКО в нефиксированных бинах
+    // 4) realtime-замены отключены: палитра теперь детерминированная
     if (paletteTimer) clearInterval(paletteTimer);
-paletteTimer = null;
-
-if (ROTATE_PALETTE) {
-  paletteTimer = setInterval(() => {
-    if (!bins || !bins.length) return;
-
-    const lockN = Math.min(DARK_LOCK_COUNT, K_BINS);
-    for (let k = 0; k < CHANGES_PER_TICK; k++) {
-      const bi = Math.floor(Math.random() * (K_BINS - lockN)) + lockN;
-      const bucket = bins[bi];
-      if (!bucket || !bucket.length) continue;
-
-      const fixedChars = fixedByBin.filter(Boolean);
-      let pool = bucket.filter(ch => !fixedChars.includes(ch));
-      if (!pool.length) pool = bucket;
-
-      palette[bi] = pool[Math.floor(Math.random() * pool.length)];
-    }
-  }, PALETTE_INTERVAL);
-}
+    paletteTimer = null;
 
   } else {
     // короткие наборы — без редьюса/ротации
@@ -1077,7 +1089,7 @@ ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     const data = ctx.getImageData(0, 0, w, h).data;
 // Генерация ASCII (юникод-безопасно + поддержка пустого набора)
-const chars = Array.from(state.charset || '');
+const chars = Array.from(state.renderCharset10 || state.charset || '');
 const n = chars.length - 1;
 
 if (n < 0) {
@@ -1126,13 +1138,7 @@ if (DITHER_ENABLED) {
 if (idx < 0) idx = 0;
 else if (idx > n) idx = n;
 
-if (palette && palette.length === K_BINS) {
-  let bi = Math.round((Yc / 255) * (K_BINS - 1));
-  if (bi < 0) bi = 0; else if (bi >= K_BINS) bi = K_BINS - 1;
-  line += palette[bi] || ' ';
-} else {
-  line += chars[idx];
-}
+line += chars[idx];
 
   }
   out += line + '\n';
@@ -2069,6 +2075,7 @@ function updateModeTabs(newMode){
 async function setMode(newMode){
   if (isTextMode() && newMode === 'video') newMode = 'live';
   state.mode = newMode;
+  rebuildRenderCharset10();
 
 // если мы не в режиме Фото → прозрачный фон всегда OFF
 if (newMode !== 'photo') {
