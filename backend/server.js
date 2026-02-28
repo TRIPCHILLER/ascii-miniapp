@@ -364,9 +364,9 @@ const TEXT_SIZE_PRESETS = {
   l: { cols: 96, rows: 56 }
 };
 const TEXT_CHARSETS = {
-  DOTS: ' .,:;i1tfLCG08@',
+  DOTS: ' .:-=+*#%@',
   PIXEL: ' .:-=+*#%@',
-  MICRO: ' .·•*',
+  MICRO: ' .:*',
   SIMPLE_RAMP: ' .:-=+*#%@'
 };
 function escapeHtml(s='') {
@@ -410,6 +410,41 @@ function parseTextCols(v) {
   const n = parseInt(String(v ?? ''), 10);
   if (!Number.isFinite(n)) return null;
   return Math.max(TEXT_COLS_MIN, Math.min(TEXT_COLS_MAX, n));
+}
+function parseTextRows(v) {
+  const n = parseInt(String(v ?? ''), 10);
+  if (!Number.isFinite(n)) return null;
+  return Math.max(TEXT_ROWS_MIN, Math.min(TEXT_ROWS_MAX, n));
+}
+function sanitizeAsciiSnapshot(rawAscii, requestedCols, requestedRows) {
+  const input = String(rawAscii || '').replace(/\r\n?/g, '\n');
+  const trimmedTrailing = input.replace(/\n+$/g, '');
+  const lines = trimmedTrailing ? trimmedTrailing.split('\n') : [];
+
+  const sourceCols = lines.reduce((m, line) => Math.max(m, Array.from(line).length), 0);
+  const sourceRows = lines.length;
+  let cols = Number.isFinite(requestedCols) ? requestedCols : sourceCols;
+  let rows = Number.isFinite(requestedRows) ? requestedRows : sourceRows;
+  if (!Number.isFinite(cols) || cols <= 0) cols = TEXT_COLS_MIN;
+  if (!Number.isFinite(rows) || rows <= 0) rows = TEXT_ROWS_MIN;
+
+  cols = Math.max(TEXT_COLS_MIN, Math.min(TEXT_COLS_MAX, Math.round(cols)));
+  rows = Math.max(TEXT_ROWS_MIN, Math.min(TEXT_ROWS_MAX, Math.round(rows)));
+
+  const slicedRows = lines.slice(0, rows).map((line) => Array.from(line || '').slice(0, cols).join(''));
+  const normalizedRows = slicedRows.length;
+  const normalizedCols = slicedRows.reduce((m, line) => Math.max(m, Array.from(line).length), 0);
+  let asciiText = slicedRows.join('\n');
+
+  if (asciiText.length > ASCII_TEXT_LIMIT) {
+    const maxRowsByLen = Math.max(1, Math.min(normalizedRows || rows, Math.floor(ASCII_TEXT_LIMIT / Math.max(1, normalizedCols + 1))));
+    asciiText = slicedRows.slice(0, maxRowsByLen).join('\n').slice(0, ASCII_TEXT_LIMIT);
+  }
+
+  const finalLines = asciiText ? asciiText.split('\n') : [];
+  const finalRows = finalLines.length;
+  const finalCols = finalLines.reduce((m, line) => Math.max(m, Array.from(line).length), 0);
+  return { asciiText, finalRows, finalCols, asciiLen: asciiText.length };
 }
 async function probeImageSize(inputPath) {
   try {
@@ -665,7 +700,6 @@ app.post('/upload', ...uploadHandler);
 app.post('/api/ascii-text', upload.any(), async (req, res) => {
   const files = Array.isArray(req.files) ? req.files : [];
   const f = files.find(x => x.fieldname === 'file') || files.find(x => x.fieldname === 'document') || files[0];
-  if (!f) return res.status(400).json({ ok:false, error:'NO_FILE' });
   const rawInit =
     (req.headers['x-telegram-init-data'] || '').trim() ||
     (req.body?.initData || '').trim() ||
@@ -688,12 +722,35 @@ app.post('/api/ascii-text', upload.any(), async (req, res) => {
       return Array.isArray(raw) ? raw[0] : raw;
     };
     const requestedColsRaw = pickField('cols', null);
+    const requestedRowsRaw = pickField('rows', null);
     const sizePreset = String(pickField('sizePreset', 'm') || 'm').toLowerCase();
     const cols = parseTextCols(requestedColsRaw);
+    const rows = parseTextRows(requestedRowsRaw);
     const charsetPreset = pickField('charsetPreset', null);
+    const charsetUsed = String(pickField('charsetUsed', '') || '');
     const charsetInput = pickField('charsetInput', null);
-    const result = await renderAsciiTextFromImage(f.path, { preset: sizePreset, cols, charsetInput, charsetPreset });
-    console.debug(`[ascii-text] requestedCols=${requestedColsRaw ?? 'null'}, parsedCols=${cols ?? 'null'}, preset=${sizePreset}, finalCols=${result.cols}, finalRows=${result.rows}, selectedCharsetSource=${result.selectedCharsetSource}, selectedCharsetPreset=${result.selectedCharsetPreset ?? 'null'}`);
+    const incomingAsciiText = String(pickField('asciiText', '') || '');
+    let result;
+    if (incomingAsciiText.trim()) {
+      const snapshot = sanitizeAsciiSnapshot(incomingAsciiText, cols, rows);
+      result = {
+        asciiText: snapshot.asciiText,
+        cols: snapshot.finalCols,
+        rows: snapshot.finalRows,
+        asciiLen: snapshot.asciiLen,
+        selectedCharsetSource: 'snapshot',
+        selectedCharset: charsetUsed || charsetPreset || TEXT_CHARSETS.DOTS
+      };
+    } else {
+      if (!f) return res.status(400).json({ ok:false, error:'NO_FILE' });
+      const rendered = await renderAsciiTextFromImage(f.path, { preset: sizePreset, cols, charsetInput, charsetPreset });
+      result = {
+        ...rendered,
+        asciiLen: rendered.asciiText.length,
+        selectedCharset: rendered.charset
+      };
+    }
+    console.debug(`[ascii-text] requestedCols=${requestedColsRaw ?? 'null'}, requestedRows=${requestedRowsRaw ?? 'null'}, parsedCols=${cols ?? 'null'}, parsedRows=${rows ?? 'null'}, preset=${sizePreset}, finalCols=${result.cols}, finalRows=${result.rows}, asciiLen=${result.asciiLen}, selectedCharsetSource=${result.selectedCharsetSource}, selectedCharset=${String(result.selectedCharset || '').slice(0, 64)}`);
     const safeText = escapeHtml(result.asciiText);
     await sendMessage(userId, `<pre>${safeText}</pre>`, { parse_mode: 'HTML', disable_web_page_preview: true });
     deduct(userId, TEXT_MODE_COST);
@@ -703,7 +760,11 @@ app.post('/api/ascii-text', upload.any(), async (req, res) => {
       asciiText: result.asciiText,
       cols: result.cols,
       rows: result.rows,
+      finalCols: result.cols,
+      finalRows: result.rows,
+      asciiLen: result.asciiLen,
       selectedCharsetSource: result.selectedCharsetSource,
+      selectedCharset: result.selectedCharset,
       selectedCharsetPreset: result.selectedCharsetPreset
     });
   } catch (e) {
