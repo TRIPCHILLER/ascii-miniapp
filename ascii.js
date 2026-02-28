@@ -100,8 +100,6 @@ function busyHide(force = false){
       modeChooser: $('#modeChooser'),
       colorRow: $('#colorRow'),
       resetModeBtn: $('#resetModeBtn'),
-      textSizeWrap: $('#textSizeWrap'),
-      textSizePreset: $('#textSizePreset'),
     modePhoto:   $('#modePhoto'),
     modeLive:    $('#modeLive'),
     modeVideo:   $('#modeVideo'),
@@ -270,13 +268,13 @@ let DITHER_ENABLED = true;
     flashEnabled: false,
     timerSeconds: 0,
     visorMode: 'image',
-    textSize: 82,
   };
 
   const TEXT_CHARSETS = {
     DOTS: ' .,:;i1tfLCG08@',
     PIXEL: ' .:-=+*#%@',
-    MICRO: ' .:*'
+    MICRO: ' .:*',
+    SIMPLE_RAMP: ' .:-=+*#%@'
   };
 
   function isTextMode(){ return state.visorMode === 'text'; }
@@ -294,10 +292,8 @@ let DITHER_ENABLED = true;
       if (app.ui.fg) app.ui.fg.value = '#ffffff';
       if (app.ui.bg) app.ui.bg.value = '#000000';
       if (app.ui.colorRow) app.ui.colorRow.hidden = true;
-      if (app.ui.textSizeWrap) app.ui.textSizeWrap.hidden = false;
     } else {
       if (app.ui.colorRow) app.ui.colorRow.hidden = false;
-      if (app.ui.textSizeWrap) app.ui.textSizeWrap.hidden = true;
     }
     applyWidthLimitsForMode();
     rebuildCharsetOptions();
@@ -322,8 +318,9 @@ let DITHER_ENABLED = true;
         <option value="${TEXT_CHARSETS.DOTS}">DOTS</option>
         <option value="${TEXT_CHARSETS.PIXEL}">PIXEL</option>
         <option value="${TEXT_CHARSETS.MICRO}">MICRO</option>
+        <option value="${TEXT_CHARSETS.SIMPLE_RAMP}">SIMPLE_RAMP</option>
         <option value="CUSTOM">(РУЧН0Й ВВ0Д)</option>`;
-      const val = [TEXT_CHARSETS.DOTS, TEXT_CHARSETS.PIXEL, TEXT_CHARSETS.MICRO, 'CUSTOM'].includes(oldVal) ? oldVal : TEXT_CHARSETS.DOTS;
+      const val = [TEXT_CHARSETS.DOTS, TEXT_CHARSETS.PIXEL, TEXT_CHARSETS.MICRO, TEXT_CHARSETS.SIMPLE_RAMP, 'CUSTOM'].includes(oldVal) ? oldVal : TEXT_CHARSETS.DOTS;
       app.ui.charset.value = val;
       state.charset = autoSortCharset(val === 'CUSTOM' ? (app.ui.customCharset.value || TEXT_CHARSETS.DOTS) : val);
     } else {
@@ -3319,12 +3316,15 @@ async function sendAsciiTextToBot() {
   form.append('initData', tgWebApp.initData || '');
   form.append('initdata', tgWebApp.initData || '');
   form.append('charsetPreset', app.ui.charset.value || TEXT_CHARSETS.DOTS);
-  const n = Number(state.textSize);
-  const cols = Math.max(20, Math.min(160, Math.round(Number.isFinite(n) ? n : 82)));
-  let preset = 'm';
-  if (cols <= 74) preset = 's';
-  else if (cols <= 88) preset = 'm';
-  else preset = 'l';
+  const sliderValue = Number(state.widthChars);
+  const minValue = 25;
+  const maxValue = 75;
+  const minCols = 28;
+  const maxCols = 60;
+  const safeValue = Math.max(minValue, Math.min(maxValue, Math.round(Number.isFinite(sliderValue) ? sliderValue : 50)));
+  const mappedCols = Math.round(minCols + ((safeValue - minValue) * (maxCols - minCols)) / (maxValue - minValue));
+  const cols = Math.max(24, Math.min(64, mappedCols));
+  const preset = 'm';
   form.append('cols', String(cols));
   form.append('sizePreset', preset);
   const textEndpointUrl = `${API_BASE}/api/ascii-text`;
@@ -3347,7 +3347,8 @@ async function sendAsciiTextToBot() {
       tgPopup('ОШИБКА', `Статус ${res.status}\n${textEndpointUrl}\n${rawHead}`);
       return;
     }
-    tgPopup('Г0Т0В0', `ASCII-арт отправлен в чат.${typeof json?.balance !== 'undefined' ? `\nОсталось: ${json.balance}` : ''}`);
+    const finalCols = Number.isFinite(Number(json?.cols)) ? Number(json.cols) : cols;
+    tgPopup('Г0Т0В0', `✅ Отправлено (cols=${finalCols})${typeof json?.balance !== 'undefined' ? `\nОсталось: ${json.balance}` : ''}`);
   } catch (e) {
     dbgState('sendAsciiTextToBot.exception', { url: textEndpointUrl, error: String(e?.message || e || '').slice(0, 200) });
     tgPopup('СЕТЕВАЯ ОШИБКА', String(e?.message || 'Не удалось отправить запрос').slice(0, 200));
@@ -3372,13 +3373,6 @@ async function routeTextSaveIfNeeded() {
   await sendAsciiTextToBot();
   return true;
 }
-if (app.ui.textSizePreset) {
-  app.ui.textSizePreset.addEventListener('change', (e) => {
-    const n = Number(e.target.value);
-    state.textSize = Number.isFinite(n) ? n : 82;
-  });
-}
-
 // Выбираем реально «чёрный» символ под текущий стек шрифтов
 function pickDarkGlyph() {
   const candidates = [
