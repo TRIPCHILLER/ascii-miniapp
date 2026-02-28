@@ -981,6 +981,14 @@ if (state.transparentBg) {
 
   // Пересчёт h и подготовка offscreen размера
 function updateGridSize() {
+  if (isTextMode()) {
+    const { finalCols, finalRows } = getFinalTextDims(state);
+    off.width = finalCols;
+    off.height = finalRows;
+    state.lastGrid = { w: finalCols, h: finalRows };
+    return { w: finalCols, h: finalRows };
+  }
+
   const src = currentSource();
   if (!src) return { w: state.widthChars, h: 1 };
 
@@ -1005,6 +1013,22 @@ if (isMobile && state.mode === 'live') {
   state.lastGrid = { w, h };
   return { w, h };
 }
+
+function getFinalTextDims(currentState) {
+  const min = Number(app.ui.width?.min || 25);
+  const max = Number(app.ui.width?.max || 75);
+  const finalCols = Math.max(min, Math.min(max, Math.round(currentState?.widthChars || min)));
+
+  const src = currentSource();
+  if (!src) return { finalCols, finalRows: 1 };
+
+  const ratioCharWOverH = measureCharAspect(); // W/H
+  const sourceHOverW = src.h / src.w;
+  const targetH = finalCols * (sourceHOverW / (1 / Math.max(1e-6, ratioCharWOverH)));
+  const finalRows = Math.max(1, Math.min(1000, Math.round(targetH)));
+  return { finalCols, finalRows };
+}
+
 // Обновление текущего кадра GIF по времени ts
 function updateGifFrame(ts) {
   if (state.mode !== 'video') return;
@@ -1088,7 +1112,7 @@ ctx.drawImage(src.el, sx, sy, sw, sh, 0, 0, w, h);
 ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     const data = ctx.getImageData(0, 0, w, h).data;
-// Генерация ASCII (юникод-безопасно + поддержка пустого набора)
+// Генерация ASCII (детерминированный выбор символа)
 const chars = Array.from(state.renderCharset10 || state.charset || '');
 const n = chars.length - 1;
 
@@ -1124,21 +1148,8 @@ for (let y = 0; y < h; y++) {
     v01 = Math.min(1, Math.max(0, v01));
 
     const Yc = Math.max(0, Math.min(255, (bias + inv * (v01 * 255))));
-    // u — непрерывный индекс 0..n
-const u = (Yc / 255) * n;
-let i0 = u | 0;        // floor
-let idx = i0;
-
-if (DITHER_ENABLED) {
-  const frac = u - i0; // 0..1
-  const thr  = BAYER8[(y & 7) * 8 + (x & 7)] / 64; // 0..1
-  if (frac > thr) idx = i0 + 1;
-}
-
-if (idx < 0) idx = 0;
-else if (idx > n) idx = n;
-
-line += chars[idx];
+const idx = Math.max(0, Math.min(n, Math.round((Yc / 255) * n)));
+line += chars[idx] || ' ';
 
   }
   out += line + '\n';
@@ -3318,12 +3329,7 @@ async function sendAsciiTextToBot() {
     return;
   }
 
-  const snapshotLinesRaw = asciiSnapshot.split('\n');
-  const snapshotLines = (snapshotLinesRaw.length && snapshotLinesRaw[snapshotLinesRaw.length - 1] === '')
-    ? snapshotLinesRaw.slice(0, -1)
-    : snapshotLinesRaw;
-  const snapshotRows = Math.max(0, snapshotLines.length);
-  const snapshotCols = snapshotLines.reduce((max, line) => Math.max(max, Array.from(line || '').length), 0);
+  const { finalCols, finalRows } = getFinalTextDims(state);
   const selectedCharsetValue = app.ui.charset.value || TEXT_CHARSETS.DOTS;
   const activeCharset = String(state.charset || TEXT_CHARSETS.DOTS);
   const charsetDebugHead = activeCharset.slice(0, 10);
@@ -3333,9 +3339,12 @@ async function sendAsciiTextToBot() {
   const form = new FormData();
   form.append('initData', tgWebApp.initData || '');
   form.append('initdata', tgWebApp.initData || '');
+  form.append('asciiTextSnapshot', asciiSnapshot);
   form.append('asciiText', asciiSnapshot);
-  form.append('cols', String(snapshotCols));
-  form.append('rows', String(snapshotRows));
+  form.append('finalCols', String(finalCols));
+  form.append('finalRows', String(finalRows));
+  form.append('cols', String(finalCols));
+  form.append('rows', String(finalRows));
   form.append('charsetUsed', activeCharset);
   form.append('charsetPreset', selectedCharsetValue);
   form.append('mode', String(state.mode || ''));
@@ -3364,10 +3373,10 @@ async function sendAsciiTextToBot() {
       tgPopup('ОШИБКА', `Статус ${res.status}\n${textEndpointUrl}\n${rawHead}`);
       return;
     }
-    const finalCols = Number.isFinite(Number(json?.finalCols)) ? Number(json.finalCols) : snapshotCols;
-    const finalRows = Number.isFinite(Number(json?.finalRows)) ? Number(json.finalRows) : snapshotRows;
+    const responseFinalCols = Number.isFinite(Number(json?.finalCols)) ? Number(json.finalCols) : finalCols;
+    const responseFinalRows = Number.isFinite(Number(json?.finalRows)) ? Number(json.finalRows) : finalRows;
     const asciiLen = Number.isFinite(Number(json?.asciiLen)) ? Number(json.asciiLen) : asciiSnapshot.length;
-    tgPopup('Г0Т0В0', `✅ Отправлено (cols=${finalCols}, rows=${finalRows}, asciiLen=${asciiLen})\ncharset: ${charsetDebugHead}…${charsetDebugTail}${typeof json?.balance !== 'undefined' ? `\nОсталось: ${json.balance}` : ''}`);
+    tgPopup('Г0Т0В0', `✅ Отправлено (cols=${responseFinalCols}, rows=${responseFinalRows}, asciiLen=${asciiLen})\ncharset: ${charsetDebugHead}…${charsetDebugTail}${typeof json?.balance !== 'undefined' ? `\nОсталось: ${json.balance}` : ''}`);
   } catch (e) {
     dbgState('sendAsciiTextToBot.exception', { url: textEndpointUrl, error: String(e?.message || e || '').slice(0, 200) });
     tgPopup('СЕТЕВАЯ ОШИБКА', String(e?.message || 'Не удалось отправить запрос').slice(0, 200));
