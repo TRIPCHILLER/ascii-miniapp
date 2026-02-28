@@ -272,16 +272,11 @@ let DITHER_ENABLED = true;
   };
 
   const TEXT_CHARSETS = {
-    DOTS: ' .,:;-=+*#%@',
+    DOTS: ' .,:;i1tfLCG08@',
     PIXEL: ' .:-=+*#%@',
     MICRO: ' .:*',
     SIMPLE_RAMP: ' .:-=+*#%@'
   };
-
-  function resolveActiveCharset(appState = state) {
-    const resolved = String(appState?.renderCharset10 || appState?.charset || TEXT_CHARSETS.DOTS);
-    return Array.from(resolved).length >= 2 ? resolved : TEXT_CHARSETS.DOTS;
-  }
 
   function isTextMode(){ return state.visorMode === 'text'; }
 
@@ -658,7 +653,7 @@ function pickPalette(_bins, fixedByBinArr = []) {
   });
 }
 
-function rebuildRenderCharset10({ allowEntryJitter = true } = {}) {
+function rebuildRenderCharset10() {
   const densSorted = computeDensities(state.charset || '');
   if (!densSorted.length) {
     state.renderCharset10 = '';
@@ -674,10 +669,6 @@ function rebuildRenderCharset10({ allowEntryJitter = true } = {}) {
   for (let i = 0; i < 10; i++) {
     const pos = Math.round((i * (densSorted.length - 1)) / 9);
     let j = pos;
-    if (allowEntryJitter && densSorted.length > 10) {
-      const jitter = Math.floor(Math.random() * 3) - 1;
-      j = Math.max(0, Math.min(densSorted.length - 1, pos + jitter));
-    }
     while (j < densSorted.length && used.has(densSorted[j].ch)) j++;
     if (j >= densSorted.length) {
       j = pos;
@@ -1098,7 +1089,7 @@ ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     const data = ctx.getImageData(0, 0, w, h).data;
 // Генерация ASCII (юникод-безопасно + поддержка пустого набора)
-const chars = Array.from(resolveActiveCharset(state));
+const chars = Array.from(state.renderCharset10 || state.charset || '');
 const n = chars.length - 1;
 
 if (n < 0) {
@@ -3332,7 +3323,7 @@ async function sendAsciiTextToBot() {
   form.append('initData', tgWebApp.initData || '');
   form.append('initdata', tgWebApp.initData || '');
   const selectedCharsetValue = app.ui.charset.value || TEXT_CHARSETS.DOTS;
-  const activeCharset = resolveActiveCharset(state);
+  const activeCharset = (state.charset || TEXT_CHARSETS.DOTS);
   if (selectedCharsetValue === 'CUSTOM') {
     form.append('charsetInput', activeCharset);
   } else {
@@ -3370,11 +3361,10 @@ async function sendAsciiTextToBot() {
       tgPopup('ОШИБКА', `Статус ${res.status}\n${textEndpointUrl}\n${rawHead}`);
       return;
     }
-    const finalCols = Number.isFinite(Number(json?.finalCols)) ? Number(json.finalCols) : (Number.isFinite(Number(json?.cols)) ? Number(json.cols) : cols);
-    const selectedCharset = String(json?.selectedCharset || activeCharset || '');
-    const charsetDebug = selectedCharset.length > 22
-      ? `${selectedCharset.slice(0, 10)}…${selectedCharset.slice(-10)}`
-      : selectedCharset;
+    const finalCols = Number.isFinite(Number(json?.cols)) ? Number(json.cols) : cols;
+    const charsetDebug = selectedCharsetValue === 'CUSTOM'
+      ? 'custom'
+      : String(json?.selectedCharsetPreset || selectedCharsetValue).slice(0, 40);
     tgPopup('Г0Т0В0', `✅ Отправлено (cols=${finalCols}, charset=${charsetDebug})${typeof json?.balance !== 'undefined' ? `\nОсталось: ${json.balance}` : ''}`);
   } catch (e) {
     dbgState('sendAsciiTextToBot.exception', { url: textEndpointUrl, error: String(e?.message || e || '').slice(0, 200) });
