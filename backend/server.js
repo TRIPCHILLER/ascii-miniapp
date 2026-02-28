@@ -354,9 +354,9 @@ function clampInt(v, min, max, def) {
 const ASCII_TEXT_LIMIT = 3800;
 const TEXT_MODE_COST = 1;
 const TEXT_COLS_MIN = 24;
-const TEXT_COLS_MAX = 56;
+const TEXT_COLS_MAX = 44;
 const TEXT_ROWS_MIN = 12;
-const TEXT_ROWS_MAX = 120;
+const TEXT_ROWS_MAX = 80;
 const TEXT_CHAR_ASPECT = 0.55;
 const TEXT_SIZE_PRESETS = {
   s: { cols: 68, rows: 40 },
