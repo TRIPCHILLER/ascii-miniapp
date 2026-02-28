@@ -431,20 +431,28 @@ function sanitizeAsciiSnapshot(rawAscii, requestedCols, requestedRows) {
   cols = Math.max(TEXT_COLS_MIN, Math.min(TEXT_COLS_MAX, Math.round(cols)));
   rows = Math.max(TEXT_ROWS_MIN, Math.min(TEXT_ROWS_MAX, Math.round(rows)));
 
-  const slicedRows = lines.slice(0, rows).map((line) => Array.from(line || '').slice(0, cols).join(''));
-  const normalizedRows = slicedRows.length;
-  const normalizedCols = slicedRows.reduce((m, line) => Math.max(m, Array.from(line).length), 0);
-  let asciiText = slicedRows.join('\n');
-
-  if (asciiText.length > ASCII_TEXT_LIMIT) {
-    const maxRowsByLen = Math.max(1, Math.min(normalizedRows || rows, Math.floor(ASCII_TEXT_LIMIT / Math.max(1, normalizedCols + 1))));
-    asciiText = slicedRows.slice(0, maxRowsByLen).join('\n').slice(0, ASCII_TEXT_LIMIT);
+  const normalizedLines = [];
+  for (let i = 0; i < rows; i++) {
+    const line = lines[i] || '';
+    normalizedLines.push(Array.from(line).slice(0, cols).join(''));
   }
 
-  const finalLines = asciiText ? asciiText.split('\n') : [];
-  const finalRows = finalLines.length;
-  const finalCols = finalLines.reduce((m, line) => Math.max(m, Array.from(line).length), 0);
-  return { asciiText, finalRows, finalCols, asciiLen: asciiText.length };
+  const safeLines = [];
+  let totalLen = 0;
+  for (let i = 0; i < normalizedLines.length; i++) {
+    const candidate = normalizedLines[i];
+    const extraLen = candidate.length + (i > 0 ? 1 : 0);
+    if (totalLen + extraLen <= ASCII_TEXT_LIMIT) {
+      safeLines.push(candidate);
+      totalLen += extraLen;
+    } else {
+      safeLines.push('');
+      if (i > 0 && totalLen < ASCII_TEXT_LIMIT) totalLen += 1;
+    }
+  }
+
+  const asciiText = safeLines.join('\n');
+  return { asciiText, finalRows: rows, finalCols: cols, asciiLen: asciiText.length };
 }
 async function probeImageSize(inputPath) {
   try {
@@ -721,15 +729,15 @@ app.post('/api/ascii-text', upload.any(), async (req, res) => {
       const raw = body[key] ?? query[key] ?? fallback;
       return Array.isArray(raw) ? raw[0] : raw;
     };
-    const requestedColsRaw = pickField('cols', null);
-    const requestedRowsRaw = pickField('rows', null);
+    const requestedColsRaw = pickField('finalCols', pickField('cols', null));
+    const requestedRowsRaw = pickField('finalRows', pickField('rows', null));
     const sizePreset = String(pickField('sizePreset', 'm') || 'm').toLowerCase();
     const cols = parseTextCols(requestedColsRaw);
     const rows = parseTextRows(requestedRowsRaw);
     const charsetPreset = pickField('charsetPreset', null);
     const charsetUsed = String(pickField('charsetUsed', '') || '');
     const charsetInput = pickField('charsetInput', null);
-    const incomingAsciiText = String(pickField('asciiText', '') || '');
+    const incomingAsciiText = String(pickField('asciiTextSnapshot', pickField('asciiText', '')) || '');
     let result;
     if (incomingAsciiText.trim()) {
       const snapshot = sanitizeAsciiSnapshot(incomingAsciiText, cols, rows);
@@ -739,7 +747,7 @@ app.post('/api/ascii-text', upload.any(), async (req, res) => {
         rows: snapshot.finalRows,
         asciiLen: snapshot.asciiLen,
         selectedCharsetSource: 'snapshot',
-        selectedCharset: charsetUsed || charsetPreset || TEXT_CHARSETS.DOTS
+        charsetUsed: charsetUsed || charsetPreset || TEXT_CHARSETS.DOTS
       };
     } else {
       if (!f) return res.status(400).json({ ok:false, error:'NO_FILE' });
@@ -747,10 +755,10 @@ app.post('/api/ascii-text', upload.any(), async (req, res) => {
       result = {
         ...rendered,
         asciiLen: rendered.asciiText.length,
-        selectedCharset: rendered.charset
+        charsetUsed: rendered.charset
       };
     }
-    console.debug(`[ascii-text] requestedCols=${requestedColsRaw ?? 'null'}, requestedRows=${requestedRowsRaw ?? 'null'}, parsedCols=${cols ?? 'null'}, parsedRows=${rows ?? 'null'}, preset=${sizePreset}, finalCols=${result.cols}, finalRows=${result.rows}, asciiLen=${result.asciiLen}, selectedCharsetSource=${result.selectedCharsetSource}, selectedCharset=${String(result.selectedCharset || '').slice(0, 64)}`);
+    console.debug(`[ascii-text] requestedCols=${requestedColsRaw ?? 'null'}, requestedRows=${requestedRowsRaw ?? 'null'}, parsedCols=${cols ?? 'null'}, parsedRows=${rows ?? 'null'}, preset=${sizePreset}, finalCols=${result.cols}, finalRows=${result.rows}, asciiLen=${result.asciiLen}, selectedCharsetSource=${result.selectedCharsetSource}, charsetUsed=${String(result.charsetUsed || '').slice(0, 64)}`);
     const safeText = escapeHtml(result.asciiText);
     await sendMessage(userId, `<pre>${safeText}</pre>`, { parse_mode: 'HTML', disable_web_page_preview: true });
     deduct(userId, TEXT_MODE_COST);
@@ -764,7 +772,7 @@ app.post('/api/ascii-text', upload.any(), async (req, res) => {
       finalRows: result.rows,
       asciiLen: result.asciiLen,
       selectedCharsetSource: result.selectedCharsetSource,
-      selectedCharset: result.selectedCharset,
+      charsetUsed: result.charsetUsed,
       selectedCharsetPreset: result.selectedCharsetPreset
     });
   } catch (e) {
