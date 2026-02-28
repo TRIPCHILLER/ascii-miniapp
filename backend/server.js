@@ -353,10 +353,10 @@ function clampInt(v, min, max, def) {
 }
 const ASCII_TEXT_LIMIT = 3800;
 const TEXT_MODE_COST = 1;
-const TEXT_COLS_MIN = 20;
-const TEXT_COLS_MAX = 160;
+const TEXT_COLS_MIN = 24;
+const TEXT_COLS_MAX = 64;
 const TEXT_ROWS_MIN = 12;
-const TEXT_ROWS_MAX = 96;
+const TEXT_ROWS_MAX = 120;
 const TEXT_CHAR_ASPECT = 0.55;
 const TEXT_SIZE_PRESETS = {
   s: { cols: 68, rows: 40 },
@@ -366,15 +366,17 @@ const TEXT_SIZE_PRESETS = {
 const TEXT_CHARSETS = {
   DOTS: ' .,:;i1tfLCG08@',
   PIXEL: ' .:-=+*#%@',
-  MICRO: ' .·•*'
+  MICRO: ' .·•*',
+  SIMPLE_RAMP: ' .:-=+*#%@'
 };
 function escapeHtml(s='') {
   return String(s).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 }
-function pickTextCharset(v) {
+function pickTextCharset(v, cols) {
   const val = String(v || 'DOTS').trim();
   if (TEXT_CHARSETS[val]) return TEXT_CHARSETS[val];
   if (Object.values(TEXT_CHARSETS).includes(val)) return val;
+  if (Number.isFinite(cols) && cols < 34) return TEXT_CHARSETS.SIMPLE_RAMP;
   return TEXT_CHARSETS.DOTS;
 }
 function normalizeGrid({ cols, rows }) {
@@ -437,7 +439,7 @@ async function renderAsciiTextFromImage(inputPath, options = {}) {
     const rowsByCols = Math.round(requestedCols * aspect * TEXT_CHAR_ASPECT);
     grid = normalizeGrid({ cols: requestedCols, rows: rowsByCols });
   }
-  const charset = pickTextCharset(options.charsetInput);
+  const charset = pickTextCharset(options.charsetInput, grid.cols);
   for (let attempt = 0; attempt < 4; attempt++) {
     const ffArgs = [
       '-hide_banner', '-loglevel', 'error',
@@ -655,21 +657,18 @@ app.post('/api/ascii-text', upload.any(), async (req, res) => {
     if (bal < TEXT_MODE_COST) {
       return res.status(402).json({ ok:false, error:'INSUFFICIENT_FUNDS', need:TEXT_MODE_COST, balance:bal });
     }
-    const sizePreset = String(req.body?.sizePreset || 'm').toLowerCase();
-    const cols = parseTextCols(req.body?.cols);
-    const charsetPreset = req.body?.charsetPreset || 'DOTS';
+    const body = (req.body && typeof req.body === 'object') ? req.body : {};
+    const query = (req.query && typeof req.query === 'object') ? req.query : {};
+    const pickField = (key, fallback = null) => {
+      const raw = body[key] ?? query[key] ?? fallback;
+      return Array.isArray(raw) ? raw[0] : raw;
+    };
+    const requestedColsRaw = pickField('cols', null);
+    const sizePreset = String(pickField('sizePreset', 'm') || 'm').toLowerCase();
+    const cols = parseTextCols(requestedColsRaw);
+    const charsetPreset = pickField('charsetPreset', null) || (cols && cols < 34 ? 'SIMPLE_RAMP' : 'DOTS');
     const result = await renderAsciiTextFromImage(f.path, { preset: sizePreset, cols, charsetInput: charsetPreset });
-    console.debug('[ascii-text] applied params', {
-      userId,
-      preset: sizePreset,
-      requestedCols: req.body?.cols ?? null,
-      parsedCols: cols,
-      finalCols: result.cols,
-      finalRows: result.rows,
-      imageWidth: result.imageWidth,
-      imageHeight: result.imageHeight,
-      charsetPreset
-    });
+    console.debug(`[ascii-text] requestedCols=${requestedColsRaw ?? 'null'}, parsedCols=${cols ?? 'null'}, preset=${sizePreset}, finalCols=${result.cols}, finalRows=${result.rows}`);
     const safeText = escapeHtml(result.asciiText);
     await sendMessage(userId, `<pre>${safeText}</pre>`, { parse_mode: 'HTML', disable_web_page_preview: true });
     deduct(userId, TEXT_MODE_COST);
