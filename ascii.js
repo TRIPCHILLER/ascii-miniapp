@@ -272,7 +272,7 @@ let DITHER_ENABLED = true;
   };
 
   const TEXT_CHARSETS = {
-    DOTS: ' .,:;i1tfLCG08@',
+    DOTS: ' .:-=+*#%@',
     PIXEL: ' .:-=+*#%@',
     MICRO: ' .:*',
     SIMPLE_RAMP: ' .:-=+*#%@'
@@ -3308,39 +3308,42 @@ async function sendAsciiTextToBot() {
   };
 
   if (uploadInFlight) return;
-  const blob = await frameBlobForTextMode();
-  if (!blob) {
-    tgPopup('ОШИБКА', 'Нет кадра для отправки');
+  const asciiSnapshot = String(app.out?.textContent || '');
+  if (!asciiSnapshot.trim()) {
+    tgPopup('ОШИБКА', 'Нет ASCII-превью для отправки');
     return;
   }
   if (!tgWebApp?.initData) {
     tgPopup('ОШИБКА', 'Режим ТЕКСТ доступен только внутри Telegram');
     return;
   }
+
+  const snapshotLinesRaw = asciiSnapshot.split('\n');
+  const snapshotLines = (snapshotLinesRaw.length && snapshotLinesRaw[snapshotLinesRaw.length - 1] === '')
+    ? snapshotLinesRaw.slice(0, -1)
+    : snapshotLinesRaw;
+  const snapshotRows = Math.max(0, snapshotLines.length);
+  const snapshotCols = snapshotLines.reduce((max, line) => Math.max(max, Array.from(line || '').length), 0);
+  const selectedCharsetValue = app.ui.charset.value || TEXT_CHARSETS.DOTS;
+  const activeCharset = String(state.charset || TEXT_CHARSETS.DOTS);
+  const charsetDebugHead = activeCharset.slice(0, 10);
+  const charsetDebugTail = activeCharset.slice(-10);
+
   uploadInFlight = true;
   const form = new FormData();
-  form.append('file', blob, 'ascii_text.jpg');
   form.append('initData', tgWebApp.initData || '');
   form.append('initdata', tgWebApp.initData || '');
-  const selectedCharsetValue = app.ui.charset.value || TEXT_CHARSETS.DOTS;
-  const activeCharset = (state.charset || TEXT_CHARSETS.DOTS);
-  if (selectedCharsetValue === 'CUSTOM') {
-    form.append('charsetInput', activeCharset);
-  } else {
-    form.append('charsetPreset', selectedCharsetValue);
-    form.append('charsetInput', activeCharset);
+  form.append('asciiText', asciiSnapshot);
+  form.append('cols', String(snapshotCols));
+  form.append('rows', String(snapshotRows));
+  form.append('charsetUsed', activeCharset);
+  form.append('charsetPreset', selectedCharsetValue);
+  form.append('mode', String(state.mode || ''));
+  form.append('visorMode', String(state.visorMode || ''));
+  form.append('isTextMode', String(isTextMode()));
+  if (tgWebApp?.initDataUnsafe?.user?.id) {
+    form.append('userId', String(tgWebApp.initDataUnsafe.user.id));
   }
-  const sliderValue = Number(state.widthChars);
-  const minValue = 25;
-  const maxValue = 75;
-  const minCols = 28;
-  const maxCols = 52;
-  const safeValue = Math.max(minValue, Math.min(maxValue, Math.round(Number.isFinite(sliderValue) ? sliderValue : 50)));
-  const mappedCols = Math.round(minCols + ((safeValue - minValue) * (maxCols - minCols)) / (maxValue - minValue));
-  const cols = Math.max(24, Math.min(56, mappedCols));
-  const preset = 'm';
-  form.append('cols', String(cols));
-  form.append('sizePreset', preset);
   const textEndpointUrl = `${API_BASE}/api/ascii-text`;
   dbgState('sendAsciiTextToBot.request', { url: textEndpointUrl, isTextMode: isTextMode(), visorMode: state.visorMode, mode: state.mode });
   busyLock = true;
@@ -3361,11 +3364,10 @@ async function sendAsciiTextToBot() {
       tgPopup('ОШИБКА', `Статус ${res.status}\n${textEndpointUrl}\n${rawHead}`);
       return;
     }
-    const finalCols = Number.isFinite(Number(json?.cols)) ? Number(json.cols) : cols;
-    const charsetDebug = selectedCharsetValue === 'CUSTOM'
-      ? 'custom'
-      : String(json?.selectedCharsetPreset || selectedCharsetValue).slice(0, 40);
-    tgPopup('Г0Т0В0', `✅ Отправлено (cols=${finalCols}, charset=${charsetDebug})${typeof json?.balance !== 'undefined' ? `\nОсталось: ${json.balance}` : ''}`);
+    const finalCols = Number.isFinite(Number(json?.finalCols)) ? Number(json.finalCols) : snapshotCols;
+    const finalRows = Number.isFinite(Number(json?.finalRows)) ? Number(json.finalRows) : snapshotRows;
+    const asciiLen = Number.isFinite(Number(json?.asciiLen)) ? Number(json.asciiLen) : asciiSnapshot.length;
+    tgPopup('Г0Т0В0', `✅ Отправлено (cols=${finalCols}, rows=${finalRows}, asciiLen=${asciiLen})\ncharset: ${charsetDebugHead}…${charsetDebugTail}${typeof json?.balance !== 'undefined' ? `\nОсталось: ${json.balance}` : ''}`);
   } catch (e) {
     dbgState('sendAsciiTextToBot.exception', { url: textEndpointUrl, error: String(e?.message || e || '').slice(0, 200) });
     tgPopup('СЕТЕВАЯ ОШИБКА', String(e?.message || 'Не удалось отправить запрос').slice(0, 200));
