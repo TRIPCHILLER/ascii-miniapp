@@ -3315,15 +3315,22 @@ async function sendAsciiTextToBot() {
   form.append('file', blob, 'ascii_text.jpg');
   form.append('initData', tgWebApp.initData || '');
   form.append('initdata', tgWebApp.initData || '');
-  form.append('charsetPreset', app.ui.charset.value || TEXT_CHARSETS.DOTS);
+  const selectedCharsetValue = app.ui.charset.value || TEXT_CHARSETS.DOTS;
+  const activeCharset = (state.charset || TEXT_CHARSETS.DOTS);
+  if (selectedCharsetValue === 'CUSTOM') {
+    form.append('charsetInput', activeCharset);
+  } else {
+    form.append('charsetPreset', selectedCharsetValue);
+    form.append('charsetInput', activeCharset);
+  }
   const sliderValue = Number(state.widthChars);
   const minValue = 25;
   const maxValue = 75;
   const minCols = 28;
-  const maxCols = 60;
+  const maxCols = 52;
   const safeValue = Math.max(minValue, Math.min(maxValue, Math.round(Number.isFinite(sliderValue) ? sliderValue : 50)));
   const mappedCols = Math.round(minCols + ((safeValue - minValue) * (maxCols - minCols)) / (maxValue - minValue));
-  const cols = Math.max(24, Math.min(64, mappedCols));
+  const cols = Math.max(24, Math.min(56, mappedCols));
   const preset = 'm';
   form.append('cols', String(cols));
   form.append('sizePreset', preset);
@@ -3348,7 +3355,10 @@ async function sendAsciiTextToBot() {
       return;
     }
     const finalCols = Number.isFinite(Number(json?.cols)) ? Number(json.cols) : cols;
-    tgPopup('Г0Т0В0', `✅ Отправлено (cols=${finalCols})${typeof json?.balance !== 'undefined' ? `\nОсталось: ${json.balance}` : ''}`);
+    const charsetDebug = selectedCharsetValue === 'CUSTOM'
+      ? 'custom'
+      : String(json?.selectedCharsetPreset || selectedCharsetValue).slice(0, 40);
+    tgPopup('Г0Т0В0', `✅ Отправлено (cols=${finalCols}, charset=${charsetDebug})${typeof json?.balance !== 'undefined' ? `\nОсталось: ${json.balance}` : ''}`);
   } catch (e) {
     dbgState('sendAsciiTextToBot.exception', { url: textEndpointUrl, error: String(e?.message || e || '').slice(0, 200) });
     tgPopup('СЕТЕВАЯ ОШИБКА', String(e?.message || 'Не удалось отправить запрос').slice(0, 200));
