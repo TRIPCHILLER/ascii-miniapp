@@ -272,7 +272,7 @@ let DITHER_ENABLED = true;
   };
 
   const TEXT_CHARSETS = {
-    DOTS: ' .·:;⋯',
+    DOTS: ' .,:;-=+*#%@',
     PIXEL: ' .:-=+*#%@',
     MICRO: ' .:*',
     SIMPLE_RAMP: ' .:-=+*#%@'
@@ -658,7 +658,7 @@ function pickPalette(_bins, fixedByBinArr = []) {
   });
 }
 
-function rebuildRenderCharset10({ allowEntryJitter = false } = {}) {
+function rebuildRenderCharset10({ allowEntryJitter = true } = {}) {
   const densSorted = computeDensities(state.charset || '');
   if (!densSorted.length) {
     state.renderCharset10 = '';
@@ -3317,15 +3317,9 @@ async function sendAsciiTextToBot() {
   };
 
   if (uploadInFlight) return;
-  const previewAsciiRaw = String(app.out?.textContent || '');
-  const previewAscii = previewAsciiRaw.replace(/\r/g, '');
-  const previewLines = previewAscii.split('\n');
-  const hadTrailingNewline = previewAscii.endsWith('\n');
-  const effectiveLines = hadTrailingNewline ? previewLines.slice(0, -1) : previewLines;
-  const snapshotRows = effectiveLines.length;
-  const snapshotCols = effectiveLines.reduce((mx, line) => Math.max(mx, Array.from(line || '').length), 0);
-  if (!previewAscii.trim()) {
-    tgPopup('ОШИБКА', 'Нет ASCII-превью для отправки');
+  const blob = await frameBlobForTextMode();
+  if (!blob) {
+    tgPopup('ОШИБКА', 'Нет кадра для отправки');
     return;
   }
   if (!tgWebApp?.initData) {
@@ -3334,16 +3328,11 @@ async function sendAsciiTextToBot() {
   }
   uploadInFlight = true;
   const form = new FormData();
+  form.append('file', blob, 'ascii_text.jpg');
   form.append('initData', tgWebApp.initData || '');
   form.append('initdata', tgWebApp.initData || '');
-  if (tgWebApp?.initDataUnsafe?.user?.id) form.append('userId', String(tgWebApp.initDataUnsafe.user.id));
   const selectedCharsetValue = app.ui.charset.value || TEXT_CHARSETS.DOTS;
   const activeCharset = resolveActiveCharset(state);
-  form.append('asciiText', previewAscii);
-  form.append('charsetUsed', activeCharset);
-  form.append('visorMode', String(state.visorMode || 'image'));
-  form.append('mode', String(state.mode || 'live'));
-  form.append('isTextMode', String(isTextMode()));
   if (selectedCharsetValue === 'CUSTOM') {
     form.append('charsetInput', activeCharset);
   } else {
@@ -3357,24 +3346,12 @@ async function sendAsciiTextToBot() {
   const maxCols = 52;
   const safeValue = Math.max(minValue, Math.min(maxValue, Math.round(Number.isFinite(sliderValue) ? sliderValue : 50)));
   const mappedCols = Math.round(minCols + ((safeValue - minValue) * (maxCols - minCols)) / (maxValue - minValue));
-  const cols = Math.max(24, Math.min(52, mappedCols));
-  const rows = Math.max(12, Math.min(90, snapshotRows || (state.lastGrid?.h || 12)));
-  const colsForSend = Math.max(24, Math.min(52, snapshotCols || cols));
+  const cols = Math.max(24, Math.min(56, mappedCols));
   const preset = 'm';
-  form.append('cols', String(colsForSend));
-  form.append('rows', String(rows));
+  form.append('cols', String(cols));
   form.append('sizePreset', preset);
   const textEndpointUrl = `${API_BASE}/api/ascii-text`;
-  dbgState('sendAsciiTextToBot.request', {
-    url: textEndpointUrl,
-    isTextMode: isTextMode(),
-    visorMode: state.visorMode,
-    mode: state.mode,
-    cols: colsForSend,
-    rows,
-    asciiLen: previewAscii.length,
-    charsetUsed: activeCharset
-  });
+  dbgState('sendAsciiTextToBot.request', { url: textEndpointUrl, isTextMode: isTextMode(), visorMode: state.visorMode, mode: state.mode });
   busyLock = true;
   busyShow('0ТПР4ВК4 ТЕКСТ-АРТА…');
   try {
@@ -3393,13 +3370,12 @@ async function sendAsciiTextToBot() {
       tgPopup('ОШИБКА', `Статус ${res.status}\n${textEndpointUrl}\n${rawHead}`);
       return;
     }
-    const finalCols = Number.isFinite(Number(json?.finalCols)) ? Number(json.finalCols) : (Number.isFinite(Number(json?.cols)) ? Number(json.cols) : colsForSend);
-    const finalRows = Number.isFinite(Number(json?.finalRows)) ? Number(json.finalRows) : (Number.isFinite(Number(json?.rows)) ? Number(json.rows) : rows);
+    const finalCols = Number.isFinite(Number(json?.finalCols)) ? Number(json.finalCols) : (Number.isFinite(Number(json?.cols)) ? Number(json.cols) : cols);
     const selectedCharset = String(json?.selectedCharset || activeCharset || '');
     const charsetDebug = selectedCharset.length > 22
       ? `${selectedCharset.slice(0, 10)}…${selectedCharset.slice(-10)}`
       : selectedCharset;
-    tgPopup('Г0Т0В0', `✅ Отправлено (cols=${finalCols}, rows=${finalRows}, charset=${charsetDebug})${typeof json?.balance !== 'undefined' ? `\nОсталось: ${json.balance}` : ''}`);
+    tgPopup('Г0Т0В0', `✅ Отправлено (cols=${finalCols}, charset=${charsetDebug})${typeof json?.balance !== 'undefined' ? `\nОсталось: ${json.balance}` : ''}`);
   } catch (e) {
     dbgState('sendAsciiTextToBot.exception', { url: textEndpointUrl, error: String(e?.message || e || '').slice(0, 200) });
     tgPopup('СЕТЕВАЯ ОШИБКА', String(e?.message || 'Не удалось отправить запрос').slice(0, 200));
