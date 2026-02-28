@@ -354,7 +354,7 @@ function clampInt(v, min, max, def) {
 const ASCII_TEXT_LIMIT = 3800;
 const TEXT_MODE_COST = 1;
 const TEXT_COLS_MIN = 24;
-const TEXT_COLS_MAX = 64;
+const TEXT_COLS_MAX = 56;
 const TEXT_ROWS_MIN = 12;
 const TEXT_ROWS_MAX = 120;
 const TEXT_CHAR_ASPECT = 0.55;
@@ -372,12 +372,29 @@ const TEXT_CHARSETS = {
 function escapeHtml(s='') {
   return String(s).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 }
-function pickTextCharset(v, cols) {
-  const val = String(v || 'DOTS').trim();
-  if (TEXT_CHARSETS[val]) return TEXT_CHARSETS[val];
-  if (Object.values(TEXT_CHARSETS).includes(val)) return val;
-  if (Number.isFinite(cols) && cols < 34) return TEXT_CHARSETS.SIMPLE_RAMP;
-  return TEXT_CHARSETS.DOTS;
+function resolveTextCharset({ charsetInput, charsetPreset, cols }) {
+  const inputRaw = String(charsetInput || '').trim();
+  if (inputRaw) {
+    if (TEXT_CHARSETS[inputRaw]) {
+      return { charset: TEXT_CHARSETS[inputRaw], source: 'input', presetName: inputRaw };
+    }
+    return { charset: inputRaw, source: 'input', presetName: null };
+  }
+
+  const presetRaw = String(charsetPreset || '').trim();
+  if (presetRaw) {
+    if (TEXT_CHARSETS[presetRaw]) {
+      return { charset: TEXT_CHARSETS[presetRaw], source: 'preset', presetName: presetRaw };
+    }
+    if (Object.values(TEXT_CHARSETS).includes(presetRaw)) {
+      return { charset: presetRaw, source: 'preset', presetName: null };
+    }
+  }
+
+  if (Number.isFinite(cols) && cols < 34) {
+    return { charset: TEXT_CHARSETS.SIMPLE_RAMP, source: 'fallback', presetName: 'SIMPLE_RAMP' };
+  }
+  return { charset: TEXT_CHARSETS.DOTS, source: 'fallback', presetName: 'DOTS' };
 }
 function normalizeGrid({ cols, rows }) {
   let c = Math.max(TEXT_COLS_MIN, Math.min(TEXT_COLS_MAX, Math.round(cols || 80)));
@@ -439,7 +456,12 @@ async function renderAsciiTextFromImage(inputPath, options = {}) {
     const rowsByCols = Math.round(requestedCols * aspect * TEXT_CHAR_ASPECT);
     grid = normalizeGrid({ cols: requestedCols, rows: rowsByCols });
   }
-  const charset = pickTextCharset(options.charsetInput, grid.cols);
+  const charsetResolved = resolveTextCharset({
+    charsetInput: options.charsetInput,
+    charsetPreset: options.charsetPreset,
+    cols: grid.cols
+  });
+  const charset = charsetResolved.charset;
   for (let attempt = 0; attempt < 4; attempt++) {
     const ffArgs = [
       '-hide_banner', '-loglevel', 'error',
@@ -460,6 +482,8 @@ async function renderAsciiTextFromImage(inputPath, options = {}) {
         rows: grid.rows,
         charset,
         preset,
+        selectedCharsetSource: charsetResolved.source,
+        selectedCharsetPreset: charsetResolved.presetName,
         requestedCols: requestedCols || null,
         imageWidth: imageSize?.width || null,
         imageHeight: imageSize?.height || null
@@ -666,13 +690,22 @@ app.post('/api/ascii-text', upload.any(), async (req, res) => {
     const requestedColsRaw = pickField('cols', null);
     const sizePreset = String(pickField('sizePreset', 'm') || 'm').toLowerCase();
     const cols = parseTextCols(requestedColsRaw);
-    const charsetPreset = pickField('charsetPreset', null) || (cols && cols < 34 ? 'SIMPLE_RAMP' : 'DOTS');
-    const result = await renderAsciiTextFromImage(f.path, { preset: sizePreset, cols, charsetInput: charsetPreset });
-    console.debug(`[ascii-text] requestedCols=${requestedColsRaw ?? 'null'}, parsedCols=${cols ?? 'null'}, preset=${sizePreset}, finalCols=${result.cols}, finalRows=${result.rows}`);
+    const charsetPreset = pickField('charsetPreset', null);
+    const charsetInput = pickField('charsetInput', null);
+    const result = await renderAsciiTextFromImage(f.path, { preset: sizePreset, cols, charsetInput, charsetPreset });
+    console.debug(`[ascii-text] requestedCols=${requestedColsRaw ?? 'null'}, parsedCols=${cols ?? 'null'}, preset=${sizePreset}, finalCols=${result.cols}, finalRows=${result.rows}, selectedCharsetSource=${result.selectedCharsetSource}, selectedCharsetPreset=${result.selectedCharsetPreset ?? 'null'}`);
     const safeText = escapeHtml(result.asciiText);
     await sendMessage(userId, `<pre>${safeText}</pre>`, { parse_mode: 'HTML', disable_web_page_preview: true });
     deduct(userId, TEXT_MODE_COST);
-    return res.json({ ok:true, balance:getBalance(userId), asciiText: result.asciiText, cols: result.cols, rows: result.rows });
+    return res.json({
+      ok:true,
+      balance:getBalance(userId),
+      asciiText: result.asciiText,
+      cols: result.cols,
+      rows: result.rows,
+      selectedCharsetSource: result.selectedCharsetSource,
+      selectedCharsetPreset: result.selectedCharsetPreset
+    });
   } catch (e) {
     console.error('[ERR] /api/ascii-text', e);
     return res.status(500).json({ ok:false, error:'ASCII_TEXT_FAILED', message:String(e?.message || e) });
