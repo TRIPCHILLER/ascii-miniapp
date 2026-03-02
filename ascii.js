@@ -336,16 +336,33 @@ let DITHER_ENABLED = true;
     app.ui.charset.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
-  function chooseVisorMode(mode){
+function chooseVisorMode(mode){
     state.visorMode = (mode === 'text') ? 'text' : 'image';
     state.textInitPending = isTextMode();
     localStorage.setItem('visorMode', state.visorMode);
     if (app.ui.modeChooser) app.ui.modeChooser.hidden = true;
     applyVisorModeUi();
     if (state.textInitPending) {
+      const startedAt = performance.now();
+      const waitTimeoutMs = 2000;
+      const hasValidTextSource = () => {
+        if (state.mode === 'photo' && state.imageEl) {
+          return state.imageEl.naturalWidth > 0 && state.imageEl.naturalHeight > 0;
+        }
+        const v = app.vid;
+        return !!(v && v.videoWidth > 0 && v.videoHeight > 0);
+      };
       const finalizeTextInit = () => {
+        if (!hasValidTextSource()) {
+          if (performance.now() - startedAt < waitTimeoutMs) {
+            requestAnimationFrame(finalizeTextInit);
+            return;
+          }
+          state.textInitPending = false;
+          return;
+        }
         const src = currentSource();
-        if (!src) {
+        if (!src || src.w <= 0 || src.h <= 0) {
           requestAnimationFrame(finalizeTextInit);
           return;
         }
@@ -999,18 +1016,20 @@ function computeTextGridFromSource(srcW, srcH, desiredCols) {
   const TELEGRAM_TEXT_ASPECT_K = 0.78;
   const TG_MAX_ROWS = 46;
   const TG_MAX_CHARS = 3900;
+  const TG_MAX_COLS = 44;
   const minCols = 10;
   const minRows = 10;
+  const aspect = Math.max(1e-6, srcH / Math.max(1, srcW));
 
   let cols = Math.max(minCols, Math.round(desiredCols));
-  let rows = Math.max(minRows, Math.round(cols * (srcH / Math.max(1, srcW)) * TELEGRAM_TEXT_ASPECT_K));
+  let rows = Math.max(minRows, Math.round(cols * aspect * TELEGRAM_TEXT_ASPECT_K));
   const limitsHit = [];
 
   if (rows > TG_MAX_ROWS) {
     const s = TG_MAX_ROWS / rows;
     cols = Math.max(minCols, Math.floor(cols * s));
     rows = Math.max(minRows, Math.floor(rows * s));
-    limitsHit.push(`rows:${TG_MAX_ROWS}`);
+    limitsHit.push('MAX_ROWS');
   }
 
   const totalChars = cols * rows;
@@ -1018,10 +1037,21 @@ function computeTextGridFromSource(srcW, srcH, desiredCols) {
     const s = Math.sqrt(TG_MAX_CHARS / totalChars);
     cols = Math.max(minCols, Math.floor(cols * s));
     rows = Math.max(minRows, Math.floor(rows * s));
-    limitsHit.push(`chars:${TG_MAX_CHARS}`);
+    limitsHit.push('MAX_CHARS');
+  }
+
+  if (cols > TG_MAX_COLS) {
+    cols = TG_MAX_COLS;
+    rows = Math.max(minRows, Math.round(cols * aspect * TELEGRAM_TEXT_ASPECT_K));
+    limitsHit.push('MAX_COLS');
   }
 
   return { cols, rows, limitsHit };
+}
+
+function getCanonicalTextGrid(srcW, srcH) {
+  const desiredCols = Math.max(25, Math.min(50, Math.round(state.widthChars)));
+  return computeTextGridFromSource(srcW, srcH, desiredCols);
 }
 
 function updateGridSize(srcOverride = null) {
@@ -1043,8 +1073,7 @@ if (!isTextMode() && isMobile && state.mode === 'live') {
   const targetH = w * (sourceHOverW / (1 / Math.max(1e-6, effectiveRatio)));
   let h = Math.max(1, Math.min(1000, Math.round(targetH)));
   if (isTextMode()) {
-    const desiredCols = Math.max(25, Math.min(50, Math.round(state.widthChars)));
-    const textGrid = computeTextGridFromSource(src.w, src.h, desiredCols);
+    const textGrid = getCanonicalTextGrid(src.w, src.h);
     w = textGrid.cols;
     h = textGrid.rows;
     console.log('[TEXT_GRID]', {
@@ -3390,6 +3419,18 @@ async function sendAsciiTextToBot() {
     : snapshotLinesRaw;
   const snapshotRows = Math.max(0, snapshotLines.length);
   const snapshotCols = snapshotLines.reduce((max, line) => Math.max(max, Array.from(line || '').length), 0);
+  const src = currentSource();
+  const srcW = src?.w || 0;
+  const srcH = src?.h || 0;
+  const finalGrid = (srcW > 0 && srcH > 0) ? getCanonicalTextGrid(srcW, srcH) : { cols: snapshotCols, rows: snapshotRows, limitsHit: [] };
+  console.log('[TEXT_GRID_FINAL]', {
+    srcW,
+    srcH,
+    cols: finalGrid.cols,
+    rows: finalGrid.rows,
+    asciiLen: asciiSnapshot.length,
+    reasonsTriggered: finalGrid.limitsHit.length ? finalGrid.limitsHit.join(',') : 'none'
+  });
   const selectedCharsetValue = app.ui.charset.value || TEXT_CHARSETS.DOTS;
   const activeCharset = String(state.charset || TEXT_CHARSETS.DOTS);
   const charsetDebugHead = activeCharset.slice(0, 10);
