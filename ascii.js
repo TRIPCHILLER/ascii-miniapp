@@ -1004,16 +1004,23 @@ if (isMobile && state.mode === 'live') {
   sourceHOverW = 16/9;
 }
 
-  const w = Math.max(1, Math.round(state.widthChars));
+  const previewRoot = app.stage;
+  if (isTextMode() && previewRoot?.clientWidth > 0 && previewRoot?.clientHeight > 0) {
+    sourceHOverW = previewRoot.clientHeight / previewRoot.clientWidth;
+  }
+
+  let w = Math.max(1, Math.round(state.widthChars));
   const TELEGRAM_TEXT_ASPECT_K = 0.78;
   const effectiveRatio = isTextMode() ? (ratioCharWOverH * TELEGRAM_TEXT_ASPECT_K) : ratioCharWOverH;
   const targetH = w * (sourceHOverW / (1 / Math.max(1e-6, effectiveRatio)));
   let h = Math.max(1, Math.min(1000, Math.round(targetH)));
   if (isTextMode()) {
+    const TG_SAFE_COLS_PAD = 2;
+    w = Math.max(10, w - TG_SAFE_COLS_PAD);
     const TG_MAX_CHARS = 3900;
     const maxRowsByLimit = Math.floor(TG_MAX_CHARS / (w + 1));
     h = Math.max(1, Math.min(h, maxRowsByLimit));
-    const TG_MAX_ROWS = 49;
+    const TG_MAX_ROWS = 46;
     h = Math.max(1, Math.min(h, TG_MAX_ROWS));
   }
 
