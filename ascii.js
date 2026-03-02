@@ -343,11 +343,17 @@ let DITHER_ENABLED = true;
     if (app.ui.modeChooser) app.ui.modeChooser.hidden = true;
     applyVisorModeUi();
     if (state.textInitPending) {
-      requestAnimationFrame(() => {
-        const { w, h } = updateGridSize();
+      const finalizeTextInit = () => {
+        const src = currentSource();
+        if (!src) {
+          requestAnimationFrame(finalizeTextInit);
+          return;
+        }
+        const { w, h } = updateGridSize(src);
         refitFont(w, h);
         state.textInitPending = false;
-      });
+      };
+      requestAnimationFrame(finalizeTextInit);
     }
   }
 
@@ -989,39 +995,66 @@ if (state.transparentBg) {
   }
 
   // Пересчёт h и подготовка offscreen размера
-function updateGridSize() {
-  const src = currentSource();
+function computeTextGridFromSource(srcW, srcH, desiredCols) {
+  const TELEGRAM_TEXT_ASPECT_K = 0.78;
+  const TG_MAX_ROWS = 46;
+  const TG_MAX_CHARS = 3900;
+  const minCols = 10;
+  const minRows = 10;
+
+  let cols = Math.max(minCols, Math.round(desiredCols));
+  let rows = Math.max(minRows, Math.round(cols * (srcH / Math.max(1, srcW)) * TELEGRAM_TEXT_ASPECT_K));
+  const limitsHit = [];
+
+  if (rows > TG_MAX_ROWS) {
+    const s = TG_MAX_ROWS / rows;
+    cols = Math.max(minCols, Math.floor(cols * s));
+    rows = Math.max(minRows, Math.floor(rows * s));
+    limitsHit.push(`rows:${TG_MAX_ROWS}`);
+  }
+
+  const totalChars = cols * rows;
+  if (totalChars > TG_MAX_CHARS) {
+    const s = Math.sqrt(TG_MAX_CHARS / totalChars);
+    cols = Math.max(minCols, Math.floor(cols * s));
+    rows = Math.max(minRows, Math.floor(rows * s));
+    limitsHit.push(`chars:${TG_MAX_CHARS}`);
+  }
+
+  return { cols, rows, limitsHit };
+}
+
+function updateGridSize(srcOverride = null) {
+  const src = srcOverride || currentSource();
   if (!src) return { w: state.widthChars, h: 1 };
 
-  const isFsLike = isFullscreenLike();
   const ratioCharWOverH = measureCharAspect(); // W/H
 
 // базовый H/W источника
 let sourceHOverW = src.h / src.w;
 
 // ФИКС: на мобилках всегда рисуем LIVE в 16:9 (и с панелями, и в режиме «Скрыть»)
-if (isMobile && state.mode === 'live') {
+if (!isTextMode() && isMobile && state.mode === 'live') {
   sourceHOverW = 16/9;
 }
 
-  const previewRoot = app.stage;
-  if (isTextMode() && previewRoot?.clientWidth > 0 && previewRoot?.clientHeight > 0) {
-    sourceHOverW = previewRoot.clientHeight / previewRoot.clientWidth;
-  }
-
   let w = Math.max(1, Math.round(state.widthChars));
-  const TELEGRAM_TEXT_ASPECT_K = 0.78;
-  const effectiveRatio = isTextMode() ? (ratioCharWOverH * TELEGRAM_TEXT_ASPECT_K) : ratioCharWOverH;
+  const effectiveRatio = ratioCharWOverH;
   const targetH = w * (sourceHOverW / (1 / Math.max(1e-6, effectiveRatio)));
   let h = Math.max(1, Math.min(1000, Math.round(targetH)));
   if (isTextMode()) {
-    const TG_SAFE_COLS_PAD = 2;
-    w = Math.max(10, w - TG_SAFE_COLS_PAD);
-    const TG_MAX_CHARS = 3900;
-    const maxRowsByLimit = Math.floor(TG_MAX_CHARS / (w + 1));
-    h = Math.max(1, Math.min(h, maxRowsByLimit));
-    const TG_MAX_ROWS = 46;
-    h = Math.max(1, Math.min(h, TG_MAX_ROWS));
+    const desiredCols = Math.max(25, Math.min(50, Math.round(state.widthChars)));
+    const textGrid = computeTextGridFromSource(src.w, src.h, desiredCols);
+    w = textGrid.cols;
+    h = textGrid.rows;
+    console.log('[TEXT_GRID]', {
+      srcW: src.w,
+      srcH: src.h,
+      cols: w,
+      rows: h,
+      asciiLen: w * h,
+      limits: textGrid.limitsHit.length ? textGrid.limitsHit.join(',') : 'none'
+    });
   }
 
 
