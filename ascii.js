@@ -269,6 +269,7 @@ let DITHER_ENABLED = true;
     flashEnabled: false,
     timerSeconds: 0,
     visorMode: 'image',
+    textInitPending: false,
   };
 
   const TEXT_CHARSETS = {
@@ -337,9 +338,17 @@ let DITHER_ENABLED = true;
 
   function chooseVisorMode(mode){
     state.visorMode = (mode === 'text') ? 'text' : 'image';
+    state.textInitPending = isTextMode();
     localStorage.setItem('visorMode', state.visorMode);
     if (app.ui.modeChooser) app.ui.modeChooser.hidden = true;
     applyVisorModeUi();
+    if (state.textInitPending) {
+      requestAnimationFrame(() => {
+        const { w, h } = updateGridSize();
+        refitFont(w, h);
+        state.textInitPending = false;
+      });
+    }
   }
 
   function initVisorMode(){
@@ -914,7 +923,7 @@ function applyWidthLimitsForMode(init = false) {
 
   if (isTextMode()) {
     min = 25;
-    max = 75;
+    max = 50;
   } else if (isMobile) {
     if (state.mode === 'live') {
       min = 50;  max = 100;
@@ -1055,6 +1064,8 @@ function updateGifFrame(ts) {
 
   function loop(ts) {
     raf = requestAnimationFrame(loop);
+
+    if (state.textInitPending) return;
 
     // FPS-ограничитель
     const frameInterval = 1000 / state.fps;
@@ -2712,7 +2723,13 @@ app.ui.flip.addEventListener('click', async () => {
     }
 
       app.ui.width.addEventListener('input', e => {
-      state.widthChars = +e.target.value;
+      const rawWidth = +e.target.value;
+      state.widthChars = isTextMode()
+        ? Math.max(25, Math.min(50, rawWidth))
+        : rawWidth;
+      if (+e.target.value !== state.widthChars) {
+        e.target.value = state.widthChars;
+      }
       app.ui.widthVal.textContent = state.widthChars;
 
       // сбрасываем пользовательский зум
