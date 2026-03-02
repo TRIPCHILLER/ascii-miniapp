@@ -26,6 +26,7 @@
   const $ = s => document.querySelector(s);
   const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
   const API_BASE = 'https://api.tripchiller.com';
+  const SAFE_TG_MAX_COLS = 40;
     // Портрет-лок (чтобы не крутилось в горизонталь, где получится каша)
   let orientationLockRequested = false;
 
@@ -929,7 +930,7 @@ function applyWidthLimitsForMode(init = false) {
 
   if (isTextMode()) {
     min = 25;
-    max = 50;
+    max = SAFE_TG_MAX_COLS;
   } else if (isMobile) {
     if (state.mode === 'live') {
       min = 50;  max = 100;
@@ -1003,8 +1004,13 @@ function computeTextGridFromSource(srcW, srcH, desiredCols) {
   const minRows = 10;
 
   let cols = Math.max(minCols, Math.round(desiredCols));
+  if (cols > SAFE_TG_MAX_COLS) cols = SAFE_TG_MAX_COLS;
   let rows = Math.max(minRows, Math.round(cols * (srcH / Math.max(1, srcW)) * TELEGRAM_TEXT_ASPECT_K));
   const limitsHit = [];
+
+  if (Math.round(desiredCols) > SAFE_TG_MAX_COLS) {
+    limitsHit.push(`cols:${SAFE_TG_MAX_COLS}`);
+  }
 
   if (rows > TG_MAX_ROWS) {
     const s = TG_MAX_ROWS / rows;
@@ -1043,7 +1049,7 @@ if (!isTextMode() && isMobile && state.mode === 'live') {
   const targetH = w * (sourceHOverW / (1 / Math.max(1e-6, effectiveRatio)));
   let h = Math.max(1, Math.min(1000, Math.round(targetH)));
   if (isTextMode()) {
-    const desiredCols = Math.max(25, Math.min(50, Math.round(state.widthChars)));
+    const desiredCols = Math.max(25, Math.round(state.widthChars));
     const textGrid = computeTextGridFromSource(src.w, src.h, desiredCols);
     w = textGrid.cols;
     h = textGrid.rows;
