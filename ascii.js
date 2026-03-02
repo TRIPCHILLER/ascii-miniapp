@@ -996,7 +996,9 @@ if (isMobile && state.mode === 'live') {
 }
 
   const w = Math.max(1, Math.round(state.widthChars));
-  const targetH = w * (sourceHOverW / (1 / Math.max(1e-6, ratioCharWOverH)));
+  const CHAR_ASPECT = 0.55;
+  const textCharAspect = isTextMode() ? CHAR_ASPECT : ratioCharWOverH;
+  const targetH = w * (sourceHOverW / (1 / Math.max(1e-6, textCharAspect)));
   const h = Math.max(1, Math.min(1000, Math.round(targetH)));
 
 
