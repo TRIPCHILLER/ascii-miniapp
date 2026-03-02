@@ -279,46 +279,7 @@ let DITHER_ENABLED = true;
     SIMPLE_RAMP: ' .:-=+*#%@'
   };
 
-  const TELEGRAM_TEXT_ASPECT_K = 0.68;
-
   function isTextMode(){ return state.visorMode === 'text'; }
-
-  function getTextLayoutSnapshot() {
-    const stageRect = app.stage?.getBoundingClientRect?.();
-    const videoRect = app.vid?.getBoundingClientRect?.();
-    return {
-      stageStyleWidth: app.stage?.style?.width || '',
-      stageStyleHeight: app.stage?.style?.height || '',
-      stageStyleAspectRatio: app.stage?.style?.aspectRatio || '',
-      videoObjectFit: app.vid?.style?.objectFit || '',
-      stageRect: stageRect ? { w: Math.round(stageRect.width), h: Math.round(stageRect.height) } : { w: 0, h: 0 },
-      videoRect: videoRect ? { w: Math.round(videoRect.width), h: Math.round(videoRect.height) } : { w: 0, h: 0 },
-      canvas: { w: off?.width || 0, h: off?.height || 0 }
-    };
-  }
-
-  function restoreTextLayoutSnapshot(snapshot) {
-    if (!snapshot) return;
-    if (app.stage) {
-      app.stage.style.width = snapshot.stageStyleWidth;
-      app.stage.style.height = snapshot.stageStyleHeight;
-      app.stage.style.aspectRatio = snapshot.stageStyleAspectRatio;
-    }
-    if (app.vid) {
-      app.vid.style.objectFit = snapshot.videoObjectFit;
-    }
-  }
-
-  function logTextLayout(mode) {
-    const snap = getTextLayoutSnapshot();
-    console.log('[TEXT_LAYOUT]', {
-      mode,
-      stageRect: snap.stageRect,
-      videoRect: snap.videoRect,
-      objectFit: snap.videoObjectFit || getComputedStyle(app.vid || document.body).objectFit || 'n/a',
-      canvas: snap.canvas
-    });
-  }
 
   function applyVisorModeUi() {
     document.body.classList.toggle('visor-text', isTextMode());
@@ -376,15 +337,11 @@ let DITHER_ENABLED = true;
   }
 
 function chooseVisorMode(mode){
-    const layoutBefore = getTextLayoutSnapshot();
-    logTextLayout('before-switch');
     state.visorMode = (mode === 'text') ? 'text' : 'image';
     state.textInitPending = isTextMode();
     localStorage.setItem('visorMode', state.visorMode);
     if (app.ui.modeChooser) app.ui.modeChooser.hidden = true;
     applyVisorModeUi();
-    if (isTextMode()) restoreTextLayoutSnapshot(layoutBefore);
-    logTextLayout('after-ui');
     if (state.textInitPending) {
       const startedAt = performance.now();
       const waitTimeoutMs = 2000;
@@ -411,8 +368,6 @@ function chooseVisorMode(mode){
         }
         const { w, h } = updateGridSize(src);
         refitFont(w, h);
-        restoreTextLayoutSnapshot(layoutBefore);
-        logTextLayout('after-grid-fit');
         state.textInitPending = false;
       };
       requestAnimationFrame(finalizeTextInit);
@@ -1058,6 +1013,7 @@ if (state.transparentBg) {
 
   // Пересчёт h и подготовка offscreen размера
 function computeTextGridFromSource(srcW, srcH, desiredCols) {
+  const TELEGRAM_TEXT_ASPECT_K = 0.78;
   const TG_MAX_ROWS = 46;
   const TG_MAX_CHARS = 3900;
   const TG_MAX_COLS = 44;
@@ -1117,15 +1073,16 @@ if (!isTextMode() && isMobile && state.mode === 'live') {
   const targetH = w * (sourceHOverW / (1 / Math.max(1e-6, effectiveRatio)));
   let h = Math.max(1, Math.min(1000, Math.round(targetH)));
   if (isTextMode()) {
-    w = Math.max(1, Math.round(state.widthChars));
-    h = Math.max(1, Math.min(1000, Math.round(w * sourceHOverW / Math.max(1e-6, 1 / effectiveRatio))));
+    const textGrid = getCanonicalTextGrid(src.w, src.h);
+    w = textGrid.cols;
+    h = textGrid.rows;
     console.log('[TEXT_GRID]', {
       srcW: src.w,
       srcH: src.h,
       cols: w,
       rows: h,
       asciiLen: w * h,
-      limits: 'preview_only'
+      limits: textGrid.limitsHit.length ? textGrid.limitsHit.join(',') : 'none'
     });
   }
 
@@ -3472,7 +3429,6 @@ async function sendAsciiTextToBot() {
     cols: finalGrid.cols,
     rows: finalGrid.rows,
     asciiLen: asciiSnapshot.length,
-    TELEGRAM_TEXT_ASPECT_K,
     reasonsTriggered: finalGrid.limitsHit.length ? finalGrid.limitsHit.join(',') : 'none'
   });
   const selectedCharsetValue = app.ui.charset.value || TEXT_CHARSETS.DOTS;
