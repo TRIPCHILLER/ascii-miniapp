@@ -874,4 +874,6 @@ input[type="color"] {
 body.visor-text #modeVideo{display:none !important;}
 body.visor-text #colorRow{display:none !important;}
 body.visor-text #textSizeWrap{display:flex !important;}
-#resetModeBtn{display:block;width:100%;margin-top:8px;margin-left:0;}
+.mode-switch-row{display:flex;align-items:center;gap:10px;margin-top:8px;}
+#resetModeBtn{display:inline-flex;width:auto;flex:0 0 auto;margin:0;padding:.45rem .85rem;}
+#visorModeStatus{font-size:12px;opacity:.9;white-space:nowrap;}

@@ -101,6 +101,7 @@ function busyHide(force = false){
       modeChooser: $('#modeChooser'),
       colorRow: $('#colorRow'),
       resetModeBtn: $('#resetModeBtn'),
+      visorModeStatus: $('#visorModeStatus'),
     modePhoto:   $('#modePhoto'),
     modeLive:    $('#modeLive'),
     modeVideo:   $('#modeVideo'),
@@ -297,6 +298,9 @@ let DITHER_ENABLED = true;
       if (app.ui.colorRow) app.ui.colorRow.hidden = true;
     } else {
       if (app.ui.colorRow) app.ui.colorRow.hidden = false;
+    }
+    if (app.ui.visorModeStatus) {
+      app.ui.visorModeStatus.textContent = `РЕЖИМ: ${isTextMode() ? 'ТЕКСТОВЫЙ АРТ' : 'ИЗОБРАЖЕНИЕ'}`;
     }
     applyWidthLimitsForMode();
     rebuildCharsetOptions();
@@ -3454,8 +3458,7 @@ async function sendAsciiTextToBot() {
 app.ui.save.addEventListener('click', doSave);
 if (app.ui.resetModeBtn) {
   app.ui.resetModeBtn.addEventListener('click', () => {
-    bindModeChooserOnce();
-    if (app.ui.modeChooser) app.ui.modeChooser.hidden = false;
+    chooseVisorMode(isTextMode() ? 'image' : 'text');
   });
 }
 
