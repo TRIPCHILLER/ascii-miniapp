@@ -319,6 +319,9 @@ let DITHER_ENABLED = true;
       if (app.ui.colorRow) app.ui.colorRow.hidden = true;
     } else {
       if (app.ui.colorRow) app.ui.colorRow.hidden = false;
+      if (app.ui.style && app.ui.style.value && app.ui.style.value !== 'custom') {
+        applyPreset(app.ui.style.value);
+      }
     }
     if (app.ui.resetModeBtn) {
       app.ui.resetModeBtn.textContent = isTextMode() ? 'ТЕКСТОВЫЙ АРТ' : 'ИЗОБРАЖЕНИЕ';
