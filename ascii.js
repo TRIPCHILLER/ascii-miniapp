@@ -1784,7 +1784,6 @@ async function downloadBlob(blob, filename) {
   // Подбор font-size
   let refitLock = false;
   function refitFont(cols, rows) {
-    dbgDuringTracking('[TRANSFORM] refitFont', { cols, rows, viewScale: state.viewScale });
     if (refitLock) return;
     refitLock = true;
 
@@ -1826,7 +1825,6 @@ async function downloadBlob(blob, filename) {
     // === Вписывание ASCII-блока: теперь только zoom по viewScale ===
 // === Вписывание ASCII-блока: теперь только zoom по viewScale ===
 function fitAsciiToViewport(){
-  dbgDuringTracking('[TRANSFORM] fitAsciiToViewport.enter', { viewScale: state.viewScale, viewX: state.viewX, viewY: state.viewY });
   const out   = app.out;
   const stage = app.stage;
   if (!out || !stage) return;
@@ -1856,7 +1854,6 @@ function fitAsciiToViewport(){
 
   // 5. Применяем базовый масштаб + пользовательский зум
   const base = S * (state.viewScale || 1);
-  dbgDuringTracking('[TRANSFORM] fitAsciiToViewport.base', { w, h, W, H, S: +S.toFixed(4), base: +base.toFixed(4) });
 
   // 5.1. Жёстко ограничиваем центр «окна» так, чтобы кадр не выходил за экран
   clampViewToBounds(w, h, W, H, base);
@@ -1877,7 +1874,6 @@ function fitAsciiToViewport(){
 // Ограничиваем viewX/viewY так, чтобы при текущем масштабе кадр нельзя было утащить
 // за пределы видимой области (никакого чёрного фона по краям)
 function clampViewToBounds(w, h, W, H, base){
-  dbgDuringTracking('[GESTURE] clampViewToBounds', { w, h, W, H, base: Number.isFinite(base) ? +base.toFixed(4) : base, viewX: state.viewX, viewY: state.viewY });
   if (!w || !h || !W || !H || !base) return;
 
   const visW = w * base;
@@ -2196,9 +2192,6 @@ function updateModeTabs(newMode){
 }
 
 async function setMode(newMode){
-  dbgState('[MODE] setMode.enter', { newMode, prevMode: state.mode });
-  diagFirstTap.captured = false;
-  diagFirstTap.trackingUntil = 0;
   if (isTextMode() && newMode === 'video') newMode = 'live';
   state.mode = newMode;
   rebuildRenderCharset10();
@@ -2247,7 +2240,6 @@ mainBtnHide();
   state.viewX = 0.5;
   state.viewY = 0.5;
   fitAsciiToViewport();
-  dbgDiagSnapshot('[MODE] post-fit');
 
   // если уходим из PHOTO — очищаем картинку
   if (newMode !== 'photo') state.imageEl = null;
@@ -2706,7 +2698,6 @@ app.ui.toggle.addEventListener('click', () => {
   };
 
   el.addEventListener('pointerdown', e => {
-    dbgDuringTracking('[GESTURE] pointerdown', { pointerType: e.pointerType, pointerId: e.pointerId, x: e.clientX, y: e.clientY, pts: pts.size + 1 });
     if (e.pointerType === 'touch') e.preventDefault?.();
     el.setPointerCapture?.(e.pointerId);
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -2749,9 +2740,7 @@ app.ui.toggle.addEventListener('click', () => {
       const ratio = d / d0;
 
       // ограничиваем общий масштаб
-      const prevScale = state.viewScale;
       state.viewScale = Math.max(1, Math.min(3, s0 * ratio));
-      dbgDuringTracking('[GESTURE] scale', { prevScale, nextScale: state.viewScale, ratio: +ratio.toFixed(4), s0: +s0.toFixed(4) });
 
       const base = S * (state.viewScale || 1);
       clampViewToBounds(w, h, W, H, base);
@@ -2783,10 +2772,8 @@ app.ui.toggle.addEventListener('click', () => {
       if (!Number.isFinite(vx)) vx = 0.5;
       if (!Number.isFinite(vy)) vy = 0.5;
 
-      const prevX = state.viewX, prevY = state.viewY;
       state.viewX = vx;
       state.viewY = vy;
-      dbgDuringTracking('[GESTURE] pan', { prevX, prevY, nextX: state.viewX, nextY: state.viewY, dx, dy });
 
       clampViewToBounds(w, h, W, H, base);
       fitAsciiToViewport();
@@ -3370,11 +3357,6 @@ fileVideo.addEventListener('change', async (e) => {
 // @section EXPORT_SAVE_SHARE
 // --- DEBUG OVERLAY (минимальный локальный лог для Telegram WebApp) ---
 let debugOverlayEl = null;
-const diagFirstTap = {
-  armed: false,
-  captured: false,
-  trackingUntil: 0,
-};
 function ensureDebugOverlay() {
   if (debugOverlayEl) return debugOverlayEl;
   if (!document.body) return null;
@@ -3399,89 +3381,6 @@ function dbgState(tag, data) {
   } catch (_) {
     dbgLine(`${tag} [unserializable]`);
   }
-}
-function dbgRect(el) {
-  if (!el || !el.getBoundingClientRect) return null;
-  const r = el.getBoundingClientRect();
-  return {
-    w: +r.width.toFixed(2),
-    h: +r.height.toFixed(2),
-    x: +r.x.toFixed(2),
-    y: +r.y.toFixed(2),
-  };
-}
-function dbgTarget(ev) {
-  const t = ev?.target;
-  if (!t) return 'unknown';
-  const id = t.id ? `#${t.id}` : '';
-  const cls = (typeof t.className === 'string' && t.className.trim()) ? `.${t.className.trim().replace(/\s+/g, '.')}` : '';
-  return `${t.tagName || 'node'}${id}${cls}`;
-}
-function dbgDiagSnapshot(tag) {
-  const vv = window.visualViewport;
-  const out = app?.out;
-  const stage = app?.stage;
-  const main = document.getElementById('app');
-  const outStyle = out ? getComputedStyle(out) : null;
-  const stageStyle = stage ? getComputedStyle(stage) : null;
-  dbgState(tag, {
-    ts: Date.now(),
-    mode: state?.mode,
-    win: { w: window.innerWidth, h: window.innerHeight },
-    vv: vv ? { w: +vv.width.toFixed(2), h: +vv.height.toFixed(2), scale: +vv.scale.toFixed(4) } : null,
-    rects: { app: dbgRect(main), stage: dbgRect(stage), out: dbgRect(out) },
-    transform: {
-      stage: stageStyle?.transform || '',
-      out: outStyle?.transform || '',
-      outLeft: outStyle?.left || '',
-      outTop: outStyle?.top || '',
-    },
-    view: {
-      viewScale: state?.viewScale,
-      viewX: state?.viewX,
-      viewY: state?.viewY,
-      minScale: state?.minScale,
-      maxScale: state?.maxScale,
-      baseScale: state?.baseScale,
-      initialScale: state?.initialScale,
-      translateX: state?.translateX,
-      translateY: state?.translateY,
-      zoom: state?.zoom,
-    }
-  });
-}
-function dbgDuringTracking(tag, data) {
-  if (Date.now() > diagFirstTap.trackingUntil) return;
-  if (typeof data === 'undefined') {
-    dbgLine(tag);
-    return;
-  }
-  dbgState(tag, data);
-}
-function dbgTrackAfterFirstTap() {
-  if (diagFirstTap.trackingUntil > Date.now()) return;
-  diagFirstTap.trackingUntil = Date.now() + 500;
-  const onResizeLike = (tag) => () => {
-    if (Date.now() > diagFirstTap.trackingUntil) return;
-    dbgDiagSnapshot(tag);
-  };
-  const onResize = onResizeLike('[RESIZE] window.resize');
-  const onOrientation = onResizeLike('[RESIZE] orientationchange');
-  const onVVResize = onResizeLike('[RESIZE] visualViewport.resize');
-  window.addEventListener('resize', onResize, { passive: true });
-  window.addEventListener('orientationchange', onOrientation, { passive: true });
-  window.visualViewport?.addEventListener?.('resize', onVVResize, { passive: true });
-  for (let i = 1; i <= 3; i++) {
-    requestAnimationFrame(() => {
-      if (Date.now() > diagFirstTap.trackingUntil) return;
-      dbgDiagSnapshot(`[RAF] #${i}`);
-    });
-  }
-  setTimeout(() => {
-    window.removeEventListener('resize', onResize);
-    window.removeEventListener('orientationchange', onOrientation);
-    window.visualViewport?.removeEventListener?.('resize', onVVResize);
-  }, 550);
 }
 async function doSave() {
   dbgState('doSave.enter', { isTextMode: isTextMode(), visorMode: state.visorMode, mode: state.mode });
@@ -3741,20 +3640,6 @@ if (app.ui.invert) app.ui.invert.checked = false;
 }
     // === Портрет-лок: пробуем залочить ориентацию один раз после первого тапа ===
     if (isMobile && typeof document !== 'undefined') {
-      diagFirstTap.armed = true;
-      dbgDiagSnapshot('[MODE] enter/init');
-      const firstTapTypes = ['touchstart', 'touchend', 'pointerdown', 'pointerup', 'click'];
-      const onStageFirstTapTrace = (ev) => {
-        if (!diagFirstTap.armed || diagFirstTap.captured) return;
-        if (!(ev?.target && ev.target.closest?.('#stage'))) return;
-        diagFirstTap.captured = true;
-        dbgState('[FIRST_TAP] event', { type: ev.type, target: dbgTarget(ev), ts: ev.timeStamp });
-        dbgDiagSnapshot('[FIRST_TAP] snapshot');
-        dbgTrackAfterFirstTap();
-        firstTapTypes.forEach((t) => app.stage?.removeEventListener(t, onStageFirstTapTrace, true));
-      };
-      firstTapTypes.forEach((t) => app.stage?.addEventListener(t, onStageFirstTapTrace, { passive: true, capture: true }));
-
       const onFirstTap = (ev) => {
         // Не перехватываем первый тап по рабочей области превью,
         // чтобы не провоцировать resize/reflow и сдвиг стартового fit.
@@ -3776,7 +3661,6 @@ bindUI();
 initVisorMode();
 applyVisorModeUi();
 window.addEventListener('resize', () => {
-  dbgDuringTracking('[RESIZE] window.resize(global)');
   layoutSettingsPanel();
 });
     
