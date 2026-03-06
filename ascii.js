@@ -275,6 +275,7 @@ let DITHER_ENABLED = true;
     textInitPending: false,
     lastImageSymbolSet: '@%#*+=-:. ',
     lastTextSymbolSet: null,
+    lastCustomImageColors: null,
   };
 
   const TEXT_CHARSETS = {
@@ -307,6 +308,12 @@ let DITHER_ENABLED = true;
     document.body.classList.toggle('visor-text', isTextMode());
     if (app.ui.styleRow) app.ui.styleRow.hidden = isTextMode();
     if (isTextMode()) {
+      if (app.ui.style?.value === 'custom') {
+        state.lastCustomImageColors = {
+          color: state.color,
+          background: state.background,
+        };
+      }
       state.mode = (state.mode === 'video') ? 'live' : state.mode;
       state.color = '#ffffff';
       state.background = '#000000';
@@ -321,6 +328,14 @@ let DITHER_ENABLED = true;
       if (app.ui.colorRow) app.ui.colorRow.hidden = false;
       if (app.ui.style && app.ui.style.value && app.ui.style.value !== 'custom') {
         applyPreset(app.ui.style.value);
+      } else if (app.ui.style?.value === 'custom' && state.lastCustomImageColors) {
+        state.color = state.lastCustomImageColors.color;
+        state.background = state.lastCustomImageColors.background;
+        if (app.ui.fg) app.ui.fg.value = state.color;
+        if (app.ui.bg) app.ui.bg.value = state.background;
+        app.out.style.color = state.color;
+        app.out.style.backgroundColor = state.background;
+        app.stage.style.backgroundColor = state.background;
       }
     }
     if (app.ui.resetModeBtn) {
