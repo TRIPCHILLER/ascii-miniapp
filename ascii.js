@@ -98,6 +98,7 @@ function busyHide(force = false){
       invert:   $('#invert'),
       fs:       $('#fs'),
       style:    $('#stylePreset'),
+      styleRow: $('#styleRow'),
       modeChooser: $('#modeChooser'),
       colorRow: $('#colorRow'),
       resetModeBtn: $('#resetModeBtn'),
@@ -272,6 +273,8 @@ let DITHER_ENABLED = true;
     timerSeconds: 0,
     visorMode: 'image',
     textInitPending: false,
+    lastImageSymbolSet: '@%#*+=-:. ',
+    lastTextSymbolSet: null,
   };
 
   const TEXT_CHARSETS = {
@@ -283,8 +286,26 @@ let DITHER_ENABLED = true;
 
   function isTextMode(){ return state.visorMode === 'text'; }
 
+  function getDefaultTextCharsetOption(){
+    return TEXT_CHARSETS.DOTS;
+  }
+
+  function getDefaultImageCharsetOption(){
+    return app.ui.charset?.options?.[0]?.value || '@%#*+=-:. ';
+  }
+
+  function rememberCurrentCharsetByMode(){
+    const currentValue = app.ui.charset?.value;
+    if (isTextMode()) {
+      state.lastTextSymbolSet = currentValue || getDefaultTextCharsetOption();
+    } else {
+      state.lastImageSymbolSet = currentValue || getDefaultImageCharsetOption();
+    }
+  }
+
   function applyVisorModeUi() {
     document.body.classList.toggle('visor-text', isTextMode());
+    if (app.ui.styleRow) app.ui.styleRow.hidden = isTextMode();
     if (isTextMode()) {
       state.mode = (state.mode === 'video') ? 'live' : state.mode;
       state.color = '#ffffff';
@@ -327,21 +348,31 @@ let DITHER_ENABLED = true;
         <option value="${TEXT_CHARSETS.MICRO}">MICRO</option>
         <option value="${TEXT_CHARSETS.SIMPLE_RAMP}">SIMPLE_RAMP</option>
         <option value="CUSTOM">(РУЧН0Й ВВ0Д)</option>`;
-      const val = [TEXT_CHARSETS.DOTS, TEXT_CHARSETS.PIXEL, TEXT_CHARSETS.MICRO, TEXT_CHARSETS.SIMPLE_RAMP, 'CUSTOM'].includes(oldVal) ? oldVal : TEXT_CHARSETS.DOTS;
+      const fallbackText = state.lastTextSymbolSet || getDefaultTextCharsetOption();
+      const val = [TEXT_CHARSETS.DOTS, TEXT_CHARSETS.PIXEL, TEXT_CHARSETS.MICRO, TEXT_CHARSETS.SIMPLE_RAMP, 'CUSTOM'].includes(fallbackText)
+        ? fallbackText
+        : getDefaultTextCharsetOption();
       app.ui.charset.value = val;
-      state.charset = autoSortCharset(val === 'CUSTOM' ? (app.ui.customCharset.value || TEXT_CHARSETS.DOTS) : val);
+      state.lastTextSymbolSet = val;
+      state.charset = autoSortCharset(val === 'CUSTOM' ? (app.ui.customCharset.value || getDefaultTextCharsetOption()) : val);
     } else {
       if (!app.ui.charset.dataset.imageModeOptions) {
         app.ui.charset.dataset.imageModeOptions = app.ui.charset.innerHTML;
       }
       app.ui.charset.innerHTML = app.ui.charset.dataset.imageModeOptions;
-      app.ui.charset.value = oldVal || app.ui.charset.options[0]?.value || '@%#*+=-:. ';
-      state.charset = autoSortCharset(app.ui.charset.value);
+      const fallbackImage = state.lastImageSymbolSet || oldVal || getDefaultImageCharsetOption();
+      app.ui.charset.value = fallbackImage;
+      if (!app.ui.charset.value) {
+        app.ui.charset.value = getDefaultImageCharsetOption();
+      }
+      state.lastImageSymbolSet = app.ui.charset.value || getDefaultImageCharsetOption();
+      state.charset = autoSortCharset(state.lastImageSymbolSet);
     }
     app.ui.charset.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
   function chooseVisorMode(mode){
+    rememberCurrentCharsetByMode();
     state.visorMode = (mode === 'text') ? 'text' : 'image';
     state.textInitPending = isTextMode();
     localStorage.setItem('visorMode', state.visorMode);
@@ -3487,6 +3518,7 @@ function pickDarkGlyph() {
 }
 app.ui.charset.addEventListener('change', e => {
   const val = e.target.value;
+  rememberCurrentCharsetByMode();
 
 if (val === 'CUSTOM') {
   app.ui.customCharset.style.display = 'inline-block';
@@ -3550,6 +3582,7 @@ updateBinsForCurrentCharset();
 // реагируем на ввод своих символов
 app.ui.customCharset.addEventListener('input', e => {
   state.charset = autoSortCharset(e.target.value || '');
+  rememberCurrentCharsetByMode();
   updateBinsForCurrentCharset(); // <<< ДОБАВЛЕНО
 });
     
