@@ -281,17 +281,10 @@ let DITHER_ENABLED = true;
     SIMPLE_RAMP: ' .:-=+*#%@'
   };
 
-  const IMAGE_DEFAULT_CHARSET = '@%#*+=-:. ';
-  const TEXT_DEFAULT_CHARSET = TEXT_CHARSETS.DOTS;
-  let lastImageSymbolSet = IMAGE_DEFAULT_CHARSET;
-  let lastTextSymbolSet = TEXT_DEFAULT_CHARSET;
-
   function isTextMode(){ return state.visorMode === 'text'; }
 
   function applyVisorModeUi() {
     document.body.classList.toggle('visor-text', isTextMode());
-    const styleRow = app.ui.style ? app.ui.style.closest('label') : null;
-    if (styleRow) styleRow.hidden = isTextMode();
     if (isTextMode()) {
       state.mode = (state.mode === 'video') ? 'live' : state.mode;
       state.color = '#ffffff';
@@ -326,6 +319,7 @@ let DITHER_ENABLED = true;
 
   function rebuildCharsetOptions(){
     if (!app.ui.charset) return;
+    const oldVal = app.ui.charset.value;
     if (isTextMode()) {
       app.ui.charset.innerHTML = `
         <option value="${TEXT_CHARSETS.DOTS}">DOTS</option>
@@ -333,22 +327,15 @@ let DITHER_ENABLED = true;
         <option value="${TEXT_CHARSETS.MICRO}">MICRO</option>
         <option value="${TEXT_CHARSETS.SIMPLE_RAMP}">SIMPLE_RAMP</option>
         <option value="CUSTOM">(РУЧН0Й ВВ0Д)</option>`;
-      const val = [TEXT_CHARSETS.DOTS, TEXT_CHARSETS.PIXEL, TEXT_CHARSETS.MICRO, TEXT_CHARSETS.SIMPLE_RAMP, 'CUSTOM'].includes(lastTextSymbolSet)
-        ? lastTextSymbolSet
-        : TEXT_DEFAULT_CHARSET;
+      const val = [TEXT_CHARSETS.DOTS, TEXT_CHARSETS.PIXEL, TEXT_CHARSETS.MICRO, TEXT_CHARSETS.SIMPLE_RAMP, 'CUSTOM'].includes(oldVal) ? oldVal : TEXT_CHARSETS.DOTS;
       app.ui.charset.value = val;
-      state.charset = autoSortCharset(val === 'CUSTOM' ? (app.ui.customCharset.value || TEXT_DEFAULT_CHARSET) : val);
+      state.charset = autoSortCharset(val === 'CUSTOM' ? (app.ui.customCharset.value || TEXT_CHARSETS.DOTS) : val);
     } else {
       if (!app.ui.charset.dataset.imageModeOptions) {
         app.ui.charset.dataset.imageModeOptions = app.ui.charset.innerHTML;
       }
       app.ui.charset.innerHTML = app.ui.charset.dataset.imageModeOptions;
-      const imageOptions = Array.from(app.ui.charset.options).map(opt => opt.value);
-      const fallbackImageSet = imageOptions.includes(IMAGE_DEFAULT_CHARSET)
-        ? IMAGE_DEFAULT_CHARSET
-        : (app.ui.charset.options[0]?.value || IMAGE_DEFAULT_CHARSET);
-      const val = imageOptions.includes(lastImageSymbolSet) ? lastImageSymbolSet : fallbackImageSet;
-      app.ui.charset.value = val;
+      app.ui.charset.value = oldVal || app.ui.charset.options[0]?.value || '@%#*+=-:. ';
       state.charset = autoSortCharset(app.ui.charset.value);
     }
     app.ui.charset.dispatchEvent(new Event('change', { bubbles: true }));
@@ -3500,12 +3487,6 @@ function pickDarkGlyph() {
 }
 app.ui.charset.addEventListener('change', e => {
   const val = e.target.value;
-
-  if (isTextMode()) {
-    lastTextSymbolSet = val || TEXT_DEFAULT_CHARSET;
-  } else {
-    lastImageSymbolSet = val || IMAGE_DEFAULT_CHARSET;
-  }
 
 if (val === 'CUSTOM') {
   app.ui.customCharset.style.display = 'inline-block';
