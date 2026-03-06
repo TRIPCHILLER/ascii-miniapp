@@ -1093,7 +1093,9 @@ function updateGridSize(srcOverride = null) {
 let sourceHOverW = src.h / src.w;
 
 // ФИКС: на мобилках всегда рисуем LIVE в 16:9 (и с панелями, и в режиме «Скрыть»)
-if (!isTextMode() && isMobile && state.mode === 'live') {
+// ВАЖНО: это должно работать и для image, и для text режима, иначе в text
+// сетка считается по «сырому» сенсору (часто 4:3), а рендер реально кадрируется в 9:16.
+if (isMobile && state.mode === 'live') {
   sourceHOverW = 16/9;
 }
 
@@ -1103,7 +1105,9 @@ if (!isTextMode() && isMobile && state.mode === 'live') {
   let h = Math.max(1, Math.min(1000, Math.round(targetH)));
   if (isTextMode()) {
     const desiredCols = Math.max(25, Math.round(state.widthChars));
-    const textGrid = computeTextGridFromSource(src.w, src.h, desiredCols);
+    const textSrcW = (isMobile && state.mode === 'live') ? 9 : src.w;
+    const textSrcH = (isMobile && state.mode === 'live') ? 16 : src.h;
+    const textGrid = computeTextGridFromSource(textSrcW, textSrcH, desiredCols);
     w = textGrid.cols;
     h = textGrid.rows;
     console.log('[TEXT_GRID]', {
