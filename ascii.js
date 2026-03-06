@@ -3640,10 +3640,7 @@ if (app.ui.invert) app.ui.invert.checked = false;
 }
     // === Портрет-лок: пробуем залочить ориентацию один раз после первого тапа ===
     if (isMobile && typeof document !== 'undefined') {
-      const onFirstTap = (ev) => {
-        // Не перехватываем первый тап по рабочей области превью,
-        // чтобы не провоцировать resize/reflow и сдвиг стартового fit.
-        if (ev?.target && ev.target.closest?.('#stage')) return;
+      const onFirstTap = () => {
         if (orientationLockRequested) return;
         orientationLockRequested = true;
         lockPortraitIfSupported();
