@@ -285,6 +285,7 @@ let DITHER_ENABLED = true;
   const TEXT_DEFAULT_CHARSET = TEXT_CHARSETS.DOTS;
   let lastImageSymbolSet = IMAGE_DEFAULT_CHARSET;
   let lastTextSymbolSet = TEXT_DEFAULT_CHARSET;
+  let lastImageStylePresetId = 'custom';
 
   function isTextMode(){ return state.visorMode === 'text'; }
 
@@ -355,11 +356,21 @@ let DITHER_ENABLED = true;
   }
 
   function chooseVisorMode(mode){
-    state.visorMode = (mode === 'text') ? 'text' : 'image';
+    const nextMode = (mode === 'text') ? 'text' : 'image';
+    if (nextMode === state.visorMode) return;
+
+    if (nextMode === 'text' && app.ui.style) {
+      lastImageStylePresetId = app.ui.style.value || detectPreset(state.color, state.background);
+    }
+
+    state.visorMode = nextMode;
     state.textInitPending = isTextMode();
     localStorage.setItem('visorMode', state.visorMode);
     if (app.ui.modeChooser) app.ui.modeChooser.hidden = true;
     applyVisorModeUi();
+    if (!isTextMode() && lastImageStylePresetId !== 'custom') {
+      applyPreset(lastImageStylePresetId);
+    }
     if (state.textInitPending) {
       const finalizeTextInit = () => {
         const src = currentSource();
@@ -2157,6 +2168,7 @@ function updateModeTabs(newMode){
 
 async function setMode(newMode){
   if (isTextMode() && newMode === 'video') newMode = 'live';
+  if (newMode === state.mode) return;
   state.mode = newMode;
   rebuildRenderCharset10();
 
@@ -2827,7 +2839,10 @@ app.ui.flip.addEventListener('click', async () => {
       app.ui.fpsVal.textContent = state.fps;
     });
 
-    if(app.ui.style){ app.ui.style.addEventListener('change', e => { applyPreset(e.target.value); }); }
+    if(app.ui.style){ app.ui.style.addEventListener('change', e => {
+      if (!isTextMode()) lastImageStylePresetId = e.target.value || 'custom';
+      applyPreset(e.target.value);
+    }); }
 
     app.ui.fg.addEventListener('input', e => {
       state.color = e.target.value;
@@ -2848,6 +2863,7 @@ app.ui.bg.addEventListener('input', e => {
   if (app.ui.style){
     const m = detectPreset(state.color, state.background);
     app.ui.style.value = (m==='custom'?'custom':m);
+    lastImageStylePresetId = app.ui.style.value || 'custom';
   }
 });
 
