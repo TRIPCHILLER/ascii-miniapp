@@ -27,6 +27,8 @@
   const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
   const API_BASE = 'https://api.tripchiller.com';
   const SAFE_TG_MAX_COLS = 40;
+  const TG_EXPORT_COLS_FACTOR = 1.28;
+  const TG_EXPORT_MAX_COLS = 56;
     // Портрет-лок (чтобы не крутилось в горизонталь, где получится каша)
   let orientationLockRequested = false;
 
@@ -1081,6 +1083,111 @@ function computeTextGridFromSource(srcW, srcH, desiredCols) {
   }
 
   return { cols, rows, limitsHit };
+}
+
+function computeTelegramExportGrid(srcW, srcH, previewCols, previewRows) {
+  const TELEGRAM_TEXT_ASPECT_K = 0.78;
+  const TG_MAX_ROWS = 46;
+  const TG_MAX_CHARS = 3900;
+  const minCols = 10;
+  const minRows = 10;
+
+  let cols = Math.max(minCols, Math.round((previewCols || 0) * TG_EXPORT_COLS_FACTOR));
+  if (cols > TG_EXPORT_MAX_COLS) cols = TG_EXPORT_MAX_COLS;
+
+  let rows = Math.max(minRows, Math.round(cols * (srcH / Math.max(1, srcW)) * TELEGRAM_TEXT_ASPECT_K));
+  const limitsHit = [];
+
+  if (rows > TG_MAX_ROWS) {
+    rows = TG_MAX_ROWS;
+    limitsHit.push(`rows:${TG_MAX_ROWS}`);
+  }
+
+  const maxRowsByChars = Math.floor(TG_MAX_CHARS / Math.max(1, cols));
+  if (rows > maxRowsByChars) {
+    rows = Math.max(minRows, maxRowsByChars);
+    limitsHit.push(`chars:${TG_MAX_CHARS}`);
+  }
+
+  if (rows < minRows) {
+    rows = minRows;
+    const maxColsByChars = Math.floor(TG_MAX_CHARS / rows);
+    cols = Math.max(minCols, Math.min(cols, maxColsByChars));
+    limitsHit.push(`colsByChars:${TG_MAX_CHARS}`);
+  }
+
+  if (previewRows && rows > Math.round(previewRows * 1.15)) {
+    rows = Math.max(minRows, Math.round(previewRows * 1.15));
+    limitsHit.push('rows:previewCap');
+  }
+
+  return { cols, rows, limitsHit };
+}
+
+function buildAsciiFromCurrentSource(src, cols, rows) {
+  let sx = 0, sy = 0, sw = src.w, sh = src.h;
+  if (isMobile && state.mode === 'live') {
+    const targetWH = 9 / 16;
+    const srcWH = src.w / src.h;
+    if (srcWH > targetWH) {
+      sw = Math.round(src.h * targetWH);
+      sx = Math.round((src.w - sw) / 2);
+    } else if (srcWH < targetWH) {
+      sh = Math.round(src.w / targetWH);
+      sy = Math.round((src.h - sh) / 2);
+    }
+  }
+
+  off.width = cols;
+  off.height = rows;
+  ctx.setTransform(state.mirror ? -1 : 1, 0, 0, 1, state.mirror ? cols : 0, 0);
+  ctx.drawImage(src.el, sx, sy, sw, sh, 0, 0, cols, rows);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  const data = ctx.getImageData(0, 0, cols, rows).data;
+  const chars = Array.from(state.renderCharset10 || state.charset || '');
+  const n = chars.length - 1;
+  if (n < 0) return '';
+
+  const inv = state.invert ? -1 : 1;
+  const bias = state.invert ? 255 : 0;
+  const gamma = state.gamma;
+  const contrast = state.contrast;
+  let out = '';
+  let i = 0;
+
+  for (let y = 0; y < rows; y++) {
+    let line = '';
+    for (let x = 0; x < cols; x++, i += 4) {
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      let Y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      let v01 = Y / 255;
+      v01 = ((v01 - 0.5) * contrast) + 0.5;
+      v01 = Math.min(1, Math.max(0, v01));
+      v01 = Math.pow(v01, 1 / gamma);
+
+      const bp = state.blackPoint;
+      const wp = state.whitePoint;
+      v01 = (v01 - bp) / Math.max(1e-6, (wp - bp));
+      v01 = Math.min(1, Math.max(0, v01));
+
+      const Yc = Math.max(0, Math.min(255, (bias + inv * (v01 * 255))));
+      const u = (Yc / 255) * n;
+      let i0 = u | 0;
+      let idx = i0;
+      if (DITHER_ENABLED) {
+        const frac = u - i0;
+        const thr = BAYER8[(y & 7) * 8 + (x & 7)] / 64;
+        if (frac > thr) idx = i0 + 1;
+      }
+      if (idx < 0) idx = 0;
+      else if (idx > n) idx = n;
+      line += chars[idx];
+    }
+    out += line + '\n';
+  }
+
+  return out;
 }
 
 function updateGridSize(srcOverride = null) {
@@ -3437,8 +3544,8 @@ async function sendAsciiTextToBot() {
   };
 
   if (uploadInFlight) return;
-  const asciiSnapshot = String(app.out?.textContent || '');
-  if (!asciiSnapshot.trim()) {
+  const previewAscii = String(app.out?.textContent || '');
+  if (!previewAscii.trim()) {
     tgPopup('ОШИБКА', 'Нет ASCII-превью для отправки');
     return;
   }
@@ -3447,12 +3554,37 @@ async function sendAsciiTextToBot() {
     return;
   }
 
-  const snapshotLinesRaw = asciiSnapshot.split('\n');
-  const snapshotLines = (snapshotLinesRaw.length && snapshotLinesRaw[snapshotLinesRaw.length - 1] === '')
-    ? snapshotLinesRaw.slice(0, -1)
-    : snapshotLinesRaw;
-  const snapshotRows = Math.max(0, snapshotLines.length);
-  const snapshotCols = snapshotLines.reduce((max, line) => Math.max(max, Array.from(line || '').length), 0);
+  const previewLinesRaw = previewAscii.split('\n');
+  const previewLines = (previewLinesRaw.length && previewLinesRaw[previewLinesRaw.length - 1] === '')
+    ? previewLinesRaw.slice(0, -1)
+    : previewLinesRaw;
+  const previewRows = Math.max(0, previewLines.length);
+  const previewCols = previewLines.reduce((max, line) => Math.max(max, Array.from(line || '').length), 0);
+
+  let asciiSnapshot = previewAscii;
+  let snapshotCols = previewCols;
+  let snapshotRows = previewRows;
+
+  const src = currentSource();
+  if (src && previewCols > 0 && previewRows > 0) {
+    const textSrcW = (isMobile && state.mode === 'live') ? 9 : src.w;
+    const textSrcH = (isMobile && state.mode === 'live') ? 16 : src.h;
+    const exportGrid = computeTelegramExportGrid(textSrcW, textSrcH, previewCols, previewRows);
+    const exportAscii = buildAsciiFromCurrentSource(src, exportGrid.cols, exportGrid.rows);
+    if (exportAscii.trim()) {
+      asciiSnapshot = exportAscii;
+      snapshotCols = exportGrid.cols;
+      snapshotRows = exportGrid.rows;
+      console.log('[TEXT_EXPORT_GRID]', {
+        previewCols,
+        previewRows,
+        exportCols: exportGrid.cols,
+        exportRows: exportGrid.rows,
+        exportFactor: TG_EXPORT_COLS_FACTOR,
+        limits: exportGrid.limitsHit.length ? exportGrid.limitsHit.join(',') : 'none'
+      });
+    }
+  }
   const selectedCharsetValue = app.ui.charset.value || TEXT_CHARSETS.DOTS;
   const activeCharset = String(state.charset || TEXT_CHARSETS.DOTS);
   const charsetDebugHead = activeCharset.slice(0, 10);
