@@ -358,6 +358,7 @@ const TEXT_COLS_MAX = 44;
 const TEXT_ROWS_MIN = 12;
 const TEXT_ROWS_MAX = 80;
 const TEXT_CHAR_ASPECT = 0.55;
+const TG_EXPORT_WIDTH_FACTOR = 1.09;
 const TEXT_SIZE_PRESETS = {
   s: { cols: 68, rows: 40 },
   m: { cols: 82, rows: 48 },
@@ -416,6 +417,21 @@ function parseTextRows(v) {
   if (!Number.isFinite(n)) return null;
   return Math.max(TEXT_ROWS_MIN, Math.min(TEXT_ROWS_MAX, n));
 }
+function expandAsciiLineWidth(line, factor = 1) {
+  const chars = Array.from(line || '');
+  const srcLen = chars.length;
+  if (srcLen <= 1 || !(factor > 1)) return chars.join('');
+
+  const targetLen = Math.max(srcLen, Math.round(srcLen * factor));
+  if (targetLen <= srcLen) return chars.join('');
+
+  const out = new Array(targetLen);
+  for (let i = 0; i < targetLen; i++) {
+    const srcPos = (i * (srcLen - 1)) / (targetLen - 1);
+    out[i] = chars[Math.round(srcPos)] ?? chars[srcLen - 1];
+  }
+  return out.join('');
+}
 function sanitizeAsciiSnapshot(rawAscii, requestedCols, requestedRows) {
   const input = String(rawAscii || '').replace(/\r\n?/g, '\n');
   const trimmedTrailing = input.replace(/\n+$/g, '');
@@ -431,7 +447,10 @@ function sanitizeAsciiSnapshot(rawAscii, requestedCols, requestedRows) {
   cols = Math.max(TEXT_COLS_MIN, Math.min(TEXT_COLS_MAX, Math.round(cols)));
   rows = Math.max(TEXT_ROWS_MIN, Math.min(TEXT_ROWS_MAX, Math.round(rows)));
 
-  const slicedRows = lines.slice(0, rows).map((line) => Array.from(line || '').slice(0, cols).join(''));
+  const slicedRows = lines.slice(0, rows).map((line) => {
+    const base = Array.from(line || '').slice(0, cols).join('');
+    return expandAsciiLineWidth(base, TG_EXPORT_WIDTH_FACTOR);
+  });
   const normalizedRows = slicedRows.length;
   const normalizedCols = slicedRows.reduce((m, line) => Math.max(m, Array.from(line).length), 0);
   let asciiText = slicedRows.join('\n');
