@@ -358,7 +358,7 @@ const TEXT_COLS_MAX = 44;
 const TEXT_ROWS_MIN = 12;
 const TEXT_ROWS_MAX = 80;
 const TEXT_CHAR_ASPECT = 0.55;
-const TG_EXPORT_WIDTH_FACTOR = 1.20;
+const TG_EXPORT_WIDTH_FACTOR = 1.30;
 const TEXT_SIZE_PRESETS = {
   s: { cols: 68, rows: 40 },
   m: { cols: 82, rows: 48 },
