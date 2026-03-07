@@ -28,6 +28,7 @@
   const API_BASE = 'https://api.tripchiller.com';
   const SAFE_TG_MAX_COLS = 40;
   const TG_EXPORT_COLS_FACTOR = 1.28;
+  const TG_EXPORT_PORTRAIT_ASPECT_FACTOR = 0.86;
   const TG_EXPORT_MAX_COLS = 56;
     // Портрет-лок (чтобы не крутилось в горизонталь, где получится каша)
   let orientationLockRequested = false;
@@ -1087,6 +1088,7 @@ function computeTextGridFromSource(srcW, srcH, desiredCols) {
 
 function computeTelegramExportGrid(srcW, srcH, previewCols, previewRows) {
   const TELEGRAM_TEXT_ASPECT_K = 0.78;
+  const exportTextAspectK = TELEGRAM_TEXT_ASPECT_K * TG_EXPORT_PORTRAIT_ASPECT_FACTOR;
   const TG_MAX_ROWS = 46;
   const TG_MAX_CHARS = 3900;
   const minCols = 10;
@@ -1095,7 +1097,7 @@ function computeTelegramExportGrid(srcW, srcH, previewCols, previewRows) {
   let cols = Math.max(minCols, Math.round((previewCols || 0) * TG_EXPORT_COLS_FACTOR));
   if (cols > TG_EXPORT_MAX_COLS) cols = TG_EXPORT_MAX_COLS;
 
-  let rows = Math.max(minRows, Math.round(cols * (srcH / Math.max(1, srcW)) * TELEGRAM_TEXT_ASPECT_K));
+  let rows = Math.max(minRows, Math.round(cols * (srcH / Math.max(1, srcW)) * exportTextAspectK));
   const limitsHit = [];
 
   if (rows > TG_MAX_ROWS) {
