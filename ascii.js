@@ -407,7 +407,7 @@ let DITHER_ENABLED = true;
       if (startBlinkTimer) clearInterval(startBlinkTimer);
       startBlinkTimer = setInterval(() => {
         app.ui.startBlinkLine.classList.toggle('start-hidden');
-      }, 500);
+      }, 1000);
     });
   }
 
