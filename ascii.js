@@ -386,7 +386,7 @@ let DITHER_ENABLED = true;
         startTypeTimer = null;
         app.ui.startInitText.textContent = target;
       }
-    }, 12);
+    }, 30);
   }
 
   function startModeChooserFx(){

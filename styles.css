@@ -416,7 +416,7 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 /* ===== Мобильный компакт-вид ===== */
 @media (max-width: 600px) {
   /* Меньше шрифт по всему UI */
-  body, .toolbar, .panel, .btn, label, output, select, option {
+  body, .toolbar, .panel, label, output, select, option {
     font-size: 14px;
   }
 
@@ -432,7 +432,7 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 
   .toolbar .btn {
     padding: .30rem .35rem;         /* компактнее сами кнопки */
-    font-size: 13px;                /* чуть меньше кегль */
+    font-size: 18px;
     letter-spacing: 0.04em;         /* лёгкая разрядка, чтобы не слипалось */
   }
 
