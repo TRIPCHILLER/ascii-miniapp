@@ -126,7 +126,7 @@ button:focus, .btn:focus{
   margin:0;
   user-select:none;
 
-  font-family: "MS Gothic",monospace;
+  font-family: "BetterVCR",monospace;
   font-weight: 400;
   font-variant-ligatures: none;
   -webkit-font-smoothing: none;
@@ -280,6 +280,13 @@ option{ background:var(--ui-panel); color:var(--ui-text); }
     font-display: swap;
 }
 @font-face {
+  font-family: "BetterVCR";
+  src: url("./assets/BetterVCR.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
   font-family: "PxPlus IBM VGA";
   src: url("./assets/PxPlus IBM VGA.woff2") format("woff2");
   font-weight: 400;
@@ -353,8 +360,9 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 
 
 #busy .busy-text{
-  color:#fff; font-family:'BetterVCR', sans-serif; font-size:18px;
+  color:#fff; font-family:'PxPlus IBM VGA', monospace; font-size:18px;
   text-align:center; white-space:pre-line;
+  text-transform:uppercase;
 }
 
 /* === CUSTOM LOGO SPINNER === */
@@ -696,7 +704,7 @@ background:#fff; }
 }
 
 #camTimerNumber {
-  font-family: 'BetterVCR', monospace;
+  font-family: 'PxPlus IBM VGA', monospace;
   font-size: clamp(64px, 20vw, 140px);
   color: #fff;
   letter-spacing: 0.12em;
@@ -900,6 +908,7 @@ input[type="color"] {
   padding:8px;
   font-size:18px;
   border:1px solid #fff;
+  white-space:pre;
 }
 
 .start-core-box{
@@ -914,6 +923,11 @@ input[type="color"] {
   min-height:4.2em;
   font-family:'PxPlus IBM VGA', monospace;
   font-size:18px;
+  text-align:center;
+}
+
+.start-mode-spacer{
+  height:1.25em;
 }
 
 .start-blink{

@@ -375,15 +375,16 @@ let DITHER_ENABLED = true;
   function runStartTypingAnimation(){
     if (!app.ui.startInitText) return;
     const target = 'ИНИЦИАЛИЗАЦИЯ МОДУЛЕЙ ЯДРА...\nОК\nЯДРО ГОТОВО К ПРЕОБРАЗОВАНИЮ';
-    app.ui.startInitText.textContent = '';
+    app.ui.startInitText.textContent = '|';
     let i = 0;
     if (startTypeTimer) clearInterval(startTypeTimer);
     startTypeTimer = setInterval(() => {
       i += 1;
-      app.ui.startInitText.textContent = target.slice(0, i);
+      app.ui.startInitText.textContent = `${target.slice(0, i)}|`;
       if (i >= target.length) {
         clearInterval(startTypeTimer);
         startTypeTimer = null;
+        app.ui.startInitText.textContent = target;
       }
     }, 12);
   }
