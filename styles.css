@@ -81,6 +81,13 @@ button:focus, .btn:focus{
   background:transparent;
   padding:6px 8px; border-radius:0;
 }
+.panel label span,
+.panel .row.colors .color span,
+.panel output,
+#visorModeStatus,
+#invert_label{
+  font-size:18px;
+}
 .panel input[type="range"]{ width:160px; }
 .panel output{ min-width:42px; text-align:right; }
 
@@ -418,6 +425,14 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   /* Меньше шрифт по всему UI */
   body, .toolbar, .panel, label, output, select, option {
     font-size: 14px;
+  }
+
+  .panel label span,
+  .panel .row.colors .color span,
+  .panel output,
+  #visorModeStatus,
+  #invert_label {
+    font-size: 18px;
   }
 
   /* Кнопки верхней панели на мобилках */
@@ -897,6 +912,11 @@ input[type="color"] {
   gap:10px;
 }
 
+.start-frame-stack{
+  border-left:1px solid #d8d8d8;
+  border-right:1px solid #d8d8d8;
+}
+
 .start-datetime{
   background:#fff;
   color:#000;
@@ -978,7 +998,6 @@ input[type="color"] {
 .start-footer-sub{
   margin-top:8px;
   padding:6px 8px 0;
-  border-top:1px solid #d8d8d8;
   display:inline-block;
   font-family:'PxPlus IBM VGA', monospace;
   font-size:18px;
