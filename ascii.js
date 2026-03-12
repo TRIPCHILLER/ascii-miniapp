@@ -372,7 +372,7 @@ let DITHER_ENABLED = true;
     app.ui.startDateTime.textContent = `${day}, ${dd} ${month}, ${yyyy}   ${hh}:${mm}:${ss}`;
   }
 
-  function runStartTypingAnimation(){
+  function runStartTypingAnimation(onComplete){
     if (!app.ui.startInitText) return;
     const target = 'ИНИЦИАЛИЗАЦИЯ МОДУЛЕЙ ЯДРА...\nОК\nЯДРО ГОТОВО К ПРЕОБРАЗОВАНИЮ';
     app.ui.startInitText.textContent = '|';
@@ -385,9 +385,7 @@ let DITHER_ENABLED = true;
         clearInterval(startTypeTimer);
         startTypeTimer = null;
         app.ui.startInitText.textContent = target;
-        if (app.ui.startBlinkLine) {
-          app.ui.startBlinkLine.classList.remove('start-hidden');
-        }
+        if (typeof onComplete === 'function') onComplete();
       }
     }, 30);
   }
@@ -400,12 +398,17 @@ let DITHER_ENABLED = true;
     if (app.ui.startBlinkLine) {
       app.ui.startBlinkLine.classList.add('start-hidden');
       if (startBlinkTimer) clearInterval(startBlinkTimer);
+      startBlinkTimer = null;
+    }
+
+    runStartTypingAnimation(() => {
+      if (!app.ui.startBlinkLine) return;
+      app.ui.startBlinkLine.classList.remove('start-hidden');
+      if (startBlinkTimer) clearInterval(startBlinkTimer);
       startBlinkTimer = setInterval(() => {
         app.ui.startBlinkLine.classList.toggle('start-hidden');
       }, 500);
-    }
-
-    runStartTypingAnimation();
+    });
   }
 
   function stopModeChooserFx(){

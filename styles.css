@@ -981,6 +981,10 @@ input[type="color"] {
   margin-top:24px;
 }
 
+.start-footer-gap{
+  height:1.25em;
+}
+
 .start-mode-btn{
   border:1px solid #fff;
   background:#fff;
