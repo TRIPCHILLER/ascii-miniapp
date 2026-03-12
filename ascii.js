@@ -385,6 +385,9 @@ let DITHER_ENABLED = true;
         clearInterval(startTypeTimer);
         startTypeTimer = null;
         app.ui.startInitText.textContent = target;
+        if (app.ui.startBlinkLine) {
+          app.ui.startBlinkLine.classList.remove('start-hidden');
+        }
       }
     }, 30);
   }
@@ -395,7 +398,7 @@ let DITHER_ENABLED = true;
     startDateTimer = setInterval(updateStartDateTime, 1000);
 
     if (app.ui.startBlinkLine) {
-      app.ui.startBlinkLine.classList.remove('start-hidden');
+      app.ui.startBlinkLine.classList.add('start-hidden');
       if (startBlinkTimer) clearInterval(startBlinkTimer);
       startBlinkTimer = setInterval(() => {
         app.ui.startBlinkLine.classList.toggle('start-hidden');
