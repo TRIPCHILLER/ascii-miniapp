@@ -103,6 +103,9 @@ function busyHide(force = false){
       style:    $('#stylePreset'),
       styleRow: $('#styleRow'),
       modeChooser: $('#modeChooser'),
+      startDateTime: $('#startDateTime'),
+      startInitText: $('#startInitText'),
+      startBlinkLine: $('#startBlinkLine'),
       colorRow: $('#colorRow'),
       resetModeBtn: $('#resetModeBtn'),
       visorModeStatus: $('#visorModeStatus'),
@@ -349,6 +352,64 @@ let DITHER_ENABLED = true;
   }
 
   let modeChooserListenerBound = false;
+  let startDateTimer = null;
+  let startBlinkTimer = null;
+  let startTypeTimer = null;
+
+  const START_MONTHS = ['ЯНВАРЯ','ФЕВРАЛЯ','МАРТА','АПРЕЛЯ','МАЯ','ИЮНЯ','ИЮЛЯ','АВГУСТА','СЕНТЯБРЯ','ОКТЯБРЯ','НОЯБРЯ','ДЕКАБРЯ'];
+  const START_DAYS = ['ВС','ПН','ВТ','СР','ЧТ','ПТ','СБ'];
+
+  function updateStartDateTime(){
+    if (!app.ui.startDateTime) return;
+    const now = new Date();
+    const day = START_DAYS[now.getDay()];
+    const dd = String(now.getDate()).padStart(2, '0');
+    const month = START_MONTHS[now.getMonth()];
+    const yyyy = now.getFullYear();
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    app.ui.startDateTime.textContent = `${day}, ${dd} ${month}, ${yyyy}   ${hh}:${mm}:${ss}`;
+  }
+
+  function runStartTypingAnimation(){
+    if (!app.ui.startInitText) return;
+    const target = 'ИНИЦИАЛИЗАЦИЯ МОДУЛЕЙ ЯДРА...\nОК\nЯДРО ГОТОВО К ПРЕОБРАЗОВАНИЮ';
+    app.ui.startInitText.textContent = '';
+    let i = 0;
+    if (startTypeTimer) clearInterval(startTypeTimer);
+    startTypeTimer = setInterval(() => {
+      i += 1;
+      app.ui.startInitText.textContent = target.slice(0, i);
+      if (i >= target.length) {
+        clearInterval(startTypeTimer);
+        startTypeTimer = null;
+      }
+    }, 12);
+  }
+
+  function startModeChooserFx(){
+    updateStartDateTime();
+    if (startDateTimer) clearInterval(startDateTimer);
+    startDateTimer = setInterval(updateStartDateTime, 1000);
+
+    if (app.ui.startBlinkLine) {
+      app.ui.startBlinkLine.classList.remove('start-hidden');
+      if (startBlinkTimer) clearInterval(startBlinkTimer);
+      startBlinkTimer = setInterval(() => {
+        app.ui.startBlinkLine.classList.toggle('start-hidden');
+      }, 500);
+    }
+
+    runStartTypingAnimation();
+  }
+
+  function stopModeChooserFx(){
+    if (startDateTimer) { clearInterval(startDateTimer); startDateTimer = null; }
+    if (startBlinkTimer) { clearInterval(startBlinkTimer); startBlinkTimer = null; }
+    if (startTypeTimer) { clearInterval(startTypeTimer); startTypeTimer = null; }
+  }
+
   function bindModeChooserOnce() {
     if (!app.ui.modeChooser || modeChooserListenerBound) return;
     app.ui.modeChooser.addEventListener('click', (e) => {
@@ -398,6 +459,7 @@ let DITHER_ENABLED = true;
     state.textInitPending = isTextMode();
     localStorage.setItem('visorMode', state.visorMode);
     if (app.ui.modeChooser) app.ui.modeChooser.hidden = true;
+    stopModeChooserFx();
     applyVisorModeUi();
     if (state.textInitPending) {
       const finalizeTextInit = () => {
@@ -417,6 +479,7 @@ let DITHER_ENABLED = true;
   function initVisorMode(){
     bindModeChooserOnce();
     if (app.ui.modeChooser) app.ui.modeChooser.hidden = false;
+    startModeChooserFx();
   }
 
   // ===== ВСПЫШКА (иконки + подсветка фронталки + torch для тыловой) =====
