@@ -877,14 +877,13 @@ input[type="color"] {
   background:#000;
   color:#fff;
   font-family:'PxPlus IBM VGA', monospace;
+  font-size:18px;
 }
 
 .start-shell{
   width:min(420px, 100%);
   min-height:100%;
   padding:14px 10px 10px;
-  border-left:1px solid #cfcfcf;
-  border-right:1px solid #cfcfcf;
   display:flex;
   flex-direction:column;
   gap:10px;
@@ -913,13 +912,15 @@ input[type="color"] {
   white-space:pre-wrap;
   line-height:1.35;
   min-height:4.2em;
+  font-family:'PxPlus IBM VGA', monospace;
+  font-size:18px;
 }
 
 .start-blink{
   text-align:center;
   padding:10px 8px;
-  border-top:1px solid #8a8a8a;
-  border-bottom:1px solid #8a8a8a;
+  font-family:'PxPlus IBM VGA', monospace;
+  font-size:18px;
 }
 
 .start-mode-block{
@@ -937,14 +938,15 @@ input[type="color"] {
   min-width:140px;
   padding:8px 10px;
   font-family:'PxPlus IBM VGA', monospace;
-  font-size:24px;
+  font-size:18px;
 }
 
 .start-mode-note,
 .start-mode-example{
   text-align:center;
   line-height:1.25;
-  font-size:28px;
+  font-family:'PxPlus IBM VGA', monospace;
+  font-size:18px;
 }
 
 .start-footer-box{
@@ -955,7 +957,8 @@ input[type="color"] {
 }
 
 .start-footer-title{
-  font-size:30px;
+  font-family:'PxPlus IBM VGA', monospace;
+  font-size:18px;
 }
 
 .start-footer-sub{
@@ -963,7 +966,8 @@ input[type="color"] {
   padding:6px 8px 0;
   border-top:1px solid #d8d8d8;
   display:inline-block;
-  font-size:28px;
+  font-family:'PxPlus IBM VGA', monospace;
+  font-size:18px;
 }
 
 .start-hidden{visibility:hidden;}
