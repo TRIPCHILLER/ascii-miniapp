@@ -142,6 +142,54 @@ function busyHide(force = false){
   // ===== Telegram WebApp (если открыто внутри Telegram) =====
   // @section TELEGRAM_WEBAPP_API
 const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
+
+const TERM_RANGE_STEPS = 10;
+
+function buildTermRange(value, min, max, steps = TERM_RANGE_STEPS) {
+  const safeSteps = Math.max(2, steps | 0);
+  const span = max - min;
+  const ratio = span <= 0 ? 0 : (value - min) / span;
+  const pos = Math.max(0, Math.min(safeSteps - 1, Math.round(ratio * (safeSteps - 1))));
+  let out = '';
+  for (let i = 0; i < safeSteps; i += 1) {
+    out += (i === pos) ? '█' : '░';
+  }
+  return out;
+}
+
+function setupTerminalRange(inputEl) {
+  if (!inputEl || inputEl.dataset.termRangeReady === '1') return;
+
+  const wrap = document.createElement('span');
+  wrap.className = 'term-range-wrap';
+  const visual = document.createElement('span');
+  visual.className = 'term-range-visual';
+  visual.setAttribute('aria-hidden', 'true');
+
+  const parent = inputEl.parentNode;
+  if (!parent) return;
+  parent.insertBefore(wrap, inputEl);
+  wrap.appendChild(inputEl);
+  wrap.appendChild(visual);
+
+  const updateVisual = () => {
+    const value = Number(inputEl.value);
+    const min = Number(inputEl.min || 0);
+    const max = Number(inputEl.max || 100);
+    visual.textContent = buildTermRange(value, min, max);
+  };
+
+  updateVisual();
+  inputEl.addEventListener('input', updateVisual);
+  inputEl.dataset.termRangeReady = '1';
+}
+
+function setupTerminalRanges() {
+  setupTerminalRange(app.ui.width);
+  setupTerminalRange(app.ui.contrast);
+  setupTerminalRange(app.ui.gamma);
+  setupTerminalRange(app.ui.fps);
+}
   
 function expandSheetASAP(){
   try{
@@ -1083,6 +1131,7 @@ function applyWidthLimitsForMode(init = false) {
 }
 
   function setUI() {
+  setupTerminalRanges();
   applyWidthLimitsForMode(true); // ← умные лимиты + мягкий старт
 
     app.ui.contrast.value = state.contrast;
