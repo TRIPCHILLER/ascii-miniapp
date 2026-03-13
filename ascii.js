@@ -145,9 +145,11 @@ const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp 
 
 const TERM_RANGE_STEPS = 10;
 const START_EASTER_EGG_MAX_SOUND = 15;
+// Версия ассетов звуков для принудительного обновления кэша в WebView/браузере.
+const SOUND_ASSET_VERSION = '20260313-1';
 const START_EASTER_EGG_SOUNDS = Array.from(
   { length: START_EASTER_EGG_MAX_SOUND },
-  (_, i) => `assets/sounds/sound${i + 1}.mp3`
+  (_, i) => `assets/sounds/sound${i + 1}.mp3?v=${SOUND_ASSET_VERSION}`
 );
 
 function buildTermRange(value, min, max, steps = TERM_RANGE_STEPS) {
