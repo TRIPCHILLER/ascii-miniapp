@@ -151,6 +151,16 @@ const START_EASTER_EGG_SOUNDS = Array.from(
   { length: START_EASTER_EGG_MAX_SOUND },
   (_, i) => `assets/sounds/sound${i + 1}.mp3?v=${SOUND_ASSET_VERSION}`
 );
+const START_UI_SOUNDS = {
+  launch: `assets/sounds/startsound.mp3?v=${SOUND_ASSET_VERSION}`,
+  modeClick: `assets/sounds/clicksound.mp3?v=${SOUND_ASSET_VERSION}`,
+  blinkOn: `assets/sounds/click1.mp3?v=${SOUND_ASSET_VERSION}`,
+  blinkOff: `assets/sounds/click2.mp3?v=${SOUND_ASSET_VERSION}`,
+  print: [
+    `assets/sounds/print1.mp3?v=${SOUND_ASSET_VERSION}`,
+    `assets/sounds/print2.mp3?v=${SOUND_ASSET_VERSION}`
+  ]
+};
 
 function buildTermRange(value, min, max, steps = TERM_RANGE_STEPS) {
   const safeSteps = Math.max(2, steps | 0);
@@ -413,6 +423,32 @@ let DITHER_ENABLED = true;
   let startEasterEggNextSound = 1;
   let startEasterEggPlaying = false;
   let startEasterEggDone = false;
+  let startLaunchSoundPlayed = false;
+  let startPrintNextSound = 0;
+  let startLastPrintSoundAt = 0;
+
+  function playUiSound(src) {
+    if (!src) return;
+    const audio = new Audio(src);
+    audio.play().catch(() => {});
+  }
+
+  function playStartPrintSound() {
+    const now = performance.now();
+    if (now - startLastPrintSoundAt < 20) return;
+    const src = START_UI_SOUNDS.print[startPrintNextSound % START_UI_SOUNDS.print.length];
+    startPrintNextSound += 1;
+    startLastPrintSoundAt = now;
+    playUiSound(src);
+  }
+
+  function setStartBlinkLineHidden(hidden) {
+    if (!app.ui.startBlinkLine) return;
+    const isHidden = app.ui.startBlinkLine.classList.contains('start-hidden');
+    if (isHidden === hidden) return;
+    app.ui.startBlinkLine.classList.toggle('start-hidden', hidden);
+    playUiSound(hidden ? START_UI_SOUNDS.blinkOff : START_UI_SOUNDS.blinkOn);
+  }
 
   const START_MONTHS = ['ЯНВАРЯ','ФЕВРАЛЯ','МАРТА','АПРЕЛЯ','МАЯ','ИЮНЯ','ИЮЛЯ','АВГУСТА','СЕНТЯБРЯ','ОКТЯБРЯ','НОЯБРЯ','ДЕКАБРЯ'];
   const START_DAYS = ['ВС','ПН','ВТ','СР','ЧТ','ПТ','СБ'];
@@ -435,9 +471,12 @@ let DITHER_ENABLED = true;
     const target = 'ИНИЦИАЛИЗАЦИЯ МОДУЛЕЙ ЯДРА...\nОК\nЯДРО ГОТОВО К ПРЕОБРАЗОВАНИЮ';
     app.ui.startInitText.textContent = '|';
     let i = 0;
+    startPrintNextSound = 0;
+    startLastPrintSoundAt = 0;
     if (startTypeTimer) clearInterval(startTypeTimer);
     startTypeTimer = setInterval(() => {
       i += 1;
+      playStartPrintSound();
       app.ui.startInitText.textContent = `${target.slice(0, i)}|`;
       if (i >= target.length) {
         clearInterval(startTypeTimer);
@@ -461,10 +500,10 @@ let DITHER_ENABLED = true;
 
     runStartTypingAnimation(() => {
       if (!app.ui.startBlinkLine) return;
-      app.ui.startBlinkLine.classList.remove('start-hidden');
+      setStartBlinkLineHidden(false);
       if (startBlinkTimer) clearInterval(startBlinkTimer);
       startBlinkTimer = setInterval(() => {
-        app.ui.startBlinkLine.classList.toggle('start-hidden');
+        setStartBlinkLineHidden(!app.ui.startBlinkLine.classList.contains('start-hidden'));
       }, 1000);
     });
   }
@@ -507,6 +546,7 @@ let DITHER_ENABLED = true;
     app.ui.modeChooser.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-visor-mode]');
       if (!btn) return;
+      playUiSound(START_UI_SOUNDS.modeClick);
       chooseVisorMode(btn.dataset.visorMode);
     });
 
@@ -588,6 +628,10 @@ let DITHER_ENABLED = true;
   function initVisorMode(){
     bindModeChooserOnce();
     if (app.ui.modeChooser) app.ui.modeChooser.hidden = false;
+    if (!startLaunchSoundPlayed) {
+      startLaunchSoundPlayed = true;
+      playUiSound(START_UI_SOUNDS.launch);
+    }
     startModeChooserFx();
   }
 
