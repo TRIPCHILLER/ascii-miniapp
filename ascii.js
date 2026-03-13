@@ -144,6 +144,11 @@ function busyHide(force = false){
 const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
 
 const TERM_RANGE_STEPS = 10;
+const START_EASTER_EGG_MAX_SOUND = 15;
+const START_EASTER_EGG_SOUNDS = Array.from(
+  { length: START_EASTER_EGG_MAX_SOUND },
+  (_, i) => `assets/sounds/sound${i + 1}.mp3`
+);
 
 function buildTermRange(value, min, max, steps = TERM_RANGE_STEPS) {
   const safeSteps = Math.max(2, steps | 0);
@@ -403,6 +408,9 @@ let DITHER_ENABLED = true;
   let startDateTimer = null;
   let startBlinkTimer = null;
   let startTypeTimer = null;
+  let startEasterEggNextSound = 1;
+  let startEasterEggPlaying = false;
+  let startEasterEggDone = false;
 
   const START_MONTHS = ['ЯНВАРЯ','ФЕВРАЛЯ','МАРТА','АПРЕЛЯ','МАЯ','ИЮНЯ','ИЮЛЯ','АВГУСТА','СЕНТЯБРЯ','ОКТЯБРЯ','НОЯБРЯ','ДЕКАБРЯ'];
   const START_DAYS = ['ВС','ПН','ВТ','СР','ЧТ','ПТ','СБ'];
@@ -467,11 +475,55 @@ let DITHER_ENABLED = true;
 
   function bindModeChooserOnce() {
     if (!app.ui.modeChooser || modeChooserListenerBound) return;
+    const footerSelector = '.start-footer-box, .start-footer-title, .start-footer-sub';
+
+    const playStartEasterEggSound = () => {
+      if (startEasterEggDone || startEasterEggPlaying) return;
+      if (startEasterEggNextSound > START_EASTER_EGG_MAX_SOUND) {
+        startEasterEggDone = true;
+        return;
+      }
+
+      const src = START_EASTER_EGG_SOUNDS[startEasterEggNextSound - 1];
+      if (!src) return;
+
+      startEasterEggPlaying = true;
+      const audio = new Audio(src);
+      const unlock = () => { startEasterEggPlaying = false; };
+
+      audio.addEventListener('ended', () => {
+        startEasterEggNextSound += 1;
+        if (startEasterEggNextSound > START_EASTER_EGG_MAX_SOUND) {
+          startEasterEggDone = true;
+        }
+        unlock();
+      }, { once: true });
+      audio.addEventListener('error', unlock, { once: true });
+      audio.play().catch(unlock);
+    };
+
     app.ui.modeChooser.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-visor-mode]');
       if (!btn) return;
       chooseVisorMode(btn.dataset.visorMode);
     });
+
+    if (typeof PointerEvent !== 'undefined') {
+      app.ui.modeChooser.addEventListener('pointerup', (e) => {
+        if (!e.target.closest(footerSelector)) return;
+        playStartEasterEggSound();
+      });
+    } else {
+      app.ui.modeChooser.addEventListener('touchend', (e) => {
+        if (!e.target.closest(footerSelector)) return;
+        playStartEasterEggSound();
+      }, { passive: true });
+      app.ui.modeChooser.addEventListener('click', (e) => {
+        if (!e.target.closest(footerSelector)) return;
+        playStartEasterEggSound();
+      });
+    }
+
     modeChooserListenerBound = true;
   }
 
