@@ -71,7 +71,7 @@ button:focus, .btn:focus{
 
 /* ===== ПАНЕЛЬ ===== */
 .panel{
-  display:flex; flex-wrap:wrap; gap:12px; padding:8px;
+  display:flex; flex-wrap:wrap; gap:10px; padding:8px;
   background:var(--ui-bg);
 }
 .panel[hidden]{ display:none !important; }
@@ -96,6 +96,21 @@ button:focus, .btn:focus{
 }
 .panel input[type="range"]{ width:160px; }
 .panel output{ min-width:42px; text-align:right; }
+
+#settings.panel{
+  gap:8px;
+}
+
+#settings.panel > label,
+#settings.panel > .row.colors{
+  margin:0;
+  padding-top:4px;
+  padding-bottom:4px;
+}
+
+#settings.panel .mode-switch-row{
+  margin-top:0;
+}
 
 .panel .row.colors{
   display:flex;
@@ -256,6 +271,38 @@ input[type="range"]::-ms-fill-upper{
 input[type="range"]::-ms-thumb{
   width:16px; height:16px; background:#fff;
   border:none; border-radius:0; margin-top:0; box-shadow:none;
+}
+
+.term-range-wrap{
+  position:relative;
+  display:inline-flex;
+  align-items:center;
+  width:160px;
+  height:22px;
+}
+
+.panel .term-range-wrap input[type="range"]{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  opacity:0;
+  z-index:2;
+  cursor:pointer;
+}
+
+.term-range-visual{
+  font-family:'PxPlus IBM VGA', monospace;
+  font-size:18px;
+  line-height:1;
+  letter-spacing:0;
+  color:var(--ui-text);
+  user-select:none;
+  white-space:pre;
+}
+
+body.flash-front-ui .term-range-visual{
+  color:#000;
 }
 
 /* ===== SELECT/INPUT — без рамок/заливок, белый текст ===== */
