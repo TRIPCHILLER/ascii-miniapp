@@ -165,6 +165,7 @@ const START_UI_SOUNDS = {
     `assets/sounds/print2.mp3?v=${SOUND_ASSET_VERSION}`
   ]
 };
+const AUDIO_UNLOCK_STORAGE_KEY = 'asciiVisorAudioUnlocked';
 
 function buildTermRange(value, min, max, steps = TERM_RANGE_STEPS) {
   const safeSteps = Math.max(2, steps | 0);
@@ -428,15 +429,63 @@ let DITHER_ENABLED = true;
   let startEasterEggPlaying = false;
   let startEasterEggDone = false;
   let startLaunchSoundPlayed = false;
+  let startLaunchSoundPendingAfterUnlock = false;
   let startPrintNextSound = 0;
   let startLastPrintSoundAt = 0;
   let workUiClickListenerBound = false;
   let workUiClickAudio = null;
+  let audioUnlockListenerBound = false;
+  let audioUnlockHandled = false;
+  let audioUnlockProbe = null;
 
   function playUiSound(src) {
-    if (!src) return;
+    if (!src) return Promise.resolve(false);
     const audio = new Audio(src);
-    audio.play().catch(() => {});
+    return audio.play().then(() => true).catch(() => false);
+  }
+
+  function hasRememberedAudioUnlock() {
+    try {
+      return localStorage.getItem(AUDIO_UNLOCK_STORAGE_KEY) === '1';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function rememberAudioUnlock() {
+    try {
+      localStorage.setItem(AUDIO_UNLOCK_STORAGE_KEY, '1');
+    } catch (_) {}
+  }
+
+  function bindAudioUnlockOnce() {
+    if (!app.ui.modeChooser || audioUnlockListenerBound) return;
+
+    const tryUnlockAudio = () => {
+      if (audioUnlockHandled) return;
+      audioUnlockHandled = true;
+
+      if (!audioUnlockProbe) {
+        audioUnlockProbe = new Audio(START_UI_SOUNDS.blinkOn);
+        audioUnlockProbe.preload = 'auto';
+      }
+
+      audioUnlockProbe.pause();
+      audioUnlockProbe.currentTime = 0;
+      audioUnlockProbe.play().then(() => {
+        rememberAudioUnlock();
+        if (startLaunchSoundPendingAfterUnlock && !startLaunchSoundPlayed) {
+          startLaunchSoundPlayed = true;
+          startLaunchSoundPendingAfterUnlock = false;
+          playUiSound(START_UI_SOUNDS.launch);
+        }
+      }).catch(() => {});
+    };
+
+    app.ui.modeChooser.addEventListener('pointerup', tryUnlockAudio, { once: true, passive: true });
+    app.ui.modeChooser.addEventListener('touchend', tryUnlockAudio, { once: true, passive: true });
+    app.ui.modeChooser.addEventListener('click', tryUnlockAudio, { once: true, passive: true });
+    audioUnlockListenerBound = true;
   }
 
   function bindWorkUiClickSoundOnce() {
@@ -666,10 +715,18 @@ let DITHER_ENABLED = true;
 
   function initVisorMode(){
     bindModeChooserOnce();
+    bindAudioUnlockOnce();
     if (app.ui.modeChooser) app.ui.modeChooser.hidden = false;
-    if (!startLaunchSoundPlayed) {
-      startLaunchSoundPlayed = true;
-      playUiSound(START_UI_SOUNDS.launch);
+    if (!startLaunchSoundPlayed && !startLaunchSoundPendingAfterUnlock) {
+      playUiSound(START_UI_SOUNDS.launch).then((played) => {
+        if (played) {
+          startLaunchSoundPlayed = true;
+          return;
+        }
+        if (hasRememberedAudioUnlock()) {
+          startLaunchSoundPendingAfterUnlock = true;
+        }
+      });
     }
     startModeChooserFx();
   }
