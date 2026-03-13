@@ -154,6 +154,10 @@ const START_EASTER_EGG_SOUNDS = Array.from(
 const START_UI_SOUNDS = {
   launch: `assets/sounds/startsound.mp3?v=${SOUND_ASSET_VERSION}`,
   modeClick: `assets/sounds/clicksound.mp3?v=${SOUND_ASSET_VERSION}`,
+  workClicks: [
+    `assets/sounds/click1.mp3?v=${SOUND_ASSET_VERSION}`,
+    `assets/sounds/click2.mp3?v=${SOUND_ASSET_VERSION}`
+  ],
   blinkOn: `assets/sounds/click1.mp3?v=${SOUND_ASSET_VERSION}`,
   blinkOff: `assets/sounds/click2.mp3?v=${SOUND_ASSET_VERSION}`,
   print: [
@@ -426,11 +430,46 @@ let DITHER_ENABLED = true;
   let startLaunchSoundPlayed = false;
   let startPrintNextSound = 0;
   let startLastPrintSoundAt = 0;
+  let workUiClickListenerBound = false;
+  let workUiClickAudio = null;
 
   function playUiSound(src) {
     if (!src) return;
     const audio = new Audio(src);
     audio.play().catch(() => {});
+  }
+
+  function bindWorkUiClickSoundOnce() {
+    if (!app.wrap || workUiClickListenerBound) return;
+
+    const clickableIds = new Set([
+      'toggle', 'flip', 'fs', 'save', 'resetModeBtn',
+      'modePhoto', 'modeLive', 'modeVideo',
+      'flashBtn', 'timerOffBtn', 'timer3Btn', 'timer10Btn'
+    ]);
+
+    app.wrap.addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn || !clickableIds.has(btn.id)) return;
+      if (!isTextMode() && !isImageMode()) return;
+      if (!app.ui.modeChooser?.hidden) return;
+
+      const sounds = START_UI_SOUNDS.workClicks;
+      const src = sounds[Math.floor(Math.random() * sounds.length)];
+      if (!src) return;
+
+      if (!workUiClickAudio) {
+        workUiClickAudio = new Audio();
+        workUiClickAudio.preload = 'auto';
+      }
+
+      workUiClickAudio.pause();
+      workUiClickAudio.currentTime = 0;
+      workUiClickAudio.src = src;
+      workUiClickAudio.play().catch(() => {});
+    });
+
+    workUiClickListenerBound = true;
   }
 
   function playStartPrintSound() {
@@ -2985,6 +3024,7 @@ function layoutSettingsPanel() {
   // ============== СВЯЗКА UI ==============
   // @section UI_BINDINGS
   function bindUI() {
+    bindWorkUiClickSoundOnce();
 // Показ/скрытие панели
 // Показ/скрытие панели
 app.ui.toggle.addEventListener('click', () => {
