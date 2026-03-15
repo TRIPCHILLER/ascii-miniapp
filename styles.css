@@ -100,14 +100,14 @@ button:focus, .btn:focus{
 #settings.panel{
   flex-direction:column;
   flex-wrap:nowrap;
-  gap:6px;
+  gap:4px;
 }
 
 #settings.panel > label,
 #settings.panel > .row.colors{
   margin:0;
-  padding-top:3px;
-  padding-bottom:3px;
+  padding-top:1px;
+  padding-bottom:1px;
 }
 
 #settings.panel .mode-switch-row{
@@ -119,7 +119,23 @@ button:focus, .btn:focus{
 }
 
 #settings.panel output{
-  min-width:34px;
+  min-width:3.5ch;
+  text-align:left;
+}
+
+#settings.panel .term-range-wrap{
+  width:10ch;
+  flex:0 0 auto;
+}
+
+#settings.panel .row.colors .color,
+#settings.panel .check{
+  padding-top:1px;
+  padding-bottom:1px;
+}
+
+#settings.panel #resetModeBtn{
+  padding:.2rem .55rem;
 }
 
 .panel .row.colors{
