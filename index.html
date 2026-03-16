@@ -65,7 +65,7 @@
     <div class="panel" id="settings" hidden>
 
       <!-- 1) НАБОР -->
-      <label>
+      <label id="charsetRow" class="select-trigger-row">
         <span>Н4Б0Р:</span>
         <select id="charset">
           <option value='@%#*+=-:. '>CL4SS1C</option>
@@ -81,10 +81,10 @@
         <input id="charset_custom" type="text" placeholder="[ВВ3ДИТ3 СИМВ0ЛЫ]" style="width:260px; display:none" />
       </label>
 
-      <label class="mode-switch-row">
+      <div class="mode-switch-row">
         <span id="visorModeStatus">РЕЖИМ:</span>
         <button class="btn ghost" id="resetModeBtn" type="button">ИЗОБРАЖЕНИЕ</button>
-      </label>
+      </div>
 
       <label>
         <span>Р4ЗМЕР</span>
@@ -107,7 +107,7 @@
       </label>
 
       <!-- 5) СТИЛЬ -->
-      <label id="styleRow">
+      <label id="styleRow" class="select-trigger-row">
         <span>СТИЛЬ:</span>
         <select id="stylePreset"></select>
       </label>

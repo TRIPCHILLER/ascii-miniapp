@@ -114,6 +114,11 @@ button:focus, .btn:focus{
   margin-top:0;
 }
 
+#settings.panel .select-trigger-row{
+  width:max-content;
+  max-width:100%;
+}
+
 #settings.panel label{
   gap:6px;
 }
@@ -618,7 +623,7 @@ body:not(.visor-text)[data-mode="live"] .modebar{
 }
 
 body:not(.visor-text)[data-mode="live"] .cam-controls{
-  bottom: 57px;
+  bottom: calc(57px + env(safe-area-inset-bottom, 0px));
 }
 
 /* ===== ПЛЕЙСХОЛДЕР ДЛЯ ФОТО/ВИДЕО ===== */
@@ -1130,6 +1135,6 @@ input[type="color"] {
 body.visor-text #modeVideo{display:none !important;}
 body.visor-text #colorRow{display:none !important;}
 body.visor-text #textSizeWrap{display:flex !important;}
-.mode-switch-row{display:flex;align-items:center;gap:6px;margin-top:8px;}
+.mode-switch-row{display:flex;align-items:center;gap:6px;margin-top:8px;width:max-content;max-width:100%;}
 #resetModeBtn{display:inline-flex;width:auto;flex:0 0 auto;margin:0;padding:.45rem .85rem;}
 #visorModeStatus{opacity:.9;white-space:nowrap;}
