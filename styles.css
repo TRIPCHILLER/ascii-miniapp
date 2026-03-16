@@ -591,6 +591,36 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   padding:10px; background:#000; border-top:1px solid #111;
 }
 
+/* GRAPHIC -> CAMERA: панели только оверлеем, без влияния на layout сцены */
+body:not(.visor-text)[data-mode="live"] .wrap{
+  position: relative;
+}
+
+body:not(.visor-text)[data-mode="live"] .stage{
+  height: 100%;
+}
+
+body:not(.visor-text)[data-mode="live"] .toolbar,
+body:not(.visor-text)[data-mode="live"] .cam-controls,
+body:not(.visor-text)[data-mode="live"] .modebar{
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 30;
+}
+
+body:not(.visor-text)[data-mode="live"] .toolbar{
+  top: 0;
+}
+
+body:not(.visor-text)[data-mode="live"] .modebar{
+  bottom: 0;
+}
+
+body:not(.visor-text)[data-mode="live"] .cam-controls{
+  bottom: 57px;
+}
+
 /* ===== ПЛЕЙСХОЛДЕР ДЛЯ ФОТО/ВИДЕО ===== */
 #out { z-index: 1; }  
 #placeholder{

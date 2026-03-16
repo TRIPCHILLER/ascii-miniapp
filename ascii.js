@@ -357,6 +357,8 @@ let DITHER_ENABLED = true;
     textInitPending: false,
     textCameraFitBox: null,
     textCameraLastGridKey: '',
+    graphicCameraFitBox: null,
+    graphicCameraLastGridKey: '',
     lastImageSymbolSet: '@%#*+=-:. ',
     lastTextSymbolSet: null,
     lastCustomImageColors: null,
@@ -375,26 +377,45 @@ let DITHER_ENABLED = true;
     return isTextMode() && state.mode === 'live';
   }
 
-  function getStageFitSize() {
+  function isGraphicCameraLive(){
+    return !isTextMode() && state.mode === 'live';
+  }
+
+  function readStableCameraFitBox(key){
     const stage = app.stage;
     if (!stage) return { w: 0, h: 0 };
 
-    if (!isTextCameraLive()) {
-      state.textCameraFitBox = null;
-      return { w: stage.clientWidth, h: stage.clientHeight };
-    }
-
-    if (!state.textCameraFitBox) {
-      state.textCameraFitBox = {
+    const fitBox = state[key];
+    if (!fitBox) {
+      state[key] = {
         w: stage.clientWidth,
         h: stage.clientHeight
       };
     } else {
-      state.textCameraFitBox.w = Math.min(state.textCameraFitBox.w, stage.clientWidth);
-      state.textCameraFitBox.h = Math.min(state.textCameraFitBox.h, stage.clientHeight);
+      fitBox.w = Math.min(fitBox.w, stage.clientWidth);
+      fitBox.h = Math.min(fitBox.h, stage.clientHeight);
     }
 
-    return state.textCameraFitBox;
+    return state[key];
+  }
+
+  function getStageFitSize() {
+    const stage = app.stage;
+    if (!stage) return { w: 0, h: 0 };
+
+    if (isTextCameraLive()) {
+      state.graphicCameraFitBox = null;
+      return readStableCameraFitBox('textCameraFitBox');
+    }
+
+    if (isGraphicCameraLive()) {
+      state.textCameraFitBox = null;
+      return readStableCameraFitBox('graphicCameraFitBox');
+    }
+
+    state.textCameraFitBox = null;
+    state.graphicCameraFitBox = null;
+    return { w: stage.clientWidth, h: stage.clientHeight };
   }
 
   function getDefaultTextCharsetOption(){
@@ -1728,13 +1749,25 @@ line += chars[idx];
     refitFont(w, h);
 
     if (isTextCameraLive()) {
-      const gridKey = `${w}x${h}`;
+      const fitSize = getStageFitSize();
+      const gridKey = `${w}x${h}|${fitSize.w}x${fitSize.h}`;
       if (state.textCameraLastGridKey !== gridKey) {
         state.textCameraLastGridKey = gridKey;
         fitAsciiToViewport();
       }
     } else if (state.textCameraLastGridKey) {
       state.textCameraLastGridKey = '';
+    }
+
+    if (isGraphicCameraLive()) {
+      const fitSize = getStageFitSize();
+      const gridKey = `${w}x${h}|${fitSize.w}x${fitSize.h}`;
+      if (state.graphicCameraLastGridKey !== gridKey) {
+        state.graphicCameraLastGridKey = gridKey;
+        fitAsciiToViewport();
+      }
+    } else if (state.graphicCameraLastGridKey) {
+      state.graphicCameraLastGridKey = '';
     }
 
     if (state.isRecording && state.recordDims) {
@@ -2670,6 +2703,8 @@ async function setMode(newMode){
   state.mode = newMode;
   state.textCameraFitBox = null;
   state.textCameraLastGridKey = '';
+  state.graphicCameraFitBox = null;
+  state.graphicCameraLastGridKey = '';
   rebuildRenderCharset10();
 
 // если мы не в режиме Фото → прозрачный фон всегда OFF
@@ -3237,7 +3272,6 @@ app.ui.toggle.addEventListener('click', () => {
       if (base * w <= W + 1 && base * h <= H + 1) {
         state.viewX = 0.5;
         state.viewY = 0.5;
-        fitAsciiToViewport();
         return;
       }
 
