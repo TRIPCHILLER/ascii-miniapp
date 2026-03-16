@@ -203,7 +203,13 @@ function setupTerminalRange(inputEl) {
 
   updateVisual();
   inputEl.addEventListener('input', updateVisual);
+  inputEl.addEventListener('term-range-sync', updateVisual);
   inputEl.dataset.termRangeReady = '1';
+}
+
+function syncTerminalRange(inputEl) {
+  if (!inputEl) return;
+  inputEl.dispatchEvent(new Event('term-range-sync'));
 }
 
 function setupTerminalRanges() {
@@ -350,6 +356,7 @@ let DITHER_ENABLED = true;
     visorMode: 'image',
     textInitPending: false,
     textCameraFitBox: null,
+    textCameraLastGridKey: '',
     lastImageSymbolSet: '@%#*+=-:. ',
     lastTextSymbolSet: null,
     lastCustomImageColors: null,
@@ -382,6 +389,9 @@ let DITHER_ENABLED = true;
         w: stage.clientWidth,
         h: stage.clientHeight
       };
+    } else {
+      state.textCameraFitBox.w = Math.min(state.textCameraFitBox.w, stage.clientWidth);
+      state.textCameraFitBox.h = Math.min(state.textCameraFitBox.h, stage.clientHeight);
     }
 
     return state.textCameraFitBox;
@@ -1346,6 +1356,7 @@ function applyWidthLimitsForMode(init = false) {
 
   app.ui.width.value = state.widthChars;
   app.ui.widthVal.textContent = state.widthChars;
+  syncTerminalRange(app.ui.width);
 }
 
   function setUI() {
@@ -1715,6 +1726,17 @@ line += chars[idx];
 
     app.out.textContent = out;
     refitFont(w, h);
+
+    if (isTextCameraLive()) {
+      const gridKey = `${w}x${h}`;
+      if (state.textCameraLastGridKey !== gridKey) {
+        state.textCameraLastGridKey = gridKey;
+        fitAsciiToViewport();
+      }
+    } else if (state.textCameraLastGridKey) {
+      state.textCameraLastGridKey = '';
+    }
+
     if (state.isRecording && state.recordDims) {
   renderAsciiFrameLocked(app.out.textContent || '');
 }
@@ -2647,6 +2669,7 @@ async function setMode(newMode){
   if (isTextMode() && newMode === 'video') newMode = 'live';
   state.mode = newMode;
   state.textCameraFitBox = null;
+  state.textCameraLastGridKey = '';
   rebuildRenderCharset10();
 
 // если мы не в режиме Фото → прозрачный фон всегда OFF
@@ -3284,10 +3307,11 @@ app.ui.flip.addEventListener('click', async () => {
       app.ui.width.addEventListener('input', e => {
       const rawWidth = +e.target.value;
       state.widthChars = isTextMode()
-        ? Math.max(25, Math.min(50, rawWidth))
+        ? Math.max(25, Math.min(SAFE_TG_MAX_COLS, rawWidth))
         : rawWidth;
       if (+e.target.value !== state.widthChars) {
         e.target.value = state.widthChars;
+        syncTerminalRange(e.target);
       }
       app.ui.widthVal.textContent = state.widthChars;
 
