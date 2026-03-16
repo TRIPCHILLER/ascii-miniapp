@@ -104,7 +104,8 @@ button:focus, .btn:focus{
 }
 
 #settings.panel > label,
-#settings.panel > .row.colors{
+#settings.panel > .row.colors,
+#settings.panel > .select-trigger-row{
   margin:0;
   padding-top:1px;
   padding-bottom:1px;
@@ -117,6 +118,13 @@ button:focus, .btn:focus{
 #settings.panel .select-trigger-row{
   width:max-content;
   max-width:100%;
+  display:flex;
+  gap:6px;
+  align-items:center;
+  flex-wrap:wrap;
+  background:transparent;
+  padding:1px 8px;
+  margin:0;
 }
 
 #settings.panel label{
@@ -140,7 +148,7 @@ button:focus, .btn:focus{
 }
 
 #settings.panel #resetModeBtn{
-  padding:.2rem .55rem;
+  padding:0;
 }
 
 .panel .row.colors{
@@ -1135,6 +1143,21 @@ input[type="color"] {
 body.visor-text #modeVideo{display:none !important;}
 body.visor-text #colorRow{display:none !important;}
 body.visor-text #textSizeWrap{display:flex !important;}
-.mode-switch-row{display:flex;align-items:center;gap:6px;margin-top:8px;width:max-content;max-width:100%;}
-#resetModeBtn{display:inline-flex;width:auto;flex:0 0 auto;margin:0;padding:.45rem .85rem;}
+.mode-switch-row{display:flex;align-items:center;gap:6px;margin:0;padding:1px 8px;max-width:100%;}
+#resetModeBtn{display:inline-flex;width:auto;flex:0 0 auto;align-self:center;margin:0;padding:0;border:0;background:transparent;line-height:1.1;}
 #visorModeStatus{opacity:.9;white-space:nowrap;}
+
+#charset,
+#stylePreset{
+  display:inline;
+  width:auto;
+  min-width:0;
+  flex:0 0 auto;
+  padding:0;
+  margin:0;
+}
+
+#charsetRow,
+#styleRow{
+  width:auto !important;
+}
