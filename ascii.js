@@ -349,6 +349,7 @@ let DITHER_ENABLED = true;
     timerSeconds: 0,
     visorMode: 'image',
     textInitPending: false,
+    textCameraFitBox: null,
     lastImageSymbolSet: '@%#*+=-:. ',
     lastTextSymbolSet: null,
     lastCustomImageColors: null,
@@ -362,6 +363,29 @@ let DITHER_ENABLED = true;
   };
 
   function isTextMode(){ return state.visorMode === 'text'; }
+
+  function isTextCameraLive(){
+    return isTextMode() && state.mode === 'live';
+  }
+
+  function getStageFitSize() {
+    const stage = app.stage;
+    if (!stage) return { w: 0, h: 0 };
+
+    if (!isTextCameraLive()) {
+      state.textCameraFitBox = null;
+      return { w: stage.clientWidth, h: stage.clientHeight };
+    }
+
+    if (!state.textCameraFitBox) {
+      state.textCameraFitBox = {
+        w: stage.clientWidth,
+        h: stage.clientHeight
+      };
+    }
+
+    return state.textCameraFitBox;
+  }
 
   function getDefaultTextCharsetOption(){
     return TEXT_CHARSETS.DOTS;
@@ -1442,7 +1466,7 @@ function computeTelegramExportGrid(srcW, srcH, previewCols, previewRows) {
 function buildAsciiFromCurrentSource(src, cols, rows) {
   let sx = 0, sy = 0, sw = src.w, sh = src.h;
   if (isMobile && state.mode === 'live') {
-    const targetWH = 9 / 16;
+    const targetWH = isTextMode() ? (3 / 4) : (9 / 16);
     const srcWH = src.w / src.h;
     if (srcWH > targetWH) {
       sw = Math.round(src.h * targetWH);
@@ -1518,7 +1542,7 @@ let sourceHOverW = src.h / src.w;
 // ВАЖНО: это должно работать и для image, и для text режима, иначе в text
 // сетка считается по «сырому» сенсору (часто 4:3), а рендер реально кадрируется в 9:16.
 if (isMobile && state.mode === 'live') {
-  sourceHOverW = 16/9;
+  sourceHOverW = isTextMode() ? (4 / 3) : (16 / 9);
 }
 
   let w = Math.max(1, Math.round(state.widthChars));
@@ -1527,8 +1551,8 @@ if (isMobile && state.mode === 'live') {
   let h = Math.max(1, Math.min(1000, Math.round(targetH)));
   if (isTextMode()) {
     const desiredCols = Math.max(25, Math.round(state.widthChars));
-    const textSrcW = (isMobile && state.mode === 'live') ? 9 : src.w;
-    const textSrcH = (isMobile && state.mode === 'live') ? 16 : src.h;
+    const textSrcW = (isMobile && state.mode === 'live') ? (isTextMode() ? 3 : 9) : src.w;
+    const textSrcH = (isMobile && state.mode === 'live') ? (isTextMode() ? 4 : 16) : src.h;
     const textGrid = computeTextGridFromSource(textSrcW, textSrcH, desiredCols);
     w = textGrid.cols;
     h = textGrid.rows;
@@ -1615,7 +1639,7 @@ const isFsLike = isFullscreenLike();
 let sx = 0, sy = 0, sw = src.w, sh = src.h;
 // ФИКС: LIVE на мобилках всегда кадрируем под 9:16, даже с открытыми панелями
 if (isMobile && state.mode === 'live') {
-  const targetWH = 9/16; // W/H
+  const targetWH = isTextMode() ? (3 / 4) : (9 / 16); // W/H
   const srcWH = src.w / src.h;
   if (srcWH > targetWH) {
     sw = Math.round(src.h * targetWH);
@@ -2213,8 +2237,9 @@ async function downloadBlob(blob, filename) {
     if (refitLock) return;
     refitLock = true;
 
-    const stageW = app.stage.clientWidth;
-    const stageH = app.stage.clientHeight;
+    const fitSize = getStageFitSize();
+    const stageW = fitSize.w;
+    const stageH = fitSize.h;
 
     const CH = measureSampleChar();
     measurePre.textContent = (CH.repeat(cols) + '\n').repeat(rows);
@@ -2265,8 +2290,9 @@ function fitAsciiToViewport(){
   const h = out.scrollHeight;
 
   // 3. Доступные размеры сцены
-  const W = stage.clientWidth;
-  const H = stage.clientHeight;
+  const fitSize = getStageFitSize();
+  const W = fitSize.w;
+  const H = fitSize.h;
 
   if (!w || !h || !W || !H) {
     out.style.transform = 'translate(-50%, -50%) scale(1)';
@@ -2620,6 +2646,7 @@ function updateModeTabs(newMode){
 async function setMode(newMode){
   if (isTextMode() && newMode === 'video') newMode = 'live';
   state.mode = newMode;
+  state.textCameraFitBox = null;
   rebuildRenderCharset10();
 
 // если мы не в режиме Фото → прозрачный фон всегда OFF
@@ -3125,6 +3152,7 @@ app.ui.toggle.addEventListener('click', () => {
   };
 
   el.addEventListener('pointerdown', e => {
+    if (isTextMode()) return;
     if (e.pointerType === 'touch') e.preventDefault?.();
     el.setPointerCapture?.(e.pointerId);
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -3146,6 +3174,7 @@ app.ui.toggle.addEventListener('click', () => {
   }, { passive:false });
 
   el.addEventListener('pointermove', e => {
+    if (isTextMode()) return;
     if (!pts.has(e.pointerId)) return;
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
@@ -3155,8 +3184,9 @@ app.ui.toggle.addEventListener('click', () => {
 
     const w = out.scrollWidth;
     const h = out.scrollHeight;
-    const W = stage.clientWidth;
-    const H = stage.clientHeight;
+    const fitSize = getStageFitSize();
+    const W = fitSize.w;
+    const H = fitSize.h;
     if (!w || !h || !W || !H) return;
 
     const S = Math.min(W / w, H / h);
@@ -3208,6 +3238,7 @@ app.ui.toggle.addEventListener('click', () => {
   }, { passive:false });
 
   const up = e => {
+    if (isTextMode()) return;
     pts.delete(e.pointerId);
     resetPanIf(e.pointerId);
     if (pts.size < 2) pinchActive = false;
