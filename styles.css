@@ -88,6 +88,23 @@ button:focus, .btn:focus{
 #invert_label{
   font-size:18px;
 }
+
+#settings.panel .select-trigger-row > span,
+#settings.panel #visorModeStatus,
+#settings.panel #charset,
+#settings.panel #stylePreset,
+#settings.panel #resetModeBtn{
+  font-family:inherit;
+  font-size:18px;
+  font-weight:inherit;
+  line-height:inherit;
+  letter-spacing:inherit;
+  text-rendering:inherit;
+  -webkit-font-smoothing:inherit;
+  text-transform:none;
+  transform:none;
+  vertical-align:baseline;
+}
 .panel select,
 .panel option,
 #charset,
@@ -105,17 +122,26 @@ button:focus, .btn:focus{
 
 #settings.panel > label,
 #settings.panel > .row.colors,
-#settings.panel > .select-trigger-row{
+#settings.panel > .select-trigger-row,
+#settings.panel > .mode-switch-row{
   margin:0;
   padding-top:1px;
   padding-bottom:1px;
 }
 
-#settings.panel .mode-switch-row{
-  margin-top:0;
+#settings.panel .select-trigger-row{
+  width:max-content;
+  max-width:100%;
+  display:flex;
+  gap:6px;
+  align-items:center;
+  flex-wrap:wrap;
+  background:transparent;
+  padding:1px 8px;
+  margin:0;
 }
 
-#settings.panel .select-trigger-row{
+#settings.panel .mode-switch-row{
   width:max-content;
   max-width:100%;
   display:flex;
@@ -1144,7 +1170,7 @@ body.visor-text #modeVideo{display:none !important;}
 body.visor-text #colorRow{display:none !important;}
 body.visor-text #textSizeWrap{display:flex !important;}
 .mode-switch-row{display:flex;align-items:center;gap:6px;margin:0;padding:1px 8px;max-width:100%;}
-#resetModeBtn{display:inline-flex;width:auto;flex:0 0 auto;align-self:center;margin:0;padding:0;border:0;background:transparent;line-height:1.1;}
+#resetModeBtn{display:inline-flex;width:auto;flex:0 0 auto;align-self:center;margin:0;padding:0;border:0;background:transparent;line-height:inherit;}
 #visorModeStatus{opacity:.9;white-space:nowrap;}
 
 #charset,
