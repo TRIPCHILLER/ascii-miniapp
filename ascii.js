@@ -1646,90 +1646,14 @@ function updateGifFrame(ts) {
     if (!src) return;
 
     const { w, h } = updateGridSize();
+    const out = buildAsciiFromCurrentSource(src, w, h);
 
-    // Подготовка трансформа для зеркала
-    // mirror = true ⇒ рисуем с scaleX(-1), чтобы получить НЕ-зеркальную картинку
-    
-// --- LIVE cover-crop под 16:9 на мобилках (и fullscreen, и с панелями) ---
-const isFsLike = isFullscreenLike();
-
-let sx = 0, sy = 0, sw = src.w, sh = src.h;
-// ФИКС: LIVE на мобилках всегда кадрируем под 9:16, даже с открытыми панелями
-if (isMobile && state.mode === 'live') {
-  const targetWH = isTextMode() ? (3 / 4) : (9 / 16); // W/H
-  const srcWH = src.w / src.h;
-  if (srcWH > targetWH) {
-    sw = Math.round(src.h * targetWH);
-    sx = Math.round((src.w - sw) / 2);
-  } else if (srcWH < targetWH) {
-    sh = Math.round(src.w / targetWH);
-    sy = Math.round((src.h - sh) / 2);
-  }
-  // дальше код оставляешь как был
-}
-
-// зеркалим как и раньше: mirror=true ⇒ scaleX(-1)
-ctx.setTransform(state.mirror ? -1 : 1, 0, 0, 1, state.mirror ? w : 0, 0);
-ctx.drawImage(src.el, sx, sy, sw, sh, 0, 0, w, h);
-ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-    const data = ctx.getImageData(0, 0, w, h).data;
-// Генерация ASCII (юникод-безопасно + поддержка пустого набора)
-const chars = Array.from(state.renderCharset10 || state.charset || '');
-const n = chars.length - 1;
-
-if (n < 0) {
-  // набор пустой → очищаем экран и выходим из функции loop
-  app.out.textContent = '';
-  refitFont(1, 1);
-  return;   // ← важно, именно return из loop!
-}
-
-const inv = state.invert ? -1 : 1;
-const bias = state.invert ? 255 : 0;
-const gamma = state.gamma;
-const contrast = state.contrast;
-
-let out = '';
-let i = 0;
-for (let y = 0; y < h; y++) {
-  let line = '';
-  for (let x = 0; x < w; x++, i += 4) {
-    const r = data[i], g = data[i+1], b = data[i+2];
-
-    // яркость → контраст → гамма
-    let Y = 0.2126*r + 0.7152*g + 0.0722*b;
-    let v01 = Y / 255;
-    v01 = ((v01 - 0.5) * contrast) + 0.5;
-    v01 = Math.min(1, Math.max(0, v01));
-    v01 = Math.pow(v01, 1 / gamma);
-// Black/White clip для повышения «плотности» картинки
-    const bp = state.blackPoint;
-    const wp = state.whitePoint;
-    v01 = (v01 - bp) / Math.max(1e-6, (wp - bp));
-    v01 = Math.min(1, Math.max(0, v01));
-
-    const Yc = Math.max(0, Math.min(255, (bias + inv * (v01 * 255))));
-    // u — непрерывный индекс 0..n
-const u = (Yc / 255) * n;
-let i0 = u | 0;        // floor
-let idx = i0;
-
-if (DITHER_ENABLED) {
-  const frac = u - i0; // 0..1
-  const thr  = BAYER8[(y & 7) * 8 + (x & 7)] / 64; // 0..1
-  if (frac > thr) idx = i0 + 1;
-}
-
-if (idx < 0) idx = 0;
-else if (idx > n) idx = n;
-
-line += chars[idx];
-
-  }
-  out += line + '\n';
-}
-
+    if (!out) {
+      // набор пустой → очищаем экран и выходим из функции loop
+      app.out.textContent = '';
+      refitFont(1, 1);
+      return;
+    }
     app.out.textContent = out;
     refitFont(w, h);
 
