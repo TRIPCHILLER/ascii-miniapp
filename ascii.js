@@ -1427,7 +1427,7 @@ function computeTextGridFromSource(srcW, srcH, desiredCols) {
 
   let cols = Math.max(minCols, Math.round(desiredCols));
   if (cols > SAFE_TG_MAX_COLS) cols = SAFE_TG_MAX_COLS;
-  let rows = Math.max(minRows, Math.round(cols * (srcH / Math.max(1, srcW)) * TEXT_TELEGRAM_CELL_ASPECT));
+  let rows = Math.max(minRows, Math.round(cols * (srcH / Math.max(1, srcW))));
   const limitsHit = [];
 
   if (Math.round(desiredCols) > SAFE_TG_MAX_COLS) {
@@ -1448,6 +1448,8 @@ function computeTextGridFromSource(srcW, srcH, desiredCols) {
     rows = Math.max(minRows, Math.floor(rows * s));
     limitsHit.push(`chars:${TG_MAX_CHARS}`);
   }
+
+  rows = Math.max(minRows, Math.round(rows * TEXT_TELEGRAM_CELL_ASPECT));
 
   return { cols, rows, limitsHit };
 }
