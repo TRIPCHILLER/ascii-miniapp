@@ -27,6 +27,7 @@
   const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
   const API_BASE = 'https://api.tripchiller.com';
   const SAFE_TG_MAX_COLS = 40;
+  const TEXT_TELEGRAM_CELL_ASPECT = 0.78;
     // Портрет-лок (чтобы не крутилось в горизонталь, где получится каша)
   let orientationLockRequested = false;
 
@@ -1419,7 +1420,6 @@ if (state.transparentBg) {
 
   // Пересчёт h и подготовка offscreen размера
 function computeTextGridFromSource(srcW, srcH, desiredCols) {
-  const TELEGRAM_TEXT_ASPECT_K = 0.78;
   const TG_MAX_ROWS = 46;
   const TG_MAX_CHARS = 3900;
   const minCols = 10;
@@ -1427,7 +1427,7 @@ function computeTextGridFromSource(srcW, srcH, desiredCols) {
 
   let cols = Math.max(minCols, Math.round(desiredCols));
   if (cols > SAFE_TG_MAX_COLS) cols = SAFE_TG_MAX_COLS;
-  let rows = Math.max(minRows, Math.round(cols * (srcH / Math.max(1, srcW)) * TELEGRAM_TEXT_ASPECT_K));
+  let rows = Math.max(minRows, Math.round(cols * (srcH / Math.max(1, srcW)) * TEXT_TELEGRAM_CELL_ASPECT));
   const limitsHit = [];
 
   if (Math.round(desiredCols) > SAFE_TG_MAX_COLS) {
@@ -3996,6 +3996,8 @@ async function sendAsciiTextToBot() {
   const snapshotCols = previewSnapshot.cols;
   const snapshotRows = previewSnapshot.rows;
   const exportHash = asciiDebugHash(asciiSnapshot);
+  const asciiLen = asciiSnapshot.length;
+  const hashMatch = previewSnapshot.hash === exportHash;
   console.log('[TEXT_ASCII_PREVIEW]', {
     hash: previewSnapshot.hash,
     cols: previewSnapshot.cols,
@@ -4010,6 +4012,20 @@ async function sendAsciiTextToBot() {
   const activeCharset = String(state.charset || TEXT_CHARSETS.DOTS);
   const charsetDebugHead = activeCharset.slice(0, 10);
   const charsetDebugTail = activeCharset.slice(-10);
+  const textAsciiDebug = {
+    previewHash: previewSnapshot.hash,
+    exportHash,
+    hashMatch,
+    previewCols: previewSnapshot.cols,
+    previewRows: previewSnapshot.rows,
+    exportCols: snapshotCols,
+    exportRows: snapshotRows,
+    asciiLen,
+    charset: activeCharset,
+    aspectCompensation: TEXT_TELEGRAM_CELL_ASPECT
+  };
+  console.log('[TEXT_ASCII_DEBUG]', textAsciiDebug);
+  dbgState('sendAsciiTextToBot.text_ascii_debug', textAsciiDebug);
 
   uploadInFlight = true;
   const form = new FormData();
@@ -4046,10 +4062,8 @@ async function sendAsciiTextToBot() {
       tgPopup('ОШИБКА', `Статус ${res.status}\n${textEndpointUrl}\n${rawHead}`);
       return;
     }
-    const finalCols = Number.isFinite(Number(json?.finalCols)) ? Number(json.finalCols) : snapshotCols;
-    const finalRows = Number.isFinite(Number(json?.finalRows)) ? Number(json.finalRows) : snapshotRows;
-    const asciiLen = Number.isFinite(Number(json?.asciiLen)) ? Number(json.asciiLen) : asciiSnapshot.length;
-    tgPopup('Г0Т0В0', `✅ Отправлено (cols=${finalCols}, rows=${finalRows}, asciiLen=${asciiLen})\ncharset: ${charsetDebugHead}…${charsetDebugTail}${typeof json?.balance !== 'undefined' ? `\nОсталось: ${json.balance}` : ''}`);
+    const serverAsciiLen = Number.isFinite(Number(json?.asciiLen)) ? Number(json.asciiLen) : asciiLen;
+    tgPopup('Г0Т0В0', `✅ Отправлено\npreviewHash=${textAsciiDebug.previewHash}\nexportHash=${textAsciiDebug.exportHash}\nhashMatch=${textAsciiDebug.hashMatch}\npreviewCols=${textAsciiDebug.previewCols}\npreviewRows=${textAsciiDebug.previewRows}\nexportCols=${textAsciiDebug.exportCols}\nexportRows=${textAsciiDebug.exportRows}\nasciiLen=${serverAsciiLen}\ncharset=${charsetDebugHead}…${charsetDebugTail}\naspect=${textAsciiDebug.aspectCompensation}${typeof json?.balance !== 'undefined' ? `\nОсталось: ${json.balance}` : ''}`);
   } catch (e) {
     dbgState('sendAsciiTextToBot.exception', { url: textEndpointUrl, error: String(e?.message || e || '').slice(0, 200) });
     tgPopup('СЕТЕВАЯ ОШИБКА', String(e?.message || 'Не удалось отправить запрос').slice(0, 200));
