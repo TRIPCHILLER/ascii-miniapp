@@ -360,6 +360,8 @@ let DITHER_ENABLED = true;
     lastImageSymbolSet: '@%#*+=-:. ',
     lastTextSymbolSet: null,
     lastCustomImageColors: null,
+    textGridDebug: null,
+    textFinalPreviewDebug: null,
   };
 
   const TEXT_CHARSETS = {
@@ -1568,17 +1570,29 @@ if (isMobile && state.mode === 'live') {
     const desiredCols = Math.max(25, Math.round(state.widthChars));
     const textSrcW = (isMobile && state.mode === 'live') ? (isTextMode() ? 3 : 9) : src.w;
     const textSrcH = (isMobile && state.mode === 'live') ? (isTextMode() ? 4 : 16) : src.h;
+    const requestedRows = Math.max(10, Math.round(desiredCols * (textSrcH / Math.max(1, textSrcW))));
     const textGrid = computeTextGridFromSource(textSrcW, textSrcH, desiredCols);
     w = textGrid.cols;
     const rowsAfterLimits = textGrid.rows;
     h = Math.max(10, Math.round(rowsAfterLimits * TEXT_TELEGRAM_CELL_ASPECT));
+    state.textGridDebug = {
+      requestedCols: desiredCols,
+      requestedRows,
+      rowsAfterLimits,
+      aspectCompensation: TEXT_TELEGRAM_CELL_ASPECT,
+      finalGridCols: w,
+      finalGridRows: h
+    };
     console.log('[TEXT_GRID]', {
       srcW: src.w,
       srcH: src.h,
+      requestedCols: desiredCols,
+      requestedRows,
       cols: w,
       rowsAfterLimits,
       rows: h,
       asciiLen: w * h,
+      aspectCompensation: TEXT_TELEGRAM_CELL_ASPECT,
       limits: textGrid.limitsHit.length ? textGrid.limitsHit.join(',') : 'none'
     });
   }
@@ -3909,6 +3923,20 @@ async function sendAsciiTextToBot() {
 
   if (uploadInFlight) return;
   const previewSnapshot = getAsciiSnapshotFromPreview();
+  const finalAsciiText = String(app.out?.textContent || '');
+  const finalAsciiLines = finalAsciiText.split('\n');
+  const finalAsciiLineCount = finalAsciiLines.length;
+  const finalAsciiMaxCols = finalAsciiLines.reduce((max, line) => Math.max(max, Array.from(line || '').length), 0);
+  const finalAsciiLen = finalAsciiText.length;
+  const finalAsciiHash = asciiDebugHash(finalAsciiText);
+  state.textFinalPreviewDebug = {
+    finalAsciiLineCount,
+    finalAsciiMaxCols,
+    finalAsciiLen,
+    hash: finalAsciiHash
+  };
+  console.log('[TEXT_ASCII_FINAL_PREVIEW]', state.textFinalPreviewDebug);
+  dbgState('sendAsciiTextToBot.final_preview_debug', state.textFinalPreviewDebug);
   if (!previewSnapshot.asciiText.trim()) {
     tgPopup('ОШИБКА', 'Нет ASCII-превью для отправки');
     return;
@@ -3947,6 +3975,9 @@ async function sendAsciiTextToBot() {
     exportCols: snapshotCols,
     exportRows: snapshotRows,
     asciiLen,
+    finalAsciiLineCount,
+    finalAsciiMaxCols,
+    finalAsciiLen,
     charset: activeCharset,
     aspectCompensation: TEXT_TELEGRAM_CELL_ASPECT
   };
@@ -3989,7 +4020,8 @@ async function sendAsciiTextToBot() {
       return;
     }
     const serverAsciiLen = Number.isFinite(Number(json?.asciiLen)) ? Number(json.asciiLen) : asciiLen;
-    tgPopup('Г0Т0В0', `✅ Отправлено\npreviewHash=${textAsciiDebug.previewHash}\nexportHash=${textAsciiDebug.exportHash}\nhashMatch=${textAsciiDebug.hashMatch}\npreviewCols=${textAsciiDebug.previewCols}\npreviewRows=${textAsciiDebug.previewRows}\nexportCols=${textAsciiDebug.exportCols}\nexportRows=${textAsciiDebug.exportRows}\nasciiLen=${serverAsciiLen}\ncharset=${charsetDebugHead}…${charsetDebugTail}\naspect=${textAsciiDebug.aspectCompensation}${typeof json?.balance !== 'undefined' ? `\nОсталось: ${json.balance}` : ''}`);
+    const requestedRows = state.textGridDebug?.requestedRows ?? '—';
+    tgPopup('Г0Т0В0', `✅ Отправлено\nrequestedRows=${requestedRows}\nfinalAsciiLineCount=${textAsciiDebug.finalAsciiLineCount}\npreviewRows=${textAsciiDebug.previewRows}\npreviewHash=${textAsciiDebug.previewHash}\nexportHash=${textAsciiDebug.exportHash}\nhashMatch=${textAsciiDebug.hashMatch}\npreviewCols=${textAsciiDebug.previewCols}\nfinalAsciiMaxCols=${textAsciiDebug.finalAsciiMaxCols}\nexportCols=${textAsciiDebug.exportCols}\nexportRows=${textAsciiDebug.exportRows}\nfinalAsciiLen=${textAsciiDebug.finalAsciiLen}\nasciiLen=${serverAsciiLen}\ncharset=${charsetDebugHead}…${charsetDebugTail}\naspect=${textAsciiDebug.aspectCompensation}${typeof json?.balance !== 'undefined' ? `\nОсталось: ${json.balance}` : ''}`);
   } catch (e) {
     dbgState('sendAsciiTextToBot.exception', { url: textEndpointUrl, error: String(e?.message || e || '').slice(0, 200) });
     tgPopup('СЕТЕВАЯ ОШИБКА', String(e?.message || 'Не удалось отправить запрос').slice(0, 200));
