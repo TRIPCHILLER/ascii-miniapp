@@ -2184,6 +2184,7 @@ async function downloadBlob(blob, filename) {
     const ctrl = new AbortController();
     let to = null;
     let pulse = null;
+    let dotsPulse = null;
     let dots = 0;
 
     try {
@@ -2246,12 +2247,16 @@ async function downloadBlob(blob, filename) {
         if (phase === 'finalize') {
           app.ui.busyText.textContent = busyTargetText;
           phase = 'dots';
+          clearInterval(pulse);
+          pulse = null;
+          dotsPulse = setInterval(() => {
+            if (!app?.ui?.busyText) return;
+            dots = (dots + 1) % 4;
+            app.ui.busyText.textContent = busyTargetText + '.'.repeat(dots);
+          }, 500);
           return;
         }
-
-        dots = (dots + 1) % 4;
-        app.ui.busyText.textContent = busyTargetText + '.'.repeat(dots);
-      }, 45);
+      }, 90);
 
       // общий таймаут (120s)
       to = setTimeout(() => ctrl.abort(), 120000);
@@ -2305,6 +2310,7 @@ async function downloadBlob(blob, filename) {
     } finally {
       if (to) clearTimeout(to);
       if (pulse) clearInterval(pulse);
+      if (dotsPulse) clearInterval(dotsPulse);
 
       window.Telegram?.WebApp?.MainButton?.hideProgress?.();
       uploadInFlight = false;
