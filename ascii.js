@@ -1449,8 +1449,6 @@ function computeTextGridFromSource(srcW, srcH, desiredCols) {
     limitsHit.push(`chars:${TG_MAX_CHARS}`);
   }
 
-  rows = Math.max(minRows, Math.round(rows * TEXT_TELEGRAM_CELL_ASPECT));
-
   return { cols, rows, limitsHit };
 }
 
@@ -1572,11 +1570,13 @@ if (isMobile && state.mode === 'live') {
     const textSrcH = (isMobile && state.mode === 'live') ? (isTextMode() ? 4 : 16) : src.h;
     const textGrid = computeTextGridFromSource(textSrcW, textSrcH, desiredCols);
     w = textGrid.cols;
-    h = textGrid.rows;
+    const rowsAfterLimits = textGrid.rows;
+    h = Math.max(10, Math.round(rowsAfterLimits * TEXT_TELEGRAM_CELL_ASPECT));
     console.log('[TEXT_GRID]', {
       srcW: src.w,
       srcH: src.h,
       cols: w,
+      rowsAfterLimits,
       rows: h,
       asciiLen: w * h,
       limits: textGrid.limitsHit.length ? textGrid.limitsHit.join(',') : 'none'
