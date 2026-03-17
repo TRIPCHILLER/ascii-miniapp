@@ -156,7 +156,7 @@ button:focus, .btn:focus{
 /* Оптическое выравнивание trigger-строк с label-строками панели */
 #settings.panel .select-trigger-row > span,
 #settings.panel #visorModeStatus{
-  margin-left:-1px;
+  margin-left:-2px;
 }
 
 #settings.panel label{
