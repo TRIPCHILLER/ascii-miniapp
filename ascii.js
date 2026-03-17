@@ -27,7 +27,7 @@
   const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
   const API_BASE = 'https://api.tripchiller.com';
   const SAFE_TG_MAX_COLS = 40;
-  const TEXT_TELEGRAM_CELL_ASPECT = 0.78;
+  const TEXT_TELEGRAM_CELL_ASPECT = 0.60;
     // Портрет-лок (чтобы не крутилось в горизонталь, где получится каша)
   let orientationLockRequested = false;
 
@@ -3924,7 +3924,10 @@ async function sendAsciiTextToBot() {
   if (uploadInFlight) return;
   const previewSnapshot = getAsciiSnapshotFromPreview();
   const finalAsciiText = String(app.out?.textContent || '');
-  const finalAsciiLines = finalAsciiText.split('\n');
+  const finalAsciiLinesRaw = finalAsciiText.split('\n');
+  const finalAsciiLines = (finalAsciiLinesRaw.length && finalAsciiLinesRaw[finalAsciiLinesRaw.length - 1] === '')
+    ? finalAsciiLinesRaw.slice(0, -1)
+    : finalAsciiLinesRaw;
   const finalAsciiLineCount = finalAsciiLines.length;
   const finalAsciiMaxCols = finalAsciiLines.reduce((max, line) => Math.max(max, Array.from(line || '').length), 0);
   const finalAsciiLen = finalAsciiText.length;
@@ -4021,7 +4024,9 @@ async function sendAsciiTextToBot() {
     }
     const serverAsciiLen = Number.isFinite(Number(json?.asciiLen)) ? Number(json.asciiLen) : asciiLen;
     const requestedRows = state.textGridDebug?.requestedRows ?? '—';
-    tgPopup('Г0Т0В0', `✅ Отправлено\nrequestedRows=${requestedRows}\nfinalAsciiLineCount=${textAsciiDebug.finalAsciiLineCount}\npreviewRows=${textAsciiDebug.previewRows}\npreviewHash=${textAsciiDebug.previewHash}\nexportHash=${textAsciiDebug.exportHash}\nhashMatch=${textAsciiDebug.hashMatch}\npreviewCols=${textAsciiDebug.previewCols}\nfinalAsciiMaxCols=${textAsciiDebug.finalAsciiMaxCols}\nexportCols=${textAsciiDebug.exportCols}\nexportRows=${textAsciiDebug.exportRows}\nfinalAsciiLen=${textAsciiDebug.finalAsciiLen}\nasciiLen=${serverAsciiLen}\ncharset=${charsetDebugHead}…${charsetDebugTail}\naspect=${textAsciiDebug.aspectCompensation}${typeof json?.balance !== 'undefined' ? `\nОсталось: ${json.balance}` : ''}`);
+    const rowsAfterLimits = state.textGridDebug?.rowsAfterLimits ?? '—';
+    const finalGridRows = state.textGridDebug?.finalGridRows ?? '—';
+    tgPopup('Г0Т0В0', `✅ Отправлено\nrequestedRows=${requestedRows}\nrowsAfterLimits=${rowsAfterLimits}\nfinalGridRows=${finalGridRows}\nfinalAsciiLineCount=${textAsciiDebug.finalAsciiLineCount}\npreviewRows=${textAsciiDebug.previewRows}\npreviewHash=${textAsciiDebug.previewHash}\nexportHash=${textAsciiDebug.exportHash}\nhashMatch=${textAsciiDebug.hashMatch}\npreviewCols=${textAsciiDebug.previewCols}\nfinalAsciiMaxCols=${textAsciiDebug.finalAsciiMaxCols}\nexportCols=${textAsciiDebug.exportCols}\nexportRows=${textAsciiDebug.exportRows}\nfinalAsciiLen=${textAsciiDebug.finalAsciiLen}\nasciiLen=${serverAsciiLen}\ncharset=${charsetDebugHead}…${charsetDebugTail}\naspect=${textAsciiDebug.aspectCompensation}${typeof json?.balance !== 'undefined' ? `\nОсталось: ${json.balance}` : ''}`);
   } catch (e) {
     dbgState('sendAsciiTextToBot.exception', { url: textEndpointUrl, error: String(e?.message || e || '').slice(0, 200) });
     tgPopup('СЕТЕВАЯ ОШИБКА', String(e?.message || 'Не удалось отправить запрос').slice(0, 200));
