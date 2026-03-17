@@ -2201,13 +2201,57 @@ async function downloadBlob(blob, filename) {
       form.append('fps', String(Math.max(5, Math.min(60, Math.round(state.fps || 30)))));
       // показываем «длинный» overlay на всё время запроса
       busyLock = true;
-      busyShow('0ТПР4ВК4 Ф4ЙЛ4 В Ч4Т…');
-      pulse = setInterval(() => {
-        dots = (dots + 1) % 4;
-        if (app?.ui?.busyText) {
-          app.ui.busyText.textContent = '0ТПР4ВК4 Ф4ЙЛА В Ч4Т' + '.'.repeat(dots);
+      const busyTargetText = 'ОТПРАВКА ФАЙЛА В ЧАТ';
+      const busyNoiseAlphabet = '0123456789АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЙЧШЩЪЫЬЭЮЯ"';
+      const placeholderMap = { 'О': '0', 'А': '4' };
+      const revealableIndexes = [];
+
+      for (let i = 0; i < busyTargetText.length; i++) {
+        const ch = busyTargetText[i];
+        if (ch !== ' ' && !placeholderMap[ch]) revealableIndexes.push(i);
+      }
+
+      const randomNoiseChar = () => busyNoiseAlphabet[Math.floor(Math.random() * busyNoiseAlphabet.length)];
+      const buildBusyText = (fixedCount, revealPlaceholders) => {
+        let out = '';
+        for (let i = 0; i < busyTargetText.length; i++) {
+          const ch = busyTargetText[i];
+          if (ch === ' ') {
+            out += ' ';
+            continue;
+          }
+          if (placeholderMap[ch]) {
+            out += revealPlaceholders ? ch : placeholderMap[ch];
+            continue;
+          }
+          const revealPos = revealableIndexes.indexOf(i);
+          out += (revealPos >= 0 && revealPos < fixedCount) ? ch : randomNoiseChar();
         }
-      }, 500);
+        return out;
+      };
+
+      let fixedCount = 0;
+      let phase = 'scramble';
+      busyShow(buildBusyText(0, false));
+      pulse = setInterval(() => {
+        if (!app?.ui?.busyText) return;
+
+        if (phase === 'scramble') {
+          fixedCount = Math.min(fixedCount + 1, revealableIndexes.length);
+          app.ui.busyText.textContent = buildBusyText(fixedCount, false);
+          if (fixedCount >= revealableIndexes.length) phase = 'finalize';
+          return;
+        }
+
+        if (phase === 'finalize') {
+          app.ui.busyText.textContent = busyTargetText;
+          phase = 'dots';
+          return;
+        }
+
+        dots = (dots + 1) % 4;
+        app.ui.busyText.textContent = busyTargetText + '.'.repeat(dots);
+      }, 45);
 
       // общий таймаут (120s)
       to = setTimeout(() => ctrl.abort(), 120000);
