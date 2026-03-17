@@ -27,9 +27,6 @@
   const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
   const API_BASE = 'https://api.tripchiller.com';
   const SAFE_TG_MAX_COLS = 40;
-  const TG_EXPORT_COLS_FACTOR = 1.28;
-  const TG_EXPORT_PORTRAIT_ASPECT_FACTOR = 0.86;
-  const TG_EXPORT_MAX_COLS = 56;
     // Портрет-лок (чтобы не крутилось в горизонталь, где получится каша)
   let orientationLockRequested = false;
 
@@ -1455,46 +1452,6 @@ function computeTextGridFromSource(srcW, srcH, desiredCols) {
   return { cols, rows, limitsHit };
 }
 
-function computeTelegramExportGrid(srcW, srcH, previewCols, previewRows) {
-  const TELEGRAM_TEXT_ASPECT_K = 0.78;
-  const exportTextAspectK = TELEGRAM_TEXT_ASPECT_K * TG_EXPORT_PORTRAIT_ASPECT_FACTOR;
-  const TG_MAX_ROWS = 46;
-  const TG_MAX_CHARS = 3900;
-  const minCols = 10;
-  const minRows = 10;
-
-  let cols = Math.max(minCols, Math.round((previewCols || 0) * TG_EXPORT_COLS_FACTOR));
-  if (cols > TG_EXPORT_MAX_COLS) cols = TG_EXPORT_MAX_COLS;
-
-  let rows = Math.max(minRows, Math.round(cols * (srcH / Math.max(1, srcW)) * exportTextAspectK));
-  const limitsHit = [];
-
-  if (rows > TG_MAX_ROWS) {
-    rows = TG_MAX_ROWS;
-    limitsHit.push(`rows:${TG_MAX_ROWS}`);
-  }
-
-  const maxRowsByChars = Math.floor(TG_MAX_CHARS / Math.max(1, cols));
-  if (rows > maxRowsByChars) {
-    rows = Math.max(minRows, maxRowsByChars);
-    limitsHit.push(`chars:${TG_MAX_CHARS}`);
-  }
-
-  if (rows < minRows) {
-    rows = minRows;
-    const maxColsByChars = Math.floor(TG_MAX_CHARS / rows);
-    cols = Math.max(minCols, Math.min(cols, maxColsByChars));
-    limitsHit.push(`colsByChars:${TG_MAX_CHARS}`);
-  }
-
-  if (previewRows && rows > Math.round(previewRows * 1.15)) {
-    rows = Math.max(minRows, Math.round(previewRows * 1.15));
-    limitsHit.push('rows:previewCap');
-  }
-
-  return { cols, rows, limitsHit };
-}
-
 function buildAsciiFromCurrentSource(src, cols, rows) {
   let sx = 0, sy = 0, sw = src.w, sh = src.h;
   if (isMobile && state.mode === 'live') {
@@ -1559,6 +1516,32 @@ function buildAsciiFromCurrentSource(src, cols, rows) {
   }
 
   return out;
+}
+
+function asciiDebugHash(text) {
+  const str = String(text || '');
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(16).padStart(8, '0');
+}
+
+function getAsciiSnapshotFromPreview() {
+  const asciiText = String(app.out?.textContent || '');
+  const linesRaw = asciiText.split('\n');
+  const lines = (linesRaw.length && linesRaw[linesRaw.length - 1] === '')
+    ? linesRaw.slice(0, -1)
+    : linesRaw;
+  const rows = Math.max(0, lines.length);
+  const cols = lines.reduce((max, line) => Math.max(max, Array.from(line || '').length), 0);
+  return {
+    asciiText,
+    cols,
+    rows,
+    hash: asciiDebugHash(asciiText)
+  };
 }
 
 function updateGridSize(srcOverride = null) {
@@ -3999,8 +3982,8 @@ async function sendAsciiTextToBot() {
   };
 
   if (uploadInFlight) return;
-  const previewAscii = String(app.out?.textContent || '');
-  if (!previewAscii.trim()) {
+  const previewSnapshot = getAsciiSnapshotFromPreview();
+  if (!previewSnapshot.asciiText.trim()) {
     tgPopup('ОШИБКА', 'Нет ASCII-превью для отправки');
     return;
   }
@@ -4009,37 +3992,20 @@ async function sendAsciiTextToBot() {
     return;
   }
 
-  const previewLinesRaw = previewAscii.split('\n');
-  const previewLines = (previewLinesRaw.length && previewLinesRaw[previewLinesRaw.length - 1] === '')
-    ? previewLinesRaw.slice(0, -1)
-    : previewLinesRaw;
-  const previewRows = Math.max(0, previewLines.length);
-  const previewCols = previewLines.reduce((max, line) => Math.max(max, Array.from(line || '').length), 0);
-
-  let asciiSnapshot = previewAscii;
-  let snapshotCols = previewCols;
-  let snapshotRows = previewRows;
-
-  const src = currentSource();
-  if (src && previewCols > 0 && previewRows > 0) {
-    const textSrcW = (isMobile && state.mode === 'live') ? 9 : src.w;
-    const textSrcH = (isMobile && state.mode === 'live') ? 16 : src.h;
-    const exportGrid = computeTelegramExportGrid(textSrcW, textSrcH, previewCols, previewRows);
-    const exportAscii = buildAsciiFromCurrentSource(src, exportGrid.cols, exportGrid.rows);
-    if (exportAscii.trim()) {
-      asciiSnapshot = exportAscii;
-      snapshotCols = exportGrid.cols;
-      snapshotRows = exportGrid.rows;
-      console.log('[TEXT_EXPORT_GRID]', {
-        previewCols,
-        previewRows,
-        exportCols: exportGrid.cols,
-        exportRows: exportGrid.rows,
-        exportFactor: TG_EXPORT_COLS_FACTOR,
-        limits: exportGrid.limitsHit.length ? exportGrid.limitsHit.join(',') : 'none'
-      });
-    }
-  }
+  const asciiSnapshot = previewSnapshot.asciiText;
+  const snapshotCols = previewSnapshot.cols;
+  const snapshotRows = previewSnapshot.rows;
+  const exportHash = asciiDebugHash(asciiSnapshot);
+  console.log('[TEXT_ASCII_PREVIEW]', {
+    hash: previewSnapshot.hash,
+    cols: previewSnapshot.cols,
+    rows: previewSnapshot.rows
+  });
+  console.log('[TEXT_ASCII_EXPORT]', {
+    hash: exportHash,
+    cols: snapshotCols,
+    rows: snapshotRows
+  });
   const selectedCharsetValue = app.ui.charset.value || TEXT_CHARSETS.DOTS;
   const activeCharset = String(state.charset || TEXT_CHARSETS.DOTS);
   const charsetDebugHead = activeCharset.slice(0, 10);
