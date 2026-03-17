@@ -28,6 +28,7 @@
   const API_BASE = 'https://api.tripchiller.com';
   const SAFE_TG_MAX_COLS = 40;
   const TEXT_TELEGRAM_CELL_ASPECT = 0.78;
+  const DEBUG_FORCE_TEXT_PREVIEW_ROWS = 20; // TEMP: критический тест пути TEXT preview
     // Портрет-лок (чтобы не крутилось в горизонталь, где получится каша)
   let orientationLockRequested = false;
 
@@ -1515,6 +1516,21 @@ function buildAsciiFromCurrentSource(src, cols, rows) {
     out += line + '\n';
   }
 
+  const outLinesRaw = out.split('\n');
+  const outLines = (outLinesRaw.length && outLinesRaw[outLinesRaw.length - 1] === '')
+    ? outLinesRaw.slice(0, -1)
+    : outLinesRaw;
+  const outputLineCount = outLines.length;
+  const outputMaxCols = outLines.reduce((max, line) => Math.max(max, Array.from(line || '').length), 0);
+  const buildDebug = {
+    inputCols: cols,
+    inputRows: rows,
+    outputLineCount,
+    outputMaxCols
+  };
+  console.log('[TEXT_BUILD_ASCII]', buildDebug);
+  dbgState('buildAsciiFromCurrentSource', buildDebug);
+
   return out;
 }
 
@@ -1572,6 +1588,13 @@ if (isMobile && state.mode === 'live') {
     w = textGrid.cols;
     const rowsAfterLimits = textGrid.rows;
     h = Math.max(10, Math.round(rowsAfterLimits * TEXT_TELEGRAM_CELL_ASPECT));
+    const textGridDebug = {
+      w,
+      h,
+      rowsAfterLimits,
+      aspectCompensation: TEXT_TELEGRAM_CELL_ASPECT
+    };
+    dbgState('updateGridSize.textGrid', textGridDebug);
     console.log('[TEXT_GRID]', {
       srcW: src.w,
       srcH: src.h,
@@ -1646,7 +1669,8 @@ function updateGifFrame(ts) {
     if (!src) return;
 
     const { w, h } = updateGridSize();
-    const out = buildAsciiFromCurrentSource(src, w, h);
+    const rowsRequested = isTextMode() ? DEBUG_FORCE_TEXT_PREVIEW_ROWS : h;
+    const out = buildAsciiFromCurrentSource(src, w, rowsRequested);
 
     if (!out) {
       // набор пустой → очищаем экран и выходим из функции loop
@@ -1654,8 +1678,22 @@ function updateGifFrame(ts) {
       refitFont(1, 1);
       return;
     }
+
+    const outLinesRaw = out.split('\n');
+    const outLines = (outLinesRaw.length && outLinesRaw[outLinesRaw.length - 1] === '')
+      ? outLinesRaw.slice(0, -1)
+      : outLinesRaw;
+    const asciiAssignDebug = {
+      rowsRequested,
+      colsRequested: w,
+      asciiLineCount: outLines.length,
+      asciiMaxCols: outLines.reduce((max, line) => Math.max(max, Array.from(line || '').length), 0)
+    };
+    console.log('[TEXT_PREVIEW_ASSIGN]', asciiAssignDebug);
+    dbgState('loop.beforeAssign.outText', asciiAssignDebug);
+
     app.out.textContent = out;
-    refitFont(w, h);
+    refitFont(w, rowsRequested);
 
     if (isTextCameraLive()) {
       const fitSize = getStageFitSize();
