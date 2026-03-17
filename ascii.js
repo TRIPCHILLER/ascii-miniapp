@@ -470,7 +470,7 @@ let DITHER_ENABLED = true;
       }
     }
     if (app.ui.resetModeBtn) {
-      app.ui.resetModeBtn.textContent = isTextMode() ? 'ТЕКСТОВЫЙ АРТ' : 'ИЗОБРАЖЕНИЕ';
+      app.ui.resetModeBtn.textContent = isTextMode() ? 'ТЕКСТ' : 'ГРАФИКА';
     }
     applyWidthLimitsForMode();
     rebuildCharsetOptions();
