@@ -28,7 +28,8 @@
   const API_BASE = 'https://api.tripchiller.com';
   const SAFE_TG_MAX_COLS = 40;
   const TEXT_TELEGRAM_CELL_ASPECT = 0.50;
-  const TEXT_PREVIEW_VISUAL_SCALE_Y = 1.15;
+  const TEXT_PREVIEW_VISUAL_SCALE_Y = 1.22;
+  const TEXT_FINAL_GRID_EXTRA_ROWS = 2; // diagnostic: проверяем, что низ режется на уровне final grid rows
     // Портрет-лок (чтобы не крутилось в горизонталь, где получится каша)
   let orientationLockRequested = false;
 
@@ -362,6 +363,7 @@ let DITHER_ENABLED = true;
     lastTextSymbolSet: null,
     lastCustomImageColors: null,
     textGridDebug: null,
+    textCropDebug: null,
     textFinalPreviewDebug: null,
   };
 
@@ -1457,8 +1459,9 @@ function computeTextGridFromSource(srcW, srcH, desiredCols) {
 
 function buildAsciiFromCurrentSource(src, cols, rows) {
   let sx = 0, sy = 0, sw = src.w, sh = src.h;
+  let targetWH = null;
   if (isMobile && state.mode === 'live') {
-    const targetWH = isTextMode() ? (3 / 4) : (9 / 16);
+    targetWH = isTextMode() ? (3 / 4) : (9 / 16);
     const srcWH = src.w / src.h;
     if (srcWH > targetWH) {
       sw = Math.round(src.h * targetWH);
@@ -1470,6 +1473,18 @@ function buildAsciiFromCurrentSource(src, cols, rows) {
         sy = Math.min(src.h - sh, sy + 1);
       }
     }
+  }
+
+  if (isTextMode()) {
+    state.textCropDebug = {
+      srcW: src.w,
+      srcH: src.h,
+      sw,
+      sh,
+      sx,
+      sy,
+      targetWH
+    };
   }
 
   off.width = cols;
@@ -1580,14 +1595,18 @@ if (isMobile && state.mode === 'live') {
     const rowsAfterLimits = textGrid.rows;
     const baseTextRows = Math.max(10, Math.round(rowsAfterLimits * TEXT_TELEGRAM_CELL_ASPECT));
     const textRowCompensation = 1;
-    h = Math.min(rowsAfterLimits, baseTextRows + textRowCompensation);
+    h = Math.min(rowsAfterLimits, baseTextRows + textRowCompensation + TEXT_FINAL_GRID_EXTRA_ROWS);
     state.textGridDebug = {
+      srcW: src.w,
+      srcH: src.h,
       requestedCols: desiredCols,
       requestedRows,
       rowsAfterLimits,
       aspectCompensation: TEXT_TELEGRAM_CELL_ASPECT,
+      effectiveRatio,
       finalGridCols: w,
-      finalGridRows: h
+      finalGridRows: h,
+      extraRows: TEXT_FINAL_GRID_EXTRA_ROWS
     };
     console.log('[TEXT_GRID]', {
       srcW: src.w,
@@ -1599,6 +1618,8 @@ if (isMobile && state.mode === 'live') {
       rows: h,
       asciiLen: w * h,
       aspectCompensation: TEXT_TELEGRAM_CELL_ASPECT,
+      effectiveRatio,
+      extraRows: TEXT_FINAL_GRID_EXTRA_ROWS,
       limits: textGrid.limitsHit.length ? textGrid.limitsHit.join(',') : 'none'
     });
   }
@@ -3989,8 +4010,17 @@ async function sendAsciiTextToBot() {
     finalAsciiLineCount,
     finalAsciiMaxCols,
     finalAsciiLen,
+    finalGridRows: state.textGridDebug?.finalGridRows ?? null,
     charset: activeCharset,
-    aspectCompensation: TEXT_TELEGRAM_CELL_ASPECT
+    aspectCompensation: TEXT_TELEGRAM_CELL_ASPECT,
+    crop: state.textCropDebug || null,
+    grid: state.textGridDebug || null,
+    previewBox: {
+      stageW: app.stage?.clientWidth || 0,
+      stageH: app.stage?.clientHeight || 0,
+      outScrollW: app.out?.scrollWidth || 0,
+      outScrollH: app.out?.scrollHeight || 0
+    }
   };
   console.log('[TEXT_ASCII_DEBUG]', textAsciiDebug);
   dbgState('sendAsciiTextToBot.text_ascii_debug', textAsciiDebug);
