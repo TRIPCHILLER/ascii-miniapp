@@ -418,8 +418,24 @@ function parseTextRows(v) {
 }
 function sanitizeAsciiSnapshot(rawAscii, requestedCols, requestedRows) {
   const input = String(rawAscii || '').replace(/\r\n?/g, '\n');
-  const trimmedTrailing = input.replace(/\n+$/g, '');
-  const lines = trimmedTrailing ? trimmedTrailing.split('\n') : [];
+  const lines = input ? input.split('\n') : [];
+  let trailingBlankLineCount = 0;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (String(lines[i] || '').trim() === '') trailingBlankLineCount++;
+    else break;
+  }
+  const lineCountBeforeCleanup = lines.length;
+  const lineCountAfterCleanup = Math.max(0, lineCountBeforeCleanup - trailingBlankLineCount);
+  const bottomLine = lines.length ? String(lines[lines.length - 1] || '') : '';
+  const bottomLineVisibleChars = (bottomLine.match(/\S/g) || []).length;
+  console.debug(
+    `[ascii-text] snapshot final debug lineCountBeforeCleanup=${lineCountBeforeCleanup},` +
+    ` lineCountAfterCleanup=${lineCountAfterCleanup},` +
+    ` hasTrailingBlankLines=${trailingBlankLineCount > 0},` +
+    ` bottomLineRawLength=${Array.from(bottomLine).length},` +
+    ` bottomLineVisibleChars=${bottomLineVisibleChars},` +
+    ` fullyBlankTrailingLineCount=${trailingBlankLineCount}`
+  );
 
   const sourceCols = lines.reduce((m, line) => Math.max(m, Array.from(line).length), 0);
   const sourceRows = lines.length;

@@ -1568,6 +1568,28 @@ function getAsciiSnapshotFromPreview() {
   };
 }
 
+function getAsciiTrailingBlankDebug(asciiText) {
+  const normalized = String(asciiText || '').replace(/\r\n?/g, '\n');
+  const lines = normalized.split('\n');
+  let trailingBlankLineCount = 0;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (String(lines[i] || '').trim() === '') trailingBlankLineCount++;
+    else break;
+  }
+  const lineCountBeforeCleanup = lines.length;
+  const lineCountAfterCleanup = Math.max(0, lineCountBeforeCleanup - trailingBlankLineCount);
+  const bottomLine = lines.length ? String(lines[lines.length - 1] || '') : '';
+  const bottomLineVisibleChars = (bottomLine.match(/\S/g) || []).length;
+  return {
+    lineCountBeforeCleanup,
+    lineCountAfterCleanup,
+    hasTrailingBlankLines: trailingBlankLineCount > 0,
+    bottomLineRawLength: Array.from(bottomLine).length,
+    bottomLineVisibleChars,
+    fullyBlankTrailingLineCount: trailingBlankLineCount
+  };
+}
+
 function updateGridSize(srcOverride = null) {
   const src = srcOverride || currentSource();
   if (!src) return { w: state.widthChars, h: 1 };
@@ -3964,11 +3986,13 @@ async function sendAsciiTextToBot() {
   const finalAsciiMaxCols = finalAsciiLines.reduce((max, line) => Math.max(max, Array.from(line || '').length), 0);
   const finalAsciiLen = finalAsciiText.length;
   const finalAsciiHash = asciiDebugHash(finalAsciiText);
+  const finalAsciiTrailingBlankDebug = getAsciiTrailingBlankDebug(finalAsciiText);
   state.textFinalPreviewDebug = {
     finalAsciiLineCount,
     finalAsciiMaxCols,
     finalAsciiLen,
-    hash: finalAsciiHash
+    hash: finalAsciiHash,
+    ...finalAsciiTrailingBlankDebug
   };
   console.log('[TEXT_ASCII_FINAL_PREVIEW]', state.textFinalPreviewDebug);
   dbgState('sendAsciiTextToBot.final_preview_debug', state.textFinalPreviewDebug);
