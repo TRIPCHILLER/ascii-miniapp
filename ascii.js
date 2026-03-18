@@ -29,7 +29,8 @@
   const SAFE_TG_MAX_COLS = 40;
   const TEXT_TELEGRAM_CELL_ASPECT = 0.50;
   const TEXT_PREVIEW_VISUAL_SCALE_Y = 1.22;
-  const TEXT_FINAL_GRID_EXTRA_ROWS = 2; // diagnostic: проверяем, что низ режется на уровне final grid rows
+  const TEXT_FINAL_GRID_EXTRA_ROWS = 0;
+  const TEXT_SOURCE_VERTICAL_BIAS = 0.20; // смещаем text live crop немного вниз в пределах доступного vertical trim
     // Портрет-лок (чтобы не крутилось в горизонталь, где получится каша)
   let orientationLockRequested = false;
 
@@ -1470,7 +1471,9 @@ function buildAsciiFromCurrentSource(src, cols, rows) {
       sh = Math.round(src.w / targetWH);
       sy = Math.round((src.h - sh) / 2);
       if (isTextMode()) {
-        sy = Math.min(src.h - sh, sy + 1);
+        const verticalTrim = Math.max(0, src.h - sh);
+        const textVerticalBiasPx = Math.max(2, Math.round(verticalTrim * TEXT_SOURCE_VERTICAL_BIAS));
+        sy = Math.min(verticalTrim, sy + textVerticalBiasPx);
       }
     }
   }
