@@ -1600,7 +1600,7 @@ function injectTelegramTrailingBlankPlaceholders(asciiText, lineWidth) {
   const normalized = String(asciiText || '').replace(/\r\n?/g, '\n');
   const lines = normalized.split('\n');
   const placeholderChar = '⠀';
-  const placeholderLineWidth = Math.max(1, Number(lineWidth) || 0);
+  const placeholderLineWidth = 1;
   let trailingBlankLinesDetected = 0;
   for (let i = lines.length - 1; i >= 0; i--) {
     if (/^ *$/.test(String(lines[i] || ''))) trailingBlankLinesDetected++;
@@ -1615,7 +1615,7 @@ function injectTelegramTrailingBlankPlaceholders(asciiText, lineWidth) {
       placeholderLinesInjected: 0
     };
   }
-  const placeholderLine = placeholderChar.repeat(placeholderLineWidth);
+  const placeholderLine = placeholderChar;
   for (let i = lines.length - trailingBlankLinesDetected; i < lines.length; i++) {
     lines[i] = placeholderLine;
   }
