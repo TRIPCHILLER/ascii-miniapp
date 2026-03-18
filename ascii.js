@@ -27,8 +27,8 @@
   const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
   const API_BASE = 'https://api.tripchiller.com';
   const SAFE_TG_MAX_COLS = 40;
-  const TEXT_TELEGRAM_CELL_ASPECT = 0.55;
-  const TEXT_PREVIEW_VISUAL_SCALE_Y = 1.09;
+  const TEXT_TELEGRAM_CELL_ASPECT = 0.50;
+  const TEXT_PREVIEW_VISUAL_SCALE_Y = 1.15;
     // Портрет-лок (чтобы не крутилось в горизонталь, где получится каша)
   let orientationLockRequested = false;
 
@@ -1466,6 +1466,9 @@ function buildAsciiFromCurrentSource(src, cols, rows) {
     } else if (srcWH < targetWH) {
       sh = Math.round(src.w / targetWH);
       sy = Math.round((src.h - sh) / 2);
+      if (isTextMode()) {
+        sy = Math.min(src.h - sh, sy + 1);
+      }
     }
   }
 
