@@ -27,7 +27,8 @@
   const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
   const API_BASE = 'https://api.tripchiller.com';
   const SAFE_TG_MAX_COLS = 40;
-  const TEXT_TELEGRAM_CELL_ASPECT = 0.60;
+  const TEXT_TELEGRAM_CELL_ASPECT = 0.55;
+  const TEXT_PREVIEW_VISUAL_SCALE_Y = 1.09;
     // Портрет-лок (чтобы не крутилось в горизонталь, где получится каша)
   let orientationLockRequested = false;
 
@@ -1574,7 +1575,9 @@ if (isMobile && state.mode === 'live') {
     const textGrid = computeTextGridFromSource(textSrcW, textSrcH, desiredCols);
     w = textGrid.cols;
     const rowsAfterLimits = textGrid.rows;
-    h = Math.max(10, Math.round(rowsAfterLimits * TEXT_TELEGRAM_CELL_ASPECT));
+    const baseTextRows = Math.max(10, Math.round(rowsAfterLimits * TEXT_TELEGRAM_CELL_ASPECT));
+    const textRowCompensation = 1;
+    h = Math.min(rowsAfterLimits, baseTextRows + textRowCompensation);
     state.textGridDebug = {
       requestedCols: desiredCols,
       requestedRows,
@@ -2348,7 +2351,9 @@ function fitAsciiToViewport(){
   // Двигаем сам #out, а transform оставляем центрирующим
   out.style.left = `calc(50% + ${dxPx}px)`;
   out.style.top  = `calc(50% + ${dyPx}px)`;
-  out.style.transform = `translate(-50%, -50%) scale(${base})`;
+  const previewScaleY = isTextMode() ? TEXT_PREVIEW_VISUAL_SCALE_Y : 1;
+  out.style.transformOrigin = '50% 50%';
+  out.style.transform = `translate(-50%, -50%) scale(${base}) scaleY(${previewScaleY})`;
 }
 
 // Ограничиваем viewX/viewY так, чтобы при текущем масштабе кадр нельзя было утащить
