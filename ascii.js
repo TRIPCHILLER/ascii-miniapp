@@ -1596,6 +1596,38 @@ function getAsciiTrailingBlankDebug(asciiText) {
   };
 }
 
+function injectTelegramTrailingBlankPlaceholders(asciiText, lineWidth) {
+  const normalized = String(asciiText || '').replace(/\r\n?/g, '\n');
+  const lines = normalized.split('\n');
+  const placeholderChar = 'ㅤ';
+  const placeholderLineWidth = Math.max(1, Number(lineWidth) || 0);
+  let trailingBlankLinesDetected = 0;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (/^ *$/.test(String(lines[i] || ''))) trailingBlankLinesDetected++;
+    else break;
+  }
+  if (!trailingBlankLinesDetected) {
+    return {
+      asciiText: normalized,
+      trailingBlankLinesDetected: 0,
+      placeholderCharUsed: placeholderChar,
+      placeholderLineWidth,
+      placeholderLinesInjected: 0
+    };
+  }
+  const placeholderLine = placeholderChar.repeat(placeholderLineWidth);
+  for (let i = lines.length - trailingBlankLinesDetected; i < lines.length; i++) {
+    lines[i] = placeholderLine;
+  }
+  return {
+    asciiText: lines.join('\n'),
+    trailingBlankLinesDetected,
+    placeholderCharUsed: placeholderChar,
+    placeholderLineWidth,
+    placeholderLinesInjected: trailingBlankLinesDetected
+  };
+}
+
 function updateGridSize(srcOverride = null) {
   const src = srcOverride || currentSource();
   if (!src) return { w: state.widthChars, h: 1 };
@@ -4014,8 +4046,13 @@ async function sendAsciiTextToBot() {
   const asciiSnapshot = previewSnapshot.asciiText;
   const snapshotCols = previewSnapshot.cols;
   const snapshotRows = previewSnapshot.rows;
-  const exportHash = asciiDebugHash(asciiSnapshot);
-  const asciiLen = asciiSnapshot.length;
+  const placeholderTransform = injectTelegramTrailingBlankPlaceholders(
+    asciiSnapshot,
+    Math.max(snapshotCols, finalAsciiMaxCols)
+  );
+  const asciiForTelegram = placeholderTransform.asciiText;
+  const exportHash = asciiDebugHash(asciiForTelegram);
+  const asciiLen = asciiForTelegram.length;
   const hashMatch = previewSnapshot.hash === exportHash;
   console.log('[TEXT_ASCII_PREVIEW]', {
     hash: previewSnapshot.hash,
@@ -4043,6 +4080,10 @@ async function sendAsciiTextToBot() {
     finalAsciiLineCount,
     finalAsciiMaxCols,
     finalAsciiLen,
+    trailingBlankLinesDetected: placeholderTransform.trailingBlankLinesDetected,
+    placeholderCharUsed: placeholderTransform.placeholderCharUsed,
+    placeholderLineWidth: placeholderTransform.placeholderLineWidth,
+    placeholderLinesInjected: placeholderTransform.placeholderLinesInjected,
     finalGridRows: state.textGridDebug?.finalGridRows ?? null,
     charset: activeCharset,
     aspectCompensation: TEXT_TELEGRAM_CELL_ASPECT,
@@ -4062,7 +4103,7 @@ async function sendAsciiTextToBot() {
   const form = new FormData();
   form.append('initData', tgWebApp.initData || '');
   form.append('initdata', tgWebApp.initData || '');
-  form.append('asciiText', asciiSnapshot);
+  form.append('asciiText', asciiForTelegram);
   form.append('cols', String(snapshotCols));
   form.append('rows', String(snapshotRows));
   form.append('charsetUsed', activeCharset);
