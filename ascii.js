@@ -2397,6 +2397,7 @@ function fitAsciiToViewport(){
   const out   = app.out;
   const stage = app.stage;
   if (!out || !stage) return;
+  const previewScaleY = isTextMode() ? TEXT_PREVIEW_VISUAL_SCALE_Y : 1;
 
   // 1. Сбрасываем transform/позицию, чтобы узнать реальный размер ASCII-блока
   out.style.transform = 'translate(-50%, -50%) scale(1)';
@@ -2420,36 +2421,35 @@ function fitAsciiToViewport(){
   }
 
   // 4. Классический "contain": вписать целиком, без обрезки
-  const S = Math.min(W / w, H / h);
+  const S = Math.min(W / w, H / (h * previewScaleY));
 
   // 5. Применяем базовый масштаб + пользовательский зум
   const base = S * (state.viewScale || 1);
 
   // 5.1. Жёстко ограничиваем центр «окна» так, чтобы кадр не выходил за экран
-  clampViewToBounds(w, h, W, H, base);
+  clampViewToBounds(w, h, W, H, base, previewScaleY);
 
   // 6. Дополнительный сдвиг в зависимости от центра «окна» (viewX/viewY)
   const vx = (typeof state.viewX === 'number') ? state.viewX : 0.5;
   const vy = (typeof state.viewY === 'number') ? state.viewY : 0.5;
 
   const dxPx = (0.5 - vx) * w * base;
-  const dyPx = (0.5 - vy) * h * base;
+  const dyPx = (0.5 - vy) * h * base * previewScaleY;
 
   // Двигаем сам #out, а transform оставляем центрирующим
   out.style.left = `calc(50% + ${dxPx}px)`;
   out.style.top  = `calc(50% + ${dyPx}px)`;
-  const previewScaleY = isTextMode() ? TEXT_PREVIEW_VISUAL_SCALE_Y : 1;
   out.style.transformOrigin = '50% 50%';
   out.style.transform = `translate(-50%, -50%) scale(${base}) scaleY(${previewScaleY})`;
 }
 
 // Ограничиваем viewX/viewY так, чтобы при текущем масштабе кадр нельзя было утащить
 // за пределы видимой области (никакого чёрного фона по краям)
-function clampViewToBounds(w, h, W, H, base){
+function clampViewToBounds(w, h, W, H, base, previewScaleY = 1){
   if (!w || !h || !W || !H || !base) return;
 
   const visW = w * base;
-  const visH = h * base;
+  const visH = h * base * (previewScaleY || 1);
 
   let vx = (typeof state.viewX === 'number') ? state.viewX : 0.5;
   let vy = (typeof state.viewY === 'number') ? state.viewY : 0.5;
