@@ -28,7 +28,7 @@
   const API_BASE = 'https://api.tripchiller.com';
   const SAFE_TG_MAX_COLS = 40;
   const TEXT_TELEGRAM_CELL_ASPECT = 0.50;
-  const TEXT_PREVIEW_VISUAL_SCALE_Y = 1.22;
+  const TEXT_PREVIEW_LINE_HEIGHT = 1.10;
   const TEXT_FINAL_GRID_EXTRA_ROWS = 0;
     // Портрет-лок (чтобы не крутилось в горизонталь, где получится каша)
   let orientationLockRequested = false;
@@ -439,6 +439,9 @@ let DITHER_ENABLED = true;
   }
 
   function applyVisorModeUi() {
+    if (app.out) {
+      app.out.style.lineHeight = isTextMode() ? String(TEXT_PREVIEW_LINE_HEIGHT) : '1';
+    }
     document.body.classList.toggle('visor-text', isTextMode());
     if (app.ui.styleRow) app.ui.styleRow.hidden = isTextMode();
     if (isTextMode()) {
@@ -2397,7 +2400,6 @@ function fitAsciiToViewport(){
   const out   = app.out;
   const stage = app.stage;
   if (!out || !stage) return;
-  const previewScaleY = isTextMode() ? TEXT_PREVIEW_VISUAL_SCALE_Y : 1;
 
   // 1. Сбрасываем transform/позицию, чтобы узнать реальный размер ASCII-блока
   out.style.transform = 'translate(-50%, -50%) scale(1)';
@@ -2421,26 +2423,26 @@ function fitAsciiToViewport(){
   }
 
   // 4. Классический "contain": вписать целиком, без обрезки
-  const S = Math.min(W / w, H / (h * previewScaleY));
+  const S = Math.min(W / w, H / h);
 
   // 5. Применяем базовый масштаб + пользовательский зум
   const base = S * (state.viewScale || 1);
 
   // 5.1. Жёстко ограничиваем центр «окна» так, чтобы кадр не выходил за экран
-  clampViewToBounds(w, h, W, H, base, previewScaleY);
+  clampViewToBounds(w, h, W, H, base);
 
   // 6. Дополнительный сдвиг в зависимости от центра «окна» (viewX/viewY)
   const vx = (typeof state.viewX === 'number') ? state.viewX : 0.5;
   const vy = (typeof state.viewY === 'number') ? state.viewY : 0.5;
 
   const dxPx = (0.5 - vx) * w * base;
-  const dyPx = (0.5 - vy) * h * base * previewScaleY;
+  const dyPx = (0.5 - vy) * h * base;
 
   // Двигаем сам #out, а transform оставляем центрирующим
   out.style.left = `calc(50% + ${dxPx}px)`;
   out.style.top  = `calc(50% + ${dyPx}px)`;
   out.style.transformOrigin = '50% 50%';
-  out.style.transform = `translate(-50%, -50%) scale(${base}) scaleY(${previewScaleY})`;
+  out.style.transform = `translate(-50%, -50%) scale(${base})`;
 }
 
 // Ограничиваем viewX/viewY так, чтобы при текущем масштабе кадр нельзя было утащить
