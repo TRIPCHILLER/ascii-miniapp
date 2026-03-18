@@ -30,7 +30,6 @@
   const TEXT_TELEGRAM_CELL_ASPECT = 0.50;
   const TEXT_PREVIEW_VISUAL_SCALE_Y = 1.22;
   const TEXT_FINAL_GRID_EXTRA_ROWS = 0;
-  const TEXT_SOURCE_VERTICAL_BIAS = 0.20; // смещаем text live crop немного вниз в пределах доступного vertical trim
     // Портрет-лок (чтобы не крутилось в горизонталь, где получится каша)
   let orientationLockRequested = false;
 
@@ -1461,6 +1460,10 @@ function computeTextGridFromSource(srcW, srcH, desiredCols) {
 function buildAsciiFromCurrentSource(src, cols, rows) {
   let sx = 0, sy = 0, sw = src.w, sh = src.h;
   let targetWH = null;
+  let trimTop = 0;
+  let trimBottom = 0;
+  let sourceBottom = src.h;
+  let bottomGap = 0;
   if (isMobile && state.mode === 'live') {
     targetWH = isTextMode() ? (3 / 4) : (9 / 16);
     const srcWH = src.w / src.h;
@@ -1470,13 +1473,12 @@ function buildAsciiFromCurrentSource(src, cols, rows) {
     } else if (srcWH < targetWH) {
       sh = Math.round(src.w / targetWH);
       sy = Math.round((src.h - sh) / 2);
-      if (isTextMode()) {
-        const verticalTrim = Math.max(0, src.h - sh);
-        const textVerticalBiasPx = Math.max(2, Math.round(verticalTrim * TEXT_SOURCE_VERTICAL_BIAS));
-        sy = Math.min(verticalTrim, sy + textVerticalBiasPx);
-      }
     }
   }
+  trimTop = sy;
+  sourceBottom = sy + sh;
+  bottomGap = src.h - sourceBottom;
+  trimBottom = Math.max(0, bottomGap);
 
   if (isTextMode()) {
     state.textCropDebug = {
@@ -1486,6 +1488,10 @@ function buildAsciiFromCurrentSource(src, cols, rows) {
       sh,
       sx,
       sy,
+      trimTop,
+      trimBottom,
+      sourceBottom,
+      bottomGap,
       targetWH
     };
   }
