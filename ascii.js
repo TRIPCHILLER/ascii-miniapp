@@ -1599,7 +1599,7 @@ function getAsciiTrailingBlankDebug(asciiText) {
 function injectTelegramTrailingBlankPlaceholders(asciiText, lineWidth) {
   const normalized = String(asciiText || '').replace(/\r\n?/g, '\n');
   const lines = normalized.split('\n');
-  const placeholderChar = '\u2800';
+  const placeholderChar = '⠀';
   const placeholderLineWidth = Math.max(1, Number(lineWidth) || 0);
   let trailingBlankLinesDetected = 0;
   for (let i = lines.length - 1; i >= 0; i--) {
