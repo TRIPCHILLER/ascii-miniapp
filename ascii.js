@@ -474,17 +474,32 @@ let DITHER_ENABLED = false;
 
     const rect = previewNode.getBoundingClientRect();
     const clone = previewNode.cloneNode(true);
+    const outSource = previewNode.querySelector?.('#out');
+    const outClone = clone.querySelector?.('#out');
+
     clone.removeAttribute?.('id');
-    clone.querySelectorAll?.('[id]').forEach((el) => el.removeAttribute('id'));
     clone.setAttribute('aria-hidden', 'true');
+
+    overlay.style.display = 'block';
+    overlay.style.alignItems = 'unset';
+    overlay.style.justifyContent = 'unset';
+
     clone.style.position = 'fixed';
     clone.style.left = `${Math.round(rect.left)}px`;
     clone.style.top = `${Math.round(rect.top)}px`;
     clone.style.width = `${Math.round(rect.width)}px`;
     clone.style.height = `${Math.round(rect.height)}px`;
     clone.style.margin = '0';
+    clone.style.inset = 'auto';
+    clone.style.transform = 'none';
     clone.style.pointerEvents = 'none';
     clone.style.zIndex = '0';
+
+    if (outSource && outClone) {
+      const outRect = outSource.getBoundingClientRect();
+      outClone.style.width = `${Math.round(outRect.width)}px`;
+      outClone.style.height = `${Math.round(outRect.height)}px`;
+    }
 
     state.frozenFrameDataUrl = '';
     state.frozenFrameNode = clone;
