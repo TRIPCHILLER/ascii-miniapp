@@ -389,8 +389,7 @@ let DITHER_ENABLED = true;
     PIXEL: ' .:-=+*#%@',
     BLOCKS: '__BLOCKS__',
     MICRO_LEGACY: ' .:*',
-    MACRO: ' .`\'^",:;Il!i~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$',
-    KATAKANA: ' カタカナアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン'
+    MACRO: ' .`\'^",:;Il!i~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$'
   };
 
   function isBrailleDotsCharset(charsetValue) {
@@ -754,13 +753,12 @@ let DITHER_ENABLED = true;
         <option value="${TEXT_CHARSETS.PIXEL}">PIXEL</option>
         <option value="${TEXT_CHARSETS.BLOCKS}">BLOCKS</option>
         <option value="${TEXT_CHARSETS.MACRO}">MACRO</option>
-        <option value="${TEXT_CHARSETS.KATAKANA}">KATAKANA</option>
         <option value="CUSTOM">(РУЧН0Й ВВ0Д)</option>`;
       const fallbackText = state.lastTextSymbolSet || getDefaultTextCharsetOption();
       const normalizedFallbackText = (fallbackText === TEXT_CHARSETS.MICRO_LEGACY)
         ? TEXT_CHARSETS.MACRO
         : fallbackText;
-      const val = [TEXT_CHARSETS.DOTS, TEXT_CHARSETS.PIXEL, TEXT_CHARSETS.BLOCKS, TEXT_CHARSETS.MACRO, TEXT_CHARSETS.KATAKANA, 'CUSTOM'].includes(normalizedFallbackText)
+      const val = [TEXT_CHARSETS.DOTS, TEXT_CHARSETS.PIXEL, TEXT_CHARSETS.BLOCKS, TEXT_CHARSETS.MACRO, 'CUSTOM'].includes(normalizedFallbackText)
         ? normalizedFallbackText
         : getDefaultTextCharsetOption();
       app.ui.charset.value = val;
@@ -1689,6 +1687,14 @@ function isTextPixelPresetSelected() {
   return optionLabel === 'PIXEL';
 }
 
+function isTextMacroPresetSelected() {
+  if (!isTextMode()) return false;
+  const optionLabel = String(app.ui.charset?.selectedOptions?.[0]?.textContent || '')
+    .trim()
+    .toUpperCase();
+  return optionLabel === 'MACRO';
+}
+
 function renderClassicDither(data, cols, rows) {
   const chars = Array.from(PIXEL_DITHER_CHARSET);
   const n = chars.length - 1;
@@ -1786,7 +1792,8 @@ function buildAsciiFromCurrentSource(src, cols, rows) {
   if (isTextPixelPresetSelected()) {
     return renderClassicDither(data, cols, rows);
   }
-  const chars = Array.from(state.renderCharset10 || state.charset || '');
+  const isMacroPreset = isTextMacroPresetSelected();
+  const chars = Array.from(isMacroPreset ? TEXT_CHARSETS.MACRO : (state.renderCharset10 || state.charset || ''));
   const n = chars.length - 1;
   if (n < 0) return '';
 
@@ -1794,26 +1801,64 @@ function buildAsciiFromCurrentSource(src, cols, rows) {
   const bias = state.invert ? 255 : 0;
   const gamma = state.gamma;
   const contrast = state.contrast;
+  let macroMin = 1;
+  let macroMax = 0;
+  let macroValues = null;
   let out = '';
   let i = 0;
+
+  if (isMacroPreset) {
+    macroValues = new Float32Array(rows * cols);
+    let j = 0;
+    for (let my = 0; my < rows; my++) {
+      for (let mx = 0; mx < cols; mx++, j += 4) {
+        const r = data[j], g = data[j + 1], b = data[j + 2];
+        let Y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        let v01 = Y / 255;
+        v01 = ((v01 - 0.5) * contrast) + 0.5;
+        v01 = Math.min(1, Math.max(0, v01));
+        v01 = Math.pow(v01, 1 / gamma);
+        const bp = state.blackPoint;
+        const wp = state.whitePoint;
+        v01 = (v01 - bp) / Math.max(1e-6, (wp - bp));
+        v01 = Math.min(1, Math.max(0, v01));
+        const Yc = Math.max(0, Math.min(255, (bias + inv * (v01 * 255))));
+        const q = Yc / 255;
+        macroValues[(my * cols) + mx] = q;
+        if (q < macroMin) macroMin = q;
+        if (q > macroMax) macroMax = q;
+      }
+    }
+    i = 0;
+  }
 
   for (let y = 0; y < rows; y++) {
     let line = '';
     for (let x = 0; x < cols; x++, i += 4) {
-      const r = data[i], g = data[i + 1], b = data[i + 2];
-      let Y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-      let v01 = Y / 255;
-      v01 = ((v01 - 0.5) * contrast) + 0.5;
-      v01 = Math.min(1, Math.max(0, v01));
-      v01 = Math.pow(v01, 1 / gamma);
+      let q = 0;
+      if (isMacroPreset && macroValues) {
+        const srcQ = macroValues[(y * cols) + x];
+        const span = Math.max(0.08, macroMax - macroMin);
+        const normalized = Math.min(1, Math.max(0, (srcQ - macroMin) / span));
+        q = Math.pow(normalized, 0.92);
+      } else {
+        const r = data[i], g = data[i + 1], b = data[i + 2];
+        let Y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        let v01 = Y / 255;
+        v01 = ((v01 - 0.5) * contrast) + 0.5;
+        v01 = Math.min(1, Math.max(0, v01));
+        v01 = Math.pow(v01, 1 / gamma);
 
-      const bp = state.blackPoint;
-      const wp = state.whitePoint;
-      v01 = (v01 - bp) / Math.max(1e-6, (wp - bp));
-      v01 = Math.min(1, Math.max(0, v01));
+        const bp = state.blackPoint;
+        const wp = state.whitePoint;
+        v01 = (v01 - bp) / Math.max(1e-6, (wp - bp));
+        v01 = Math.min(1, Math.max(0, v01));
 
-      const Yc = Math.max(0, Math.min(255, (bias + inv * (v01 * 255))));
-      const u = (Yc / 255) * n;
+        const Yc = Math.max(0, Math.min(255, (bias + inv * (v01 * 255))));
+        q = Yc / 255;
+      }
+
+      const u = q * n;
       let i0 = u | 0;
       let idx = i0;
       if (DITHER_ENABLED) {
