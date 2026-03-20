@@ -472,7 +472,17 @@ let DITHER_ENABLED = false;
       state.frozenFrameNode.parentNode.removeChild(state.frozenFrameNode);
     }
 
+    const container = previewNode.parentElement || previewNode;
+    const containerStyle = window.getComputedStyle(container);
+    if (containerStyle.position === 'static') {
+      container.style.position = 'relative';
+    }
+    if (overlay.parentNode !== container) {
+      container.appendChild(overlay);
+    }
+
     const rect = previewNode.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
     const clone = previewNode.cloneNode(true);
     const outSource = previewNode.querySelector?.('#out');
     const outClone = clone.querySelector?.('#out');
@@ -483,11 +493,9 @@ let DITHER_ENABLED = false;
     overlay.style.alignItems = 'unset';
     overlay.style.justifyContent = 'unset';
 
-    clone.style.position = 'fixed';
-    const scrollX = window.scrollX ?? document.documentElement?.scrollLeft ?? 0;
-    const scrollY = window.scrollY ?? document.documentElement?.scrollTop ?? 0;
-    clone.style.left = `${Math.round(rect.left + scrollX)}px`;
-    clone.style.top = `${Math.round(rect.top + scrollY)}px`;
+    clone.style.position = 'absolute';
+    clone.style.left = `${Math.round(rect.left - containerRect.left)}px`;
+    clone.style.top = `${Math.round(rect.top - containerRect.top)}px`;
     clone.style.width = `${Math.round(rect.width)}px`;
     clone.style.height = `${Math.round(rect.height)}px`;
     clone.style.margin = '0';

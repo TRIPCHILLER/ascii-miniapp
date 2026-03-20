@@ -631,7 +631,7 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 }
 
 #frozenFrameOverlay{
-  position:fixed;
+  position:absolute;
   inset:0;
   z-index:34;
   pointer-events:none;
