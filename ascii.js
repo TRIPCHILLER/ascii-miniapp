@@ -326,7 +326,7 @@ const BAYER4 = [
   15,  7, 13,  5
 ];
 const PIXEL_DITHER_CHARSET = '.:-=+*#%@';
-let DITHER_ENABLED = true;
+let DITHER_ENABLED = false;
 // ============== STATE / DEFAULT CONFIG ==============
 // @section STATE_CONFIG
   const state = {
@@ -1859,13 +1859,7 @@ function buildAsciiFromCurrentSource(src, cols, rows) {
       }
 
       const u = q * n;
-      let i0 = u | 0;
-      let idx = i0;
-      if (DITHER_ENABLED) {
-        const frac = u - i0;
-        const thr = BAYER8[(y & 7) * 8 + (x & 7)] / 64;
-        if (frac > thr) idx = i0 + 1;
-      }
+      let idx = Math.round(u);
       if (idx < 0) idx = 0;
       else if (idx > n) idx = n;
       line += chars[idx];
@@ -4552,7 +4546,7 @@ if (isPresetKatakana) {
   DARK_LOCK_COUNT = 2;
 
   // Дизеринг снова включаем — он даёт как раз тот «панч» в полутонах
-  DITHER_ENABLED  = true;
+  DITHER_ENABLED  = false;
 
   // Ротацию схожих символов выключаем, чтобы картинка не «дрожала»
   ROTATE_PALETTE  = false;
@@ -4575,7 +4569,7 @@ else {
 
   K_BINS = 10;
   DARK_LOCK_COUNT = 3;
-  DITHER_ENABLED  = true;
+  DITHER_ENABLED  = false;
   ROTATE_PALETTE  = true;
 }
 updateBinsForCurrentCharset();
