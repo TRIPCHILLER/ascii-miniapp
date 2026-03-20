@@ -4265,7 +4265,9 @@ fileVideo.addEventListener('change', async (e) => {
 // @section EXPORT_SAVE_SHARE
 // --- DEBUG OVERLAY (минимальный локальный лог для Telegram WebApp) ---
 let debugOverlayEl = null;
+const DEBUG_OVERLAY_VISIBLE = false;
 function ensureDebugOverlay() {
+  if (!DEBUG_OVERLAY_VISIBLE) return null;
   if (debugOverlayEl) return debugOverlayEl;
   if (!document.body) return null;
   debugOverlayEl = document.createElement('div');
