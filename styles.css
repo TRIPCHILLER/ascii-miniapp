@@ -1239,19 +1239,21 @@ body.visor-text #textSizeWrap{display:flex !important;}
 }
 .ascii-popup__dialog{
   position:relative;
-  width:min(92vw,560px);
+  width:fit-content;
+  max-width:90vw;
   display:flex;
   flex-direction:column;
   align-items:center;
   gap:8px;
 }
 .ascii-popup__text{
-  width:100%;
+  width:fit-content;
+  max-width:100%;
   background:#000;
   border:1px solid #fff;
   color:#fff;
-  padding:16px 18px;
-  text-align:left;
+  padding:16px;
+  text-align:center;
   font-family:'PxPlus IBM VGA','BetterVCR',monospace;
   font-size:18px;
   line-height:1.35;
