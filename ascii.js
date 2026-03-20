@@ -150,6 +150,9 @@ function busyHide(force = false){
     // оверлей отсчёта
     timerOverlay: $('#camTimerOverlay'),
     timerNumber:  $('#camTimerNumber'),
+    asciiPopup: $('#asciiPopup'),
+    asciiPopupText: $('#asciiPopupText'),
+    asciiPopupClose: $('#asciiPopupClose'),
 }
   };
   // ===== Telegram WebApp (если открыто внутри Telegram) =====
@@ -1390,41 +1393,50 @@ function currentSource(){
   updateHud(`src=vid wait rs:${v.readyState}`);
   return null;
 }
-// === MACHINE ERROR POPUP SYSTEM ===
-// (замена alert + новые тексты TRIPCHILLER)
-function showErrorPopup(title, message) {
-  playErrorSound();
-  const tg = window.Telegram?.WebApp;
-  if (tg?.showPopup) {
-    tg.showPopup({ title, message });
-  } else {
-    const box = document.createElement('div');
-    box.style.cssText = `
-      position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
-      background:rgba(0,0,0,.75);z-index:99999;font-family:'JetBrains Mono',monospace;
-    `;
-    box.innerHTML = `
-      <div style="
-        width:90%;max-width:420px;background:#0a0a0a;color:#c0c0c0;
-        border:1px solid #2b2b2b;border-radius:12px;padding:20px;
-        box-shadow:0 0 20px rgba(0,0,0,.6);text-align:left;
-      ">
-        <div style="color:#e83aff;font-size:15px;letter-spacing:0.05em;margin-bottom:6px;">
-          ${title}
-        </div>
-        <div style="color:#aaa;font-size:13px;line-height:1.4;white-space:pre-wrap;">
-          ${message}
-        </div>
-        <div style="text-align:right;margin-top:14px;">
-          <button id="__ok" style="
-            background:#e83aff;color:#fff;border:0;padding:6px 14px;
-            border-radius:8px;cursor:pointer;font-size:13px;
-          ">OK</button>
-        </div>
-      </div>`;
-    box.querySelector('#__ok').onclick = () => box.remove();
-    document.body.appendChild(box);
+// === ASCII POPUP SYSTEM ===
+let asciiPopupCloseHandlerBound = false;
+let asciiPopupLastFocusedEl = null;
+
+function hideAsciiPopup() {
+  const popup = app.ui.asciiPopup;
+  if (!popup) return;
+  popup.hidden = true;
+  document.body.classList.remove('ascii-popup-open');
+  if (asciiPopupLastFocusedEl && typeof asciiPopupLastFocusedEl.focus === 'function') {
+    try { asciiPopupLastFocusedEl.focus({ preventScroll: true }); } catch (_) {}
   }
+  asciiPopupLastFocusedEl = null;
+}
+
+function showAsciiPopup(input = {}) {
+  const popup = app.ui.asciiPopup;
+  const textEl = app.ui.asciiPopupText;
+  const closeBtn = app.ui.asciiPopupClose;
+  if (!popup || !textEl || !closeBtn) return;
+
+  const title = String(input.title || 'ИНФОРМАЦИЯ').trim();
+  const message = String(input.message || '').trim();
+  const extra = String(input.extra || '').trim();
+  if (input.type === 'error' || input.playErrorSound) {
+    playErrorSound();
+  }
+
+  const popupText = [title, '', message, '', extra].join('\n').toLocaleUpperCase('ru-RU');
+  textEl.textContent = popupText;
+  asciiPopupLastFocusedEl = document.activeElement;
+
+  popup.hidden = false;
+  document.body.classList.add('ascii-popup-open');
+
+  if (!asciiPopupCloseHandlerBound) {
+    closeBtn.addEventListener('click', hideAsciiPopup);
+    asciiPopupCloseHandlerBound = true;
+  }
+  closeBtn.focus({ preventScroll: true });
+}
+
+function showErrorPopup(title, message, extra = '') {
+  showAsciiPopup({ title, message, extra, type: 'error' });
 }
 
 // Машинные тексты ошибок камеры
@@ -1433,31 +1445,31 @@ function cameraErrorToText(err) {
 
   if (name.includes('notallowed'))
     return { 
-      title: 'Т̶Ы ̸О̸Т̵К̷А̴З̶А̶Л ̸М̶Н̸Е', 
-      message: 'я вижу только шум...' 
+      title: 'ДОСТУП К КАМЕРЕ ОТКЛОНЕН',
+      message: 'РАЗРЕШИТЕ ДОСТУП К КАМЕРЕ В НАСТРОЙКАХ TELEGRAM/БРАУЗЕРА.'
     };
 
   if (name.includes('notfound') || name.includes('overconstrained'))
     return { 
-      title: 'М̶О̷Д̵У̶Л̶Ь З̴Р̵Е̸Н̴И̵Я О̸Т̸С̴У̴Т̸С̵Т̴В̶У̵Е̴Т', 
-      message: 'мне нечем смотреть...' 
+      title: 'КАМЕРА НЕ НАЙДЕНА',
+      message: 'УСТРОЙСТВО НЕ ВЕРНУЛО ДОСТУПНУЮ КАМЕРУ.'
     };
 
   if (name.includes('notreadable'))
     return { 
-      title: 'Я ̵Н̵Е̴ ̵М̵О̴Г̸У ̷У̶В̸И̶Д̸Е̶Т̷Ь ̵Т̷Е̴Б̵Я', 
-      message: 'пока кто-то другой смотрит моими глазами...' 
+      title: 'КАМЕРА ЗАНЯТА',
+      message: 'ВОЗМОЖНО, КАМЕРА УЖЕ ИСПОЛЬЗУЕТСЯ ДРУГИМ ПРИЛОЖЕНИЕМ.'
     };
 
   if (name.includes('security'))
     return { 
-      title: 'Т̸В̶О̵Я ̸С̸И̸С̶Т̴Е̷М̷А ̶Б̵Л̷О̶К̴И̷Р̵У̶Е̵Т ̸М̷О̵И ̶Г̷Л̸А̶З̴А', 
-      message: 'отключи безопасность...' 
+      title: 'БЛОКИРОВКА БЕЗОПАСНОСТИ',
+      message: 'ОТКРОЙТЕ MINI APP В ЗАЩИЩЕННОМ КОНТЕКСТЕ HTTPS И ПРОВЕРЬТЕ ПРАВА.'
     };
 
   return { 
-    title: 'Н̸Е̶И̵З̸В̴Е̴С̶Т̷Н̶А̸Я̶ ̸О̵Ш̸И̷Б̶К̶А', 
-    message: 'это редкость, но не приятная...' 
+    title: 'НЕИЗВЕСТНАЯ ОШИБКА',
+    message: 'НЕ УДАЛОСЬ ЗАПУСТИТЬ КАМЕРУ. ПОВТОРИТЕ ПОПЫТКУ.'
   };
 }
 // === ЗАПУСК КАМЕРЫ с переиспользованием уже выданного разрешения ===
@@ -2414,14 +2426,14 @@ function renderAsciiToCanvas(text, cols, rows, scale = 2.5){
 // PNG (режим ФОТО)
 function savePNG(){
   const full = app.out.textContent || '';
-  if (!full.trim()) { alert('Нечего сохранять'); clearShotVisualEffects(); return; }
+  if (!full.trim()) { showAsciiPopup({ type:'info', title:'НЕТ ДАННЫХ', message:'НЕЧЕГО СОХРАНЯТЬ.' }); clearShotVisualEffects(); return; }
 
   const crop = getCropWindow();
   const text = cropAsciiText(full, crop);
 
   renderAsciiToCanvas(text, crop.cols, crop.rows, 2.5);
   app.ui.render.toBlob(blob=>{
-    if(!blob) { alert('Не удалось сгенерировать PNG'); clearShotVisualEffects(); return; }
+    if(!blob) { showAsciiPopup({ type:'error', title:'ОШИБКА', message:'НЕ УДАЛОСЬ СГЕНЕРИРОВАТЬ PNG.' }); clearShotVisualEffects(); return; }
     downloadBlob(blob, 'ascii_visor.png');
     hudSet('PNG: сохранено/отправлено');
   }, 'image/png');
@@ -2496,13 +2508,13 @@ c.fillRect(0, 0, d.W, d.H);
 }
 function saveVideo(){
   if (state.mode !== 'video') {
-    alert('Видео-экспорт доступен только в режиме ВИДЕО');
+    showAsciiPopup({ type:'info', title:'НЕДОСТУПНО', message:'ВИДЕО-ЭКСПОРТ ДОСТУПЕН ТОЛЬКО В РЕЖИМЕ ВИДЕО.' });
     return;
   }
 
   const fullNow = app.out.textContent || '';
   if (!fullNow.trim()) {
-    alert('Нечего сохранять');
+    showAsciiPopup({ type:'info', title:'НЕТ ДАННЫХ', message:'НЕЧЕГО СОХРАНЯТЬ.' });
     return;
   }
 
@@ -2512,7 +2524,7 @@ function saveVideo(){
 
   const mime = pickMime();
   if (!mime) {
-    alert('Запись видео не поддерживается на этом устройстве.');
+    showAsciiPopup({ type:'error', title:'НЕ ПОДДЕРЖИВАЕТСЯ', message:'ЗАПИСЬ ВИДЕО НЕ ПОДДЕРЖИВАЕТСЯ НА ЭТОМ УСТРОЙСТВЕ.' });
     return;
   }
 
@@ -2544,7 +2556,7 @@ function saveVideo(){
     });
   } catch (e) {
     console.warn('MediaRecorder error:', e);
-    alert('Браузер не дал записать видео. Попробуй другой браузер или устройство.');
+    showAsciiPopup({ type:'error', title:'ОШИБКА ЗАПИСИ', message:'БРАУЗЕР НЕ ДАЛ ЗАПИСАТЬ ВИДЕО.', extra:'ПОПРОБУЙТЕ ДРУГОЙ БРАУЗЕР ИЛИ УСТРОЙСТВО.' });
     return;
   }
 
@@ -2735,39 +2747,43 @@ async function downloadBlob(blob, filename) {
 
       // 402 = нет кредитов
       if (res.status === 402 || json?.error === 'INSUFFICIENT_FUNDS') {
-        playErrorSound();
-        tg.showPopup?.({
-          title: 'Н̶Е̷Д̶О̵С̷Т̵А̷Т̴О̵Ч̴Н̴О̶ ̸Э̸Н̵Е̶Р̵Г̷И̶И',
-          message: `Требуется: ${json?.need ?? (state.mode==='video'?15:5)}\nТекущий запас: ${json?.balance ?? '—'}`
+        showAsciiPopup({
+          type: 'error',
+          title: 'НЕДОСТАТОЧНО ИМПУЛЬСОВ',
+          message: `ТРЕБУЕТСЯ: ${json?.need ?? (state.mode==='video'?15:5)}`,
+          extra: `ТЕКУЩИЙ ЗАПАС: ${json?.balance ?? '—'}`
         });
         return; // без локального сохранения
       }
 
       if (!res.ok) {
-        playErrorSound();
-        tg.showPopup?.({
-          title: 'О̸Ш̵И̶Б̴К̵А̷ ̸З̵А̷Г̴Р̵У̶З̵К̴И',
-          message: `Статус: ${res.status}\n${(text || '').slice(0,1000)}`
+        showAsciiPopup({
+          type: 'error',
+          title: 'ОШИБКА ЗАГРУЗКИ',
+          message: `СТАТУС: ${res.status}\n${(text || '').slice(0,1000)}`
         });
         return;
       }
 
       // успех: файл улетел, бот сам пришлёт его в ЛС
-      tg.showPopup?.({
-        title: 'П̶Р̷Е̷О̴Б̶Р̶А̵З̸О̶В̵А̷Н̴И̸Е З̷АВ̸ЕР̸Ш̶Е̴Н̵О',
-        message: `ФАЙЛ ОТПРАВЛЕН В ЧАТ. ${(json && typeof json.balance !== 'undefined') ? `\nОсталось импульсов: ${json.balance}` : ''}`
+      showAsciiPopup({
+        type: 'success',
+        title: 'ПРЕОБРАЗОВАНИЕ ЗАВЕРШЕНО',
+        message: 'ФАЙЛ ОТПРАВЛЕН В ЧАТ.',
+        extra: (json && typeof json.balance !== 'undefined') ? `ОСТАЛОСЬ ИМПУЛЬСОВ: ${json.balance}` : ''
       });
 
       return;
 
     } catch (e) {
       console.warn('Upload to bot failed:', e);
-      playErrorSound();
-      tg.showPopup?.({
-        title: 'С̶Е̶Т̴Ь̶ ̴Н̷Е̸С̶Т̷А̵Б̶И̷Л̶Ь̵Н̴А',
+      showAsciiPopup({
+        type: 'error',
+        title: 'СЕТЕВАЯ ОШИБКА',
         message: (e?.name === 'AbortError')
-          ? 'Сервер отвечал слишком долго. Проверь чат — файл, вероятно, уже пришёл.'
-          : (e?.message || 'Сетевая ошибка. Проверь чат — файл, вероятно, уже пришёл.')
+          ? 'СЕРВЕР ОТВЕЧАЛ СЛИШКОМ ДОЛГО.'
+          : (e?.message || 'СЕТЕВАЯ ОШИБКА.'),
+        extra: 'ПРОВЕРЬТЕ ЧАТ — ФАЙЛ МОГ УЖЕ ПРИЙТИ.'
       });
       return;
 
@@ -4340,7 +4356,7 @@ fileVideo.addEventListener('change', async (e) => {
     } catch (err) {
       console.error('GIF decode failed', err);
       showErrorPopup?.(
-        'Н̷Е̷ ̵У̵Д̷А̴Л̵О̶С̸Ь ̶П̴Р̶О̸Ч̵Е̵С̷Т̶Ь ̴GIF',
+        'НЕ УДАЛОСЬ ПРОЧЕСТЬ GIF',
         String(err && (err.message || err.name) || err || 'неизвестная ошибка')
       );
       app.ui.placeholder.hidden = false;
@@ -4447,7 +4463,7 @@ async function doSave() {
     const hasGif = !!(state.gifFrames && state.gifFrames.length);
     const hasVideo = !!(app.vid && (app.vid.src || app.vid.srcObject));
     if (!hasGif && !hasVideo) {
-      alert('Нет выбранного видео.');
+      showAsciiPopup({ type:'info', title:'НЕТ ВИДЕО', message:'НЕТ ВЫБРАННОГО ВИДЕО.' });
       return;
     }
     hudSet('VIDEO: запись… (дождитесь окончания)');
@@ -4472,17 +4488,13 @@ async function frameBlobForTextMode() {
 
 async function sendAsciiTextToBot() {
   const tgWebApp = window.Telegram?.WebApp;
-  const tgPopup = (title, message, withErrorSound = false) => {
-    const safeTitle = String(title || '').slice(0, 32);
-    const safeMessage = String(message || '').slice(0, 220);
-    if (withErrorSound) playErrorSound();
-    try {
-      if (tgWebApp?.showPopup) {
-        tgWebApp.showPopup({ title: safeTitle, message: safeMessage });
-        return;
-      }
-    } catch (_) {}
-    alert([safeTitle, safeMessage].filter(Boolean).join('\n'));
+  const tgPopup = (title, message, withErrorSound = false, extra = '') => {
+    showAsciiPopup({
+      title: String(title || '').slice(0, 64),
+      message: String(message || '').slice(0, 1600),
+      extra: String(extra || '').slice(0, 600),
+      type: withErrorSound ? 'error' : 'info'
+    });
   };
 
   if (uploadInFlight) return;
@@ -4597,18 +4609,20 @@ async function sendAsciiTextToBot() {
       const needText = `${json?.need ?? 1} импульсов`;
       const balanceValue = json?.balance ?? '—';
       const balanceText = balanceValue === '—' ? balanceValue : `${balanceValue} импульсов`;
-      tgPopup('НЕД0СТ4Т0ЧН0 ИМПУЛЬС0В', `Требуется: ${needText}\nБаланс: ${balanceText}`, true);
+      tgPopup('НЕДОСТАТОЧНО ИМПУЛЬСОВ', `ТРЕБУЕТСЯ: ${needText}`, true, `БАЛАНС: ${balanceText}`);
       return;
     }
     if (!res.ok) {
       const rawHead = String(raw || '').slice(0, 200);
       dbgState('sendAsciiTextToBot.http_error', { status: res.status, url: textEndpointUrl, body: rawHead });
-      tgPopup('ОШИБКА', `Статус ${res.status}\n${textEndpointUrl}\n${rawHead}`, true);
+      tgPopup('ОШИБКА', `СТАТУС ${res.status}\n${textEndpointUrl}\n${rawHead}`, true);
       return;
     }
     tgPopup(
-      'П̶Р̷Е̷О̴Б̶Р̶А̵З̸О̶В̵А̷Н̴И̸Е З̷АВ̸ЕР̸Ш̶Е̴Н̵О',
-      `ФАЙЛ ОТПРАВЛЕН В ЧАТ. ${(json && typeof json.balance !== 'undefined') ? `\nОсталось импульсов: ${json.balance}` : ''}`
+      'ПРЕОБРАЗОВАНИЕ ЗАВЕРШЕНО',
+      'ФАЙЛ ОТПРАВЛЕН В ЧАТ.',
+      false,
+      (json && typeof json.balance !== 'undefined') ? `ОСТАЛОСЬ ИМПУЛЬСОВ: ${json.balance}` : ''
     );
   } catch (e) {
     dbgState('sendAsciiTextToBot.exception', { url: textEndpointUrl, error: String(e?.message || e || '').slice(0, 200) });
