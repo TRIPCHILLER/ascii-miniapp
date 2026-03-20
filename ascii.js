@@ -477,7 +477,6 @@ let DITHER_ENABLED = false;
     const outSource = previewNode.querySelector?.('#out');
     const outClone = clone.querySelector?.('#out');
 
-    clone.removeAttribute?.('id');
     clone.setAttribute('aria-hidden', 'true');
 
     overlay.style.display = 'block';
@@ -490,10 +489,7 @@ let DITHER_ENABLED = false;
     clone.style.width = `${Math.round(rect.width)}px`;
     clone.style.height = `${Math.round(rect.height)}px`;
     clone.style.margin = '0';
-    clone.style.inset = 'auto';
-    clone.style.transform = 'none';
     clone.style.pointerEvents = 'none';
-    clone.style.zIndex = '0';
 
     if (outSource && outClone) {
       const outRect = outSource.getBoundingClientRect();
