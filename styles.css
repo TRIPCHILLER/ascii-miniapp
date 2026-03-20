@@ -1219,3 +1219,60 @@ body.visor-text #textSizeWrap{display:flex !important;}
 #styleRow{
   width:auto !important;
 }
+
+.ascii-popup{
+  position:fixed;
+  inset:0;
+  z-index:100000;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+}
+.ascii-popup[hidden]{
+  display:none !important;
+}
+.ascii-popup__backdrop{
+  position:absolute;
+  inset:0;
+  background:rgba(0,0,0,.7);
+}
+.ascii-popup__dialog{
+  position:relative;
+  width:min(92vw,560px);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:8px;
+}
+.ascii-popup__text{
+  width:100%;
+  background:#000;
+  border:1px solid #fff;
+  color:#fff;
+  padding:16px 18px;
+  text-align:left;
+  font-family:'PxPlus IBM VGA','BetterVCR',monospace;
+  font-size:18px;
+  line-height:1.35;
+  text-transform:uppercase;
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+.ascii-popup__close{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:0;
+  margin:0;
+  border:0;
+  background:transparent;
+  color:#fff;
+  font-family:'PxPlus IBM VGA','BetterVCR',monospace;
+  font-size:18px;
+  text-transform:uppercase;
+}
+body.ascii-popup-open{
+  overflow:hidden;
+}
