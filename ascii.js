@@ -137,6 +137,9 @@ function busyHide(force = false){
     camControls:  $('#camControls'),
     flashBtn:  $('#flashBtn'),
     flashIcon: $('#flashIcon'),
+    frozenFrameOverlay: $('#frozenFrameOverlay'),
+    frozenFrameImage: $('#frozenFrameImage'),
+    shutterFlashOverlay: $('#shutterFlashOverlay'),
     // таймер
     timerOffBtn:  $('#timerOffBtn'),
     timer3Btn:    $('#timer3Btn'),
@@ -395,6 +398,9 @@ let DITHER_ENABLED = false;
     textGridDebug: null,
     textCropDebug: null,
     textFinalPreviewDebug: null,
+    frozenFrameDataUrl: '',
+    frozenFrameActive: false,
+    flashFadeTimers: [],
   };
 
   const TEXT_CHARSETS = {
@@ -421,6 +427,112 @@ let DITHER_ENABLED = false;
 
   function isGraphicCameraLive(){
     return !isTextMode() && state.mode === 'live';
+  }
+
+  function clearFlashFadeTimers() {
+    if (!state.flashFadeTimers?.length) return;
+    for (const id of state.flashFadeTimers) clearTimeout(id);
+    state.flashFadeTimers = [];
+  }
+
+  function playShutterFlash() {
+    const overlay = app?.ui?.shutterFlashOverlay;
+    if (!overlay) return;
+
+    clearFlashFadeTimers();
+    overlay.hidden = false;
+    overlay.style.opacity = '1';
+
+    const steps = [
+      { delay: 500, opacity: '0.75' },
+      { delay: 1000, opacity: '0.5' },
+      { delay: 1500, opacity: '0.25' },
+      { delay: 2000, opacity: '0' }
+    ];
+
+    for (const step of steps) {
+      const timerId = setTimeout(() => {
+        overlay.style.opacity = step.opacity;
+        if (step.opacity === '0') overlay.hidden = true;
+      }, step.delay);
+      state.flashFadeTimers.push(timerId);
+    }
+  }
+
+  function captureFrozenFrameNow() {
+    if (!app?.stage || !app?.out) return '';
+
+    const rect = app.stage.getBoundingClientRect();
+    const width = Math.max(1, Math.round(rect.width || window.innerWidth || 1));
+    const height = Math.max(1, Math.round(rect.height || window.innerHeight || 1));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return '';
+
+    const stageStyle = getComputedStyle(app.stage);
+    const outStyle = getComputedStyle(app.out);
+    ctx.fillStyle = stageStyle.backgroundColor || '#000';
+    ctx.fillRect(0, 0, width, height);
+
+    const text = app.out.textContent || '';
+    if (text) {
+      const fontSize = parseFloat(outStyle.fontSize) || 16;
+      const lineHeightRaw = outStyle.lineHeight;
+      const lineHeight = (lineHeightRaw && lineHeightRaw.endsWith('px'))
+        ? parseFloat(lineHeightRaw)
+        : (fontSize * 1.2);
+
+      ctx.fillStyle = outStyle.color || '#fff';
+      ctx.font = outStyle.font || `${fontSize}px monospace`;
+      ctx.textBaseline = 'top';
+
+      const lines = text.split('\n');
+      const totalHeight = Math.max(0, lines.length * lineHeight);
+      const startY = Math.round((height - totalHeight) / 2);
+
+      for (let i = 0; i < lines.length; i += 1) {
+        const line = lines[i];
+        const lineWidth = ctx.measureText(line).width;
+        const x = Math.round((width - lineWidth) / 2);
+        const y = startY + Math.round(i * lineHeight);
+        ctx.fillText(line, x, y);
+      }
+    }
+
+    return canvas.toDataURL('image/png');
+  }
+
+  function showFrozenFrameOverlay(frameDataUrl) {
+    const overlay = app?.ui?.frozenFrameOverlay;
+    const image = app?.ui?.frozenFrameImage;
+    if (!overlay || !image || !frameDataUrl) return;
+
+    state.frozenFrameDataUrl = frameDataUrl;
+    state.frozenFrameActive = true;
+    image.src = frameDataUrl;
+    overlay.hidden = false;
+  }
+
+  function clearShotVisualEffects() {
+    const overlay = app?.ui?.frozenFrameOverlay;
+    const image = app?.ui?.frozenFrameImage;
+    const flash = app?.ui?.shutterFlashOverlay;
+
+    state.frozenFrameActive = false;
+    state.frozenFrameDataUrl = '';
+
+    if (overlay) overlay.hidden = true;
+    if (image) image.removeAttribute('src');
+
+    clearFlashFadeTimers();
+    if (flash) {
+      flash.style.opacity = '0';
+      flash.hidden = true;
+    }
   }
 
   function readStableCameraFitBox(key){
@@ -2302,14 +2414,14 @@ function renderAsciiToCanvas(text, cols, rows, scale = 2.5){
 // PNG (режим ФОТО)
 function savePNG(){
   const full = app.out.textContent || '';
-  if (!full.trim()) { alert('Нечего сохранять'); return; }
+  if (!full.trim()) { alert('Нечего сохранять'); clearShotVisualEffects(); return; }
 
   const crop = getCropWindow();
   const text = cropAsciiText(full, crop);
 
   renderAsciiToCanvas(text, crop.cols, crop.rows, 2.5);
   app.ui.render.toBlob(blob=>{
-    if(!blob) { alert('Не удалось сгенерировать PNG'); return; }
+    if(!blob) { alert('Не удалось сгенерировать PNG'); clearShotVisualEffects(); return; }
     downloadBlob(blob, 'ascii_visor.png');
     hudSet('PNG: сохранено/отправлено');
   }, 'image/png');
@@ -2668,12 +2780,14 @@ async function downloadBlob(blob, filename) {
       uploadInFlight = false;
       busyLock = false;
       setTimeout(() => busyHide(true), 200);
+      setTimeout(() => clearShotVisualEffects(), 220);
     }
   }
 
   // Не Telegram — сразу локально
   tryLocalDownload(file);
   uploadInFlight = false;
+  setTimeout(() => clearShotVisualEffects(), 220);
 
   function tryLocalDownload(file) {
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -3140,6 +3254,7 @@ syncBgPaletteLock();
       app.ui.timerNumber.textContent = '';
     }
   }
+  if (newMode !== 'live') clearShotVisualEffects();
 
   // и пересчитываем визуал вспышки (свечение/torch)
   updateFlashUI();
@@ -3923,9 +4038,13 @@ if (app.ui.flashBtn) {
         if (state.mode !== 'live') return;
         if (shotLock) return;
         shotLock = true;
+        let shotPipelineStarted = false;
 
         try {
           pressOn();
+          const frozenFrame = captureFrozenFrameNow();
+          if (frozenFrame) showFrozenFrameOverlay(frozenFrame);
+          playShutterFlash();
           shutterSound.currentTime = 0;
           const playPromise = shutterSound.play();
           if (playPromise && typeof playPromise.catch === 'function') {
@@ -3954,11 +4073,17 @@ if (app.ui.flashBtn) {
           dbgState('doShot.enter', { isTextMode: isTextMode(), visorMode: state.visorMode, mode: state.mode });
           const shotTextHandled = await routeTextSaveIfNeeded();
           dbgState('doShot.routeTextSaveIfNeeded', { handled: shotTextHandled, mode: state.mode });
-          if (shotTextHandled) { dbgLine('doShot.return:text-mode'); return; }
+          if (shotTextHandled) {
+            shotPipelineStarted = true;
+            dbgLine('doShot.return:text-mode');
+            return;
+          }
           dbgLine('doShot.branch:png');
+          shotPipelineStarted = true;
           await Promise.resolve(savePNG());
         } catch (err) {
           console.error('[camShot]', err);
+          if (!shotPipelineStarted) clearShotVisualEffects();
         } finally {
           setTimeout(pressOff, 180);
           setTimeout(() => { shotLock = false; }, 400);
@@ -4492,6 +4617,7 @@ async function sendAsciiTextToBot() {
     uploadInFlight = false;
     busyLock = false;
     busyHide(true);
+    setTimeout(() => clearShotVisualEffects(), 220);
   }
 }
 
