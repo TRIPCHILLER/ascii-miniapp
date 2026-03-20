@@ -475,17 +475,15 @@ let DITHER_ENABLED = false;
       state.frozenFrameNode.parentNode.removeChild(state.frozenFrameNode);
     }
 
-    const container = previewNode.parentElement || previewNode;
-    const containerStyle = window.getComputedStyle(container);
-    if (containerStyle.position === 'static') {
-      container.style.position = 'relative';
+    const positioningRoot = previewNode.offsetParent || previewNode.parentElement || previewNode;
+    const rootStyle = window.getComputedStyle(positioningRoot);
+    if (rootStyle.position === 'static') {
+      positioningRoot.style.position = 'relative';
     }
-    if (overlay.parentNode !== container) {
-      container.appendChild(overlay);
+    if (overlay.parentNode !== positioningRoot) {
+      positioningRoot.appendChild(overlay);
     }
 
-    const rect = previewNode.getBoundingClientRect();
-    const containerRect = container.getBoundingClientRect();
     const clone = previewNode.cloneNode(true);
     const outSource = previewNode.querySelector?.('#out');
     const outClone = clone.querySelector?.('#out');
@@ -497,10 +495,10 @@ let DITHER_ENABLED = false;
     overlay.style.justifyContent = 'unset';
 
     clone.style.position = 'absolute';
-    clone.style.left = `${Math.round(rect.left - containerRect.left)}px`;
-    clone.style.top = `${Math.round(rect.top - containerRect.top)}px`;
-    clone.style.width = `${Math.round(rect.width)}px`;
-    clone.style.height = `${Math.round(rect.height)}px`;
+    clone.style.left = `${previewNode.offsetLeft}px`;
+    clone.style.top = `${previewNode.offsetTop}px`;
+    clone.style.width = `${previewNode.offsetWidth}px`;
+    clone.style.height = `${previewNode.offsetHeight}px`;
     clone.style.margin = '0';
     clone.style.pointerEvents = 'none';
 
