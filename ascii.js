@@ -319,6 +319,13 @@ const BAYER8 = [
   10,58, 6,54,  9,57, 5,53,
   42,26,38,22, 41,25,37,21
 ];
+const BAYER4 = [
+   0,  8,  2, 10,
+  12,  4, 14,  6,
+   3, 11,  1,  9,
+  15,  7, 13,  5
+];
+const PIXEL_DITHER_CHARSET = '.:-=+*#%@';
 let DITHER_ENABLED = true;
 // ============== STATE / DEFAULT CONFIG ==============
 // @section STATE_CONFIG
@@ -1582,6 +1589,54 @@ function renderBrailleDots(src, cropRect, cols, rows) {
   return out;
 }
 
+function isTextPixelPresetSelected() {
+  if (!isTextMode()) return false;
+  const optionLabel = String(app.ui.charset?.selectedOptions?.[0]?.textContent || '')
+    .trim()
+    .toUpperCase();
+  return optionLabel === 'PIXEL';
+}
+
+function renderClassicDither(data, cols, rows) {
+  const chars = Array.from(PIXEL_DITHER_CHARSET);
+  const n = chars.length - 1;
+  if (n < 0) return '';
+
+  const inv = state.invert ? -1 : 1;
+  const bias = state.invert ? 255 : 0;
+  const gamma = state.gamma;
+  const contrast = state.contrast;
+  const bp = state.blackPoint;
+  const wp = state.whitePoint;
+  const ditherScale = 1 / Math.max(1, n);
+
+  let out = '';
+  let i = 0;
+  for (let y = 0; y < rows; y++) {
+    let line = '';
+    for (let x = 0; x < cols; x++, i += 4) {
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      let v01 = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+      v01 = ((v01 - 0.5) * contrast) + 0.5;
+      v01 = Math.min(1, Math.max(0, v01));
+      v01 = Math.pow(v01, 1 / gamma);
+      v01 = (v01 - bp) / Math.max(1e-6, (wp - bp));
+      v01 = Math.min(1, Math.max(0, v01));
+
+      const Yc = Math.max(0, Math.min(255, (bias + inv * (v01 * 255))));
+      const q = Yc / 255;
+      const threshold = (BAYER4[(y & 3) * 4 + (x & 3)] + 0.5) / 16;
+      const qDithered = Math.min(1, Math.max(0, q + (threshold - 0.5) * ditherScale));
+      let idx = Math.round(qDithered * n);
+      if (idx < 0) idx = 0;
+      else if (idx > n) idx = n;
+      line += chars[idx];
+    }
+    out += line + '\n';
+  }
+  return out;
+}
+
 function buildAsciiFromCurrentSource(src, cols, rows) {
   let sx = 0, sy = 0, sw = src.w, sh = src.h;
   let targetWH = null;
@@ -1633,6 +1688,9 @@ function buildAsciiFromCurrentSource(src, cols, rows) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
   const data = ctx.getImageData(0, 0, cols, rows).data;
+  if (isTextPixelPresetSelected()) {
+    return renderClassicDither(data, cols, rows);
+  }
   const chars = Array.from(state.renderCharset10 || state.charset || '');
   const n = chars.length - 1;
   if (n < 0) return '';
