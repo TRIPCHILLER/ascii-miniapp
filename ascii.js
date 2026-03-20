@@ -4393,8 +4393,6 @@ async function sendAsciiTextToBot() {
   });
   const selectedCharsetValue = app.ui.charset.value || TEXT_CHARSETS.DOTS;
   const activeCharset = String(state.charset || TEXT_CHARSETS.DOTS);
-  const charsetDebugHead = activeCharset.slice(0, 10);
-  const charsetDebugTail = activeCharset.slice(-10);
   const textAsciiDebug = {
     previewHash: previewSnapshot.hash,
     exportHash,
@@ -4461,11 +4459,10 @@ async function sendAsciiTextToBot() {
       tgPopup('ОШИБКА', `Статус ${res.status}\n${textEndpointUrl}\n${rawHead}`);
       return;
     }
-    const serverAsciiLen = Number.isFinite(Number(json?.asciiLen)) ? Number(json.asciiLen) : asciiLen;
-    const requestedRows = state.textGridDebug?.requestedRows ?? '—';
-    const rowsAfterLimits = state.textGridDebug?.rowsAfterLimits ?? '—';
-    const finalGridRows = state.textGridDebug?.finalGridRows ?? '—';
-    tgPopup('Г0Т0В0', `✅ Отправлено\nrequestedRows=${requestedRows}\nrowsAfterLimits=${rowsAfterLimits}\nfinalGridRows=${finalGridRows}\nfinalAsciiLineCount=${textAsciiDebug.finalAsciiLineCount}\npreviewRows=${textAsciiDebug.previewRows}\npreviewHash=${textAsciiDebug.previewHash}\nexportHash=${textAsciiDebug.exportHash}\nhashMatch=${textAsciiDebug.hashMatch}\npreviewCols=${textAsciiDebug.previewCols}\nfinalAsciiMaxCols=${textAsciiDebug.finalAsciiMaxCols}\nexportCols=${textAsciiDebug.exportCols}\nexportRows=${textAsciiDebug.exportRows}\nfinalAsciiLen=${textAsciiDebug.finalAsciiLen}\nasciiLen=${serverAsciiLen}\ncharset=${charsetDebugHead}…${charsetDebugTail}\naspect=${textAsciiDebug.aspectCompensation}${typeof json?.balance !== 'undefined' ? `\nОсталось: ${json.balance}` : ''}`);
+    tgPopup(
+      'П̶Р̷Е̷О̴Б̶Р̶А̵З̸О̶В̵А̷Н̴И̸Е З̷АВ̸ЕР̸Ш̶Е̴Н̵О',
+      `ФАЙЛ ОТПРАВЛЕН В ЧАТ. ${(json && typeof json.balance !== 'undefined') ? `\nОсталось импульсов: ${json.balance}` : ''}`
+    );
   } catch (e) {
     dbgState('sendAsciiTextToBot.exception', { url: textEndpointUrl, error: String(e?.message || e || '').slice(0, 200) });
     tgPopup('СЕТЕВАЯ ОШИБКА', String(e?.message || 'Не удалось отправить запрос').slice(0, 200));
