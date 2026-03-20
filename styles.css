@@ -476,7 +476,7 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   position:absolute; inset:0;
   display:flex; align-items:center; justify-content:center;
   background:rgba(0,0,0,.75);
-  z-index: 3;           /* поверх #out и #placeholder */
+  z-index: 40;          /* поверх freeze-кадра и UI */
   backdrop-filter: blur(2px);
 }
 #busy[hidden]{ display:none !important; }
@@ -629,6 +629,32 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   object-fit:contain;
   pointer-events:none;
 }
+
+#frozenFrameOverlay{
+  position:fixed;
+  inset:0;
+  z-index:34;
+  pointer-events:none;
+  background:#000;
+}
+#frozenFrameOverlay[hidden]{ display:none !important; }
+
+#frozenFrameImage{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+
+#shutterFlashOverlay{
+  position:fixed;
+  inset:0;
+  z-index:100000;
+  pointer-events:none;
+  background:#fff;
+  opacity:0;
+}
+#shutterFlashOverlay[hidden]{ display:none !important; }
 
 /* ===== НИЖНИЙ РЯД РЕЖИМОВ ===== */
 .modebar{
