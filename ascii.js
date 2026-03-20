@@ -4469,8 +4469,10 @@ async function sendAsciiTextToBot() {
     let json = null;
     try { json = JSON.parse(raw || '{}'); } catch (_) { json = null; }
     if (res.status === 402 || json?.error === 'INSUFFICIENT_FUNDS') {
-      const rawHead = String(raw || '').slice(0, 200);
-      tgPopup('НЕД0СТ4Т0ЧН0 ИМПУЛЬС0В', `Нужно: ${json?.need ?? 1}\nБаланс: ${json?.balance ?? '—'}${rawHead ? `\n${rawHead}` : ''}`, true);
+      const needText = `${json?.need ?? 1} импульсов`;
+      const balanceValue = json?.balance ?? '—';
+      const balanceText = balanceValue === '—' ? balanceValue : `${balanceValue} импульсов`;
+      tgPopup('НЕД0СТ4Т0ЧН0 ИМПУЛЬС0В', `Требуется: ${needText}\nБаланс: ${balanceText}`, true);
       return;
     }
     if (!res.ok) {
