@@ -30,6 +30,16 @@
   const TEXT_TELEGRAM_CELL_ASPECT = 0.50;
   const TEXT_PREVIEW_LINE_HEIGHT = 1.10;
   const TEXT_FINAL_GRID_EXTRA_ROWS = 0;
+  const DOTS_BRAILLE_CFG = Object.freeze({
+    CELL_W: 2,
+    CELL_H: 4,
+    THRESHOLD: 0.52,
+    THRESHOLD_BIAS: -0.04,
+    CONTRAST: 1.14,
+    LOCAL_CONTRAST: 0.30,
+    GAMMA: 1.0,
+    SAMPLE_ASPECT_Y: 1.0,
+  });
     // Портрет-лок (чтобы не крутилось в горизонталь, где получится каша)
   let orientationLockRequested = false;
 
@@ -368,11 +378,15 @@ let DITHER_ENABLED = true;
   };
 
   const TEXT_CHARSETS = {
-    DOTS: ' .:-=+*#%@',
+    DOTS: '__DOTS_BRAILLE__',
     PIXEL: ' .:-=+*#%@',
     MICRO: ' .:*',
     SIMPLE_RAMP: ' .:-=+*#%@'
   };
+
+  function isBrailleDotsCharset(charsetValue) {
+    return String(charsetValue || '') === TEXT_CHARSETS.DOTS;
+  }
 
   function isTextMode(){ return state.visorMode === 'text'; }
 
@@ -1128,6 +1142,15 @@ function rebuildRenderCharset10() {
 }
 
 function updateBinsForCurrentCharset() {
+  if (isBrailleDotsCharset(state.charset)) {
+    state.renderCharset10 = '';
+    bins = [];
+    palette = [];
+    if (paletteTimer) { clearInterval(paletteTimer); paletteTimer = null; }
+    fixedByBin = new Array(K_BINS).fill(null);
+    return;
+  }
+
   rebuildRenderCharset10();
   // включаем «умное сужение» только для длинных наборов
   if (state.charset && state.charset.length > K_BINS) {
@@ -1460,6 +1483,105 @@ function computeTextGridFromSource(srcW, srcH, desiredCols) {
   return { cols, rows, limitsHit };
 }
 
+function renderBrailleDots(src, cropRect, cols, rows) {
+  const cfg = DOTS_BRAILLE_CFG;
+  const sampleW = Math.max(1, cols * cfg.CELL_W);
+  const sampleH = Math.max(1, Math.round(rows * cfg.CELL_H * cfg.SAMPLE_ASPECT_Y));
+
+  off.width = sampleW;
+  off.height = sampleH;
+  ctx.setTransform(state.mirror ? -1 : 1, 0, 0, 1, state.mirror ? sampleW : 0, 0);
+  ctx.drawImage(src.el, cropRect.sx, cropRect.sy, cropRect.sw, cropRect.sh, 0, 0, sampleW, sampleH);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  const data = ctx.getImageData(0, 0, sampleW, sampleH).data;
+  const luma = new Float32Array(sampleW * sampleH);
+  let minLum = Infinity;
+  let maxLum = -Infinity;
+
+  for (let y = 0; y < sampleH; y++) {
+    const row = y * sampleW;
+    for (let x = 0; x < sampleW; x++) {
+      const i = ((row + x) << 2);
+      const lum = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+      luma[row + x] = lum;
+      if (lum < minLum) minLum = lum;
+      if (lum > maxLum) maxLum = lum;
+    }
+  }
+
+  const span = Math.max(1, maxLum - minLum);
+  const inv = state.invert ? -1 : 1;
+  const bias = state.invert ? 1 : 0;
+  const threshold = Math.max(0, Math.min(1, cfg.THRESHOLD + cfg.THRESHOLD_BIAS));
+  let out = '';
+
+  for (let cy = 0; cy < rows; cy++) {
+    let line = '';
+    const py0 = Math.floor((cy * sampleH) / rows);
+    const py1 = Math.floor(((cy + 1) * sampleH) / rows);
+    const stepY = Math.max(1, py1 - py0);
+
+    for (let cx = 0; cx < cols; cx++) {
+      const px0 = Math.floor((cx * sampleW) / cols);
+      const px1 = Math.floor(((cx + 1) * sampleW) / cols);
+      const stepX = Math.max(1, px1 - px0);
+
+      let mask = 0;
+      for (let sy = 0; sy < cfg.CELL_H; sy++) {
+        for (let sx = 0; sx < cfg.CELL_W; sx++) {
+          const px = Math.min(sampleW - 1, px0 + Math.floor(((sx + 0.5) * stepX) / cfg.CELL_W));
+          const py = Math.min(sampleH - 1, py0 + Math.floor(((sy + 0.5) * stepY) / cfg.CELL_H));
+          const idx = py * sampleW + px;
+
+          let v01 = (luma[idx] - minLum) / span;
+          v01 = ((v01 - 0.5) * cfg.CONTRAST) + 0.5;
+
+          if (cfg.LOCAL_CONTRAST > 0) {
+            const lx0 = Math.max(px0, px - 1);
+            const lx1 = Math.min(sampleW - 1, px + 1);
+            const ly0 = Math.max(py0, py - 1);
+            const ly1 = Math.min(sampleH - 1, py + 1);
+            let sum = 0;
+            let cnt = 0;
+            for (let yy = ly0; yy <= ly1; yy++) {
+              for (let xx = lx0; xx <= lx1; xx++) {
+                sum += luma[yy * sampleW + xx];
+                cnt++;
+              }
+            }
+            const localMean = cnt ? (sum / cnt - minLum) / span : v01;
+            v01 += (v01 - localMean) * cfg.LOCAL_CONTRAST;
+          }
+
+          v01 = Math.max(0, Math.min(1, v01));
+          v01 = Math.pow(v01, 1 / Math.max(1e-6, cfg.GAMMA));
+          const onScore = bias + inv * v01;
+          const dotOn = onScore <= threshold;
+
+          if (dotOn) {
+            const bit = (
+              sy === 0 && sx === 0 ? 0 :
+              sy === 1 && sx === 0 ? 1 :
+              sy === 2 && sx === 0 ? 2 :
+              sy === 0 && sx === 1 ? 3 :
+              sy === 1 && sx === 1 ? 4 :
+              sy === 2 && sx === 1 ? 5 :
+              sy === 3 && sx === 0 ? 6 : 7
+            );
+            mask |= (1 << bit);
+          }
+        }
+      }
+
+      line += String.fromCharCode(0x2800 + mask);
+    }
+    out += line + '\n';
+  }
+
+  return out;
+}
+
 function buildAsciiFromCurrentSource(src, cols, rows) {
   let sx = 0, sy = 0, sw = src.w, sh = src.h;
   let targetWH = null;
@@ -1497,6 +1619,11 @@ function buildAsciiFromCurrentSource(src, cols, rows) {
       bottomGap,
       targetWH
     };
+  }
+
+  const cropRect = { sx, sy, sw, sh };
+  if (isTextMode() && isBrailleDotsCharset(app.ui.charset?.value || state.charset)) {
+    return renderBrailleDots(src, cropRect, cols, rows);
   }
 
   off.width = cols;
@@ -4234,7 +4361,7 @@ else {
   // все остальные пресеты — как раньше
   applyFontStack(FONT_STACK_MAIN, '700', false);
   forcedAspect = null;
-  state.charset = autoSortCharset(val);
+  state.charset = isBrailleDotsCharset(val) ? TEXT_CHARSETS.DOTS : autoSortCharset(val);
 
   K_BINS = 10;
   DARK_LOCK_COUNT = 3;
