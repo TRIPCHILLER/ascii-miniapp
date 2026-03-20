@@ -399,6 +399,7 @@ let DITHER_ENABLED = false;
     textCropDebug: null,
     textFinalPreviewDebug: null,
     frozenFrameDataUrl: '',
+    frozenFrameNode: null,
     frozenFrameActive: false,
     flashFadeTimers: [],
   };
@@ -460,60 +461,35 @@ let DITHER_ENABLED = false;
   }
 
   function captureFrozenFrameNow() {
-    if (!app?.stage || !app?.out) return '';
-
-    const rect = app.stage.getBoundingClientRect();
-    const width = Math.max(1, Math.round(rect.width || window.innerWidth || 1));
-    const height = Math.max(1, Math.round(rect.height || window.innerHeight || 1));
-
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return '';
-
-    const stageStyle = getComputedStyle(app.stage);
-    const outStyle = getComputedStyle(app.out);
-    ctx.fillStyle = stageStyle.backgroundColor || '#000';
-    ctx.fillRect(0, 0, width, height);
-
-    const text = app.out.textContent || '';
-    if (text) {
-      const fontSize = parseFloat(outStyle.fontSize) || 16;
-      const lineHeightRaw = outStyle.lineHeight;
-      const lineHeight = (lineHeightRaw && lineHeightRaw.endsWith('px'))
-        ? parseFloat(lineHeightRaw)
-        : (fontSize * 1.2);
-
-      ctx.fillStyle = outStyle.color || '#fff';
-      ctx.font = outStyle.font || `${fontSize}px monospace`;
-      ctx.textBaseline = 'top';
-
-      const lines = text.split('\n');
-      const totalHeight = Math.max(0, lines.length * lineHeight);
-      const startY = Math.round((height - totalHeight) / 2);
-
-      for (let i = 0; i < lines.length; i += 1) {
-        const line = lines[i];
-        const lineWidth = ctx.measureText(line).width;
-        const x = Math.round((width - lineWidth) / 2);
-        const y = startY + Math.round(i * lineHeight);
-        ctx.fillText(line, x, y);
-      }
-    }
-
-    return canvas.toDataURL('image/png');
+    return app?.stage || null;
   }
 
-  function showFrozenFrameOverlay(frameDataUrl) {
+  function showFrozenFrameOverlay(previewNode) {
     const overlay = app?.ui?.frozenFrameOverlay;
-    const image = app?.ui?.frozenFrameImage;
-    if (!overlay || !image || !frameDataUrl) return;
+    if (!overlay || !previewNode) return;
 
-    state.frozenFrameDataUrl = frameDataUrl;
+    if (state.frozenFrameNode && state.frozenFrameNode.parentNode) {
+      state.frozenFrameNode.parentNode.removeChild(state.frozenFrameNode);
+    }
+
+    const rect = previewNode.getBoundingClientRect();
+    const clone = previewNode.cloneNode(true);
+    clone.removeAttribute?.('id');
+    clone.querySelectorAll?.('[id]').forEach((el) => el.removeAttribute('id'));
+    clone.setAttribute('aria-hidden', 'true');
+    clone.style.position = 'fixed';
+    clone.style.left = `${Math.round(rect.left)}px`;
+    clone.style.top = `${Math.round(rect.top)}px`;
+    clone.style.width = `${Math.round(rect.width)}px`;
+    clone.style.height = `${Math.round(rect.height)}px`;
+    clone.style.margin = '0';
+    clone.style.pointerEvents = 'none';
+    clone.style.zIndex = '0';
+
+    state.frozenFrameDataUrl = '';
+    state.frozenFrameNode = clone;
     state.frozenFrameActive = true;
-    image.src = frameDataUrl;
+    overlay.appendChild(clone);
     overlay.hidden = false;
   }
 
@@ -521,12 +497,15 @@ let DITHER_ENABLED = false;
     const overlay = app?.ui?.frozenFrameOverlay;
     const image = app?.ui?.frozenFrameImage;
     const flash = app?.ui?.shutterFlashOverlay;
+    const frozenNode = state.frozenFrameNode;
 
     state.frozenFrameActive = false;
     state.frozenFrameDataUrl = '';
+    state.frozenFrameNode = null;
 
     if (overlay) overlay.hidden = true;
     if (image) image.removeAttribute('src');
+    if (frozenNode && frozenNode.parentNode) frozenNode.parentNode.removeChild(frozenNode);
 
     clearFlashFadeTimers();
     if (flash) {
