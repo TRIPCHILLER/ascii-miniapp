@@ -435,11 +435,13 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 /* ===== FULLSCREEN ===== */
 :fullscreen .toolbar,
 :fullscreen .panel,
-:fullscreen .modebar { display:none !important; }
+:fullscreen .modebar,
+:fullscreen .cam-controls { display:none !important; }
 
 .body-fullscreen .toolbar,
 .body-fullscreen .panel,
-.body-fullscreen .modebar { display:none !important; }
+.body-fullscreen .modebar,
+.body-fullscreen .cam-controls { display:none !important; }
 
 
 .fs-exit {
