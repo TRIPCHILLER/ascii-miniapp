@@ -484,8 +484,10 @@ let DITHER_ENABLED = false;
     overlay.style.justifyContent = 'unset';
 
     clone.style.position = 'fixed';
-    clone.style.left = `${Math.round(rect.left)}px`;
-    clone.style.top = `${Math.round(rect.top)}px`;
+    const scrollX = window.scrollX ?? document.documentElement?.scrollLeft ?? 0;
+    const scrollY = window.scrollY ?? document.documentElement?.scrollTop ?? 0;
+    clone.style.left = `${Math.round(rect.left + scrollX)}px`;
+    clone.style.top = `${Math.round(rect.top + scrollY)}px`;
     clone.style.width = `${Math.round(rect.width)}px`;
     clone.style.height = `${Math.round(rect.height)}px`;
     clone.style.margin = '0';
