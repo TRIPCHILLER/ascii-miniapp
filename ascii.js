@@ -387,12 +387,17 @@ let DITHER_ENABLED = true;
   const TEXT_CHARSETS = {
     DOTS: '__DOTS_BRAILLE__',
     PIXEL: ' .:-=+*#%@',
-    MICRO: ' .:*',
+    BLOCKS: '__BLOCKS__',
+    MICRO_LEGACY: ' .:*',
     SIMPLE_RAMP: ' .:-=+*#%@'
   };
 
   function isBrailleDotsCharset(charsetValue) {
     return String(charsetValue || '') === TEXT_CHARSETS.DOTS;
+  }
+
+  function isBlockCharset(charsetValue) {
+    return String(charsetValue || '') === TEXT_CHARSETS.BLOCKS;
   }
 
   function isTextMode(){ return state.visorMode === 'text'; }
@@ -746,12 +751,15 @@ let DITHER_ENABLED = true;
       app.ui.charset.innerHTML = `
         <option value="${TEXT_CHARSETS.DOTS}">DOTS</option>
         <option value="${TEXT_CHARSETS.PIXEL}">PIXEL</option>
-        <option value="${TEXT_CHARSETS.MICRO}">MICRO</option>
+        <option value="${TEXT_CHARSETS.BLOCKS}">BLOCKS</option>
         <option value="${TEXT_CHARSETS.SIMPLE_RAMP}">SIMPLE_RAMP</option>
         <option value="CUSTOM">(РУЧН0Й ВВ0Д)</option>`;
       const fallbackText = state.lastTextSymbolSet || getDefaultTextCharsetOption();
-      const val = [TEXT_CHARSETS.DOTS, TEXT_CHARSETS.PIXEL, TEXT_CHARSETS.MICRO, TEXT_CHARSETS.SIMPLE_RAMP, 'CUSTOM'].includes(fallbackText)
-        ? fallbackText
+      const normalizedFallbackText = (fallbackText === TEXT_CHARSETS.MICRO_LEGACY)
+        ? TEXT_CHARSETS.BLOCKS
+        : fallbackText;
+      const val = [TEXT_CHARSETS.DOTS, TEXT_CHARSETS.PIXEL, TEXT_CHARSETS.BLOCKS, TEXT_CHARSETS.SIMPLE_RAMP, 'CUSTOM'].includes(normalizedFallbackText)
+        ? normalizedFallbackText
         : getDefaultTextCharsetOption();
       app.ui.charset.value = val;
       state.lastTextSymbolSet = val;
@@ -1149,7 +1157,7 @@ function rebuildRenderCharset10() {
 }
 
 function updateBinsForCurrentCharset() {
-  if (isBrailleDotsCharset(state.charset)) {
+  if (isBrailleDotsCharset(state.charset) || isBlockCharset(state.charset)) {
     state.renderCharset10 = '';
     bins = [];
     palette = [];
@@ -1589,6 +1597,88 @@ function renderBrailleDots(src, cropRect, cols, rows) {
   return out;
 }
 
+function getBlockCharFromMask(mask) {
+  switch (mask & 15) {
+    case 0: return ' ';
+    case 1: return '▘';
+    case 2: return '▝';
+    case 3: return '▀';
+    case 4: return '▖';
+    case 5: return '▌';
+    case 6: return '▞';
+    case 7: return '▛';
+    case 8: return '▗';
+    case 9: return '▚';
+    case 10: return '▐';
+    case 11: return '▜';
+    case 12: return '▄';
+    case 13: return '▙';
+    case 14: return '▟';
+    default: return '█';
+  }
+}
+
+function renderBlockCharset(src, cropRect, cols, rows) {
+  const sampleW = Math.max(1, cols * 2);
+  const sampleH = Math.max(1, rows * 2);
+
+  off.width = sampleW;
+  off.height = sampleH;
+  ctx.setTransform(state.mirror ? -1 : 1, 0, 0, 1, state.mirror ? sampleW : 0, 0);
+  ctx.drawImage(src.el, cropRect.sx, cropRect.sy, cropRect.sw, cropRect.sh, 0, 0, sampleW, sampleH);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  const data = ctx.getImageData(0, 0, sampleW, sampleH).data;
+  const inv = state.invert ? -1 : 1;
+  const bias = state.invert ? 255 : 0;
+  const gamma = state.gamma;
+  const contrast = state.contrast;
+  const bp = state.blackPoint;
+  const wp = state.whitePoint;
+  const threshold = 128;
+
+  let out = '';
+  for (let y = 0; y < rows; y++) {
+    let line = '';
+    const py = y * 2;
+    for (let x = 0; x < cols; x++) {
+      const px = x * 2;
+      let mask = 0;
+
+      for (let sy = 0; sy < 2; sy++) {
+        for (let sx = 0; sx < 2; sx++) {
+          const sxp = px + sx;
+          const syp = py + sy;
+          const idx = ((syp * sampleW + sxp) << 2);
+          const r = data[idx];
+          const g = data[idx + 1];
+          const b = data[idx + 2];
+
+          let v01 = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+          v01 = ((v01 - 0.5) * contrast) + 0.5;
+          v01 = Math.min(1, Math.max(0, v01));
+          v01 = Math.pow(v01, 1 / gamma);
+          v01 = (v01 - bp) / Math.max(1e-6, (wp - bp));
+          v01 = Math.min(1, Math.max(0, v01));
+
+          const Yc = Math.max(0, Math.min(255, (bias + inv * (v01 * 255))));
+          if (Yc < threshold) {
+            const bit = (sy === 0)
+              ? (sx === 0 ? 1 : 2)
+              : (sx === 0 ? 4 : 8);
+            mask |= bit;
+          }
+        }
+      }
+
+      line += getBlockCharFromMask(mask);
+    }
+    out += line + '\n';
+  }
+
+  return out;
+}
+
 function isTextPixelPresetSelected() {
   if (!isTextMode()) return false;
   const optionLabel = String(app.ui.charset?.selectedOptions?.[0]?.textContent || '')
@@ -1679,6 +1769,9 @@ function buildAsciiFromCurrentSource(src, cols, rows) {
   const cropRect = { sx, sy, sw, sh };
   if (isTextMode() && isBrailleDotsCharset(app.ui.charset?.value || state.charset)) {
     return renderBrailleDots(src, cropRect, cols, rows);
+  }
+  if (isTextMode() && isBlockCharset(app.ui.charset?.value || state.charset)) {
+    return renderBlockCharset(src, cropRect, cols, rows);
   }
 
   off.width = cols;
@@ -4425,7 +4518,13 @@ else {
   // все остальные пресеты — как раньше
   applyFontStack(FONT_STACK_MAIN, '700', false);
   forcedAspect = null;
-  state.charset = isBrailleDotsCharset(val) ? TEXT_CHARSETS.DOTS : autoSortCharset(val);
+  if (isBrailleDotsCharset(val)) {
+    state.charset = TEXT_CHARSETS.DOTS;
+  } else if (isBlockCharset(val)) {
+    state.charset = TEXT_CHARSETS.BLOCKS;
+  } else {
+    state.charset = autoSortCharset(val);
+  }
 
   K_BINS = 10;
   DARK_LOCK_COUNT = 3;
