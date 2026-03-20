@@ -1058,10 +1058,10 @@ function autoSortCharset(str) {
 let K_BINS = 10;
 
 // быстрее и плавнее
-let PALETTE_INTERVAL = 320;   // мс — темп смены похожих символов
-const CHANGES_PER_TICK = 1;   // меняем ровно 1 бин за тик
+let PALETTE_INTERVAL = 320;   // legacy: rotation выключен, таймер не используется
+const CHANGES_PER_TICK = 1;   // legacy: rotation выключен, смена по тикам отключена
   
-let ROTATE_PALETTE = true; 
+let ROTATE_PALETTE = false; 
 
 // фиксируем первые N самых тёмных (по измеренной плотности)
 let DARK_LOCK_COUNT = 3;    // ← можно менять на 2/3/4 по вкусу
@@ -4570,7 +4570,7 @@ else {
   K_BINS = 10;
   DARK_LOCK_COUNT = 3;
   DITHER_ENABLED  = false;
-  ROTATE_PALETTE  = true;
+  ROTATE_PALETTE  = false;
 }
 updateBinsForCurrentCharset();
 
