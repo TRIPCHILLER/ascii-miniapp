@@ -1557,7 +1557,7 @@ function renderBrailleDots(src, cropRect, cols, rows) {
           v01 = Math.max(0, Math.min(1, v01));
           v01 = Math.pow(v01, 1 / Math.max(1e-6, cfg.GAMMA));
           const onScore = bias + inv * v01;
-          const dotOn = onScore <= threshold;
+          const dotOn = onScore >= threshold;
 
           if (dotOn) {
             const bit = (
@@ -3707,6 +3707,7 @@ if (app.ui.flashBtn) {
       };
 
       let shotLock = false;
+      const shutterSound = new Audio('assets/sounds/camerashuttersoundwithdelay.mp3');
 
       const doShot = async (e) => {
         e.preventDefault();
@@ -3716,6 +3717,11 @@ if (app.ui.flashBtn) {
 
         try {
           pressOn();
+          shutterSound.currentTime = 0;
+          const playPromise = shutterSound.play();
+          if (playPromise && typeof playPromise.catch === 'function') {
+            playPromise.catch(() => {});
+          }
 
           const sec = state.timerSeconds | 0;
           const hasTimer = sec > 0 && app.ui.timerOverlay && app.ui.timerNumber;
