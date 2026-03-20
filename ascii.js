@@ -389,7 +389,8 @@ let DITHER_ENABLED = true;
     PIXEL: ' .:-=+*#%@',
     BLOCKS: '__BLOCKS__',
     MICRO_LEGACY: ' .:*',
-    SIMPLE_RAMP: ' .:-=+*#%@'
+    MACRO: ' .`\'^",:;Il!i~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$',
+    KATAKANA: ' カタカナアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン'
   };
 
   function isBrailleDotsCharset(charsetValue) {
@@ -752,13 +753,14 @@ let DITHER_ENABLED = true;
         <option value="${TEXT_CHARSETS.DOTS}">DOTS</option>
         <option value="${TEXT_CHARSETS.PIXEL}">PIXEL</option>
         <option value="${TEXT_CHARSETS.BLOCKS}">BLOCKS</option>
-        <option value="${TEXT_CHARSETS.SIMPLE_RAMP}">SIMPLE_RAMP</option>
+        <option value="${TEXT_CHARSETS.MACRO}">MACRO</option>
+        <option value="${TEXT_CHARSETS.KATAKANA}">KATAKANA</option>
         <option value="CUSTOM">(РУЧН0Й ВВ0Д)</option>`;
       const fallbackText = state.lastTextSymbolSet || getDefaultTextCharsetOption();
       const normalizedFallbackText = (fallbackText === TEXT_CHARSETS.MICRO_LEGACY)
-        ? TEXT_CHARSETS.BLOCKS
+        ? TEXT_CHARSETS.MACRO
         : fallbackText;
-      const val = [TEXT_CHARSETS.DOTS, TEXT_CHARSETS.PIXEL, TEXT_CHARSETS.BLOCKS, TEXT_CHARSETS.SIMPLE_RAMP, 'CUSTOM'].includes(normalizedFallbackText)
+      const val = [TEXT_CHARSETS.DOTS, TEXT_CHARSETS.PIXEL, TEXT_CHARSETS.BLOCKS, TEXT_CHARSETS.MACRO, TEXT_CHARSETS.KATAKANA, 'CUSTOM'].includes(normalizedFallbackText)
         ? normalizedFallbackText
         : getDefaultTextCharsetOption();
       app.ui.charset.value = val;
@@ -4480,9 +4482,9 @@ if (val === 'CUSTOM') {
 
 app.ui.customCharset.style.display = 'none';
 
-// индекс «カタカナ» в твоём <select> — 4 (см. index.html)
+// индекс «カタカナ» в графическом режиме <select> — 4 (см. index.html)
 const idx = app.ui.charset.selectedIndex;
-const isPresetKatakana = (idx === 4); // «カタカナ» в твоём select
+const isPresetKatakana = (!isTextMode() && idx === 4); // «カタカナ» только для графического режима
 
 if (isPresetKatakana) {
   // Моно CJK + full-width
