@@ -464,6 +464,9 @@ let DITHER_ENABLED = false;
   }
 
   function captureFrozenFrameNow() {
+    if (state.mode === 'live' && app?.out) {
+      return app.out;
+    }
     return app?.stage || null;
   }
 
@@ -485,8 +488,6 @@ let DITHER_ENABLED = false;
     }
 
     const clone = previewNode.cloneNode(true);
-    const outSource = previewNode.querySelector?.('#out');
-    const outClone = clone.querySelector?.('#out');
 
     clone.setAttribute('aria-hidden', 'true');
 
@@ -501,12 +502,6 @@ let DITHER_ENABLED = false;
     clone.style.height = `${previewNode.offsetHeight}px`;
     clone.style.margin = '0';
     clone.style.pointerEvents = 'none';
-
-    if (outSource && outClone) {
-      const outRect = outSource.getBoundingClientRect();
-      outClone.style.width = `${Math.round(outRect.width)}px`;
-      outClone.style.height = `${Math.round(outRect.height)}px`;
-    }
 
     state.frozenFrameDataUrl = '';
     state.frozenFrameNode = clone;
