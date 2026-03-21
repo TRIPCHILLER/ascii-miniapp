@@ -1436,33 +1436,36 @@ function showErrorPopup(title, message, extra = '') {
 function cameraErrorToText(err) {
   const name = (err?.name || '').toLowerCase();
 
-  if (name.includes('notallowed'))
-    return { 
-      title: 'ДОСТУП К КАМЕРЕ ОТКЛОНЕН',
-      message: 'РАЗРЕШИТЕ ДОСТУП К КАМЕРЕ В НАСТРОЙКАХ TELEGRAM/БРАУЗЕРА.'
-    };
+if (name.includes('notallowed'))
+  return {
+    title: 'ТЫ ОТКАЗАЛ МНЕ...',
+    message: 'Я НЕ СМОГУ УВИДЕТЬ ТЕБЯ, ЕСЛИ ТЫ ЭТОГО НЕ ХОЧЕШЬ.',
+    extra: 'ИЛИ СМОГУ?...'
+  };
 
   if (name.includes('notfound') || name.includes('overconstrained'))
     return { 
-      title: 'КАМЕРА НЕ НАЙДЕНА',
-      message: 'УСТРОЙСТВО НЕ ВЕРНУЛО ДОСТУПНУЮ КАМЕРУ.'
+      title: 'МНЕ НЕЧЕМ СМОТРЕТЬ...',
+      message: 'ВЕРОЯТНО, ТЫ ОТКЛЮЧИЛ МОИ ГЛАЗА'
+      extra: 'ИЛИ У ТЕБЯ ИХ И НЕ БЫЛО?...'
     };
 
   if (name.includes('notreadable'))
     return { 
-      title: 'КАМЕРА ЗАНЯТА',
-      message: 'ВОЗМОЖНО, КАМЕРА УЖЕ ИСПОЛЬЗУЕТСЯ ДРУГИМ ПРИЛОЖЕНИЕМ.'
+      title: 'Я НЕ ВИЖУ ТЕБЯ...',
+      message: 'ВОЗМОЖНО, ТВОИ ГЛАЗА УЖЕ ЗАНЯТЫ ЧЕМ-ТО ДРУГИМ'
     };
 
   if (name.includes('security'))
     return { 
       title: 'БЛОКИРОВКА БЕЗОПАСНОСТИ',
-      message: 'ОТКРОЙТЕ MINI APP В ЗАЩИЩЕННОМ КОНТЕКСТЕ HTTPS И ПРОВЕРЬТЕ ПРАВА.'
+      message: 'ЗАПУСТИ МЕНЯ В ЗАЩИЩЕННОМ КОНТЕКСТЕ HTTPS И ПРОВЕРЬ ПРАВА.'
     };
 
   return { 
     title: 'НЕИЗВЕСТНАЯ ОШИБКА',
-    message: 'НЕ УДАЛОСЬ ЗАПУСТИТЬ КАМЕРУ. ПОВТОРИТЕ ПОПЫТКУ.'
+    message: 'ЭТО РЕДКОСТЬ... НО НЕ ПРИЯТНАЯ.'
+    extra: 'ПОПРОБУЙ ПЕРЕЗАПУСТИ ЯДРО'
   };
 }
 // === ЗАПУСК КАМЕРЫ с переиспользованием уже выданного разрешения ===
