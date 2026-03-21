@@ -1414,7 +1414,9 @@ function showAsciiPopup(input = {}) {
     playErrorSound();
   }
 
-  const popupText = [title, '', message, '', extra].join('\n').toLocaleUpperCase('ru-RU');
+  const popupLines = [title, '', message];
+  if (extra) popupLines.push('', extra);
+  const popupText = popupLines.join('\n').toLocaleUpperCase('ru-RU');
   textEl.textContent = popupText;
   asciiPopupLastFocusedEl = document.activeElement;
 
@@ -1428,8 +1430,11 @@ function showAsciiPopup(input = {}) {
   closeBtn.focus({ preventScroll: true });
 }
 
-function showErrorPopup(title, message, extra = '') {
-  showAsciiPopup({ title, message, extra, type: 'error' });
+function showErrorPopup(titleOrPayload, message = '', extra = '') {
+  const payload = (titleOrPayload && typeof titleOrPayload === 'object' && !Array.isArray(titleOrPayload))
+    ? titleOrPayload
+    : { title: titleOrPayload, message, extra };
+  showAsciiPopup({ ...payload, type: 'error' });
 }
 
 // Машинные тексты ошибок камеры
@@ -1516,7 +1521,7 @@ async function startStream() {
   } catch (err) {
     state.camBlocked = true;
     const msg = cameraErrorToText(err);
-    showErrorPopup(msg.title, msg.message, msg.extra);
+    showErrorPopup(msg);
     return false;
   }
 }
