@@ -424,6 +424,13 @@ option{ background:var(--ui-panel); color:var(--ui-text); }
   font-style: normal;
   font-display: swap;
 }
+@font-face {
+  font-family: "PixPlus";
+  src: url("./assets/PxPlus IBM VGA.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
 
 /* === Шрифт интерфейса === */
 body, .toolbar, .panel, .btn, label, output, select, option {
@@ -783,7 +790,7 @@ background:#fff; }
   background:transparent;
   border:0;
   padding:.4rem .6rem;
-  font-family:'BetterVCR', monospace;
+  font-family:'PixPlus', monospace;
   font-size:14px;              /* тот же размер, что и у вкладок */
   text-transform:uppercase;
   letter-spacing:0.06em;
@@ -843,7 +850,7 @@ background:#fff; }
   display:inline-flex;   /* даёт точное выравнивание по центру */
   align-items:center;
   line-height:20px;      /* высота текста = высоте квадрата */
-  font-family:'betterVCR', monospace;
+  font-family:'PixPlus', monospace;
 }
 
 /* чёрный квадрат */
@@ -977,7 +984,7 @@ body.flash-front-ui input[type="range"]::-ms-thumb {
 .cp-tabs{
   display:flex;
   margin-bottom:10px;
-  font-family:'BetterVCR', monospace;
+  font-family:'PixPlus', monospace;
   font-size:14px;
   letter-spacing:0.06em;
   text-transform:uppercase;
@@ -994,7 +1001,7 @@ body.flash-front-ui input[type="range"]::-ms-thumb {
   cursor:pointer;
 
   /* Гарантируем фирменный шрифт и капс прямо на кнопке */
-  font-family:'BetterVCR', monospace !important;
+  font-family:'PixPlus', monospace !important;
   font-size:14px;
   text-transform:uppercase;
   letter-spacing:0.06em;
