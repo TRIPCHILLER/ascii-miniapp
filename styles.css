@@ -1252,7 +1252,7 @@ body.visor-text #textSizeWrap{display:flex !important;}
   width:fit-content;
   max-width:100%;
   background:#000;
-  border:1px solid #fff;
+  border:2px solid #fff;
   color:#fff;
   padding:16px;
   text-align:center;
