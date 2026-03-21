@@ -1269,7 +1269,7 @@ body.visor-text #textSizeWrap{display:flex !important;}
   align-items:center;
   justify-content:center;
   padding:0;
-  margin:0;
+  margin:16px 0 0;
   border:0;
   background:transparent;
   color:#fff;
