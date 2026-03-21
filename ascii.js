@@ -1516,7 +1516,7 @@ async function startStream() {
   } catch (err) {
     state.camBlocked = true;
     const msg = cameraErrorToText(err);
-    showErrorPopup(msg.title, msg.message);
+    showErrorPopup(msg.title, msg.message, msg.extra);
     return false;
   }
 }
