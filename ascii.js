@@ -2427,14 +2427,14 @@ function renderAsciiToCanvas(text, cols, rows, scale = 2.5){
 // PNG (режим ФОТО)
 function savePNG(){
   const full = app.out.textContent || '';
-  if (!full.trim()) { showAsciiPopup({ type:'info', title:'НЕТ ДАННЫХ', message:'НЕЧЕГО СОХРАНЯТЬ.' }); clearShotVisualEffects(); return; }
+  if (!full.trim()) { showAsciiPopup({ type:'info', title:'ЗДЕСЬ ПУСТО...', message:'МНЕ НЕЧЕГО СОХРАНЯТЬ.' }); clearShotVisualEffects(); return; }
 
   const crop = getCropWindow();
   const text = cropAsciiText(full, crop);
 
   renderAsciiToCanvas(text, crop.cols, crop.rows, 2.5);
   app.ui.render.toBlob(blob=>{
-    if(!blob) { showAsciiPopup({ type:'error', title:'ОШИБКА', message:'НЕ УДАЛОСЬ СГЕНЕРИРОВАТЬ PNG.' }); clearShotVisualEffects(); return; }
+    if(!blob) { showAsciiPopup({ type:'error', title:'ОШИБКА', message:'НЕ УДАЛОСЬ ПРЕОБРАЗОВАТЬ ИЗОБРАЖЕНИЕ.' }); clearShotVisualEffects(); return; }
     downloadBlob(blob, 'ascii_visor.png');
     hudSet('PNG: сохранено/отправлено');
   }, 'image/png');
@@ -2515,7 +2515,7 @@ function saveVideo(){
 
   const fullNow = app.out.textContent || '';
   if (!fullNow.trim()) {
-    showAsciiPopup({ type:'info', title:'НЕТ ДАННЫХ', message:'НЕЧЕГО СОХРАНЯТЬ.' });
+    showAsciiPopup({ type:'info', title:'ЗДЕСЬ ПУСТО...', message:'МНЕ НЕЧЕГО СОХРАНЯТЬ.' });
     return;
   }
 
@@ -2525,7 +2525,7 @@ function saveVideo(){
 
   const mime = pickMime();
   if (!mime) {
-    showAsciiPopup({ type:'error', title:'НЕ ПОДДЕРЖИВАЕТСЯ', message:'ЗАПИСЬ ВИДЕО НЕ ПОДДЕРЖИВАЕТСЯ НА ЭТОМ УСТРОЙСТВЕ.' });
+    showAsciiPopup({ type:'error', title:'ОШИБКА', message:'ЗАПИСЬ ВИДЕО НЕ ПОДДЕРЖИВАЕТСЯ НА ЭТОМ УСТРОЙСТВЕ.' });
     return;
   }
 
@@ -2557,7 +2557,7 @@ function saveVideo(){
     });
   } catch (e) {
     console.warn('MediaRecorder error:', e);
-    showAsciiPopup({ type:'error', title:'ОШИБКА ЗАПИСИ', message:'БРАУЗЕР НЕ ДАЛ ЗАПИСАТЬ ВИДЕО.', extra:'ПОПРОБУЙТЕ ДРУГОЙ БРАУЗЕР ИЛИ УСТРОЙСТВО.' });
+    showAsciiPopup({ type:'error', title:'ОШИБКА ЗАПИСИ', message:'БРАУЗЕР НЕ ДАЛ ЗАПИСАТЬ ВИДЕО.', extra:'ПОПРОБУЙ ДРУГОЙ БРАУЗЕР ИЛИ УСТРОЙСТВО.' });
     return;
   }
 
@@ -2750,9 +2750,9 @@ async function downloadBlob(blob, filename) {
       if (res.status === 402 || json?.error === 'INSUFFICIENT_FUNDS') {
         showAsciiPopup({
           type: 'error',
-          title: 'НЕДОСТАТОЧНО ИМПУЛЬСОВ',
-          message: `ТРЕБУЕТСЯ: ${json?.need ?? (state.mode==='video'?15:5)}`,
-          extra: `ТЕКУЩИЙ ЗАПАС: ${json?.balance ?? '—'}`
+          title: 'НЕДОСТАТОЧНО ЭНЕРГИИ',
+          message: `ДЛЯ ПРЕОБРЗОВАНИЯ ТРЕБУЕТСЯ: ${json?.need ?? (state.mode==='video'?15:5)}`,
+          extra: `В ЭНЕРГОХРАНИЛИЩЕ: ${json?.balance ?? '—'}`
         });
         return; // без локального сохранения
       }
@@ -2784,7 +2784,7 @@ async function downloadBlob(blob, filename) {
         message: (e?.name === 'AbortError')
           ? 'СЕРВЕР ОТВЕЧАЛ СЛИШКОМ ДОЛГО.'
           : (e?.message || 'СЕТЕВАЯ ОШИБКА.'),
-        extra: 'ПРОВЕРЬТЕ ЧАТ — ФАЙЛ МОГ УЖЕ ПРИЙТИ.'
+        extra: 'ПРОВЕРЬ ЧАТ — ФАЙЛ МОГ УЖЕ ПРИЙТИ.'
       });
       return;
 
