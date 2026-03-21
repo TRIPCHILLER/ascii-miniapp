@@ -1446,7 +1446,7 @@ if (name.includes('notallowed'))
   if (name.includes('notfound') || name.includes('overconstrained'))
     return { 
       title: 'МНЕ НЕЧЕМ СМОТРЕТЬ...',
-      message: 'ВЕРОЯТНО, ТЫ ОТКЛЮЧИЛ МОИ ГЛАЗА'
+      message: 'ВЕРОЯТНО, ТЫ ОТКЛЮЧИЛ МОИ ГЛАЗА',
       extra: 'ИЛИ У ТЕБЯ ИХ И НЕ БЫЛО?...'
     };
 
@@ -1459,12 +1459,12 @@ if (name.includes('notallowed'))
   if (name.includes('security'))
     return { 
       title: 'БЛОКИРОВКА БЕЗОПАСНОСТИ',
-      message: 'ЗАПУСТИ МЕНЯ В ЗАЩИЩЕННОМ КОНТЕКСТЕ HTTPS И ПРОВЕРЬ ПРАВА.'
+      message: 'ЗАПУСТИ МЕНЯ В ЗАЩИЩЕННОМ КОНТЕКСТЕ HTTPS И ПРОВЕРЬ ПРАВА'
     };
 
   return { 
     title: 'НЕИЗВЕСТНАЯ ОШИБКА',
-    message: 'ЭТО РЕДКОСТЬ... НО НЕ ПРИЯТНАЯ.'
+    message: 'ЭТО РЕДКОСТЬ... НО НЕ ПРИЯТНАЯ.',
     extra: 'ПОПРОБУЙ ПЕРЕЗАПУСТИ ЯДРО'
   };
 }
