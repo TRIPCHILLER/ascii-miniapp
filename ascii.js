@@ -1410,7 +1410,22 @@ function showAsciiPopup(input = {}) {
   const title = String(input.title || 'ИНФОРМАЦИЯ').trim();
   const message = String(input.message || '').trim();
   const extra = String(input.extra || '').trim();
-  if (input.type === 'error' || input.playErrorSound) {
+  const normalizeMachineText = (value) => String(value || '')
+    .toLocaleUpperCase('ru-RU')
+    // схлопываем многоточия/знаки препинания, чтобы совпадения не зависели от "...", "!!!", "," и т.д.
+    .replace(/[.,!?…:;'"`~_\-()[\]{}\\/|]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const upperTitle = normalizeMachineText(title);
+  const upperMessage = normalizeMachineText(message);
+  const machineErrorPopup = (
+    upperTitle.includes('ТЫ ОТКАЗАЛ МНЕ') ||
+    upperMessage.includes('МНЕ НЕЧЕГО СОХРАНЯТЬ') ||
+    upperTitle.includes('ОШИБКА') ||
+    upperTitle.includes('НЕДОСТАТОЧНО ЭНЕРГИИ') ||
+    upperTitle.includes('СЕТЕВАЯ ОШИБКА')
+  );
+  if (input.type === 'error' || input.playErrorSound || machineErrorPopup) {
     playErrorSound();
   }
 
