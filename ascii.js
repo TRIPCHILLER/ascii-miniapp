@@ -1113,8 +1113,16 @@ function isFullscreenLike() {
   const ASCII_SELECT_FONT_SIZE_PX = 18;
   let asciiSelectOpenedAt = 0;
 
+  function getCharsetTriggerLabel(option){
+    const fullLabel = String(option?.textContent || '').trim();
+    const value = String(option?.value || '');
+    if (!fullLabel) return '';
+    if (value === 'CUSTOM' || fullLabel === 'カタカナ') return fullLabel;
+    return fullLabel.includes('|') ? fullLabel.split('|')[0].trim() : fullLabel;
+  }
+
   function syncAsciiSelectTriggers(){
-    const charsetLabel = String(app.ui.charset?.selectedOptions?.[0]?.textContent || '').trim();
+    const charsetLabel = getCharsetTriggerLabel(app.ui.charset?.selectedOptions?.[0]);
     if (app.ui.charsetTrigger) {
       app.ui.charsetTrigger.textContent = charsetLabel || '—';
       app.ui.charsetTrigger.style.fontSize = `${ASCII_SELECT_FONT_SIZE_PX}px`;
