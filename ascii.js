@@ -1163,13 +1163,26 @@ function isFullscreenLike() {
       fgBox.className = 'ascii-select-popup__color';
       fgBox.style.backgroundColor = palette.text;
 
+      const isNearBlack = (hexColor) => {
+        const hex = String(hexColor || '').trim().replace('#', '');
+        if (hex.length !== 6) return false;
+        const r = parseInt(hex.slice(0, 2), 16);
+        const g = parseInt(hex.slice(2, 4), 16);
+        const b = parseInt(hex.slice(4, 6), 16);
+        if ([r, g, b].some(Number.isNaN)) return false;
+        return r <= 24 && g <= 24 && b <= 24;
+      };
+
+      if (isNearBlack(palette.text)) fgBox.classList.add('is-dark');
+
       const slash = document.createElement('span');
       slash.className = 'ascii-select-popup__slash';
-      slash.textContent = '/';
+      slash.textContent = '+';
 
       const bgBox = document.createElement('span');
       bgBox.className = 'ascii-select-popup__color';
       bgBox.style.backgroundColor = palette.bg;
+      if (isNearBlack(palette.bg)) bgBox.classList.add('is-dark');
 
       paletteWrap.append(fgBox, slash, bgBox);
       row.appendChild(paletteWrap);
