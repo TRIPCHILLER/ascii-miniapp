@@ -2661,6 +2661,45 @@ function saveVideo(){
   
 let uploadInFlight = false;
 
+function getRequiredImpulsesForCapture() {
+  if (isTextMode()) return 1;
+  return (state.mode === 'video') ? 15 : 5;
+}
+
+async function precheckCaptureImpulses() {
+  const tgWebApp = window.Telegram?.WebApp;
+  const telegramId = tgWebApp?.initDataUnsafe?.user?.id;
+  const required = getRequiredImpulsesForCapture();
+
+  if (!telegramId) return true;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/balance?telegramId=${encodeURIComponent(String(telegramId))}`, {
+      method: 'GET',
+      cache: 'no-store'
+    });
+    if (!res.ok) return true;
+
+    const json = await res.json().catch(() => ({}));
+    const balance = Number(json?.balance);
+    if (!Number.isFinite(balance)) return true;
+
+    if (balance < required) {
+      showAsciiPopup({
+        type: 'error',
+        title: 'НЕДОСТАТОЧНО ЭНЕРГИИ',
+        message: `ДЛЯ ПРЕОБРЗОВАНИЯ ТРЕБУЕТСЯ: ${required}`,
+        extra: `В ЭНЕРГОХРАНИЛИЩЕ: ${balance}`
+      });
+      return false;
+    }
+  } catch (err) {
+    console.warn('[balance precheck] failed:', err);
+  }
+
+  return true;
+}
+
 // Универсальная отправка: в Telegram → на сервер; иначе → локальная загрузка
 async function downloadBlob(blob, filename) {
   const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
@@ -4087,6 +4126,9 @@ if (app.ui.flashBtn) {
         let shotPipelineStarted = false;
 
         try {
+          const hasEnoughImpulses = await precheckCaptureImpulses();
+          if (!hasEnoughImpulses) return;
+
           pressOn();
           const sec = state.timerSeconds | 0;
           const hasTimer = sec > 0 && app.ui.timerOverlay && app.ui.timerNumber;
