@@ -4069,6 +4069,15 @@ if (app.ui.flashBtn) {
         e.preventDefault();
         if (state.mode !== 'live') return;
         if (shotLock) return;
+
+        const hasSource = !!currentSource();
+        const hasAsciiFrame = !!(app.out?.textContent || '').trim();
+        if (!hasSource || !hasAsciiFrame) {
+          showAsciiPopup({ type:'info', title:'ЗДЕСЬ ПУСТО...', message:'МНЕ НЕЧЕГО СОХРАНЯТЬ.' });
+          clearShotVisualEffects();
+          return;
+        }
+
         shotLock = true;
         let shotPipelineStarted = false;
 
