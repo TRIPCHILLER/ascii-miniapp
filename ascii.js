@@ -1118,7 +1118,7 @@ function isFullscreenLike() {
     const value = String(option?.value || '');
     if (!fullLabel) return '';
     if (value === 'CUSTOM' || fullLabel === 'カタカナ') return fullLabel;
-    return fullLabel.includes('|') ? fullLabel.split('|')[0].trim() : fullLabel;
+    return fullLabel.split(/[|│]/)[0].trim();
   }
 
   function syncAsciiSelectTriggers(){
