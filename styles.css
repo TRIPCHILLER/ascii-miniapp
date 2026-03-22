@@ -1300,7 +1300,7 @@ body.visor-text #textSizeWrap{display:flex !important;}
   background:#000;
   color:#fff;
   font-family:'PxPlus IBM VGA','BetterVCR',monospace;
-  font-size:22px;
+  font-size:24px;
   line-height:1;
   text-align:left;
 }
