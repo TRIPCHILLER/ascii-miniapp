@@ -1390,11 +1390,18 @@ function currentSource(){
 let asciiPopupCloseHandlerBound = false;
 let asciiPopupLastFocusedEl = null;
 
+function resetCamShutterPressedState() {
+  if (!app?.ui?.camShutter || !app?.ui?.camBtnCore) return;
+  app.ui.camBtnCore.src = 'assets/camera_button.svg';
+  app.ui.camShutter.classList.remove('active');
+}
+
 function hideAsciiPopup() {
   const popup = app.ui.asciiPopup;
   if (!popup) return;
   popup.hidden = true;
   document.body.classList.remove('ascii-popup-open');
+  resetCamShutterPressedState();
   if (asciiPopupLastFocusedEl && typeof asciiPopupLastFocusedEl.focus === 'function') {
     try { asciiPopupLastFocusedEl.focus({ preventScroll: true }); } catch (_) {}
   }
@@ -4057,10 +4064,7 @@ if (app.ui.flashBtn) {
         app.ui.camBtnCore.src = 'assets/camera_button_active.svg';
         app.ui.camShutter.classList.add('active');
       };
-      const pressOff = () => {
-        app.ui.camBtnCore.src = 'assets/camera_button.svg';
-        app.ui.camShutter.classList.remove('active');
-      };
+      const pressOff = () => resetCamShutterPressedState();
 
       let shotLock = false;
       const shutterSound = new Audio('assets/sounds/camerashuttersoundwithdelay.mp3');
@@ -4073,6 +4077,7 @@ if (app.ui.flashBtn) {
         const hasSource = !!currentSource();
         const hasAsciiFrame = !!(app.out?.textContent || '').trim();
         if (!hasSource || !hasAsciiFrame) {
+          pressOff();
           showAsciiPopup({ type:'info', title:'ЗДЕСЬ ПУСТО...', message:'МНЕ НЕЧЕГО СОХРАНЯТЬ.' });
           clearShotVisualEffects();
           return;
