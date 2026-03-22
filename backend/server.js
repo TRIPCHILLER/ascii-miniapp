@@ -1383,7 +1383,7 @@ if (/^\/all(?:@[\w_]+)?\s+([\s\S]+)$/i.test(text)) {
 ⠀
 <blockquote><b>ИМПУJIЬС = ЗВЕЗДА</b>
 ⠀
-<b>ТЕКСТ = 1 ИМПУJIЬС</b>
+<b>Т3КСТ-4РТ = 1 ИМПУJIЬС</b>
 <b>Ф0Т0 = 5 ИМПУJIЬС0В</b>
 <b>ВИД30 = 15 ИМПУJIЬС0В</b></blockquote>`,
     { parse_mode: 'HTML', reply_markup: JSON.stringify(kb) });
