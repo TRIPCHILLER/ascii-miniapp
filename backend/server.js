@@ -263,9 +263,7 @@ function HELP_HTML() {
 ⠀
 <b>«FPS»</b> — регулирует частоту обновления кадров: скорость, с которой Ядро реагирует на мир
 </blockquote>
-⠀
 <blockquote><b>«СКРЫТЬ»</b> — прячет интерфейс, оставляя чистый поток данных</blockquote>
-⠀
 <blockquote><b>«С0ХР4НИТЬ» </b> — запускает преобразование и отправляет результат в чат</blockquote>
 <blockquote expandable="true">
 <b>: : ПАНЕЛЬ РЕЖИМОВ : :</b>
@@ -1200,6 +1198,7 @@ if (text === '/referal' || text === '/referral') {
   const link = `https://t.me/${botUsername}?start=ref_${fromId}`;
   const msgHtml = 
 `<b>РАСПРОСТРАНЯЙ ЯДРО:</b>
+⠀
 <code>${link}</code>
 За каждого приведённого адепта, который активирует ядро по твоей ссылке и впервые сгенерирует файл/видео:
 <blockquote>— система выдаст тебе <code>+[15]</code> импульсов сразу
