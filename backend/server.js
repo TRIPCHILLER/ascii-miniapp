@@ -191,6 +191,7 @@ function WELCOME_HTML(name) {
 Изменяй параметры и режимы отображения реальности панелями сверху и снизу.
 ⠀
 <blockquote expandable="true"><b>Узнать больше о работе ядра и дополнительные команды:</b>
+⠀
 <b>/balance</b> — доступная энергия
 <b>/help</b> — манифест по управлению ядром
 <b>/buy_energy</b> — пополнить запасы энергии
@@ -1377,7 +1378,10 @@ if (/^\/all(?:@[\w_]+)?\s+([\s\S]+)$/i.test(text)) {
       };
      await sendMessage(fromId, `
     <b>ЯДРО ПИТАЕТСЯ ЭНЕРГИЕЙ:</b>
+⠀
 <blockquote><b>ИМПУJIЬС = ЗВЕЗДА</b>
+⠀
+<b>ТЕКСТ = 1 ИМПУJIЬС</b>
 <b>Ф0Т0 = 5 ИМПУJIЬС0В</b>
 <b>ВИД30 = 15 ИМПУJIЬС0В</b></blockquote>`,
     { parse_mode: 'HTML', reply_markup: JSON.stringify(kb) });
