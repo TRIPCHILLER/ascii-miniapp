@@ -67,7 +67,8 @@
       <!-- 1) НАБОР -->
       <div id="charsetRow" class="select-trigger-row">
         <span>Н4Б0Р:</span>
-        <select id="charset">
+        <button type="button" id="charsetTrigger" class="ascii-select-trigger"></button>
+        <select id="charset" aria-hidden="true" tabindex="-1">
           <option value='@%#*+=-:. '>CL4SS1C</option>
           <option value='01²346⁷𝟴⁸9+. ,'>NUMB3RS</option>
           <option value='Ａ 𝗠  E ᶠ ᵖ ⁱ t  x  ᶻ . , y W . '>L4T1N</option>
@@ -109,7 +110,8 @@
       <!-- 5) СТИЛЬ -->
       <div id="styleRow" class="select-trigger-row">
         <span>СТИЛЬ:</span>
-        <select id="stylePreset"></select>
+        <button type="button" id="styleTrigger" class="ascii-select-trigger"></button>
+        <select id="stylePreset" aria-hidden="true" tabindex="-1"></select>
       </div>
 
       <!-- 6) ОТДЕЛЬНАЯ СТРОКА — ТЕКСТ + ФОН -->
@@ -267,6 +269,14 @@
   <div class="ascii-popup__dialog" role="dialog" aria-modal="true" aria-live="polite">
     <div id="asciiPopupText" class="ascii-popup__text"></div>
     <button type="button" id="asciiPopupClose" class="ascii-popup__close">[ЗАКРЫТЬ]</button>
+  </div>
+</div>
+
+<div id="asciiSelectPopup" class="ascii-select-popup" hidden>
+  <div class="ascii-select-popup__backdrop"></div>
+  <div class="ascii-select-popup__dialog" role="dialog" aria-modal="true">
+    <div id="asciiSelectPopupTitle" class="ascii-select-popup__title"></div>
+    <div id="asciiSelectPopupList" class="ascii-select-popup__list" role="listbox"></div>
   </div>
 </div>
 <script src="https://unpkg.com/gifuct-js@1.0.0/dist/gifuct-js.min.js"></script>

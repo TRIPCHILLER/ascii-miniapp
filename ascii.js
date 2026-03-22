@@ -107,10 +107,12 @@ function busyHide(force = false){
       fg:       $('#fg'),
       bg:       $('#bg'),
       charset:  $('#charset'),
+      charsetTrigger: $('#charsetTrigger'),
       customCharset: $('#charset_custom'),
       invert:   $('#invert'),
       fs:       $('#fs'),
       style:    $('#stylePreset'),
+      styleTrigger: $('#styleTrigger'),
       styleRow: $('#styleRow'),
       modeChooser: $('#modeChooser'),
       startDateTime: $('#startDateTime'),
@@ -147,6 +149,9 @@ function busyHide(force = false){
     timerOffIcon: $('#timerOffIcon'),
     timer3Icon:   $('#timer3Icon'),
     timer10Icon:  $('#timer10Icon'),
+    asciiSelectPopup: $('#asciiSelectPopup'),
+    asciiSelectPopupTitle: $('#asciiSelectPopupTitle'),
+    asciiSelectPopupList: $('#asciiSelectPopupList'),
     // оверлей отсчёта
     timerOverlay: $('#camTimerOverlay'),
     timerNumber:  $('#camTimerNumber'),
@@ -1046,15 +1051,15 @@ function isFullscreenLike() {
 { id:'zenith',     name:'Z3NITH ZVM 1240',      colors:['#3f291e', '#fdca55'] },
 { id:'obra',       name:'0BR4 DINN',            colors:['#000b40', '#ebe1cd'] },
 { id:'ibm8503',    name:'IBM 8503',             colors:['#2e3037', '#ebe5ce'] },
-{ id:'commodore',  name:'C0MM0D0R3 1084',       colors:['#40318e', '#88d7de'] },
+{ id:'commodore',  name:'C0MM0D0R3',            colors:['#40318e', '#88d7de'] },
 { id:'ibm5151',    name:'IBM 5151',             colors:['#25342f', '#01eb5f'] },
 { id:'matrix',     name:'M4TRIX',               colors:['#000000', '#00ff40'] },
 { id:'casio',      name:'C4SI0',                colors:['#000000', '#83b07e'] },
 { id:'funkyjam',   name:'FUNKY J4M',            colors:['#920244', '#fec28c'] },
 { id:'cornsole',   name:'C0RNS0L3',             colors:['#6495ed', '#fff8dc'] },
-{ id:'postapoc',   name:'P0ST4P0C SUNS3T',      colors:['#1d0f44', '#f44e38'] },
-{ id:'laughcry',   name:'P0P L4UGH CRY',        colors:['#452f47', '#d7bcad'] },
-{ id:'flowers',    name:'FL0W3RS 4ND 4SB3ST0S', colors:['#c62b69', '#edf4ff'] },
+{ id:'postapoc',   name:'P0ST4P0C SUN',         colors:['#1d0f44', '#f44e38'] },
+{ id:'laughcry',   name:'L4UGH CRY',            colors:['#452f47', '#d7bcad'] },
+{ id:'flowers',    name:'FL0W3R DUST',          colors:['#c62b69', '#edf4ff'] },
 { id:'pepper1bit', name:'1BIT P3PP3R',          colors:['#100101', '#ebb5b5'] },
 { id:'shapebit',   name:'SH4P3 BIT',            colors:['#200955', '#ff0055'] },
 { id:'chasing',    name:'CH4SING LIGHT',        colors:['#000000', '#ffff02'] },
@@ -1088,11 +1093,12 @@ function isFullscreenLike() {
     app.ui.style.innerHTML='';
     const opt = new Option(CUSTOM_LABEL,'custom'); app.ui.style.append(opt);
     PRESETS.forEach(p=> app.ui.style.append(new Option(p.name,p.id)));
+    syncAsciiSelectTriggers();
   }
   function applyPreset(id){
     if(!app.ui.style) return;
-    if(id==='custom'){ app.ui.style.value='custom'; return; }
-    const p = PRESETS.find(x=>x.id===id); if(!p){ app.ui.style.value='custom'; return; }
+    if(id==='custom'){ app.ui.style.value='custom'; syncAsciiSelectTriggers(); return; }
+    const p = PRESETS.find(x=>x.id===id); if(!p){ app.ui.style.value='custom'; syncAsciiSelectTriggers(); return; }
     const {bg,text}=splitToBgText(p.colors);
     // обновим state и UI как при ручном выборе цвета
     state.color = toHex(text); state.background = toHex(bg);
@@ -1101,6 +1107,146 @@ function isFullscreenLike() {
     app.out.style.backgroundColor = state.background;
     app.stage.style.backgroundColor = state.background;
     app.ui.style.value = id;
+    syncAsciiSelectTriggers();
+  }
+
+  const ASCII_SELECT_FONT_SIZE_PX = 18;
+  let asciiSelectOpenedAt = 0;
+
+  function syncAsciiSelectTriggers(){
+    const charsetLabel = String(app.ui.charset?.selectedOptions?.[0]?.textContent || '').trim();
+    if (app.ui.charsetTrigger) {
+      app.ui.charsetTrigger.textContent = charsetLabel || '—';
+      app.ui.charsetTrigger.style.fontSize = `${ASCII_SELECT_FONT_SIZE_PX}px`;
+    }
+
+    const styleLabel = String(app.ui.style?.selectedOptions?.[0]?.textContent || '').trim();
+    if (app.ui.styleTrigger) {
+      app.ui.styleTrigger.textContent = styleLabel || CUSTOM_LABEL;
+      app.ui.styleTrigger.style.fontSize = `${ASCII_SELECT_FONT_SIZE_PX}px`;
+    }
+  }
+
+  function createAsciiSelectCheck(isSelected){
+    const check = document.createElement('span');
+    check.className = 'ascii-select-popup__check';
+    if (isSelected) check.classList.add('is-selected');
+    check.setAttribute('aria-hidden', 'true');
+    return check;
+  }
+
+  function buildAsciiSelectRow({ label, isSelected, onClick, isKatakana = false, palette = null }){
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'ascii-select-popup__row';
+
+    const labelEl = document.createElement('span');
+    labelEl.className = `ascii-select-popup__row-label${isKatakana ? ' ascii-select-popup__row-label--katakana' : ''}`;
+
+    if (isKatakana) {
+      const img = document.createElement('img');
+      img.className = 'ascii-select-popup__katakana';
+      img.src = 'assets/katakana.svg';
+      img.alt = 'カタカナ';
+      labelEl.appendChild(img);
+    } else {
+      labelEl.textContent = label;
+    }
+
+    row.appendChild(labelEl);
+
+    if (palette) {
+      const paletteWrap = document.createElement('span');
+      paletteWrap.className = 'ascii-select-popup__palette';
+
+      const fgBox = document.createElement('span');
+      fgBox.className = 'ascii-select-popup__color';
+      fgBox.style.backgroundColor = palette.text;
+
+      const slash = document.createElement('span');
+      slash.className = 'ascii-select-popup__slash';
+      slash.textContent = '/';
+
+      const bgBox = document.createElement('span');
+      bgBox.className = 'ascii-select-popup__color';
+      bgBox.style.backgroundColor = palette.bg;
+
+      paletteWrap.append(fgBox, slash, bgBox);
+      row.appendChild(paletteWrap);
+    } else {
+      row.appendChild(document.createElement('span'));
+    }
+
+    row.appendChild(createAsciiSelectCheck(isSelected));
+    row.addEventListener('click', onClick);
+    return row;
+  }
+
+  function closeAsciiSelectPopup(){
+    if (!app.ui.asciiSelectPopup) return;
+    app.ui.asciiSelectPopup.hidden = true;
+    document.body.classList.remove('ascii-popup-open');
+  }
+
+  function openAsciiSelectPopup(type){
+    if (!app.ui.asciiSelectPopup || !app.ui.asciiSelectPopupList) return;
+    const list = app.ui.asciiSelectPopupList;
+    list.innerHTML = '';
+
+    if (type === 'charset') {
+      Array.from(app.ui.charset?.options || []).forEach((option) => {
+        const isKatakana = !isTextMode() && option.textContent === 'カタカナ';
+        const row = buildAsciiSelectRow({
+          label: option.textContent,
+          isSelected: app.ui.charset.value === option.value,
+          isKatakana,
+          onClick: () => {
+            app.ui.charset.value = option.value;
+            app.ui.charset.dispatchEvent(new Event('change', { bubbles: true }));
+            syncAsciiSelectTriggers();
+            closeAsciiSelectPopup();
+          }
+        });
+        list.appendChild(row);
+      });
+    } else if (type === 'style') {
+      const selectedValue = app.ui.style?.value || 'custom';
+      const customRow = buildAsciiSelectRow({
+        label: CUSTOM_LABEL,
+        isSelected: selectedValue === 'custom',
+        onClick: () => {
+          app.ui.style.value = 'custom';
+          app.ui.style.dispatchEvent(new Event('change', { bubbles: true }));
+          syncAsciiSelectTriggers();
+          closeAsciiSelectPopup();
+        }
+      });
+      list.appendChild(customRow);
+
+      PRESETS.forEach((preset) => {
+        const colors = splitToBgText(preset.colors);
+        const row = buildAsciiSelectRow({
+          label: preset.name,
+          isSelected: selectedValue === preset.id,
+          palette: { text: toHex(colors.text), bg: toHex(colors.bg) },
+          onClick: () => {
+            app.ui.style.value = preset.id;
+            app.ui.style.dispatchEvent(new Event('change', { bubbles: true }));
+            syncAsciiSelectTriggers();
+            closeAsciiSelectPopup();
+          }
+        });
+        list.appendChild(row);
+      });
+    }
+
+    if (app.ui.asciiSelectPopupTitle) {
+      app.ui.asciiSelectPopupTitle.textContent = type === 'charset' ? 'Н4Б0Р' : 'СТИЛЬ';
+      app.ui.asciiSelectPopupTitle.style.fontSize = `${ASCII_SELECT_FONT_SIZE_PX}px`;
+    }
+    asciiSelectOpenedAt = Date.now();
+    app.ui.asciiSelectPopup.hidden = false;
+    document.body.classList.add('ascii-popup-open');
   }
 
   // Вспомогательные канвасы
@@ -1622,6 +1768,7 @@ if (state.transparentBg) {
     fillStyleSelect();
     const matched = detectPreset(state.color, state.background);
     if (app.ui.style) app.ui.style.value = matched === 'custom' ? 'custom' : matched;
+    syncAsciiSelectTriggers();
     syncFpsVisibility(); // обновим видимость FPS на старте
   }
 
@@ -3763,6 +3910,33 @@ function layoutSettingsPanel() {
   // @section UI_BINDINGS
   function bindUI() {
     bindWorkUiClickSoundOnce();
+
+    if (app.ui.charsetTrigger) {
+      app.ui.charsetTrigger.addEventListener('click', (e) => {
+        e.preventDefault();
+        openAsciiSelectPopup('charset');
+      });
+    }
+
+    if (app.ui.styleTrigger) {
+      app.ui.styleTrigger.addEventListener('click', (e) => {
+        e.preventDefault();
+        openAsciiSelectPopup('style');
+      });
+    }
+
+    if (app.ui.asciiSelectPopup) {
+      const popupBackdrop = app.ui.asciiSelectPopup.querySelector('.ascii-select-popup__backdrop');
+      popupBackdrop?.addEventListener('click', () => {
+        if (Date.now() - asciiSelectOpenedAt < 160) return;
+        closeAsciiSelectPopup();
+      });
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      if (!app.ui.asciiSelectPopup?.hidden) closeAsciiSelectPopup();
+    });
 // Показ/скрытие панели
 // Показ/скрытие панели
 app.ui.toggle.addEventListener('click', () => {
@@ -3975,12 +4149,13 @@ app.ui.flip.addEventListener('click', async () => {
       app.ui.fpsVal.textContent = state.fps;
     });
 
-    if(app.ui.style){ app.ui.style.addEventListener('change', e => { applyPreset(e.target.value); }); }
+    if(app.ui.style){ app.ui.style.addEventListener('change', e => { applyPreset(e.target.value); syncAsciiSelectTriggers(); }); }
 
     app.ui.fg.addEventListener('input', e => {
       state.color = e.target.value;
       app.out.style.color = state.color;
       if(app.ui.style){ const m = detectPreset(state.color, state.background); app.ui.style.value = (m==='custom'?'custom':m); }
+      syncAsciiSelectTriggers();
     });
     
 app.ui.bg.addEventListener('input', e => {
@@ -3997,6 +4172,7 @@ app.ui.bg.addEventListener('input', e => {
     const m = detectPreset(state.color, state.background);
     app.ui.style.value = (m==='custom'?'custom':m);
   }
+  syncAsciiSelectTriggers();
 });
 
 // Перехватываем нативный color-picker и открываем наш кастомный:
@@ -4806,6 +4982,7 @@ else {
   ROTATE_PALETTE  = false;
 }
 updateBinsForCurrentCharset();
+syncAsciiSelectTriggers();
 
 });
 

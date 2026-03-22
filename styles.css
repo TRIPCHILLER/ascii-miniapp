@@ -1219,17 +1219,145 @@ body.visor-text #textSizeWrap{display:flex !important;}
 
 #charset,
 #stylePreset{
-  display:inline;
-  width:auto;
-  min-width:0;
-  flex:0 0 auto;
-  padding:0;
-  margin:0;
+  position:absolute;
+  width:1px;
+  height:1px;
+  opacity:0;
+  pointer-events:none;
 }
 
 #charsetRow,
 #styleRow{
   width:auto !important;
+}
+
+.ascii-select-trigger{
+  display:inline-flex;
+  align-items:center;
+  justify-content:flex-start;
+  min-width:0;
+  padding:0;
+  margin:0;
+  border:0;
+  background:transparent;
+  color:#fff;
+  font-family:'PxPlus IBM VGA','BetterVCR',monospace;
+  font-size:18px;
+  line-height:1.2;
+  text-transform:none;
+}
+
+.ascii-select-popup{
+  position:fixed;
+  inset:0;
+  z-index:100100;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+}
+
+.ascii-select-popup[hidden]{
+  display:none !important;
+}
+
+.ascii-select-popup__backdrop{
+  position:absolute;
+  inset:0;
+  background:rgba(0,0,0,.7);
+}
+
+.ascii-select-popup__dialog{
+  position:relative;
+  width:min(92vw, 640px);
+  max-height:min(80vh, 760px);
+  overflow:auto;
+  background:#000;
+  border:2px solid #fff;
+  color:#fff;
+  font-family:'PxPlus IBM VGA','BetterVCR',monospace;
+}
+
+.ascii-select-popup__title{
+  display:none;
+}
+
+.ascii-select-popup__list{
+  display:flex;
+  flex-direction:column;
+}
+
+.ascii-select-popup__row{
+  width:100%;
+  min-height:64px;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto auto;
+  align-items:center;
+  gap:16px;
+  padding:0 18px;
+  border:0;
+  border-top:2px solid #fff;
+  background:#000;
+  color:#fff;
+  font-family:'PxPlus IBM VGA','BetterVCR',monospace;
+  font-size:18px;
+  line-height:1;
+  text-align:left;
+}
+
+.ascii-select-popup__row:first-child{
+  border-top:0;
+}
+
+.ascii-select-popup__row-label{
+  min-width:0;
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:clip;
+}
+
+.ascii-select-popup__row-label--katakana{
+  display:flex;
+  align-items:center;
+}
+
+.ascii-select-popup__katakana{
+  display:block;
+  width:auto;
+  height:26px;
+}
+
+.ascii-select-popup__check{
+  width:28px;
+  height:28px;
+  border:2px solid #fff;
+  background:#000;
+  flex:0 0 28px;
+}
+
+.ascii-select-popup__check.is-selected{
+  background:#fff;
+}
+
+.ascii-select-popup__palette{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:8px;
+  width:132px;
+  flex:0 0 132px;
+}
+
+.ascii-select-popup__slash{
+  color:#fff;
+}
+
+.ascii-select-popup__color{
+  width:28px;
+  height:28px;
+  border:2px solid #fff;
+  background:#000;
+  box-sizing:border-box;
 }
 
 .ascii-popup{
