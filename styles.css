@@ -751,7 +751,7 @@ body:not(.visor-text)[data-mode="live"] .cam-controls{
 }
 #cp-modal .cp-card{
   position:relative; width:92vw; max-width:420px;
-  background:#2a2a2a; color:#fff; border-radius:12px; padding:16px;
+  background:#2a2a2a; color:#fff; border-radius:0; padding:16px;
   box-shadow:0 10px 40px rgba(0,0,0,.5);
 }
 #cp-modal .cp-title{ font-size:18px; margin-bottom:10px; }
@@ -791,7 +791,7 @@ background:#fff; }
   border:0;
   padding:.4rem .6rem;
   font-family:'PixPlus', monospace;
-  font-size:14px;              /* тот же размер, что и у вкладок */
+  font-size:21px;
   text-transform:uppercase;
   letter-spacing:0.06em;
 
@@ -851,6 +851,7 @@ background:#fff; }
   align-items:center;
   line-height:20px;      /* высота текста = высоте квадрата */
   font-family:'PixPlus', monospace;
+  font-size:21px;
 }
 
 /* чёрный квадрат */
@@ -975,7 +976,7 @@ body.flash-front-ui input[type="range"]::-ms-thumb {
 /* === Color Picker: вкладки и сетка === */
 .cp-card{
   background:#181818;
-  border-radius:16px;
+  border-radius:0;
   padding:14px 16px 12px;
   max-width:360px;
   width:100%;
@@ -987,7 +988,7 @@ body.flash-front-ui input[type="range"]::-ms-thumb {
   display:flex;
   margin-bottom:10px;
   font-family:'PixPlus', monospace;
-  font-size:14px;
+  font-size:28px;
   letter-spacing:0.06em;
   text-transform:uppercase;
   justify-content:space-between;
@@ -1004,7 +1005,7 @@ body.flash-front-ui input[type="range"]::-ms-thumb {
 
   /* Гарантируем фирменный шрифт и капс прямо на кнопке */
   font-family:'PixPlus', monospace !important;
-  font-size:14px;
+  font-size:28px;
   text-transform:uppercase;
   letter-spacing:0.06em;
 }
