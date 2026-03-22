@@ -4134,7 +4134,7 @@ if (app.ui.flashBtn) {
           const hasTimer = sec > 0 && app.ui.timerOverlay && app.ui.timerNumber;
 
           if (hasTimer) {
-            // показываем крупные цифры по центру
+            // показываем крупные цифры по центру и затемняем рабочую область
             app.ui.timerOverlay.hidden = false;
 
             for (let s = sec; s > 0; s--) {
@@ -4144,12 +4144,7 @@ if (app.ui.flashBtn) {
               await new Promise(res => setTimeout(res, 1000));
             }
 
-            // показываем "0" в финале отсчёта и сразу выполняем кадр
-            app.ui.timerNumber.textContent = '0';
-            // eslint-disable-next-line no-await-in-loop
-            await new Promise(res => setTimeout(res, 180));
-
-            // убираем цифры перед фактическим сохранением
+            // не показываем "0": сразу скрываем таймер перед фактическим capture
             app.ui.timerOverlay.hidden = true;
             app.ui.timerNumber.textContent = '';
           }
@@ -4178,6 +4173,8 @@ if (app.ui.flashBtn) {
           console.error('[camShot]', err);
           if (!shotPipelineStarted) clearShotVisualEffects();
         } finally {
+          if (app.ui.timerOverlay) app.ui.timerOverlay.hidden = true;
+          if (app.ui.timerNumber) app.ui.timerNumber.textContent = '';
           setTimeout(pressOff, 180);
           setTimeout(() => { shotLock = false; }, 400);
         }
