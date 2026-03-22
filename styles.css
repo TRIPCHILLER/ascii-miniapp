@@ -905,19 +905,16 @@ background:#fff; }
 
 /* === Оверлей таймера камеры === */
 #camTimerOverlay {
-  position: fixed;
+  position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
   pointer-events: none;
   z-index: 4; /* выше ASCII-текста, ниже busy-оверлея */
+  background: rgba(0, 0, 0, 0.5);
 }
 
 #camTimerNumber {
-  position: fixed;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
   display: block;
   width: 2ch;
   text-align: center;
@@ -926,9 +923,7 @@ background:#fff; }
   color: #fff;
   line-height: 1;
   letter-spacing: 0;
-  text-shadow:
-    0 0 10px rgba(0,0,0,.9),
-    0 0 25px rgba(0,0,0,.9);
+  text-shadow: none;
 }
 
 /* Панель настроек как оверлей: не двигает сцену.
