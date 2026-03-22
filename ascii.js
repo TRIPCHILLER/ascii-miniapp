@@ -4083,15 +4083,6 @@ if (app.ui.flashBtn) {
 
         try {
           pressOn();
-          const frozenFrame = captureFrozenFrameNow();
-          if (frozenFrame) showFrozenFrameOverlay(frozenFrame);
-          playShutterFlash();
-          shutterSound.currentTime = 0;
-          const playPromise = shutterSound.play();
-          if (playPromise && typeof playPromise.catch === 'function') {
-            playPromise.catch(() => {});
-          }
-
           const sec = state.timerSeconds | 0;
           const hasTimer = sec > 0 && app.ui.timerOverlay && app.ui.timerNumber;
 
@@ -4106,9 +4097,23 @@ if (app.ui.flashBtn) {
               await new Promise(res => setTimeout(res, 1000));
             }
 
-            // убираем цифры
+            // показываем "0" в финале отсчёта и сразу выполняем кадр
+            app.ui.timerNumber.textContent = '0';
+            // eslint-disable-next-line no-await-in-loop
+            await new Promise(res => setTimeout(res, 180));
+
+            // убираем цифры перед фактическим сохранением
             app.ui.timerOverlay.hidden = true;
             app.ui.timerNumber.textContent = '';
+          }
+
+          const frozenFrame = captureFrozenFrameNow();
+          if (frozenFrame) showFrozenFrameOverlay(frozenFrame);
+          playShutterFlash();
+          shutterSound.currentTime = 0;
+          const playPromise = shutterSound.play();
+          if (playPromise && typeof playPromise.catch === 'function') {
+            playPromise.catch(() => {});
           }
 
           dbgState('doShot.enter', { isTextMode: isTextMode(), visorMode: state.visorMode, mode: state.mode });

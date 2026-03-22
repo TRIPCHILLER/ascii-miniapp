@@ -915,10 +915,11 @@ background:#fff; }
 }
 
 #camTimerNumber {
-  font-family: 'PxPlus IBM VGA', monospace;
-  font-size: clamp(64px, 20vw, 140px);
+  font-family: 'PixPlus', monospace;
+  font-size: clamp(160px, 50vh, 56vh);
   color: #fff;
-  letter-spacing: 0.12em;
+  line-height: 1;
+  letter-spacing: 0.04em;
   text-shadow:
     0 0 10px rgba(0,0,0,.9),
     0 0 25px rgba(0,0,0,.9);
