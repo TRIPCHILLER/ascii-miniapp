@@ -3325,12 +3325,12 @@ syncBgPaletteLock();
   if (app.ui.camControls) {
     app.ui.camControls.hidden = (newMode !== 'live');
   }
-  // таймер-оверлей скрываем, если мы не в live
+  // таймер-оверлей должен быть виден только в момент обратного отсчёта
   if (app.ui.timerOverlay) {
-    app.ui.timerOverlay.hidden = (newMode !== 'live');
-    if (newMode !== 'live' && app.ui.timerNumber) {
-      app.ui.timerNumber.textContent = '';
-    }
+    app.ui.timerOverlay.hidden = true;
+  }
+  if (app.ui.timerNumber) {
+    app.ui.timerNumber.textContent = '';
   }
   if (newMode !== 'live') clearShotVisualEffects();
 
