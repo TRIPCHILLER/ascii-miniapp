@@ -47,7 +47,7 @@ img, video, canvas, pre {
 
 /* ===== ТУЛБАР ===== */
 .toolbar {
-  display:flex; gap:8px; align-items:center;
+  display:flex; gap:0; align-items:center;
   justify-content:center;
   padding:10px;
   background:#000; 
@@ -56,14 +56,20 @@ img, video, canvas, pre {
 #flip,
 #toggle,
 #fs{
+  flex:1 1 0;
   background:#000;
   color:#fff;
   border-style:solid;
-  border-width:1px;
+  border-width:2px 2px 2px 0;
   border-top-color:var(--vintage-light);
   border-left-color:var(--vintage-light);
   border-right-color:var(--vintage-dark);
   border-bottom-color:var(--vintage-dark);
+  padding:.48rem .95rem;
+}
+
+#flip{
+  border-left-width:2px;
 }
 
 #flip:active,
@@ -204,7 +210,7 @@ button:focus, .btn:focus{
 }
 
 #settings.panel #resetModeBtn{
-  padding:0;
+  padding:4px 12px;
 }
 
 .panel .row.colors{
@@ -242,11 +248,12 @@ button:focus, .btn:focus{
   background:#000;
   color:#fff;
   border-style:solid;
-  border-width:1px;
+  border-width:2px;
   border-top-color:var(--vintage-light);
   border-left-color:var(--vintage-light);
   border-right-color:var(--vintage-dark);
   border-bottom-color:var(--vintage-dark);
+  padding:4px 12px;
 }
 
 #charsetTrigger:active,
@@ -627,14 +634,14 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   .toolbar {
     display: flex;
     flex-wrap: nowrap;              /* всегда одна строка */
-    justify-content: space-evenly;  /* равные отступы от краёв и между словами */
+    justify-content: center;
     align-items: center;
     padding: 4px 8px;
-    gap: 0;                         /* всё пространство даём space-evenly */
+    gap: 0;
   }
 
   .toolbar .btn {
-    padding: .30rem .35rem;         /* компактнее сами кнопки */
+    padding: .34rem .55rem;
     font-size: 18px;
     letter-spacing: 0.04em;         /* лёгкая разрядка, чтобы не слипалось */
   }
@@ -1283,7 +1290,7 @@ body.visor-text #modeVideo{display:none !important;}
 body.visor-text #colorRow{display:none !important;}
 body.visor-text #textSizeWrap{display:flex !important;}
 .mode-switch-row{display:flex;align-items:center;gap:6px;margin:0;padding:1px 8px;max-width:100%;}
-#resetModeBtn{display:inline-flex;width:auto;flex:0 0 auto;align-self:center;margin:0;padding:0;line-height:inherit;}
+#resetModeBtn{display:inline-flex;width:auto;flex:0 0 auto;align-self:center;margin:0;line-height:inherit;}
 #visorModeStatus{opacity:.9;white-space:nowrap;}
 
 #charset,
@@ -1305,15 +1312,39 @@ body.visor-text #textSizeWrap{display:flex !important;}
   align-items:center;
   justify-content:flex-start;
   min-width:0;
-  padding:0;
+  padding:4px 12px;
   margin:0;
-  border:0;
-  background:transparent;
+  border-style:solid;
+  border-width:2px;
+  border-top-color:var(--vintage-light);
+  border-left-color:var(--vintage-light);
+  border-right-color:var(--vintage-dark);
+  border-bottom-color:var(--vintage-dark);
+  background:#000;
   color:#fff;
   font-family:'PxPlus IBM VGA','BetterVCR',monospace;
   font-size:18px;
   line-height:1.2;
   text-transform:none;
+}
+
+.ascii-select-trigger:active{
+  border-top-color:var(--vintage-dark);
+  border-left-color:var(--vintage-dark);
+  border-right-color:var(--vintage-light);
+  border-bottom-color:var(--vintage-light);
+}
+
+.check-row{
+  width:max-content;
+  max-width:100%;
+  display:flex;
+  gap:6px;
+  align-items:center;
+  flex-wrap:wrap;
+  background:transparent;
+  padding:1px 8px;
+  margin:0;
 }
 
 .ascii-select-popup{
