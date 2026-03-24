@@ -824,7 +824,28 @@ background:#fff; }
 
 /* Квадратные мини-свотчи в панелях */
 .panel .row.colors input[type="color"]{
-  width: 24px; height: 24px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  min-width: 24px;
+  min-height: 24px;
+  aspect-ratio: 1 / 1;
+  box-sizing: border-box;
+  border: 0 !important;
+  border-radius: 0;
+  flex: 0 0 24px;
+  display: block;
+  line-height: 0;
+}
+
+.panel .row.colors input[type="color"]::-webkit-color-swatch-wrapper{
+  padding: 0;
+}
+
+.panel .row.colors input[type="color"]::-webkit-color-swatch,
+.panel .row.colors input[type="color"]::-moz-color-swatch{
+  border: 0;
+  border-radius: 0;
 }
 
 /* Если для #bg в коде поставим класс .transparent — показываем иконку PNG */
