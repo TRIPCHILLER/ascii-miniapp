@@ -9,6 +9,8 @@ html, body, .wrap { overflow-x: hidden; }
   --ui-bg:#151515;     /* тулбар/фон панели */
   --ui-panel:#1b1b1b;  /* карточки внутри панели */
   --ui-text:#ffffff;
+  --vintage-light:#808080;
+  --vintage-dark:#404040;
 }
 
 .wrap{ display:flex; flex-direction:column; height:100%; }
@@ -49,6 +51,28 @@ img, video, canvas, pre {
   justify-content:center;
   padding:10px;
   background:#000; 
+}
+
+#flip,
+#toggle,
+#fs{
+  background:#000;
+  color:#fff;
+  border-style:solid;
+  border-width:1px;
+  border-top-color:var(--vintage-light);
+  border-left-color:var(--vintage-light);
+  border-right-color:var(--vintage-dark);
+  border-bottom-color:var(--vintage-dark);
+}
+
+#flip:active,
+#toggle:active,
+#fs:active{
+  border-top-color:var(--vintage-dark);
+  border-left-color:var(--vintage-dark);
+  border-right-color:var(--vintage-light);
+  border-bottom-color:var(--vintage-light);
 }
 
 /* ===== КНОПКИ — базовая очистка стилей ===== */
@@ -209,6 +233,30 @@ button:focus, .btn:focus{
 }
 .check input[type="checkbox"]{
   display:none;        /* полностью убираем из потока, клики по label всё равно работают */
+}
+
+#charsetTrigger,
+#styleTrigger,
+#resetModeBtn,
+#settings.panel .check{
+  background:#000;
+  color:#fff;
+  border-style:solid;
+  border-width:1px;
+  border-top-color:var(--vintage-light);
+  border-left-color:var(--vintage-light);
+  border-right-color:var(--vintage-dark);
+  border-bottom-color:var(--vintage-dark);
+}
+
+#charsetTrigger:active,
+#styleTrigger:active,
+#resetModeBtn:active,
+#settings.panel .check:active{
+  border-top-color:var(--vintage-dark);
+  border-left-color:var(--vintage-dark);
+  border-right-color:var(--vintage-light);
+  border-bottom-color:var(--vintage-light);
 }
 
 /* ===== СЦЕНА/ВЫВОД ===== */
@@ -1235,7 +1283,7 @@ body.visor-text #modeVideo{display:none !important;}
 body.visor-text #colorRow{display:none !important;}
 body.visor-text #textSizeWrap{display:flex !important;}
 .mode-switch-row{display:flex;align-items:center;gap:6px;margin:0;padding:1px 8px;max-width:100%;}
-#resetModeBtn{display:inline-flex;width:auto;flex:0 0 auto;align-self:center;margin:0;padding:0;border:0;background:transparent;line-height:inherit;}
+#resetModeBtn{display:inline-flex;width:auto;flex:0 0 auto;align-self:center;margin:0;padding:0;line-height:inherit;}
 #visorModeStatus{opacity:.9;white-space:nowrap;}
 
 #charset,
