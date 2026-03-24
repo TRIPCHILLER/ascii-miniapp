@@ -1312,7 +1312,7 @@ body.visor-text #textSizeWrap{display:flex !important;}
   width:100%;
   min-height:64px;
   display:grid;
-  grid-template-columns:minmax(0,1fr) auto auto;
+  grid-template-columns:minmax(0,1fr) auto;
   align-items:center;
   gap:16px;
   padding:0 18px;
@@ -1324,6 +1324,12 @@ body.visor-text #textSizeWrap{display:flex !important;}
   font-size:24px;
   line-height:1;
   text-align:left;
+}
+.ascii-select-popup__row.is-selected,
+.ascii-select-popup__row:hover:not(.is-selected),
+.ascii-select-popup__row:active:not(.is-selected){
+  background:#fff;
+  color:#000;
 }
 
 .ascii-select-popup__row:first-child{
@@ -1348,27 +1354,6 @@ body.visor-text #textSizeWrap{display:flex !important;}
   height:26px;
 }
 
-.ascii-select-popup__check{
-  position:relative;
-  width:28px;
-  height:28px;
-  border:2px solid #fff;
-  background:#000;
-  flex:0 0 28px;
-  box-sizing:border-box;
-}
-
-.ascii-select-popup__check.is-selected{
-  background:#000;
-}
-
-.ascii-select-popup__check.is-selected::after{
-  content:'';
-  position:absolute;
-  inset:4px;
-  background:#fff;
-}
-
 .ascii-select-popup__palette{
   display:flex;
   align-items:center;
@@ -1379,7 +1364,7 @@ body.visor-text #textSizeWrap{display:flex !important;}
 }
 
 .ascii-select-popup__slash{
-  color:#fff;
+  color:currentColor;
 }
 
 .ascii-select-popup__color{
@@ -1392,6 +1377,9 @@ body.visor-text #textSizeWrap{display:flex !important;}
 
 .ascii-select-popup__color.is-dark{
   border:2px solid #fff;
+}
+.ascii-select-popup__row.is-selected .ascii-select-popup__color.is-dark{
+  border:0;
 }
 
 .ascii-popup{
