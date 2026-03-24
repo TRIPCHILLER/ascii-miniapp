@@ -56,7 +56,8 @@ img, video, canvas, pre {
 
 #flip,
 #toggle,
-#fs{
+#fs,
+#save{
   flex:1 1 0;
   background:#000;
   color:#fff;
@@ -73,7 +74,8 @@ img, video, canvas, pre {
 
 #flip:active,
 #toggle:active,
-#fs:active{
+#fs:active,
+#save:active{
   border-top-color:var(--vintage-dark);
   border-left-color:var(--vintage-dark);
   border-right-color:var(--vintage-light);
