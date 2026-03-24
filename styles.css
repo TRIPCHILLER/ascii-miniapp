@@ -1382,6 +1382,16 @@ body.visor-text #textSizeWrap{display:flex !important;}
   border:0;
 }
 
+.ascii-select-popup__color.is-light{
+  border:2px solid #000;
+}
+.ascii-select-popup__row.is-selected .ascii-select-popup__color.is-light,
+.ascii-select-popup__row:hover:not(.is-selected) .ascii-select-popup__color.is-light,
+.ascii-select-popup__row:active:not(.is-selected) .ascii-select-popup__color.is-light{
+  border-color:transparent;
+  box-shadow:inset 0 0 0 2px #000;
+}
+
 .ascii-popup{
   position:fixed;
   inset:0;

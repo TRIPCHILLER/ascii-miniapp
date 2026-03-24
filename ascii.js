@@ -1174,7 +1174,18 @@ function isFullscreenLike() {
         return r <= 24 && g <= 24 && b <= 24;
       };
 
+      const isNearWhite = (hexColor) => {
+        const hex = String(hexColor || '').trim().replace('#', '');
+        if (hex.length !== 6) return false;
+        const r = parseInt(hex.slice(0, 2), 16);
+        const g = parseInt(hex.slice(2, 4), 16);
+        const b = parseInt(hex.slice(4, 6), 16);
+        if ([r, g, b].some(Number.isNaN)) return false;
+        return r >= 231 && g >= 231 && b >= 231;
+      };
+
       if (isNearBlack(palette.text)) fgBox.classList.add('is-dark');
+      if (isNearWhite(palette.text)) fgBox.classList.add('is-light');
 
       const slash = document.createElement('span');
       slash.className = 'ascii-select-popup__slash';
@@ -1184,6 +1195,7 @@ function isFullscreenLike() {
       bgBox.className = 'ascii-select-popup__color';
       bgBox.style.backgroundColor = palette.bg;
       if (isNearBlack(palette.bg)) bgBox.classList.add('is-dark');
+      if (isNearWhite(palette.bg)) bgBox.classList.add('is-light');
 
       paletteWrap.append(fgBox, slash, bgBox);
       row.appendChild(paletteWrap);
@@ -1222,18 +1234,6 @@ function isFullscreenLike() {
       });
     } else if (type === 'style') {
       const selectedValue = app.ui.style?.value || 'custom';
-      const customRow = buildAsciiSelectRow({
-        label: CUSTOM_LABEL,
-        isSelected: selectedValue === 'custom',
-        onClick: () => {
-          app.ui.style.value = 'custom';
-          app.ui.style.dispatchEvent(new Event('change', { bubbles: true }));
-          syncAsciiSelectTriggers();
-          closeAsciiSelectPopup();
-        }
-      });
-      list.appendChild(customRow);
-
       PRESETS.forEach((preset) => {
         const colors = splitToBgText(preset.colors);
         const row = buildAsciiSelectRow({
