@@ -1135,18 +1135,11 @@ function isFullscreenLike() {
     }
   }
 
-  function createAsciiSelectCheck(isSelected){
-    const check = document.createElement('span');
-    check.className = 'ascii-select-popup__check';
-    if (isSelected) check.classList.add('is-selected');
-    check.setAttribute('aria-hidden', 'true');
-    return check;
-  }
-
   function buildAsciiSelectRow({ label, isSelected, onClick, isKatakana = false, palette = null }){
     const row = document.createElement('button');
     row.type = 'button';
     row.className = 'ascii-select-popup__row';
+    if (isSelected) row.classList.add('is-selected');
 
     const labelEl = document.createElement('span');
     labelEl.className = `ascii-select-popup__row-label${isKatakana ? ' ascii-select-popup__row-label--katakana' : ''}`;
@@ -1194,11 +1187,8 @@ function isFullscreenLike() {
 
       paletteWrap.append(fgBox, slash, bgBox);
       row.appendChild(paletteWrap);
-    } else {
-      row.appendChild(document.createElement('span'));
     }
 
-    row.appendChild(createAsciiSelectCheck(isSelected));
     row.addEventListener('click', onClick);
     return row;
   }
