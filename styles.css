@@ -87,6 +87,7 @@ img, video, canvas, pre {
 #toggle:active,
 #fs:active,
 #save:active{
+  color:#bfbfbf;
   background-image:
     linear-gradient(var(--vintage-dark), var(--vintage-dark)),
     linear-gradient(var(--vintage-dark), var(--vintage-dark)),
@@ -284,6 +285,7 @@ button:focus, .btn:focus{
 #styleTrigger:active,
 #resetModeBtn:active,
 #settings.panel .check:active{
+  color:#bfbfbf;
   background-image:
     linear-gradient(var(--vintage-dark), var(--vintage-dark)),
     linear-gradient(var(--vintage-dark), var(--vintage-dark)),
