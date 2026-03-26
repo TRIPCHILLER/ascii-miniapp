@@ -11,6 +11,7 @@ html, body, .wrap { overflow-x: hidden; }
   --ui-text:#ffffff;
   --vintage-light:#808080;
   --vintage-dark:#404040;
+  --button-text-drop:2px;
 }
 
 .wrap{ display:flex; flex-direction:column; height:100%; }
@@ -82,7 +83,7 @@ img, video, canvas, pre {
     bottom left,
     top right;
   background-repeat:no-repeat;
-  padding:8px 12px;
+  padding:calc(8px + var(--button-text-drop)) 12px calc(8px - var(--button-text-drop));
   margin:0;
   border-radius:0;
 }
@@ -106,7 +107,7 @@ button, .btn, input[type="button"], input[type="submit"]{
   background-image:none;           /* ← без !important */
   color:var(--ui-text);
   border:0; outline:none; box-shadow:none;   /* без !important */
-  padding:.55rem 1rem; border-radius:0; cursor:pointer;
+  padding:calc(.55rem + var(--button-text-drop)) 1rem calc(.55rem - var(--button-text-drop)); border-radius:0; cursor:pointer;
   -webkit-tap-highlight-color:transparent;
 }
 
@@ -229,7 +230,7 @@ button:focus, .btn:focus{
 }
 
 #settings.panel #resetModeBtn{
-  padding:4px 12px;
+  padding:calc(4px + var(--button-text-drop)) 12px calc(4px - var(--button-text-drop));
 }
 
 .panel .row.colors{
@@ -253,7 +254,7 @@ button:focus, .btn:focus{
   display:flex;
   align-items:center;
   /* gap убираем, т.к. остаётся только текст */
-  padding:6px 8px;
+  padding:calc(6px + var(--button-text-drop)) 8px calc(6px - var(--button-text-drop));
   cursor:pointer;
 }
 .check input[type="checkbox"]{
@@ -273,7 +274,7 @@ button:focus, .btn:focus{
   border:0;
   background-image:none;
   box-shadow:none;
-  padding:4px 12px;
+  padding:calc(4px + var(--button-text-drop)) 12px calc(4px - var(--button-text-drop));
 }
 
 #charsetTrigger:active,
