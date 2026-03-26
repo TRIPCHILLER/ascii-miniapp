@@ -924,11 +924,24 @@ background:#fff; }
   min-height: 24px;
   aspect-ratio: 1 / 1;
   box-sizing: border-box;
-  border: 0 !important;
+  border-style: solid;
+  border-width: 2px;
+  border-top-color: var(--vintage-light);
+  border-left-color: var(--vintage-light);
+  border-right-color: var(--vintage-dark);
+  border-bottom-color: var(--vintage-dark);
   border-radius: 0;
   flex: 0 0 24px;
   display: block;
   line-height: 0;
+}
+
+.panel .row.colors input[type="color"]:active,
+.panel .row.colors .color:active input[type="color"]{
+  border-top-color: var(--vintage-dark);
+  border-left-color: var(--vintage-dark);
+  border-right-color: var(--vintage-light);
+  border-bottom-color: var(--vintage-light);
 }
 
 .panel .row.colors input[type="color"]::-webkit-color-swatch-wrapper{
@@ -939,6 +952,13 @@ background:#fff; }
 .panel .row.colors input[type="color"]::-moz-color-swatch{
   border: 0;
   border-radius: 0;
+}
+
+.panel .row.colors input[type="color"]:active::-webkit-color-swatch,
+.panel .row.colors .color:active input[type="color"]::-webkit-color-swatch,
+.panel .row.colors input[type="color"]:active::-moz-color-swatch,
+.panel .row.colors .color:active input[type="color"]::-moz-color-swatch{
+  filter: brightness(0.75);
 }
 
 /* Если для #bg в коде поставим класс .transparent — показываем иконку PNG */
