@@ -268,25 +268,11 @@ button:focus, .btn:focus{
   align-items:center;
   justify-content:center;
   line-height:1;
-  background:#000;
+  background:#404040;
   color:#fff;
   border:0;
-  background-image:
-    linear-gradient(var(--vintage-light), var(--vintage-light)),
-    linear-gradient(var(--vintage-light), var(--vintage-light)),
-    linear-gradient(var(--vintage-dark), var(--vintage-dark)),
-    linear-gradient(var(--vintage-dark), var(--vintage-dark));
-  background-size:
-    100% 2px,
-    2px 100%,
-    100% 2px,
-    2px 100%;
-  background-position:
-    top left,
-    top left,
-    bottom left,
-    top right;
-  background-repeat:no-repeat;
+  background-image:none;
+  box-shadow:none;
   padding:4px 12px;
 }
 
@@ -294,12 +280,11 @@ button:focus, .btn:focus{
 #styleTrigger:active,
 #resetModeBtn:active,
 #settings.panel .check:active{
+  background:#262626;
   color:#bfbfbf;
-  background-image:
-    linear-gradient(var(--vintage-dark), var(--vintage-dark)),
-    linear-gradient(var(--vintage-dark), var(--vintage-dark)),
-    linear-gradient(var(--vintage-light), var(--vintage-light)),
-    linear-gradient(var(--vintage-light), var(--vintage-light));
+  border:0;
+  background-image:none;
+  box-shadow:none;
 }
 
 /* ===== СЦЕНА/ВЫВОД ===== */
