@@ -1761,7 +1761,7 @@ function applyWidthLimitsForMode(init = false) {
     app.ui.charset.value = state.charset;
     app.ui.invert.checked = state.invert;
 const lbl = document.getElementById('invert_label');
-if (lbl) lbl.textContent = state.invert ? 'ВКЛ' : 'ВЫКЛ';
+if (lbl) lbl.textContent = state.invert ? 'ВКЛ.' : 'ВЫКЛ.';
 
     app.out.style.color = state.color;
     app.out.style.backgroundColor = state.background;
@@ -5015,7 +5015,7 @@ app.ui.invert.addEventListener('change', e => {
   state.invert = e.target.checked;
   const lbl = document.getElementById('invert_label');
   if (lbl) {
-    lbl.textContent = state.invert ? 'ВКЛ' : 'ВЫКЛ';
+    lbl.textContent = state.invert ? 'ВКЛ.' : 'ВЫКЛ.';
   }
 });
     // Подгон при изменении окна/ориентации
@@ -5036,7 +5036,7 @@ state.invert = false;
 if (app.ui.invert) app.ui.invert.checked = false;
 {
   const lbl = document.getElementById('invert_label');
-  if (lbl) lbl.textContent = 'ВЫКЛ';
+  if (lbl) lbl.textContent = 'ВЫКЛ.';
 }
     // === Портрет-лок: пробуем залочить ориентацию один раз после первого тапа ===
     if (isMobile && typeof document !== 'undefined') {
