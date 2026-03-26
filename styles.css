@@ -61,12 +61,23 @@ img, video, canvas, pre {
   flex:1 1 0;
   background:#000;
   color:#fff;
-  border-style:solid;
-  border-width:3px;
-  border-top-color:var(--vintage-light);
-  border-left-color:var(--vintage-light);
-  border-right-color:var(--vintage-dark);
-  border-bottom-color:var(--vintage-dark);
+  border:0;
+  background-image:
+    linear-gradient(var(--vintage-light), var(--vintage-light)),
+    linear-gradient(var(--vintage-light), var(--vintage-light)),
+    linear-gradient(var(--vintage-dark), var(--vintage-dark)),
+    linear-gradient(var(--vintage-dark), var(--vintage-dark));
+  background-size:
+    100% 3px,
+    3px 100%,
+    100% 3px,
+    3px 100%;
+  background-position:
+    top left,
+    top left,
+    bottom left,
+    top right;
+  background-repeat:no-repeat;
   padding:8px 12px;
   margin:0;
   border-radius:0;
@@ -76,10 +87,11 @@ img, video, canvas, pre {
 #toggle:active,
 #fs:active,
 #save:active{
-  border-top-color:var(--vintage-dark);
-  border-left-color:var(--vintage-dark);
-  border-right-color:var(--vintage-light);
-  border-bottom-color:var(--vintage-light);
+  background-image:
+    linear-gradient(var(--vintage-dark), var(--vintage-dark)),
+    linear-gradient(var(--vintage-dark), var(--vintage-dark)),
+    linear-gradient(var(--vintage-light), var(--vintage-light)),
+    linear-gradient(var(--vintage-light), var(--vintage-light));
 }
 
 /* ===== КНОПКИ — базовая очистка стилей ===== */
@@ -248,12 +260,23 @@ button:focus, .btn:focus{
 #settings.panel .check{
   background:#000;
   color:#fff;
-  border-style:solid;
-  border-width:2px;
-  border-top-color:var(--vintage-light);
-  border-left-color:var(--vintage-light);
-  border-right-color:var(--vintage-dark);
-  border-bottom-color:var(--vintage-dark);
+  border:0;
+  background-image:
+    linear-gradient(var(--vintage-light), var(--vintage-light)),
+    linear-gradient(var(--vintage-light), var(--vintage-light)),
+    linear-gradient(var(--vintage-dark), var(--vintage-dark)),
+    linear-gradient(var(--vintage-dark), var(--vintage-dark));
+  background-size:
+    100% 2px,
+    2px 100%,
+    100% 2px,
+    2px 100%;
+  background-position:
+    top left,
+    top left,
+    bottom left,
+    top right;
+  background-repeat:no-repeat;
   padding:4px 12px;
 }
 
@@ -261,10 +284,11 @@ button:focus, .btn:focus{
 #styleTrigger:active,
 #resetModeBtn:active,
 #settings.panel .check:active{
-  border-top-color:var(--vintage-dark);
-  border-left-color:var(--vintage-dark);
-  border-right-color:var(--vintage-light);
-  border-bottom-color:var(--vintage-light);
+  background-image:
+    linear-gradient(var(--vintage-dark), var(--vintage-dark)),
+    linear-gradient(var(--vintage-dark), var(--vintage-dark)),
+    linear-gradient(var(--vintage-light), var(--vintage-light)),
+    linear-gradient(var(--vintage-light), var(--vintage-light));
 }
 
 /* ===== СЦЕНА/ВЫВОД ===== */
