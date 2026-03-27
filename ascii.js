@@ -709,12 +709,18 @@ let DITHER_ENABLED = false;
       'modePhoto', 'modeLive', 'modeVideo',
       'flashBtn', 'timerOffBtn', 'timer3Btn', 'timer10Btn'
     ]);
+    const toolbarModeClickIds = new Set(['flip', 'toggle', 'fs', 'save']);
 
     app.wrap.addEventListener('click', (e) => {
       const btn = e.target.closest('button');
       if (!btn || !clickableIds.has(btn.id)) return;
       if (!isTextMode() && !isImageMode()) return;
       if (!app.ui.modeChooser?.hidden) return;
+
+      if (toolbarModeClickIds.has(btn.id)) {
+        playUiSound(START_UI_SOUNDS.modeClick);
+        return;
+      }
 
       const sounds = START_UI_SOUNDS.workClicks;
       const src = sounds[Math.floor(Math.random() * sounds.length)];
