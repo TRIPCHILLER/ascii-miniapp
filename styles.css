@@ -1166,10 +1166,27 @@ body.flash-front-ui input[type="range"]::-ms-thumb {
   pointer-events:none;
 }
 
-/* Строка чекбокса */
-.cp-transparent-row{
-  margin-top:8px;
-  margin-bottom:6px;
+/* Строка чекбокса (фикс видимости внизу попапа) */
+#cp-modal .cp-transparent-row{
+  display:flex;
+  align-items:center;
+  min-height:22px;
+  margin:8px 0 4px;
+  padding:0 2px;
+}
+
+#cp-modal .cp-transparent-check{
+  display:inline-flex;
+  align-items:center;
+}
+
+#cp-modal .cp-transparent-check span{
+  display:inline-flex;
+  align-items:center;
+  font-family:'PixPlus', monospace;
+  font-size:16px;
+  line-height:1.1;
+  letter-spacing:0.04em;
 }
 
 /* === FIX: компактная карточка цветового пикера === */
