@@ -67,22 +67,8 @@ img, video, canvas, pre {
   background:#000;
   color:#fff;
   border:0;
-  background-image:
-    linear-gradient(var(--vintage-light), var(--vintage-light)),
-    linear-gradient(var(--vintage-light), var(--vintage-light)),
-    linear-gradient(var(--vintage-dark), var(--vintage-dark)),
-    linear-gradient(var(--vintage-dark), var(--vintage-dark));
-  background-size:
-    100% 3px,
-    3px 100%,
-    100% 3px,
-    3px 100%;
-  background-position:
-    top left,
-    top left,
-    bottom left,
-    top right;
-  background-repeat:no-repeat;
+  background-image:none;
+  box-shadow:none;
   padding:calc(8px + var(--button-text-drop)) 12px calc(8px - var(--button-text-drop));
   margin:0;
   border-radius:0;
@@ -93,11 +79,9 @@ img, video, canvas, pre {
 #fs:active,
 #save:active{
   color:#bfbfbf;
-  background-image:
-    linear-gradient(var(--vintage-dark), var(--vintage-dark)),
-    linear-gradient(var(--vintage-dark), var(--vintage-dark)),
-    linear-gradient(var(--vintage-light), var(--vintage-light)),
-    linear-gradient(var(--vintage-light), var(--vintage-light));
+  background:#000;
+  background-image:none;
+  box-shadow:none;
 }
 
 /* ===== КНОПКИ — базовая очистка стилей ===== */
