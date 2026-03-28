@@ -205,15 +205,20 @@ const ARG_SCENE_TIMINGS = {
   bottomToSecondPopupMs: 1000,
   eyeToCountdownMs: 1000,
   countdownStepMs: 1000,
-  serveDelayMs: 700
+  serveDelayMs: 700,
+  popupGlitchMs: 19,
+  popupSpaceTypeMs: 12,
+  popupCharTypeMs: 23
 };
 const ARG_PONG = {
   scoreToWin: 3,
-  ballSizePx: 52,
-  paddleWidthPx: 260,
-  paddleHeightPx: 28,
-  topPaddleYVh: 12,
-  bottomPaddleYVh: 88,
+  ballSizePx: 22,
+  paddleWidthPx: 132,
+  paddleHeightPx: 12,
+  topPaddleYVh: 4,
+  bottomPaddleYVh: 96,
+  topScoreYVh: 10,
+  bottomScoreYVh: 10,
   sideWallPaddingPx: 8,
   ballBaseSpeedPx: 6,
   ballMaxSpeedPx: 13,
@@ -785,10 +790,10 @@ let DITHER_ENABLED = false;
       const fixedPart = text.slice(0, i);
       textEl.classList.add('is-glitching');
       textEl.textContent = `${fixedPart}${randomSymbol()}|`;
-      await sleep(28);
+      await sleep(ARG_SCENE_TIMINGS.popupGlitchMs);
       textEl.classList.remove('is-glitching');
       textEl.textContent = `${fixedPart}${text[i]}|`;
-      await sleep(text[i] === ' ' ? 18 : 34);
+      await sleep(text[i] === ' ' ? ARG_SCENE_TIMINGS.popupSpaceTypeMs : ARG_SCENE_TIMINGS.popupCharTypeMs);
     }
     await sleep(120);
     textEl.textContent = text;
@@ -919,6 +924,10 @@ let DITHER_ENABLED = false;
     argPongState.shakeY = 0;
     playerScoreEl.textContent = '0';
     aiScoreEl.textContent = '0';
+    aiScoreEl.style.top = `${ARG_PONG.topScoreYVh}vh`;
+    aiScoreEl.style.bottom = '';
+    playerScoreEl.style.bottom = `${ARG_PONG.bottomScoreYVh}vh`;
+    playerScoreEl.style.top = '';
     scoreLayer.hidden = false;
     resetArgBall(Math.random() > 0.5);
     bindArgPlayerControls(overlay);
@@ -1098,6 +1107,8 @@ let DITHER_ENABLED = false;
     }
 
     overlay.hidden = false;
+    stopStartBlinkTickerForArg();
+    if (startDateTimer) { clearInterval(startDateTimer); startDateTimer = null; }
     eyeLayer.innerHTML = '';
     ballStickLayer.innerHTML = '';
     countdownLayer.textContent = '';
@@ -1110,6 +1121,8 @@ let DITHER_ENABLED = false;
     ball.className = 'arg-scene-ball';
     ball.src = ARG_SCENE_ASSETS.ball;
     ball.alt = '';
+    ball.style.width = `${ARG_PONG.ballSizePx}px`;
+    ball.style.height = `${ARG_PONG.ballSizePx}px`;
     ballStickLayer.appendChild(ball);
     playUiSoundNoThrow(ARG_SCENE_SOUNDS.click);
 
@@ -1120,6 +1133,10 @@ let DITHER_ENABLED = false;
     topStick.className = 'arg-scene-stick arg-scene-stick--top';
     topStick.src = ARG_SCENE_ASSETS.topStick;
     topStick.alt = '';
+    topStick.style.width = `${ARG_PONG.paddleWidthPx}px`;
+    topStick.style.height = `${ARG_PONG.paddleHeightPx}px`;
+    topStick.style.top = `${ARG_PONG.topPaddleYVh}vh`;
+    topStick.style.bottom = '';
     ballStickLayer.appendChild(topStick);
     playUiSoundNoThrow(ARG_SCENE_SOUNDS.click);
 
@@ -1129,6 +1146,10 @@ let DITHER_ENABLED = false;
     bottomStick.className = 'arg-scene-stick arg-scene-stick--bottom';
     bottomStick.src = ARG_SCENE_ASSETS.bottomStick;
     bottomStick.alt = '';
+    bottomStick.style.width = `${ARG_PONG.paddleWidthPx}px`;
+    bottomStick.style.height = `${ARG_PONG.paddleHeightPx}px`;
+    bottomStick.style.bottom = `${100 - ARG_PONG.bottomPaddleYVh}vh`;
+    bottomStick.style.top = '';
     ballStickLayer.appendChild(bottomStick);
     playUiSoundNoThrow(ARG_SCENE_SOUNDS.click);
 
@@ -1318,6 +1339,16 @@ let DITHER_ENABLED = false;
     if (startTypeTimer) { clearInterval(startTypeTimer); startTypeTimer = null; }
   }
 
+  function stopStartBlinkTickerForArg() {
+    if (startBlinkTimer) {
+      clearInterval(startBlinkTimer);
+      startBlinkTimer = null;
+    }
+    if (app.ui.startBlinkLine) {
+      app.ui.startBlinkLine.classList.add('start-hidden');
+    }
+  }
+
   function bindModeChooserOnce() {
     if (!app.ui.modeChooser || modeChooserListenerBound) return;
     const footerSelector = '.start-footer-box, .start-footer-title, .start-footer-sub';
@@ -1341,6 +1372,7 @@ let DITHER_ENABLED = false;
         if (startEasterEggNextSound > START_EASTER_EGG_MAX_SOUND) {
           startEasterEggDone = true;
           if (!startArgScenePending && !startArgSceneRunning && !startArgSceneStarted) {
+            stopStartBlinkTickerForArg();
             startArgScenePending = true;
             runStartArgScene().catch(() => {
               startArgScenePending = false;

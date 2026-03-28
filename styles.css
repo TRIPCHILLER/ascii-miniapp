@@ -1364,8 +1364,8 @@ input[type="color"] {
   left:50%;
   top:50%;
   transform:translate(-50%, -50%);
-  width:min(9vw, 72px);
-  min-width:36px;
+  width:22px;
+  height:22px;
   image-rendering:pixelated;
 }
 
@@ -1373,13 +1373,13 @@ input[type="color"] {
   position:absolute;
   left:50%;
   transform:translateX(-50%);
-  width:min(72vw, 640px);
-  max-width:90vw;
+  width:132px;
+  height:12px;
   image-rendering:pixelated;
 }
 
-.arg-scene-stick--top{ top:12vh; }
-.arg-scene-stick--bottom{ bottom:12vh; }
+.arg-scene-stick--top{ top:4vh; }
+.arg-scene-stick--bottom{ bottom:4vh; }
 
 .arg-scene-visor{
   position:absolute;
@@ -1401,7 +1401,7 @@ input[type="color"] {
 .arg-scene-score{
   pointer-events:none;
   font-family:'PixPlus', monospace;
-  color:#fff;
+  color:#bfbfbf;
   text-shadow:0 0 8px rgba(255,255,255,.35);
 }
 
@@ -1414,8 +1414,8 @@ input[type="color"] {
   line-height:1;
 }
 
-.arg-scene-score-top{ top:4vh; }
-.arg-scene-score-bottom{ bottom:4vh; }
+.arg-scene-score-top{ top:10vh; }
+.arg-scene-score-bottom{ bottom:10vh; }
 
 .arg-scene-popup{
   background:rgba(0,0,0,.45);
