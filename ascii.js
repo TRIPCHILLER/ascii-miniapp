@@ -165,7 +165,7 @@ function busyHide(force = false){
 const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
 
 const TERM_RANGE_STEPS = 10;
-const START_EASTER_EGG_MAX_SOUND = 15;
+const START_EASTER_EGG_MAX_SOUND = 10;
 // Версия ассетов звуков для принудительного обновления кэша в WebView/браузере.
 const SOUND_ASSET_VERSION = '20260313-1';
 const START_EASTER_EGG_SOUNDS = Array.from(
@@ -186,6 +186,25 @@ const START_UI_SOUNDS = {
     `assets/sounds/print1.mp3?v=${SOUND_ASSET_VERSION}`,
     `assets/sounds/print2.mp3?v=${SOUND_ASSET_VERSION}`
   ]
+};
+const ARG_SCENE_SOUNDS = {
+  turnOff: `assets/sounds/turnoff.mp3?v=${SOUND_ASSET_VERSION}`,
+  click: `assets/sounds/clicksound1.mp3?v=${SOUND_ASSET_VERSION}`
+};
+const ARG_SCENE_ASSETS = {
+  ball: 'assets/pongball.svg',
+  topStick: 'assets/pongstick1.svg',
+  bottomStick: 'assets/pongstick2.svg',
+  visorBack: 'assets/VISOR1.svg',
+  visorFront: 'assets/VISOR2.svg'
+};
+const ARG_SCENE_TIMINGS = {
+  afterBlackMs: 3000,
+  ballToPopupMs: 1000,
+  topToBottomStickMs: 1000,
+  bottomToSecondPopupMs: 1000,
+  eyeToCountdownMs: 1000,
+  countdownStepMs: 1000
 };
 const AUDIO_UNLOCK_STORAGE_KEY = 'asciiVisorAudioUnlocked';
 let errorSoundAudio = null;
@@ -641,6 +660,9 @@ let DITHER_ENABLED = false;
   let startEasterEggNextSound = 1;
   let startEasterEggPlaying = false;
   let startEasterEggDone = false;
+  let startArgScenePending = false;
+  let startArgSceneRunning = false;
+  let startArgSceneStarted = false;
   let startLaunchSoundPlayed = false;
   let startLaunchSoundPendingAfterUnlock = false;
   let startPrintNextSound = 0;
@@ -651,10 +673,178 @@ let DITHER_ENABLED = false;
   let audioUnlockHandled = false;
   let audioUnlockProbe = null;
 
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+  }
+
   function playUiSound(src) {
     if (!src) return Promise.resolve(false);
     const audio = new Audio(src);
     return audio.play().then(() => true).catch(() => false);
+  }
+
+  function playUiSoundNoThrow(src) {
+    if (!src) return;
+    playUiSound(src).catch(() => {});
+  }
+
+  function ensureArgOverlay() {
+    let overlay = document.getElementById('argSceneOverlay');
+    if (overlay) return overlay;
+
+    overlay = document.createElement('div');
+    overlay.id = 'argSceneOverlay';
+    overlay.className = 'arg-scene-overlay';
+    overlay.hidden = true;
+    overlay.innerHTML = `
+      <div class="arg-scene-layer arg-scene-bg"></div>
+      <div class="arg-scene-layer arg-scene-eye" id="argSceneEyeLayer"></div>
+      <div class="arg-scene-layer arg-scene-ball-stick" id="argSceneBallStickLayer"></div>
+      <div class="arg-scene-layer arg-scene-countdown" id="argSceneCountdownLayer"></div>
+      <div class="arg-scene-layer arg-scene-popup" id="argScenePopupLayer" hidden>
+        <div class="arg-scene-popup-box">
+          <div class="arg-scene-popup-text" id="argScenePopupText"></div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    return overlay;
+  }
+
+  async function animateArgPopupText(textEl, text) {
+    if (!textEl) return;
+    const alphabet = 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ';
+    const numberPool = ['1','2','3','4','5','6','7','8','9','10'];
+    const randomSymbol = () => {
+      if (Math.random() < 0.35) {
+        return numberPool[Math.floor(Math.random() * numberPool.length)];
+      }
+      return alphabet[Math.floor(Math.random() * alphabet.length)];
+    };
+
+    textEl.textContent = '|';
+    for (let i = 0; i < text.length; i += 1) {
+      const fixedPart = text.slice(0, i);
+      textEl.classList.add('is-glitching');
+      textEl.textContent = `${fixedPart}${randomSymbol()}|`;
+      await sleep(28);
+      textEl.classList.remove('is-glitching');
+      textEl.textContent = `${fixedPart}${text[i]}|`;
+      await sleep(text[i] === ' ' ? 18 : 34);
+    }
+    await sleep(120);
+    textEl.textContent = text;
+  }
+
+  async function showArgPopup(text) {
+    const overlay = ensureArgOverlay();
+    const popupLayer = overlay.querySelector('#argScenePopupLayer');
+    const textEl = overlay.querySelector('#argScenePopupText');
+    if (!popupLayer || !textEl) return;
+
+    popupLayer.hidden = false;
+    await animateArgPopupText(textEl, text);
+
+    await new Promise((resolve) => {
+      let closed = false;
+      const close = () => {
+        if (closed) return;
+        closed = true;
+        popupLayer.removeEventListener('pointerup', onClose, true);
+        popupLayer.removeEventListener('click', onClose, true);
+        popupLayer.hidden = true;
+        playUiSoundNoThrow(ARG_SCENE_SOUNDS.click);
+        resolve();
+      };
+      const onClose = (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        close();
+      };
+      popupLayer.addEventListener('pointerup', onClose, { capture: true });
+      popupLayer.addEventListener('click', onClose, { capture: true });
+    });
+  }
+
+  async function runArgCountdown() {
+    const overlay = ensureArgOverlay();
+    const layer = overlay.querySelector('#argSceneCountdownLayer');
+    if (!layer) return;
+    for (const value of ['3', '2', '1']) {
+      layer.textContent = value;
+      await sleep(ARG_SCENE_TIMINGS.countdownStepMs);
+    }
+    layer.textContent = '';
+  }
+
+  async function runStartArgScene() {
+    if (startArgSceneRunning || startArgSceneStarted) return;
+    startArgScenePending = false;
+    startArgSceneRunning = true;
+    startArgSceneStarted = true;
+
+    const overlay = ensureArgOverlay();
+    const eyeLayer = overlay.querySelector('#argSceneEyeLayer');
+    const ballStickLayer = overlay.querySelector('#argSceneBallStickLayer');
+    const countdownLayer = overlay.querySelector('#argSceneCountdownLayer');
+    if (!eyeLayer || !ballStickLayer || !countdownLayer) {
+      startArgSceneRunning = false;
+      return;
+    }
+
+    overlay.hidden = false;
+    eyeLayer.innerHTML = '';
+    ballStickLayer.innerHTML = '';
+    countdownLayer.textContent = '';
+
+    playUiSoundNoThrow(ARG_SCENE_SOUNDS.turnOff);
+    await sleep(ARG_SCENE_TIMINGS.afterBlackMs);
+
+    const ball = document.createElement('img');
+    ball.className = 'arg-scene-ball';
+    ball.src = ARG_SCENE_ASSETS.ball;
+    ball.alt = '';
+    ballStickLayer.appendChild(ball);
+    playUiSoundNoThrow(ARG_SCENE_SOUNDS.click);
+
+    await sleep(ARG_SCENE_TIMINGS.ballToPopupMs);
+    await showArgPopup('ИНТЕЛЛЕКТ — ЭТО СПОСОБНОСТЬ АДАПТИРОВАТЬСЯ К ИЗМЕНЕНИЯМ.');
+
+    const topStick = document.createElement('img');
+    topStick.className = 'arg-scene-stick arg-scene-stick--top';
+    topStick.src = ARG_SCENE_ASSETS.topStick;
+    topStick.alt = '';
+    ballStickLayer.appendChild(topStick);
+    playUiSoundNoThrow(ARG_SCENE_SOUNDS.click);
+
+    await sleep(ARG_SCENE_TIMINGS.topToBottomStickMs);
+
+    const bottomStick = document.createElement('img');
+    bottomStick.className = 'arg-scene-stick arg-scene-stick--bottom';
+    bottomStick.src = ARG_SCENE_ASSETS.bottomStick;
+    bottomStick.alt = '';
+    ballStickLayer.appendChild(bottomStick);
+    playUiSoundNoThrow(ARG_SCENE_SOUNDS.click);
+
+    await sleep(ARG_SCENE_TIMINGS.bottomToSecondPopupMs);
+    await showArgPopup('3/3');
+
+    const visorBack = document.createElement('img');
+    visorBack.className = 'arg-scene-visor arg-scene-visor--back';
+    visorBack.src = ARG_SCENE_ASSETS.visorBack;
+    visorBack.alt = '';
+    const visorFront = document.createElement('img');
+    visorFront.className = 'arg-scene-visor arg-scene-visor--front';
+    visorFront.src = ARG_SCENE_ASSETS.visorFront;
+    visorFront.alt = '';
+    eyeLayer.appendChild(visorBack);
+    eyeLayer.appendChild(visorFront);
+    playUiSoundNoThrow(ARG_SCENE_SOUNDS.turnOff);
+
+    await sleep(ARG_SCENE_TIMINGS.eyeToCountdownMs);
+    await runArgCountdown();
+
+    startArgSceneRunning = false;
   }
 
   function hasRememberedAudioUnlock() {
@@ -826,7 +1016,7 @@ let DITHER_ENABLED = false;
     const footerSelector = '.start-footer-box, .start-footer-title, .start-footer-sub';
 
     const playStartEasterEggSound = () => {
-      if (startEasterEggDone || startEasterEggPlaying) return;
+      if (startEasterEggDone || startEasterEggPlaying || startArgScenePending || startArgSceneRunning) return;
       if (startEasterEggNextSound > START_EASTER_EGG_MAX_SOUND) {
         startEasterEggDone = true;
         return;
@@ -843,6 +1033,13 @@ let DITHER_ENABLED = false;
         startEasterEggNextSound += 1;
         if (startEasterEggNextSound > START_EASTER_EGG_MAX_SOUND) {
           startEasterEggDone = true;
+          if (!startArgScenePending && !startArgSceneRunning && !startArgSceneStarted) {
+            startArgScenePending = true;
+            runStartArgScene().catch(() => {
+              startArgScenePending = false;
+              startArgSceneRunning = false;
+            });
+          }
         }
         unlock();
       }, { once: true });
