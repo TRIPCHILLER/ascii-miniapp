@@ -212,9 +212,9 @@ const ARG_SCENE_TIMINGS = {
 };
 const ARG_PONG = {
   scoreToWin: 3,
-  ballSizePx: 22,
   paddleWidthPx: 132,
   paddleHeightPx: 12,
+  ballSizeToPaddleHeightRatio: 1,
   topPaddleYVh: 4,
   bottomPaddleYVh: 96,
   topScoreYVh: 10,
@@ -239,7 +239,9 @@ const ARG_PONG = {
   syncFollowAccelPx: 1.15,
   visorEyeMaxShiftXPx: 18,
   visorEyeMaxShiftYPx: 12,
-  visorEyeSmooth: 0.15,
+  visorEyeSpring: 0.2,
+  visorEyeDamping: 0.78,
+  visorEyeMaxSpeedPx: 3.2,
   shakeHitAmountPx: 2.2,
   shakeDecay: 0.82
 };
@@ -728,6 +730,8 @@ let DITHER_ENABLED = false;
     targetPlayerX: 0.5,
     visorShiftX: 0,
     visorShiftY: 0,
+    visorVX: 0,
+    visorVY: 0,
     shakeX: 0,
     shakeY: 0
   };
@@ -996,8 +1000,9 @@ let DITHER_ENABLED = false;
       argPongState.ballX += argPongState.ballVX / rect.width;
       argPongState.ballY += argPongState.ballVY / rect.height;
 
-      const ballHalfX = (ARG_PONG.ballSizePx * 0.5) / rect.width;
-      const ballHalfY = (ARG_PONG.ballSizePx * 0.5) / rect.height;
+      const ballSizePx = ARG_PONG.paddleHeightPx * ARG_PONG.ballSizeToPaddleHeightRatio;
+      const ballHalfX = (ballSizePx * 0.5) / rect.width;
+      const ballHalfY = (ballSizePx * 0.5) / rect.height;
       const wallNorm = ARG_PONG.sideWallPaddingPx / rect.width;
       if (argPongState.ballX - ballHalfX <= wallNorm || argPongState.ballX + ballHalfX >= 1 - wallNorm) {
         argPongState.ballX = clamp(argPongState.ballX, wallNorm + ballHalfX, 1 - wallNorm - ballHalfX);
@@ -1036,7 +1041,9 @@ let DITHER_ENABLED = false;
         applyTinyShake();
       }
 
-      if (!serveLocked && argPongState.ballY < -ballHalfY) {
+      const topGoalLine = topY + paddleHalfH + ballHalfY;
+      const bottomGoalLine = bottomY - paddleHalfH - ballHalfY;
+      if (!serveLocked && argPongState.ballVY < 0 && argPongState.ballY < topGoalLine) {
         argPongState.playerScore += 1;
         playerScoreEl.textContent = String(argPongState.playerScore);
         if (argPongState.playerScore >= ARG_PONG.scoreToWin) {
@@ -1049,7 +1056,7 @@ let DITHER_ENABLED = false;
           resetArgBall(false);
           serveLocked = false;
         }, ARG_SCENE_TIMINGS.serveDelayMs);
-      } else if (!serveLocked && argPongState.ballY > 1 + ballHalfY) {
+      } else if (!serveLocked && argPongState.ballVY > 0 && argPongState.ballY > bottomGoalLine) {
         argPongState.aiScore += 1;
         aiScoreEl.textContent = String(argPongState.aiScore);
         if (argPongState.aiScore >= ARG_PONG.scoreToWin) {
@@ -1071,8 +1078,16 @@ let DITHER_ENABLED = false;
 
       const ballTargetX = (argPongState.ballX - 0.5) * 2 * ARG_PONG.visorEyeMaxShiftXPx;
       const ballTargetY = (argPongState.ballY - 0.5) * 2 * ARG_PONG.visorEyeMaxShiftYPx;
-      argPongState.visorShiftX += (clamp(ballTargetX, -ARG_PONG.visorEyeMaxShiftXPx, ARG_PONG.visorEyeMaxShiftXPx) - argPongState.visorShiftX) * ARG_PONG.visorEyeSmooth;
-      argPongState.visorShiftY += (clamp(ballTargetY, -ARG_PONG.visorEyeMaxShiftYPx, ARG_PONG.visorEyeMaxShiftYPx) - argPongState.visorShiftY) * ARG_PONG.visorEyeSmooth;
+      const clampedTargetX = clamp(ballTargetX, -ARG_PONG.visorEyeMaxShiftXPx, ARG_PONG.visorEyeMaxShiftXPx);
+      const clampedTargetY = clamp(ballTargetY, -ARG_PONG.visorEyeMaxShiftYPx, ARG_PONG.visorEyeMaxShiftYPx);
+      argPongState.visorVX += (clampedTargetX - argPongState.visorShiftX) * ARG_PONG.visorEyeSpring;
+      argPongState.visorVY += (clampedTargetY - argPongState.visorShiftY) * ARG_PONG.visorEyeSpring;
+      argPongState.visorVX *= ARG_PONG.visorEyeDamping;
+      argPongState.visorVY *= ARG_PONG.visorEyeDamping;
+      argPongState.visorVX = clamp(argPongState.visorVX, -ARG_PONG.visorEyeMaxSpeedPx, ARG_PONG.visorEyeMaxSpeedPx);
+      argPongState.visorVY = clamp(argPongState.visorVY, -ARG_PONG.visorEyeMaxSpeedPx, ARG_PONG.visorEyeMaxSpeedPx);
+      argPongState.visorShiftX = clamp(argPongState.visorShiftX + argPongState.visorVX, -ARG_PONG.visorEyeMaxShiftXPx, ARG_PONG.visorEyeMaxShiftXPx);
+      argPongState.visorShiftY = clamp(argPongState.visorShiftY + argPongState.visorVY, -ARG_PONG.visorEyeMaxShiftYPx, ARG_PONG.visorEyeMaxShiftYPx);
       argPongState.shakeX *= ARG_PONG.shakeDecay;
       argPongState.shakeY *= ARG_PONG.shakeDecay;
 
@@ -1081,7 +1096,7 @@ let DITHER_ENABLED = false;
       topStick.style.left = `${argPongState.aiX * 100}%`;
       bottomStick.style.left = `${argPongState.playerX * 100}%`;
       ballStickLayer.style.transform = `translate(${argPongState.shakeX}px, ${argPongState.shakeY}px)`;
-      visorFront.style.transform = `translate(calc(-50% + ${argPongState.visorShiftX + argPongState.shakeX}px), calc(-50% + ${argPongState.visorShiftY + argPongState.shakeY}px))`;
+      visorFront.style.transform = `translate(${argPongState.visorShiftX + argPongState.shakeX}px, ${argPongState.visorShiftY + argPongState.shakeY}px)`;
 
       argPongRafId = requestAnimationFrame(loop);
     };
@@ -1121,13 +1136,14 @@ let DITHER_ENABLED = false;
     ball.className = 'arg-scene-ball';
     ball.src = ARG_SCENE_ASSETS.ball;
     ball.alt = '';
-    ball.style.width = `${ARG_PONG.ballSizePx}px`;
-    ball.style.height = `${ARG_PONG.ballSizePx}px`;
+    const ballSizePx = ARG_PONG.paddleHeightPx * ARG_PONG.ballSizeToPaddleHeightRatio;
+    ball.style.width = `${ballSizePx}px`;
+    ball.style.height = `${ballSizePx}px`;
     ballStickLayer.appendChild(ball);
     playUiSoundNoThrow(ARG_SCENE_SOUNDS.click);
 
     await sleep(ARG_SCENE_TIMINGS.ballToPopupMs);
-    await showArgPopup('ИНТЕЛЛЕКТ — ЭТО СПОСОБНОСТЬ АДАПТИРОВАТЬСЯ К ИЗМЕНЕНИЯМ.');
+    await showArgPopup('NH73ЛЛЗК7 - Э70\nСПОСОБНОС7Ь\n4Д4П7NР0847ЬСЯ\nК ИЗМ3Н3НNЯМ');
 
     const topStick = document.createElement('img');
     topStick.className = 'arg-scene-stick arg-scene-stick--top';
