@@ -208,6 +208,7 @@ const ARG_SCENE_TIMINGS = {
   serveDelayMs: 700
 };
 const ARG_PONG = {
+  scoreToWin: 3,
   ballSizePx: 52,
   paddleWidthPx: 260,
   paddleHeightPx: 28,
@@ -220,6 +221,17 @@ const ARG_PONG = {
   playerPointerSmoothing: 0.4,
   aiMaxSpeedPx: 6,
   aiTrackDeadZonePx: 6,
+  aiLevels: [
+    { maxSpeedPx: 4.2, reaction: 0.1, autoAim: 0.2, accelPx: 0.35, deadZonePx: 14 },
+    { maxSpeedPx: 7.2, reaction: 0.2, autoAim: 0.45, accelPx: 0.65, deadZonePx: 8 },
+    { maxSpeedPx: 11.8, reaction: 0.35, autoAim: 0.82, accelPx: 1.2, deadZonePx: 2 }
+  ],
+  syncDistancePx: 54,
+  syncHoldMs: 2400,
+  syncDecayPerMs: 0.9,
+  syncPull: 0.18,
+  syncFollowMaxSpeedPx: 10.5,
+  syncFollowAccelPx: 1.15,
   visorEyeMaxShiftXPx: 18,
   visorEyeMaxShiftYPx: 12,
   visorEyeSmooth: 0.15,
@@ -683,6 +695,7 @@ let DITHER_ENABLED = false;
   let startArgScenePending = false;
   let startArgSceneRunning = false;
   let startArgSceneStarted = false;
+  let startArgSessionLocked = false;
   let startLaunchSoundPlayed = false;
   let startLaunchSoundPendingAfterUnlock = false;
   let startPrintNextSound = 0;
@@ -695,14 +708,18 @@ let DITHER_ENABLED = false;
   let argPongRafId = 0;
   const argPongState = {
     running: false,
+    ended: false,
     ballX: 0,
     ballY: 0,
     ballVX: 0,
     ballVY: 0,
     playerX: 0.5,
     aiX: 0.5,
+    aiVX: 0,
     playerScore: 0,
     aiScore: 0,
+    syncProgressMs: 0,
+    syncActive: false,
     targetPlayerX: 0.5,
     visorShiftX: 0,
     visorShiftY: 0,
@@ -807,6 +824,32 @@ let DITHER_ENABLED = false;
     });
   }
 
+  function stopArgPongLoop() {
+    argPongState.running = false;
+    if (argPongRafId) {
+      cancelAnimationFrame(argPongRafId);
+      argPongRafId = 0;
+    }
+  }
+
+  async function finishArgMatch(result = 'lose') {
+    if (argPongState.ended) return;
+    argPongState.ended = true;
+    stopArgPongLoop();
+    if (result === 'win') {
+      await showArgPopup('ТЫ ОДОЛЕЛ СИСТЕМУ');
+      startArgSceneRunning = false;
+      return;
+    }
+
+    await showArgPopup('ТЫ ТАК И НЕ УВИДЕЛ СУТЬ...');
+    const overlay = ensureArgOverlay();
+    overlay.hidden = true;
+    startArgSessionLocked = true;
+    startArgSceneRunning = false;
+    startArgSceneStarted = false;
+  }
+
   async function runArgCountdown() {
     const overlay = ensureArgOverlay();
     const layer = overlay.querySelector('#argSceneCountdownLayer');
@@ -861,10 +904,14 @@ let DITHER_ENABLED = false;
     if (!overlay || !ballStickLayer || !ball || !topStick || !bottomStick || !visorFront || !scoreLayer || !aiScoreEl || !playerScoreEl) return;
     if (argPongRafId) cancelAnimationFrame(argPongRafId);
     argPongState.running = true;
+    argPongState.ended = false;
     argPongState.playerScore = 0;
     argPongState.aiScore = 0;
     argPongState.playerX = 0.5;
     argPongState.aiX = 0.5;
+    argPongState.aiVX = 0;
+    argPongState.syncProgressMs = 0;
+    argPongState.syncActive = false;
     argPongState.targetPlayerX = 0.5;
     argPongState.visorShiftX = 0;
     argPongState.visorShiftY = 0;
@@ -877,9 +924,13 @@ let DITHER_ENABLED = false;
     bindArgPlayerControls(overlay);
 
     let serveLocked = false;
+    let prevTs = 0;
     const loop = () => {
       if (!argPongState.running) return;
       const rect = overlay.getBoundingClientRect();
+      const now = performance.now();
+      const deltaMs = prevTs ? Math.min(64, now - prevTs) : 16.67;
+      prevTs = now;
       if (!rect.width || !rect.height) {
         argPongRafId = requestAnimationFrame(loop);
         return;
@@ -889,11 +940,49 @@ let DITHER_ENABLED = false;
       argPongState.playerX += (argPongState.targetPlayerX - argPongState.playerX) * ARG_PONG.playerPointerSmoothing;
       argPongState.playerX = clamp(argPongState.playerX, paddleHalfNorm, 1 - paddleHalfNorm);
 
-      const aiDelta = argPongState.ballX - argPongState.aiX;
-      const aiStep = clamp(aiDelta, -ARG_PONG.aiMaxSpeedPx / rect.width, ARG_PONG.aiMaxSpeedPx / rect.width);
-      if (Math.abs(aiDelta) > (ARG_PONG.aiTrackDeadZonePx / rect.width)) {
-        argPongState.aiX = clamp(argPongState.aiX + aiStep, paddleHalfNorm, 1 - paddleHalfNorm);
+      const syncDistanceNorm = ARG_PONG.syncDistancePx / rect.width;
+      const syncDelta = Math.abs(argPongState.playerX - argPongState.aiX);
+      if (syncDelta <= syncDistanceNorm) {
+        argPongState.syncProgressMs = Math.min(ARG_PONG.syncHoldMs, argPongState.syncProgressMs + deltaMs);
+      } else {
+        argPongState.syncProgressMs = Math.max(0, argPongState.syncProgressMs - deltaMs * ARG_PONG.syncDecayPerMs);
       }
+      if (!argPongState.syncActive && argPongState.syncProgressMs >= ARG_PONG.syncHoldMs) {
+        argPongState.syncActive = true;
+      }
+
+      let aiTargetX = argPongState.ballX;
+      let aiMaxSpeedPx = ARG_PONG.aiMaxSpeedPx;
+      let aiAccelPx = 0.6;
+      let aiDeadZonePx = ARG_PONG.aiTrackDeadZonePx;
+      if (argPongState.syncActive) {
+        aiTargetX += (argPongState.playerX - aiTargetX) * ARG_PONG.syncPull;
+        aiMaxSpeedPx = ARG_PONG.syncFollowMaxSpeedPx;
+        aiAccelPx = ARG_PONG.syncFollowAccelPx;
+        aiDeadZonePx = 1;
+      } else {
+        const aiLevel = ARG_PONG.aiLevels[Math.min(argPongState.playerScore, ARG_PONG.aiLevels.length - 1)];
+        const lookAheadNorm = clamp(argPongState.ballVX * aiLevel.autoAim * 6 / rect.width, -0.2, 0.2);
+        const aimX = clamp(argPongState.ballX + lookAheadNorm, paddleHalfNorm, 1 - paddleHalfNorm);
+        aiTargetX += (aimX - aiTargetX) * aiLevel.reaction;
+        aiMaxSpeedPx = aiLevel.maxSpeedPx;
+        aiAccelPx = aiLevel.accelPx;
+        aiDeadZonePx = aiLevel.deadZonePx;
+      }
+
+      const aiDelta = aiTargetX - argPongState.aiX;
+      if (Math.abs(aiDelta) > (aiDeadZonePx / rect.width)) {
+        const targetAiVx = clamp(aiDelta, -aiMaxSpeedPx / rect.width, aiMaxSpeedPx / rect.width);
+        const aiAccelNorm = aiAccelPx / rect.width;
+        if (argPongState.aiVX < targetAiVx) {
+          argPongState.aiVX = Math.min(targetAiVx, argPongState.aiVX + aiAccelNorm);
+        } else {
+          argPongState.aiVX = Math.max(targetAiVx, argPongState.aiVX - aiAccelNorm);
+        }
+      } else {
+        argPongState.aiVX *= 0.8;
+      }
+      argPongState.aiX = clamp(argPongState.aiX + argPongState.aiVX, paddleHalfNorm, 1 - paddleHalfNorm);
 
       argPongState.ballX += argPongState.ballVX / rect.width;
       argPongState.ballY += argPongState.ballVY / rect.height;
@@ -941,16 +1030,26 @@ let DITHER_ENABLED = false;
       if (!serveLocked && argPongState.ballY < -ballHalfY) {
         argPongState.playerScore += 1;
         playerScoreEl.textContent = String(argPongState.playerScore);
+        if (argPongState.playerScore >= ARG_PONG.scoreToWin) {
+          finishArgMatch('win');
+          return;
+        }
         serveLocked = true;
         setTimeout(() => {
+          if (!argPongState.running) return;
           resetArgBall(false);
           serveLocked = false;
         }, ARG_SCENE_TIMINGS.serveDelayMs);
       } else if (!serveLocked && argPongState.ballY > 1 + ballHalfY) {
         argPongState.aiScore += 1;
         aiScoreEl.textContent = String(argPongState.aiScore);
+        if (argPongState.aiScore >= ARG_PONG.scoreToWin) {
+          finishArgMatch('lose');
+          return;
+        }
         serveLocked = true;
         setTimeout(() => {
+          if (!argPongState.running) return;
           resetArgBall(true);
           serveLocked = false;
         }, ARG_SCENE_TIMINGS.serveDelayMs);
@@ -981,7 +1080,7 @@ let DITHER_ENABLED = false;
   }
 
   async function runStartArgScene() {
-    if (startArgSceneRunning || startArgSceneStarted) return;
+    if (startArgSessionLocked || startArgSceneRunning || startArgSceneStarted) return;
     startArgScenePending = false;
     startArgSceneRunning = true;
     startArgSceneStarted = true;
@@ -1224,7 +1323,7 @@ let DITHER_ENABLED = false;
     const footerSelector = '.start-footer-box, .start-footer-title, .start-footer-sub';
 
     const playStartEasterEggSound = () => {
-      if (startEasterEggDone || startEasterEggPlaying || startArgScenePending || startArgSceneRunning) return;
+      if (startArgSessionLocked || startEasterEggDone || startEasterEggPlaying || startArgScenePending || startArgSceneRunning) return;
       if (startEasterEggNextSound > START_EASTER_EGG_MAX_SOUND) {
         startEasterEggDone = true;
         return;
