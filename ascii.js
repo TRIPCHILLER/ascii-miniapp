@@ -255,6 +255,7 @@ const ARG_PONG = {
   ],
   syncDistancePx: 54,
   syncHoldMs: 2400,
+  syncMaxDurationMs: 3000,
   syncDecayPerMs: 0.9,
   syncPull: 0.18,
   syncFollowMaxSpeedPx: 10.5,
@@ -749,6 +750,7 @@ let DITHER_ENABLED = false;
     aiScore: 0,
     syncProgressMs: 0,
     syncActive: false,
+    syncStartedAt: 0,
     targetPlayerX: 0.5,
     visorShiftX: 0,
     visorShiftY: 0,
@@ -913,10 +915,26 @@ let DITHER_ENABLED = false;
 
   function bindArgPlayerControls(overlay) {
     if (!overlay || overlay.dataset.argControlsBound === '1') return;
-    const updateTarget = (clientX) => {
+    const rectCache = {
+      left: 0,
+      width: 0,
+      height: 0
+    };
+    const updateRectCache = () => {
       const rect = overlay.getBoundingClientRect();
-      if (!rect.width) return;
-      argPongState.targetPlayerX = clamp((clientX - rect.left) / rect.width, 0, 1);
+      rectCache.left = rect.left;
+      rectCache.width = rect.width;
+      rectCache.height = rect.height;
+    };
+    updateRectCache();
+    if (typeof ResizeObserver === 'function') {
+      const ro = new ResizeObserver(updateRectCache);
+      ro.observe(overlay);
+      overlay.__argControlsResizeObserver = ro;
+    }
+    const updateTarget = (clientX) => {
+      if (!rectCache.width) return;
+      argPongState.targetPlayerX = clamp((clientX - rectCache.left) / rectCache.width, 0, 1);
     };
     overlay.addEventListener('pointerdown', (e) => updateTarget(e.clientX), { passive: true });
     overlay.addEventListener('pointermove', (e) => updateTarget(e.clientX), { passive: true });
@@ -929,6 +947,9 @@ let DITHER_ENABLED = false;
       if (touch) updateTarget(touch.clientX);
     }, { passive: true });
     overlay.addEventListener('mousemove', (e) => updateTarget(e.clientX), { passive: true });
+    window.addEventListener('resize', updateRectCache, { passive: true });
+    window.addEventListener('orientationchange', updateRectCache, { passive: true });
+    overlay.__argControlsUpdateRectCache = updateRectCache;
     overlay.dataset.argControlsBound = '1';
   }
 
@@ -944,6 +965,7 @@ let DITHER_ENABLED = false;
     argPongState.aiVX = 0;
     argPongState.syncProgressMs = 0;
     argPongState.syncActive = false;
+    argPongState.syncStartedAt = 0;
     argPongState.targetPlayerX = 0.5;
     argPongState.visorShiftX = 0;
     argPongState.visorShiftY = 0;
@@ -985,6 +1007,12 @@ let DITHER_ENABLED = false;
       }
       if (!argPongState.syncActive && argPongState.syncProgressMs >= ARG_PONG.syncHoldMs) {
         argPongState.syncActive = true;
+        argPongState.syncStartedAt = now;
+      }
+      if (argPongState.syncActive && (now - argPongState.syncStartedAt >= ARG_PONG.syncMaxDurationMs)) {
+        argPongState.syncActive = false;
+        argPongState.syncProgressMs = 0;
+        argPongState.syncStartedAt = 0;
       }
 
       let aiTargetX = argPongState.ballX;
@@ -992,7 +1020,7 @@ let DITHER_ENABLED = false;
       let aiAccelPx = 0.6;
       let aiDeadZonePx = ARG_PONG.aiTrackDeadZonePx;
       if (argPongState.syncActive) {
-        aiTargetX += (argPongState.playerX - aiTargetX) * ARG_PONG.syncPull;
+        aiTargetX = argPongState.playerX;
         aiMaxSpeedPx = ARG_PONG.syncFollowMaxSpeedPx;
         aiAccelPx = ARG_PONG.syncFollowAccelPx;
         aiDeadZonePx = 1;
