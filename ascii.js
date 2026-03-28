@@ -163,6 +163,28 @@ function busyHide(force = false){
   // ===== Telegram WebApp (если открыто внутри Telegram) =====
   // @section TELEGRAM_WEBAPP_API
 const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
+const TEXT_HAPTIC_THROTTLE_MS = 45;
+
+function tgHaptic(method, ...args) {
+  try {
+    const haptic = window.Telegram?.WebApp?.HapticFeedback;
+    const fn = haptic?.[method];
+    if (typeof fn !== 'function') return;
+    fn(...args);
+  } catch (_) {}
+}
+
+function createThrottle(fn, waitMs) {
+  let lastAt = 0;
+  return (...args) => {
+    const now = performance.now();
+    if (now - lastAt < waitMs) return;
+    lastAt = now;
+    fn(...args);
+  };
+}
+
+const tgTextHaptic = createThrottle(() => tgHaptic('impactOccurred', 'light'), TEXT_HAPTIC_THROTTLE_MS);
 
 const TERM_RANGE_STEPS = 10;
 const START_EASTER_EGG_MAX_SOUND = 10;
@@ -797,6 +819,7 @@ let DITHER_ENABLED = false;
       await sleep(ARG_SCENE_TIMINGS.popupGlitchMs);
       textEl.classList.remove('is-glitching');
       textEl.textContent = `${fixedPart}${text[i]}|`;
+      tgTextHaptic();
       await sleep(text[i] === ' ' ? ARG_SCENE_TIMINGS.popupSpaceTypeMs : ARG_SCENE_TIMINGS.popupCharTypeMs);
     }
     await sleep(120);
@@ -1318,6 +1341,7 @@ let DITHER_ENABLED = false;
     startTypeTimer = setInterval(() => {
       i += 1;
       playStartPrintSound();
+      tgTextHaptic();
       app.ui.startInitText.textContent = `${target.slice(0, i)}|`;
       if (i >= target.length) {
         clearInterval(startTypeTimer);
@@ -3439,7 +3463,7 @@ async function downloadBlob(blob, filename) {
     let dots = 0;
 
     try {
-      tg.HapticFeedback?.impactOccurred?.('light');
+      tgHaptic('impactOccurred', 'light');
       tg.MainButton?.showProgress?.();
 
       // === важно: именно такие поля и заголовки ===
