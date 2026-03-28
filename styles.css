@@ -1224,16 +1224,16 @@ input[type="color"] {
 }
 
 .start-shell{
-  width:min(420px, 100%);
+  width:100%;
   min-height:100%;
-  padding:14px 10px 10px;
+  padding:14px 4px 10px;
   display:flex;
   flex-direction:column;
   gap:10px;
 }
 
 .start-frame-stack{
-  border:3px double #d8d8d8;
+  border:4px double #d8d8d8;
 }
 
 .start-datetime{
@@ -1251,7 +1251,7 @@ input[type="color"] {
 }
 
 .start-core-box{
-  border-bottom:3px double #d8d8d8;
+  border-bottom:4px double #d8d8d8;
   padding:10px 12px;
 }
 
@@ -1312,7 +1312,7 @@ input[type="color"] {
 
 .start-footer-box{
   margin-top:auto;
-  border-top:3px double #d8d8d8;
+  border-top:4px double #d8d8d8;
   padding:14px 10px 8px;
   text-align:center;
 }
