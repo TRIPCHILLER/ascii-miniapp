@@ -213,7 +213,10 @@ const START_UI_SOUNDS = {
 };
 const ARG_SCENE_SOUNDS = {
   turnOff: `assets/sounds/turnoff.mp3?v=${SOUND_ASSET_VERSION}`,
-  click: `assets/sounds/clicksound1.mp3?v=${SOUND_ASSET_VERSION}`
+  click: `assets/sounds/clicksound1.mp3?v=${SOUND_ASSET_VERSION}`,
+  bitClick: `assets/sounds/bitclick.mp3?v=${SOUND_ASSET_VERSION}`,
+  danger: `assets/sounds/dangersound.mp3?v=${SOUND_ASSET_VERSION}`,
+  danger2: `assets/sounds/dangersound2.mp3?v=${SOUND_ASSET_VERSION}`
 };
 const ARG_SCENE_ASSETS = {
   ball: 'assets/pongball.svg',
@@ -858,13 +861,14 @@ let DITHER_ENABLED = false;
     textEl.textContent = text;
   }
 
-  async function showArgPopup(text) {
+  async function showArgPopup(text, { openSoundSrc = '' } = {}) {
     const overlay = ensureArgOverlay();
     const popupLayer = overlay.querySelector('#argScenePopupLayer');
     const textEl = overlay.querySelector('#argScenePopupText');
     if (!popupLayer || !textEl) return;
 
     popupLayer.hidden = false;
+    if (openSoundSrc) playUiSoundNoThrow(openSoundSrc);
     await animateArgPopupText(textEl, text);
 
     await new Promise((resolve) => {
@@ -1272,10 +1276,13 @@ let DITHER_ENABLED = false;
     ball.style.width = `${ballSizePx}px`;
     ball.style.height = `${ballSizePx}px`;
     ballStickLayer.appendChild(ball);
-    playUiSoundNoThrow(ARG_SCENE_SOUNDS.click);
+    playUiSoundNoThrow(ARG_SCENE_SOUNDS.bitClick);
+    tgHaptic('impactOccurred', 'light');
 
     await sleep(ARG_SCENE_TIMINGS.ballToPopupMs);
-    await showArgPopup('NH73ЛЛЗК7 - Э70\nСПОСОБНОС7Ь\n4Д4П7NР0847ЬСЯ\nК ИЗМ3Н3НNЯМ');
+    await showArgPopup('NH73ЛЛЗК7 - Э70\nСПОСОБНОС7Ь\n4Д4П7NР0847ЬСЯ\nК ИЗМ3Н3НNЯМ', {
+      openSoundSrc: ARG_SCENE_SOUNDS.danger
+    });
 
     const topStick = document.createElement('img');
     topStick.className = 'arg-scene-stick arg-scene-stick--top';
@@ -1286,7 +1293,8 @@ let DITHER_ENABLED = false;
     topStick.style.top = `${ARG_PONG.topPaddleYVh}vh`;
     topStick.style.bottom = '';
     ballStickLayer.appendChild(topStick);
-    playUiSoundNoThrow(ARG_SCENE_SOUNDS.click);
+    playUiSoundNoThrow(ARG_SCENE_SOUNDS.bitClick);
+    tgHaptic('impactOccurred', 'light');
 
     await sleep(ARG_SCENE_TIMINGS.topToBottomStickMs);
 
@@ -1299,10 +1307,13 @@ let DITHER_ENABLED = false;
     bottomStick.style.bottom = `${100 - ARG_PONG.bottomPaddleYVh}vh`;
     bottomStick.style.top = '';
     ballStickLayer.appendChild(bottomStick);
-    playUiSoundNoThrow(ARG_SCENE_SOUNDS.click);
+    playUiSoundNoThrow(ARG_SCENE_SOUNDS.bitClick);
+    tgHaptic('impactOccurred', 'light');
 
     await sleep(ARG_SCENE_TIMINGS.bottomToSecondPopupMs);
-    await showArgPopup('3/3');
+    await showArgPopup('3/3', {
+      openSoundSrc: ARG_SCENE_SOUNDS.danger2
+    });
 
     const visorBack = document.createElement('div');
     visorBack.className = 'arg-scene-visor arg-scene-visor--back';
