@@ -758,6 +758,15 @@ let DITHER_ENABLED = false;
     shakeY: 0
   };
 
+  const ARG_BOSS_ASCII = {
+    size: 100,
+    contrast: 1.30,
+    gamma: 1.50,
+    color: '#bebebe',
+    background: '#000000',
+    fps: 24
+  };
+
   function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
   }
@@ -932,8 +941,111 @@ let DITHER_ENABLED = false;
     overlay.dataset.argControlsBound = '1';
   }
 
-  function startArgPong({ overlay, ballStickLayer, ball, topStick, bottomStick, visorFront, scoreLayer, aiScoreEl, playerScoreEl }) {
-    if (!overlay || !ballStickLayer || !ball || !topStick || !bottomStick || !visorFront || !scoreLayer || !aiScoreEl || !playerScoreEl) return;
+  function withTempClassicAsciiState(fn) {
+    const prev = {
+      contrast: state.contrast,
+      gamma: state.gamma,
+      blackPoint: state.blackPoint,
+      whitePoint: state.whitePoint,
+      invert: state.invert
+    };
+    state.contrast = ARG_BOSS_ASCII.contrast;
+    state.gamma = ARG_BOSS_ASCII.gamma;
+    state.blackPoint = 0;
+    state.whitePoint = 1;
+    state.invert = false;
+    try {
+      return fn();
+    } finally {
+      state.contrast = prev.contrast;
+      state.gamma = prev.gamma;
+      state.blackPoint = prev.blackPoint;
+      state.whitePoint = prev.whitePoint;
+      state.invert = prev.invert;
+    }
+  }
+
+  function drawArgVisorBackWarp(ctx2d, img, width, height, tMs) {
+    if (!ctx2d || !img || !width || !height) return;
+    const strips = 18;
+    const stripH = height / strips;
+    for (let i = 0; i < strips; i += 1) {
+      const sy = Math.floor(i * stripH);
+      const sh = Math.max(1, Math.ceil((i + 1) * stripH) - sy);
+      const yNorm = sy / Math.max(1, height);
+      const waveA = Math.sin((tMs * 0.0014) + yNorm * 9.2) * 5.5;
+      const waveB = Math.sin((tMs * 0.0021) + yNorm * 17.0) * 2.2;
+      const jitterY = Math.sin((tMs * 0.001) + yNorm * 6.0) * 0.8;
+      const dx = waveA + waveB;
+      const dy = jitterY;
+      ctx2d.drawImage(img, 0, sy, width, sh, dx, sy + dy, width, sh + 1);
+    }
+  }
+
+  function createArgBossAsciiRenderer({ eyeLayer, visorBackImg, visorFrontImg }) {
+    if (!eyeLayer || !visorBackImg || !visorFrontImg) return null;
+    const textLayer = document.createElement('pre');
+    textLayer.className = 'arg-scene-boss-ascii';
+    textLayer.style.color = ARG_BOSS_ASCII.color;
+    textLayer.style.backgroundColor = ARG_BOSS_ASCII.background;
+    eyeLayer.appendChild(textLayer);
+
+    const compositeCanvas = document.createElement('canvas');
+    const compositeCtx = compositeCanvas.getContext('2d', { alpha: false, desynchronized: true });
+    if (!compositeCtx) return null;
+
+    const renderFromComposite = () => withTempClassicAsciiState(() => {
+      const srcW = compositeCanvas.width;
+      const srcH = compositeCanvas.height;
+      if (!srcW || !srcH) return '';
+      const grid = computeTextGridFromSource(srcW, srcH, ARG_BOSS_ASCII.size);
+      const cols = grid.cols;
+      const rows = grid.rows;
+      off.width = cols;
+      off.height = rows;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(compositeCanvas, 0, 0, srcW, srcH, 0, 0, cols, rows);
+      const data = ctx.getImageData(0, 0, cols, rows).data;
+      return renderClassicDither(data, cols, rows);
+    });
+
+    let lastRenderAt = 0;
+    const minFrameMs = 1000 / ARG_BOSS_ASCII.fps;
+
+    return {
+      textLayer,
+      render({ shiftX = 0, shiftY = 0, shakeX = 0, shakeY = 0, nowMs = performance.now() }) {
+        if (!eyeLayer.isConnected) return;
+        if (!visorBackImg.naturalWidth || !visorFrontImg.naturalWidth) return;
+        if (nowMs - lastRenderAt < minFrameMs) return;
+        lastRenderAt = nowMs;
+
+        const rect = eyeLayer.getBoundingClientRect();
+        const width = Math.max(1, Math.round(rect.width));
+        const height = Math.max(1, Math.round(rect.height));
+        if (!width || !height) return;
+
+        if (compositeCanvas.width !== width || compositeCanvas.height !== height) {
+          compositeCanvas.width = width;
+          compositeCanvas.height = height;
+        }
+
+        compositeCtx.setTransform(1, 0, 0, 1, 0, 0);
+        compositeCtx.clearRect(0, 0, width, height);
+        compositeCtx.fillStyle = ARG_BOSS_ASCII.background;
+        compositeCtx.fillRect(0, 0, width, height);
+
+        drawArgVisorBackWarp(compositeCtx, visorBackImg, width, height, nowMs);
+        compositeCtx.drawImage(visorFrontImg, shiftX + shakeX, shiftY + shakeY, width, height);
+
+        const ascii = renderFromComposite();
+        if (ascii) textLayer.textContent = ascii;
+      }
+    };
+  }
+
+  function startArgPong({ overlay, ballStickLayer, ball, topStick, bottomStick, bossAsciiRenderer, scoreLayer, aiScoreEl, playerScoreEl }) {
+    if (!overlay || !ballStickLayer || !ball || !topStick || !bottomStick || !bossAsciiRenderer || !scoreLayer || !aiScoreEl || !playerScoreEl) return;
     if (argPongRafId) cancelAnimationFrame(argPongRafId);
     argPongState.running = true;
     argPongState.ended = false;
@@ -1119,11 +1231,39 @@ let DITHER_ENABLED = false;
       topStick.style.left = `${argPongState.aiX * 100}%`;
       bottomStick.style.left = `${argPongState.playerX * 100}%`;
       ballStickLayer.style.transform = `translate(${argPongState.shakeX}px, ${argPongState.shakeY}px)`;
-      visorFront.style.transform = `translate(${argPongState.visorShiftX + argPongState.shakeX}px, ${argPongState.visorShiftY + argPongState.shakeY}px)`;
+      bossAsciiRenderer.render({
+        shiftX: argPongState.visorShiftX,
+        shiftY: argPongState.visorShiftY,
+        shakeX: argPongState.shakeX,
+        shakeY: argPongState.shakeY,
+        nowMs: now
+      });
 
       argPongRafId = requestAnimationFrame(loop);
     };
     argPongRafId = requestAnimationFrame(loop);
+  }
+
+  async function waitImageDecode(img) {
+    if (!img) return false;
+    if (img.complete && img.naturalWidth > 0) return true;
+    try {
+      if (typeof img.decode === 'function') {
+        await img.decode();
+        return true;
+      }
+    } catch (_) {}
+    return new Promise((resolve) => {
+      const done = (ok) => {
+        img.removeEventListener('load', onLoad);
+        img.removeEventListener('error', onError);
+        resolve(ok);
+      };
+      const onLoad = () => done(true);
+      const onError = () => done(false);
+      img.addEventListener('load', onLoad, { once: true });
+      img.addEventListener('error', onError, { once: true });
+    });
   }
 
   async function runStartArgScene() {
@@ -1195,21 +1335,28 @@ let DITHER_ENABLED = false;
     await sleep(ARG_SCENE_TIMINGS.bottomToSecondPopupMs);
     await showArgPopup('3/3');
 
-    const visorBack = document.createElement('img');
-    visorBack.className = 'arg-scene-visor arg-scene-visor--back';
+    const visorBack = new Image();
     visorBack.src = ARG_SCENE_ASSETS.visorBack;
     visorBack.alt = '';
-    const visorFront = document.createElement('img');
-    visorFront.className = 'arg-scene-visor arg-scene-visor--front';
+    const visorFront = new Image();
     visorFront.src = ARG_SCENE_ASSETS.visorFront;
     visorFront.alt = '';
-    eyeLayer.appendChild(visorBack);
-    eyeLayer.appendChild(visorFront);
+    await Promise.all([waitImageDecode(visorBack), waitImageDecode(visorFront)]);
+    const bossAsciiRenderer = createArgBossAsciiRenderer({
+      eyeLayer,
+      visorBackImg: visorBack,
+      visorFrontImg: visorFront
+    });
+    if (!bossAsciiRenderer) {
+      startArgSceneRunning = false;
+      return;
+    }
+    bossAsciiRenderer.render();
     playUiSoundNoThrow(ARG_SCENE_SOUNDS.turnOff);
 
     await sleep(ARG_SCENE_TIMINGS.eyeToCountdownMs);
     await runArgCountdown();
-    startArgPong({ overlay, ballStickLayer, ball, topStick, bottomStick, visorFront, scoreLayer, aiScoreEl, playerScoreEl });
+    startArgPong({ overlay, ballStickLayer, ball, topStick, bottomStick, bossAsciiRenderer, scoreLayer, aiScoreEl, playerScoreEl });
 
     startArgSceneRunning = false;
   }
