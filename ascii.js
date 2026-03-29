@@ -265,6 +265,14 @@ const ARG_PONG = {
   visorEyeSpring: 0.2,
   visorEyeDamping: 0.78,
   visorEyeMaxSpeedPx: 3.2,
+  visorBackDriftAmpXPx: 1.8,
+  visorBackDriftAmpYPx: 1.2,
+  visorBackMicroJitterAmpXPx: 0.45,
+  visorBackMicroJitterAmpYPx: 0.35,
+  visorBackDriftSpeedX: 0.00072,
+  visorBackDriftSpeedY: 0.00053,
+  visorBackMicroJitterSpeedX: 0.0031,
+  visorBackMicroJitterSpeedY: 0.0027,
   shakeHitAmountPx: 2.2,
   shakeDecay: 0.82
 };
@@ -756,6 +764,8 @@ let DITHER_ENABLED = false;
     visorShiftY: 0,
     visorVX: 0,
     visorVY: 0,
+    visorBackPhaseX: 0,
+    visorBackPhaseY: 0,
     shakeX: 0,
     shakeY: 0
   };
@@ -953,8 +963,8 @@ let DITHER_ENABLED = false;
     overlay.dataset.argControlsBound = '1';
   }
 
-  function startArgPong({ overlay, ballStickLayer, ball, topStick, bottomStick, visorFront, scoreLayer, aiScoreEl, playerScoreEl }) {
-    if (!overlay || !ballStickLayer || !ball || !topStick || !bottomStick || !visorFront || !scoreLayer || !aiScoreEl || !playerScoreEl) return;
+  function startArgPong({ overlay, ballStickLayer, ball, topStick, bottomStick, visorBack, visorFront, scoreLayer, aiScoreEl, playerScoreEl }) {
+    if (!overlay || !ballStickLayer || !ball || !topStick || !bottomStick || !visorBack || !visorFront || !scoreLayer || !aiScoreEl || !playerScoreEl) return;
     if (argPongRafId) cancelAnimationFrame(argPongRafId);
     argPongState.running = true;
     argPongState.ended = false;
@@ -969,6 +979,8 @@ let DITHER_ENABLED = false;
     argPongState.targetPlayerX = 0.5;
     argPongState.visorShiftX = 0;
     argPongState.visorShiftY = 0;
+    argPongState.visorBackPhaseX = Math.random() * Math.PI * 2;
+    argPongState.visorBackPhaseY = Math.random() * Math.PI * 2;
     argPongState.shakeX = 0;
     argPongState.shakeY = 0;
     playerScoreEl.textContent = '0';
@@ -1139,6 +1151,12 @@ let DITHER_ENABLED = false;
       argPongState.visorVY = clamp(argPongState.visorVY, -ARG_PONG.visorEyeMaxSpeedPx, ARG_PONG.visorEyeMaxSpeedPx);
       argPongState.visorShiftX = clamp(argPongState.visorShiftX + argPongState.visorVX, -ARG_PONG.visorEyeMaxShiftXPx, ARG_PONG.visorEyeMaxShiftXPx);
       argPongState.visorShiftY = clamp(argPongState.visorShiftY + argPongState.visorVY, -ARG_PONG.visorEyeMaxShiftYPx, ARG_PONG.visorEyeMaxShiftYPx);
+      const visorBackOffsetX =
+        Math.sin(now * ARG_PONG.visorBackDriftSpeedX + argPongState.visorBackPhaseX) * ARG_PONG.visorBackDriftAmpXPx
+        + Math.cos(now * ARG_PONG.visorBackMicroJitterSpeedX + argPongState.visorBackPhaseY * 0.67) * ARG_PONG.visorBackMicroJitterAmpXPx;
+      const visorBackOffsetY =
+        Math.cos(now * ARG_PONG.visorBackDriftSpeedY + argPongState.visorBackPhaseY) * ARG_PONG.visorBackDriftAmpYPx
+        + Math.sin(now * ARG_PONG.visorBackMicroJitterSpeedY + argPongState.visorBackPhaseX * 0.83) * ARG_PONG.visorBackMicroJitterAmpYPx;
       argPongState.shakeX *= ARG_PONG.shakeDecay;
       argPongState.shakeY *= ARG_PONG.shakeDecay;
 
@@ -1147,6 +1165,7 @@ let DITHER_ENABLED = false;
       topStick.style.left = `${argPongState.aiX * 100}%`;
       bottomStick.style.left = `${argPongState.playerX * 100}%`;
       ballStickLayer.style.transform = `translate(${argPongState.shakeX}px, ${argPongState.shakeY}px)`;
+      visorBack.style.transform = `translate(${visorBackOffsetX + argPongState.shakeX * 0.12}px, ${visorBackOffsetY + argPongState.shakeY * 0.12}px)`;
       visorFront.style.transform = `translate(${argPongState.visorShiftX + argPongState.shakeX}px, ${argPongState.visorShiftY + argPongState.shakeY}px)`;
 
       argPongRafId = requestAnimationFrame(loop);
@@ -1237,7 +1256,7 @@ let DITHER_ENABLED = false;
 
     await sleep(ARG_SCENE_TIMINGS.eyeToCountdownMs);
     await runArgCountdown();
-    startArgPong({ overlay, ballStickLayer, ball, topStick, bottomStick, visorFront, scoreLayer, aiScoreEl, playerScoreEl });
+    startArgPong({ overlay, ballStickLayer, ball, topStick, bottomStick, visorBack, visorFront, scoreLayer, aiScoreEl, playerScoreEl });
 
     startArgSceneRunning = false;
   }
