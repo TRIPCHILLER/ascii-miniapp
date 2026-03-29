@@ -267,6 +267,9 @@ const ARG_PONG = {
   visorEyeSpring: 0.2,
   visorEyeDamping: 0.78,
   visorEyeMaxSpeedPx: 3.2,
+  visorBackParallaxFollow: 0.2,
+  visorBackParallaxMaxXPx: 3.2,
+  visorBackParallaxMaxYPx: 2.2,
   visorBackDriftAmpXPx: 7.4,
   visorBackDriftAmpYPx: 5.1,
   visorBackMicroJitterAmpXPx: 2.25,
@@ -279,6 +282,13 @@ const ARG_PONG = {
   visorBackPulseAmpYPx: 2.8,
   visorBackPulseSpeedX: 0.00128,
   visorBackPulseSpeedY: 0.00105,
+  visorBackWarpAmpXPx: 2.2,
+  visorBackWarpAmpYPx: 1.65,
+  visorBackWarpSpeedX: 0.00235,
+  visorBackWarpSpeedY: 0.00195,
+  visorEngineJitterAmpXPx: 0.95,
+  visorEngineJitterAmpYPx: 0.78,
+  visorEngineJitterResponse: 0.48,
   shakeHitAmountPx: 2.2,
   shakeDecay: 0.82
 };
@@ -772,6 +782,10 @@ let DITHER_ENABLED = false;
     visorVY: 0,
     visorBackPhaseX: 0,
     visorBackPhaseY: 0,
+    visorBackWarpPhaseA: 0,
+    visorBackWarpPhaseB: 0,
+    visorEngineShakeX: 0,
+    visorEngineShakeY: 0,
     shakeX: 0,
     shakeY: 0
   };
@@ -987,6 +1001,10 @@ let DITHER_ENABLED = false;
     argPongState.visorShiftY = 0;
     argPongState.visorBackPhaseX = Math.random() * Math.PI * 2;
     argPongState.visorBackPhaseY = Math.random() * Math.PI * 2;
+    argPongState.visorBackWarpPhaseA = Math.random() * Math.PI * 2;
+    argPongState.visorBackWarpPhaseB = Math.random() * Math.PI * 2;
+    argPongState.visorEngineShakeX = 0;
+    argPongState.visorEngineShakeY = 0;
     argPongState.shakeX = 0;
     argPongState.shakeY = 0;
     playerScoreEl.textContent = '0';
@@ -998,6 +1016,7 @@ let DITHER_ENABLED = false;
     scoreLayer.hidden = false;
     resetArgBall(Math.random() > 0.5);
     bindArgPlayerControls(overlay);
+    const visorBackSlices = visorBack.querySelectorAll('.arg-scene-visor-slice');
 
     let serveLocked = false;
     let prevTs = 0;
@@ -1168,6 +1187,22 @@ let DITHER_ENABLED = false;
         Math.cos(now * ARG_PONG.visorBackDriftSpeedY + argPongState.visorBackPhaseY) * ARG_PONG.visorBackDriftAmpYPx
         + Math.sin(now * ARG_PONG.visorBackMicroJitterSpeedY + argPongState.visorBackPhaseX * 0.83) * ARG_PONG.visorBackMicroJitterAmpYPx
         + Math.cos(now * ARG_PONG.visorBackPulseSpeedY + argPongState.visorBackPhaseY * 1.19 + argPongState.visorBackPhaseX * 0.28) * ARG_PONG.visorBackPulseAmpYPx;
+      const visorBackParallaxX = clamp(
+        clampedTargetX * ARG_PONG.visorBackParallaxFollow,
+        -ARG_PONG.visorBackParallaxMaxXPx,
+        ARG_PONG.visorBackParallaxMaxXPx
+      );
+      const visorBackParallaxY = clamp(
+        clampedTargetY * ARG_PONG.visorBackParallaxFollow,
+        -ARG_PONG.visorBackParallaxMaxYPx,
+        ARG_PONG.visorBackParallaxMaxYPx
+      );
+      argPongState.visorEngineShakeX += (
+        (Math.random() * 2 - 1) * ARG_PONG.visorEngineJitterAmpXPx - argPongState.visorEngineShakeX
+      ) * ARG_PONG.visorEngineJitterResponse;
+      argPongState.visorEngineShakeY += (
+        (Math.random() * 2 - 1) * ARG_PONG.visorEngineJitterAmpYPx - argPongState.visorEngineShakeY
+      ) * ARG_PONG.visorEngineJitterResponse;
       argPongState.shakeX *= ARG_PONG.shakeDecay;
       argPongState.shakeY *= ARG_PONG.shakeDecay;
 
@@ -1176,8 +1211,24 @@ let DITHER_ENABLED = false;
       topStick.style.left = `${argPongState.aiX * 100}%`;
       bottomStick.style.left = `${argPongState.playerX * 100}%`;
       ballStickLayer.style.transform = `translate(${argPongState.shakeX}px, ${argPongState.shakeY}px)`;
-      visorBack.style.transform = `translate(${visorBackOffsetX + argPongState.shakeX * 0.12}px, ${visorBackOffsetY + argPongState.shakeY * 0.12}px)`;
-      visorFront.style.transform = `translate(${argPongState.visorShiftX + argPongState.shakeX}px, ${argPongState.visorShiftY + argPongState.shakeY}px)`;
+      const visorBackX = visorBackOffsetX + visorBackParallaxX + argPongState.shakeX * 0.12 + argPongState.visorEngineShakeX;
+      const visorBackY = visorBackOffsetY + visorBackParallaxY + argPongState.shakeY * 0.12 + argPongState.visorEngineShakeY;
+      visorBack.style.transform = `translate(${visorBackX}px, ${visorBackY}px)`;
+      if (visorBackSlices.length) {
+        const warpWaveA = now * ARG_PONG.visorBackWarpSpeedX + argPongState.visorBackWarpPhaseA;
+        const warpWaveB = now * ARG_PONG.visorBackWarpSpeedY + argPongState.visorBackWarpPhaseB;
+        for (let i = 0; i < visorBackSlices.length; i += 1) {
+          const slice = visorBackSlices[i];
+          const depth = i - 1;
+          const waveX = Math.sin(warpWaveA + depth * 1.9) + Math.cos(warpWaveB * 1.11 - depth * 1.37);
+          const waveY = Math.cos(warpWaveB + depth * 1.73) - Math.sin(warpWaveA * 0.92 - depth * 1.26);
+          const localShiftX = waveX * ARG_PONG.visorBackWarpAmpXPx * (0.46 + i * 0.22);
+          const localShiftY = waveY * ARG_PONG.visorBackWarpAmpYPx * (0.4 + i * 0.2);
+          const localRotate = waveX * 0.24 + waveY * 0.14;
+          slice.style.transform = `translate(${localShiftX}px, ${localShiftY}px) rotate(${localRotate}deg) scale(1.004)`;
+        }
+      }
+      visorFront.style.transform = `translate(${argPongState.visorShiftX + argPongState.shakeX + argPongState.visorEngineShakeX * 0.22}px, ${argPongState.visorShiftY + argPongState.shakeY + argPongState.visorEngineShakeY * 0.22}px)`;
 
       argPongRafId = requestAnimationFrame(loop);
     };
@@ -1253,10 +1304,18 @@ let DITHER_ENABLED = false;
     await sleep(ARG_SCENE_TIMINGS.bottomToSecondPopupMs);
     await showArgPopup('3/3');
 
-    const visorBack = document.createElement('img');
+    const visorBack = document.createElement('div');
     visorBack.className = 'arg-scene-visor arg-scene-visor--back';
-    visorBack.src = ARG_SCENE_ASSETS.visorBack;
-    visorBack.alt = '';
+    for (let i = 0; i < 3; i += 1) {
+      const slice = document.createElement('img');
+      slice.className = `arg-scene-visor-slice arg-scene-visor-slice--${i + 1}`;
+      slice.src = ARG_SCENE_ASSETS.visorBack;
+      slice.alt = '';
+      if (i === 0) slice.style.clipPath = 'polygon(0 0, 100% 0, 100% 38%, 0 44%)';
+      else if (i === 1) slice.style.clipPath = 'polygon(0 31%, 100% 26%, 100% 72%, 0 70%)';
+      else slice.style.clipPath = 'polygon(0 58%, 100% 64%, 100% 100%, 0 100%)';
+      visorBack.appendChild(slice);
+    }
     const visorFront = document.createElement('img');
     visorFront.className = 'arg-scene-visor arg-scene-visor--front';
     visorFront.src = ARG_SCENE_ASSETS.visorFront;
