@@ -841,6 +841,7 @@ let DITHER_ENABLED = false;
     const textEl = overlay.querySelector('#argScenePopupText');
     if (!popupLayer || !textEl) return;
 
+    if (text === '3/3') console.log('[ARG][PONG] popup 3/3 shown');
     popupLayer.hidden = false;
     await animateArgPopupText(textEl, text);
 
@@ -852,6 +853,7 @@ let DITHER_ENABLED = false;
         popupLayer.removeEventListener('pointerup', onClose, true);
         popupLayer.removeEventListener('click', onClose, true);
         popupLayer.hidden = true;
+        if (text === '3/3') console.log('[ARG][PONG] popup 3/3 closed');
         playUiSoundNoThrow(ARG_SCENE_SOUNDS.click);
         resolve();
       };
@@ -1073,6 +1075,7 @@ let DITHER_ENABLED = false;
 
     let serveLocked = false;
     let prevTs = 0;
+    let bossRenderTickLogged = false;
     const loop = () => {
       if (!argPongState.running) return;
       const rect = overlay.getBoundingClientRect();
@@ -1238,6 +1241,10 @@ let DITHER_ENABLED = false;
         shakeY: argPongState.shakeY,
         nowMs: now
       });
+      if (!bossRenderTickLogged) {
+        bossRenderTickLogged = true;
+        console.log('[ARG][PONG] boss render tick active');
+      }
 
       argPongRafId = requestAnimationFrame(loop);
     };
@@ -1254,15 +1261,27 @@ let DITHER_ENABLED = false;
       }
     } catch (_) {}
     return new Promise((resolve) => {
+      let settled = false;
+      const settle = (ok) => {
+        if (settled) return;
+        settled = true;
+        resolve(ok);
+      };
       const done = (ok) => {
         img.removeEventListener('load', onLoad);
         img.removeEventListener('error', onError);
-        resolve(ok);
+        settle(ok);
       };
       const onLoad = () => done(true);
       const onError = () => done(false);
       img.addEventListener('load', onLoad, { once: true });
       img.addEventListener('error', onError, { once: true });
+      // В некоторых webview событие load может уже пройти между initial-check и addEventListener.
+      if (img.complete) done(img.naturalWidth > 0);
+      // Fail-safe против вечного ожидания decode/load (замечено на SVG в Telegram WebView).
+      setTimeout(() => {
+        if (!settled && img.complete) done(img.naturalWidth > 0);
+      }, 1200);
     });
   }
 
@@ -1335,13 +1354,15 @@ let DITHER_ENABLED = false;
     await sleep(ARG_SCENE_TIMINGS.bottomToSecondPopupMs);
     await showArgPopup('3/3');
 
+    console.log('[ARG][PONG] boss init started');
     const visorBack = new Image();
     visorBack.src = ARG_SCENE_ASSETS.visorBack;
     visorBack.alt = '';
     const visorFront = new Image();
     visorFront.src = ARG_SCENE_ASSETS.visorFront;
     visorFront.alt = '';
-    await Promise.all([waitImageDecode(visorBack), waitImageDecode(visorFront)]);
+    const [visorBackReady, visorFrontReady] = await Promise.all([waitImageDecode(visorBack), waitImageDecode(visorFront)]);
+    console.log('[ARG][PONG] boss assets ready', { visorBackReady, visorFrontReady });
     const bossAsciiRenderer = createArgBossAsciiRenderer({
       eyeLayer,
       visorBackImg: visorBack,
@@ -1356,6 +1377,7 @@ let DITHER_ENABLED = false;
 
     await sleep(ARG_SCENE_TIMINGS.eyeToCountdownMs);
     await runArgCountdown();
+    console.log('[ARG][PONG] boss fight started');
     startArgPong({ overlay, ballStickLayer, ball, topStick, bottomStick, bossAsciiRenderer, scoreLayer, aiScoreEl, playerScoreEl });
 
     startArgSceneRunning = false;
