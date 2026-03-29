@@ -1391,24 +1391,6 @@ input[type="color"] {
   image-rendering:pixelated;
 }
 
-.arg-scene-boss-ascii{
-  position:absolute;
-  inset:0;
-  margin:0;
-  padding:0;
-  overflow:hidden;
-  white-space:pre;
-  text-align:center;
-  font-family:'PxPlus IBM VGA', monospace;
-  font-size:clamp(7px, 0.95vw, 12px);
-  line-height:0.82;
-  letter-spacing:0;
-  color:#bebebe;
-  background:#000;
-  text-shadow:none;
-  pointer-events:none;
-}
-
 .arg-scene-countdown{
   font-family:'PixPlus', monospace;
   font-size:min(36vw, 320px);
