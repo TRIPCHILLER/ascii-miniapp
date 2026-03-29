@@ -185,9 +185,11 @@ function createThrottle(fn, waitMs) {
 }
 
 const tgTextHaptic = createThrottle(() => tgHaptic('impactOccurred', 'light'), TEXT_HAPTIC_THROTTLE_MS);
+const tgPongHitHaptic = createThrottle(() => tgHaptic('impactOccurred', 'light'), 55);
 
 const TERM_RANGE_STEPS = 10;
 const START_EASTER_EGG_MAX_SOUND = 10;
+const START_EASTER_EGG_TEST_TAP_COUNT = 1;
 // Версия ассетов звуков для принудительного обновления кэша в WebView/браузере.
 const SOUND_ASSET_VERSION = '20260313-1';
 const START_EASTER_EGG_SOUNDS = Array.from(
@@ -265,14 +267,18 @@ const ARG_PONG = {
   visorEyeSpring: 0.2,
   visorEyeDamping: 0.78,
   visorEyeMaxSpeedPx: 3.2,
-  visorBackDriftAmpXPx: 1.8,
-  visorBackDriftAmpYPx: 1.2,
-  visorBackMicroJitterAmpXPx: 0.45,
-  visorBackMicroJitterAmpYPx: 0.35,
+  visorBackDriftAmpXPx: 7.4,
+  visorBackDriftAmpYPx: 5.1,
+  visorBackMicroJitterAmpXPx: 2.25,
+  visorBackMicroJitterAmpYPx: 1.75,
   visorBackDriftSpeedX: 0.00072,
   visorBackDriftSpeedY: 0.00053,
   visorBackMicroJitterSpeedX: 0.0031,
   visorBackMicroJitterSpeedY: 0.0027,
+  visorBackPulseAmpXPx: 3.5,
+  visorBackPulseAmpYPx: 2.8,
+  visorBackPulseSpeedX: 0.00128,
+  visorBackPulseSpeedY: 0.00105,
   shakeHitAmountPx: 2.2,
   shakeDecay: 0.82
 };
@@ -727,7 +733,7 @@ let DITHER_ENABLED = false;
   let startDateTimer = null;
   let startBlinkTimer = null;
   let startTypeTimer = null;
-  let startEasterEggNextSound = 1;
+  let startEasterEggNextSound = Math.max(1, START_EASTER_EGG_MAX_SOUND - START_EASTER_EGG_TEST_TAP_COUNT + 1);
   let startEasterEggPlaying = false;
   let startEasterEggDone = false;
   let startArgScenePending = false;
@@ -1071,6 +1077,7 @@ let DITHER_ENABLED = false;
         argPongState.ballX = clamp(argPongState.ballX, wallNorm + ballHalfX, 1 - wallNorm - ballHalfX);
         argPongState.ballVX *= -1;
         applyTinyShake();
+        tgPongHitHaptic();
       }
 
       const topY = ARG_PONG.topPaddleYVh / 100;
@@ -1089,6 +1096,7 @@ let DITHER_ENABLED = false;
         argPongState.ballVX = clamp(argPongState.ballVX, -ARG_PONG.ballMaxSpeedPx, ARG_PONG.ballMaxSpeedPx);
         argPongState.ballY = topY + paddleHalfH + ballHalfY;
         applyTinyShake();
+        tgPongHitHaptic();
       }
 
       const hitBottom = argPongState.ballVY > 0
@@ -1102,6 +1110,7 @@ let DITHER_ENABLED = false;
         argPongState.ballVX = clamp(argPongState.ballVX, -ARG_PONG.ballMaxSpeedPx, ARG_PONG.ballMaxSpeedPx);
         argPongState.ballY = bottomY - paddleHalfH - ballHalfY;
         applyTinyShake();
+        tgPongHitHaptic();
       }
 
       const topGoalLine = topY + paddleHalfH + ballHalfY;
@@ -1153,10 +1162,12 @@ let DITHER_ENABLED = false;
       argPongState.visorShiftY = clamp(argPongState.visorShiftY + argPongState.visorVY, -ARG_PONG.visorEyeMaxShiftYPx, ARG_PONG.visorEyeMaxShiftYPx);
       const visorBackOffsetX =
         Math.sin(now * ARG_PONG.visorBackDriftSpeedX + argPongState.visorBackPhaseX) * ARG_PONG.visorBackDriftAmpXPx
-        + Math.cos(now * ARG_PONG.visorBackMicroJitterSpeedX + argPongState.visorBackPhaseY * 0.67) * ARG_PONG.visorBackMicroJitterAmpXPx;
+        + Math.cos(now * ARG_PONG.visorBackMicroJitterSpeedX + argPongState.visorBackPhaseY * 0.67) * ARG_PONG.visorBackMicroJitterAmpXPx
+        + Math.sin(now * ARG_PONG.visorBackPulseSpeedX + argPongState.visorBackPhaseX * 1.37 + argPongState.visorBackPhaseY * 0.41) * ARG_PONG.visorBackPulseAmpXPx;
       const visorBackOffsetY =
         Math.cos(now * ARG_PONG.visorBackDriftSpeedY + argPongState.visorBackPhaseY) * ARG_PONG.visorBackDriftAmpYPx
-        + Math.sin(now * ARG_PONG.visorBackMicroJitterSpeedY + argPongState.visorBackPhaseX * 0.83) * ARG_PONG.visorBackMicroJitterAmpYPx;
+        + Math.sin(now * ARG_PONG.visorBackMicroJitterSpeedY + argPongState.visorBackPhaseX * 0.83) * ARG_PONG.visorBackMicroJitterAmpYPx
+        + Math.cos(now * ARG_PONG.visorBackPulseSpeedY + argPongState.visorBackPhaseY * 1.19 + argPongState.visorBackPhaseX * 0.28) * ARG_PONG.visorBackPulseAmpYPx;
       argPongState.shakeX *= ARG_PONG.shakeDecay;
       argPongState.shakeY *= ARG_PONG.shakeDecay;
 
