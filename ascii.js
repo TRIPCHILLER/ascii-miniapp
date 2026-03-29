@@ -186,6 +186,7 @@ function createThrottle(fn, waitMs) {
 
 const tgTextHaptic = createThrottle(() => tgHaptic('impactOccurred', 'light'), TEXT_HAPTIC_THROTTLE_MS);
 const tgPongHitHaptic = createThrottle(() => tgHaptic('impactOccurred', 'light'), 55);
+const tgPongSpawnHaptic = createThrottle(() => tgHaptic('impactOccurred', 'light'), 90);
 
 const TERM_RANGE_STEPS = 10;
 const START_EASTER_EGG_MAX_SOUND = 10;
@@ -247,8 +248,8 @@ const ARG_PONG = {
   topScoreYVh: 10,
   bottomScoreYVh: 10,
   sideWallPaddingPx: 8,
-  ballBaseSpeedPx: 6,
-  ballMaxSpeedPx: 13,
+  ballBaseSpeedPx: 4,
+  ballMaxSpeedPx: 8.7,
   paddleBounceBoost: 0.3,
   playerPointerSmoothing: 0.4,
   aiMaxSpeedPx: 6,
@@ -258,6 +259,7 @@ const ARG_PONG = {
     { maxSpeedPx: 7.2, reaction: 0.2, autoAim: 0.45, accelPx: 0.65, deadZonePx: 8 },
     { maxSpeedPx: 11.8, reaction: 0.35, autoAim: 0.82, accelPx: 1.2, deadZonePx: 2 }
   ],
+  aiClutch: { maxSpeedPx: 14.5, reaction: 0.92, autoAim: 1.15, accelPx: 2.05, deadZonePx: 0.8 },
   syncDistancePx: 54,
   syncHoldMs: 2400,
   syncMaxDurationMs: 3000,
@@ -289,6 +291,15 @@ const ARG_PONG = {
   visorBackWarpAmpYPx: 1.65,
   visorBackWarpSpeedX: 0.00235,
   visorBackWarpSpeedY: 0.00195,
+  visorBackWarpFieldAmpPx: 3.4,
+  visorBackWarpFieldScaleBase: 0.022,
+  visorBackWarpFieldScaleX: 0.0048,
+  visorBackWarpFieldScaleY: 0.0044,
+  visorBackWarpFieldSpeedA: 0.00058,
+  visorBackWarpFieldSpeedB: 0.00044,
+  visorBackWarpFieldSpeedC: 0.00037,
+  visorBackWarpFieldBaseFreqX: 0.019,
+  visorBackWarpFieldBaseFreqY: 0.026,
   visorEngineJitterAmpXPx: 0.95,
   visorEngineJitterAmpYPx: 0.78,
   visorEngineJitterResponse: 0.48,
@@ -904,18 +915,33 @@ let DITHER_ENABLED = false;
     if (argPongState.ended) return;
     argPongState.ended = true;
     stopArgPongLoop();
+    const cleanupAndExitToMenu = ({ lockSession = false } = {}) => {
+      const overlay = ensureArgOverlay();
+      const eyeLayer = overlay.querySelector('#argSceneEyeLayer');
+      const ballStickLayer = overlay.querySelector('#argSceneBallStickLayer');
+      const countdownLayer = overlay.querySelector('#argSceneCountdownLayer');
+      const scoreLayer = overlay.querySelector('#argSceneScoreLayer');
+      const popupLayer = overlay.querySelector('#argScenePopupLayer');
+      overlay.hidden = true;
+      if (eyeLayer) eyeLayer.innerHTML = '';
+      if (ballStickLayer) ballStickLayer.innerHTML = '';
+      if (countdownLayer) countdownLayer.textContent = '';
+      if (scoreLayer) scoreLayer.hidden = true;
+      if (popupLayer) popupLayer.hidden = true;
+      startArgSessionLocked = !!lockSession;
+      startArgSceneRunning = false;
+      startArgSceneStarted = false;
+      startArgScenePending = false;
+      initVisorMode();
+    };
     if (result === 'win') {
       await showArgPopup('ТЫ ОДОЛЕЛ СИСТЕМУ');
-      startArgSceneRunning = false;
+      cleanupAndExitToMenu();
       return;
     }
 
     await showArgPopup('ТЫ ТАК И НЕ УВИДЕЛ СУТЬ...');
-    const overlay = ensureArgOverlay();
-    overlay.hidden = true;
-    startArgSessionLocked = true;
-    startArgSceneRunning = false;
-    startArgSceneStarted = false;
+    cleanupAndExitToMenu({ lockSession: true });
   }
 
   async function runArgCountdown() {
@@ -1020,7 +1046,8 @@ let DITHER_ENABLED = false;
     scoreLayer.hidden = false;
     resetArgBall(Math.random() > 0.5);
     bindArgPlayerControls(overlay);
-    const visorBackSlices = visorBack.querySelectorAll('.arg-scene-visor-slice');
+    const visorBackWarpField = visorBack.querySelector('feTurbulence');
+    const visorBackWarpMap = visorBack.querySelector('feDisplacementMap');
 
     let serveLocked = false;
     let prevTs = 0;
@@ -1067,12 +1094,27 @@ let DITHER_ENABLED = false;
         aiDeadZonePx = 1;
       } else {
         const aiLevel = ARG_PONG.aiLevels[Math.min(argPongState.playerScore, ARG_PONG.aiLevels.length - 1)];
-        const lookAheadNorm = clamp(argPongState.ballVX * aiLevel.autoAim * 6 / rect.width, -0.2, 0.2);
-        const aimX = clamp(argPongState.ballX + lookAheadNorm, paddleHalfNorm, 1 - paddleHalfNorm);
-        aiTargetX += (aimX - aiTargetX) * aiLevel.reaction;
-        aiMaxSpeedPx = aiLevel.maxSpeedPx;
-        aiAccelPx = aiLevel.accelPx;
-        aiDeadZonePx = aiLevel.deadZonePx;
+        const aiIsClutch = argPongState.playerScore >= (ARG_PONG.scoreToWin - 1);
+        const aiEffectiveLevel = aiIsClutch ? ARG_PONG.aiClutch : aiLevel;
+        let aimX = argPongState.ballX;
+        if (aiIsClutch && argPongState.ballVY < -0.001) {
+          const topYNorm = ARG_PONG.topPaddleYVh / 100;
+          const travelNormY = Math.max(0, (argPongState.ballY - topYNorm));
+          const framesToTop = travelNormY / Math.max(0.0001, -argPongState.ballVY / rect.height);
+          const projectedX = argPongState.ballX + (argPongState.ballVX / rect.width) * framesToTop * aiEffectiveLevel.autoAim;
+          const playLeft = paddleHalfNorm + (ARG_PONG.sideWallPaddingPx / rect.width);
+          const playRight = 1 - paddleHalfNorm - (ARG_PONG.sideWallPaddingPx / rect.width);
+          const span = Math.max(0.0001, playRight - playLeft);
+          const mirrored = playLeft + Math.abs((((projectedX - playLeft) % (span * 2)) + (span * 2)) % (span * 2) - span);
+          aimX = clamp(mirrored, paddleHalfNorm, 1 - paddleHalfNorm);
+        } else {
+          const lookAheadNorm = clamp(argPongState.ballVX * aiEffectiveLevel.autoAim * 6 / rect.width, -0.2, 0.2);
+          aimX = clamp(argPongState.ballX + lookAheadNorm, paddleHalfNorm, 1 - paddleHalfNorm);
+        }
+        aiTargetX += (aimX - aiTargetX) * aiEffectiveLevel.reaction;
+        aiMaxSpeedPx = aiEffectiveLevel.maxSpeedPx;
+        aiAccelPx = aiEffectiveLevel.accelPx;
+        aiDeadZonePx = aiEffectiveLevel.deadZonePx;
       }
 
       const aiDelta = aiTargetX - argPongState.aiX;
@@ -1218,19 +1260,19 @@ let DITHER_ENABLED = false;
       const visorBackX = visorBackOffsetX + visorBackParallaxX + argPongState.shakeX * 0.12 + argPongState.visorEngineShakeX;
       const visorBackY = visorBackOffsetY + visorBackParallaxY + argPongState.shakeY * 0.12 + argPongState.visorEngineShakeY;
       visorBack.style.transform = `translate(${visorBackX}px, ${visorBackY}px)`;
-      if (visorBackSlices.length) {
-        const warpWaveA = now * ARG_PONG.visorBackWarpSpeedX + argPongState.visorBackWarpPhaseA;
-        const warpWaveB = now * ARG_PONG.visorBackWarpSpeedY + argPongState.visorBackWarpPhaseB;
-        for (let i = 0; i < visorBackSlices.length; i += 1) {
-          const slice = visorBackSlices[i];
-          const depth = i - 1;
-          const waveX = Math.sin(warpWaveA + depth * 1.9) + Math.cos(warpWaveB * 1.11 - depth * 1.37);
-          const waveY = Math.cos(warpWaveB + depth * 1.73) - Math.sin(warpWaveA * 0.92 - depth * 1.26);
-          const localShiftX = waveX * ARG_PONG.visorBackWarpAmpXPx * (0.46 + i * 0.22);
-          const localShiftY = waveY * ARG_PONG.visorBackWarpAmpYPx * (0.4 + i * 0.2);
-          const localRotate = waveX * 0.24 + waveY * 0.14;
-          slice.style.transform = `translate(${localShiftX}px, ${localShiftY}px) rotate(${localRotate}deg) scale(1.004)`;
-        }
+      if (visorBackWarpField && visorBackWarpMap) {
+        const warpPhaseA = now * ARG_PONG.visorBackWarpFieldSpeedA + argPongState.visorBackWarpPhaseA;
+        const warpPhaseB = now * ARG_PONG.visorBackWarpFieldSpeedB + argPongState.visorBackWarpPhaseB;
+        const warpPhaseC = now * ARG_PONG.visorBackWarpFieldSpeedC + argPongState.visorBackPhaseX * 0.61;
+        const scaleX = ARG_PONG.visorBackWarpFieldScaleBase + Math.sin(warpPhaseA) * ARG_PONG.visorBackWarpFieldScaleX;
+        const scaleY = ARG_PONG.visorBackWarpFieldScaleBase + Math.cos(warpPhaseB) * ARG_PONG.visorBackWarpFieldScaleY;
+        visorBackWarpField.setAttribute('baseFrequency', `${Math.max(0.004, scaleX)} ${Math.max(0.004, scaleY)}`);
+        visorBackWarpField.setAttribute('seed', String(7 + Math.floor((Math.sin(warpPhaseC) + 1) * 11)));
+        const warpScale =
+          ARG_PONG.visorBackWarpFieldAmpPx
+          + Math.sin(warpPhaseA * 1.7 + warpPhaseB * 0.4) * 1.2
+          + Math.cos(warpPhaseB * 1.4 - warpPhaseC * 0.8) * 0.9;
+        visorBackWarpMap.setAttribute('scale', String(Math.max(1.4, warpScale)));
       }
       visorFront.style.transform = `translate(${argPongState.visorShiftX + argPongState.shakeX + argPongState.visorEngineShakeX * 0.22}px, ${argPongState.visorShiftY + argPongState.shakeY + argPongState.visorEngineShakeY * 0.22}px)`;
 
@@ -1277,7 +1319,7 @@ let DITHER_ENABLED = false;
     ball.style.height = `${ballSizePx}px`;
     ballStickLayer.appendChild(ball);
     playUiSoundNoThrow(ARG_SCENE_SOUNDS.bitClick);
-    tgHaptic('impactOccurred', 'light');
+    tgPongSpawnHaptic();
 
     await sleep(ARG_SCENE_TIMINGS.ballToPopupMs);
     await showArgPopup('NH73ЛЛЗК7 - Э70\nСПОСОБНОС7Ь\n4Д4П7NР0847ЬСЯ\nК ИЗМ3Н3НNЯМ', {
@@ -1294,7 +1336,7 @@ let DITHER_ENABLED = false;
     topStick.style.bottom = '';
     ballStickLayer.appendChild(topStick);
     playUiSoundNoThrow(ARG_SCENE_SOUNDS.bitClick);
-    tgHaptic('impactOccurred', 'light');
+    tgPongSpawnHaptic();
 
     await sleep(ARG_SCENE_TIMINGS.topToBottomStickMs);
 
@@ -1308,25 +1350,27 @@ let DITHER_ENABLED = false;
     bottomStick.style.top = '';
     ballStickLayer.appendChild(bottomStick);
     playUiSoundNoThrow(ARG_SCENE_SOUNDS.bitClick);
-    tgHaptic('impactOccurred', 'light');
+    tgPongSpawnHaptic();
 
     await sleep(ARG_SCENE_TIMINGS.bottomToSecondPopupMs);
     await showArgPopup('3/3', {
       openSoundSrc: ARG_SCENE_SOUNDS.danger2
     });
 
-    const visorBack = document.createElement('div');
+    const visorBack = document.createElement('svg');
     visorBack.className = 'arg-scene-visor arg-scene-visor--back';
-    for (let i = 0; i < 3; i += 1) {
-      const slice = document.createElement('img');
-      slice.className = `arg-scene-visor-slice arg-scene-visor-slice--${i + 1}`;
-      slice.src = ARG_SCENE_ASSETS.visorBack;
-      slice.alt = '';
-      if (i === 0) slice.style.clipPath = 'polygon(0 0, 100% 0, 100% 38%, 0 44%)';
-      else if (i === 1) slice.style.clipPath = 'polygon(0 31%, 100% 26%, 100% 72%, 0 70%)';
-      else slice.style.clipPath = 'polygon(0 58%, 100% 64%, 100% 100%, 0 100%)';
-      visorBack.appendChild(slice);
-    }
+    visorBack.setAttribute('viewBox', '0 0 100 100');
+    visorBack.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+    visorBack.setAttribute('aria-hidden', 'true');
+    visorBack.innerHTML = `
+      <defs>
+        <filter id="argSceneVisorWarpFilter" x="-15%" y="-15%" width="130%" height="130%">
+          <feTurbulence type="fractalNoise" baseFrequency="${ARG_PONG.visorBackWarpFieldBaseFreqX} ${ARG_PONG.visorBackWarpFieldBaseFreqY}" numOctaves="2" seed="13" />
+          <feDisplacementMap in="SourceGraphic" scale="${ARG_PONG.visorBackWarpFieldAmpPx}" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </defs>
+      <image href="${ARG_SCENE_ASSETS.visorBack}" x="0" y="0" width="100" height="100" preserveAspectRatio="xMidYMid slice" filter="url(#argSceneVisorWarpFilter)"></image>
+    `;
     const visorFront = document.createElement('img');
     visorFront.className = 'arg-scene-visor arg-scene-visor--front';
     visorFront.src = ARG_SCENE_ASSETS.visorFront;
