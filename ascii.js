@@ -341,11 +341,11 @@ const ARG_PONG = {
   syncPull: 0.18,
   syncFollowMaxSpeedPx: 10.5,
   syncFollowAccelPx: 1.15,
-  visorEyeMaxShiftXPx: 18,
-  visorEyeMaxShiftYPx: 12,
-  visorEyeSpring: 0.2,
-  visorEyeDamping: 0.78,
-  visorEyeMaxSpeedPx: 3.2,
+  visorEyeMaxShiftXPx: 27,
+  visorEyeMaxShiftYPx: 18,
+  visorEyeSpring: 0.28,
+  visorEyeDamping: 0.74,
+  visorEyeMaxSpeedPx: 4.4,
   visorBodyDriftAmpXPx: 6.4,
   visorBodyDriftAmpYPx: 4.3,
   visorBodyMicroJitterAmpXPx: 1.95,
@@ -997,6 +997,14 @@ let DITHER_ENABLED = false;
     argBossAscii.originalCtx = originalCtx;
     argBossAscii.asciiCanvas = asciiCanvas;
     argBossAscii.asciiCtx = asciiCtx;
+    const asciiContexts = [argBossAscii.originalCtx, argBossAscii.asciiCtx, argBossAscii.compositeCtx];
+    for (const ctx of asciiContexts) {
+      if (!ctx) continue;
+      ctx.imageSmoothingEnabled = false;
+      if (typeof ctx.webkitImageSmoothingEnabled === 'boolean') ctx.webkitImageSmoothingEnabled = false;
+      if (typeof ctx.mozImageSmoothingEnabled === 'boolean') ctx.mozImageSmoothingEnabled = false;
+      if (typeof ctx.msImageSmoothingEnabled === 'boolean') ctx.msImageSmoothingEnabled = false;
+    }
     argBossAscii.failed = false;
     argBossAscii.visualReady = false;
     root.dataset.asciiReady = '0';
@@ -1579,8 +1587,10 @@ let DITHER_ENABLED = false;
         argPongState.ballY = 0.5;
       }
 
-      const ballTargetX = (argPongState.ballX - 0.5) * 2 * ARG_PONG.visorEyeMaxShiftXPx;
-      const ballTargetY = (argPongState.ballY - 0.5) * 2 * ARG_PONG.visorEyeMaxShiftYPx;
+      const ballOffsetFromEyeX = argPongState.ballX - 0.5;
+      const ballOffsetFromEyeY = argPongState.ballY - 0.5;
+      const ballTargetX = ballOffsetFromEyeX * 2 * ARG_PONG.visorEyeMaxShiftXPx;
+      const ballTargetY = ballOffsetFromEyeY * 2 * ARG_PONG.visorEyeMaxShiftYPx;
       const clampedTargetX = clamp(ballTargetX, -ARG_PONG.visorEyeMaxShiftXPx, ARG_PONG.visorEyeMaxShiftXPx);
       const clampedTargetY = clamp(ballTargetY, -ARG_PONG.visorEyeMaxShiftYPx, ARG_PONG.visorEyeMaxShiftYPx);
       argPongState.visorVX += (clampedTargetX - argPongState.visorShiftX) * ARG_PONG.visorEyeSpring;
@@ -1609,8 +1619,8 @@ let DITHER_ENABLED = false;
         -ARG_PONG.visorEyeParallaxMaxYPx,
         ARG_PONG.visorEyeParallaxMaxYPx
       );
-      argPongState.visorEyeShiftX += (visorEyeTargetX - argPongState.visorEyeShiftX) * 0.14;
-      argPongState.visorEyeShiftY += (visorEyeTargetY - argPongState.visorEyeShiftY) * 0.14;
+      argPongState.visorEyeShiftX += (visorEyeTargetX - argPongState.visorEyeShiftX) * 0.22;
+      argPongState.visorEyeShiftY += (visorEyeTargetY - argPongState.visorEyeShiftY) * 0.22;
       const visorEyeDriftX =
         Math.sin(now * ARG_PONG.visorEyeDriftSpeedX + argPongState.visorEyePhaseX) * ARG_PONG.visorEyeDriftAmpXPx
         + Math.cos(now * ARG_PONG.visorEyeMicroJitterSpeedX + argPongState.visorEyePhaseY) * ARG_PONG.visorEyeMicroJitterAmpXPx;
@@ -1619,8 +1629,10 @@ let DITHER_ENABLED = false;
         + Math.sin(now * ARG_PONG.visorEyeMicroJitterSpeedY + argPongState.visorEyePhaseX * 0.91) * ARG_PONG.visorEyeMicroJitterAmpYPx;
       const visorEyeX = argPongState.visorEyeShiftX + visorEyeDriftX + argPongState.shakeX * 0.22 + argPongState.visorEngineShakeX * 0.2;
       const visorEyeY = argPongState.visorEyeShiftY + visorEyeDriftY + argPongState.shakeY * 0.22 + argPongState.visorEngineShakeY * 0.2;
-      const visorPupilX = argPongState.visorShiftX + argPongState.shakeX + argPongState.visorEngineShakeX * 0.24;
-      const visorPupilY = argPongState.visorShiftY + argPongState.shakeY + argPongState.visorEngineShakeY * 0.24;
+      const visorPupilOffsetX = argPongState.visorShiftX + argPongState.shakeX * 0.78 + argPongState.visorEngineShakeX * 0.24;
+      const visorPupilOffsetY = argPongState.visorShiftY + argPongState.shakeY * 0.78 + argPongState.visorEngineShakeY * 0.24;
+      const visorPupilX = visorEyeX + visorPupilOffsetX;
+      const visorPupilY = visorEyeY + visorPupilOffsetY;
       argPongState.visorEngineShakeX += (
         (Math.random() * 2 - 1) * ARG_PONG.visorEngineJitterAmpXPx - argPongState.visorEngineShakeX
       ) * ARG_PONG.visorEngineJitterResponse;
@@ -3384,6 +3396,10 @@ function buildAsciiFromCurrentSource(src, cols, rows) {
 
 function renderAsciiFromSource(sourceCanvas, targetCtx, options = {}) {
   if (!sourceCanvas || !targetCtx) return { ok: false, reason: 'missing-target' };
+  targetCtx.imageSmoothingEnabled = false;
+  if (typeof targetCtx.webkitImageSmoothingEnabled === 'boolean') targetCtx.webkitImageSmoothingEnabled = false;
+  if (typeof targetCtx.mozImageSmoothingEnabled === 'boolean') targetCtx.mozImageSmoothingEnabled = false;
+  if (typeof targetCtx.msImageSmoothingEnabled === 'boolean') targetCtx.msImageSmoothingEnabled = false;
   const sourceW = sourceCanvas.width | 0;
   const sourceH = sourceCanvas.height | 0;
   if (sourceW < 2 || sourceH < 2) return { ok: false, reason: 'invalid-source-size' };
