@@ -370,6 +370,14 @@ const ARG_PONG = {
   shakeHitAmountPx: 2.2,
   shakeDecay: 0.82
 };
+const ARG_BOSS_ASCII_PRESET = Object.freeze({
+  charset: '@%#*+=-:. ',
+  size: 100,
+  contrast: 1.30,
+  gamma: 1.50,
+  color: '#bf0003',
+  background: '#000000'
+});
 const AUDIO_UNLOCK_STORAGE_KEY = 'asciiVisorAudioUnlocked';
 let errorSoundAudio = null;
 
@@ -868,6 +876,20 @@ let DITHER_ENABLED = false;
     shakeX: 0,
     shakeY: 0
   };
+  const argBossAscii = {
+    root: null,
+    originalCanvas: null,
+    originalCtx: null,
+    asciiCanvas: null,
+    asciiCtx: null,
+    compositeCanvas: null,
+    compositeCtx: null,
+    backImage: null,
+    frontImage: null,
+    ready: false,
+    failed: false,
+    dpr: 1
+  };
 
   function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
@@ -894,7 +916,12 @@ let DITHER_ENABLED = false;
     overlay.hidden = true;
     overlay.innerHTML = `
       <div class="arg-scene-layer arg-scene-bg"></div>
-      <div class="arg-scene-layer arg-scene-eye" id="argSceneEyeLayer"></div>
+      <div class="arg-scene-layer arg-scene-eye" id="argSceneEyeLayer">
+        <div id="boss-root" class="arg-scene-boss-root">
+          <canvas id="boss-original" hidden></canvas>
+          <canvas id="boss-ascii" hidden></canvas>
+        </div>
+      </div>
       <div class="arg-scene-layer arg-scene-ball-stick" id="argSceneBallStickLayer"></div>
       <div class="arg-scene-layer arg-scene-countdown" id="argSceneCountdownLayer"></div>
       <div class="arg-scene-layer arg-scene-score" id="argSceneScoreLayer" hidden>
@@ -909,6 +936,85 @@ let DITHER_ENABLED = false;
     `;
     document.body.appendChild(overlay);
     return overlay;
+  }
+
+  function loadArgSceneImage(src) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.decoding = 'async';
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = src;
+    });
+  }
+
+  async function initArgBossAscii(overlay) {
+    const root = overlay?.querySelector('#boss-root');
+    const originalCanvas = overlay?.querySelector('#boss-original');
+    const asciiCanvas = overlay?.querySelector('#boss-ascii');
+    if (!root || !originalCanvas || !asciiCanvas) {
+      argBossAscii.failed = true;
+      argBossAscii.ready = false;
+      return false;
+    }
+
+    const originalCtx = originalCanvas.getContext('2d');
+    const asciiCtx = asciiCanvas.getContext('2d');
+    if (!originalCtx || !asciiCtx) {
+      argBossAscii.failed = true;
+      argBossAscii.ready = false;
+      return false;
+    }
+
+    if (!argBossAscii.compositeCanvas) {
+      argBossAscii.compositeCanvas = document.createElement('canvas');
+      argBossAscii.compositeCtx = argBossAscii.compositeCanvas.getContext('2d');
+    }
+
+    argBossAscii.root = root;
+    argBossAscii.originalCanvas = originalCanvas;
+    argBossAscii.originalCtx = originalCtx;
+    argBossAscii.asciiCanvas = asciiCanvas;
+    argBossAscii.asciiCtx = asciiCtx;
+    argBossAscii.failed = false;
+
+    try {
+      const [backImage, frontImage] = await Promise.all([
+        loadArgSceneImage(ARG_SCENE_ASSETS.visorBack),
+        loadArgSceneImage(ARG_SCENE_ASSETS.visorFront)
+      ]);
+      argBossAscii.backImage = backImage;
+      argBossAscii.frontImage = frontImage;
+      argBossAscii.ready = true;
+      root.dataset.asciiReady = '1';
+      return true;
+    } catch (_) {
+      argBossAscii.ready = false;
+      argBossAscii.failed = true;
+      root.dataset.asciiReady = '0';
+      return false;
+    }
+  }
+
+  function ensureArgBossCanvasSize(overlay) {
+    if (!argBossAscii.ready || !argBossAscii.originalCanvas || !argBossAscii.asciiCanvas || !argBossAscii.compositeCanvas) return;
+    const rect = overlay?.getBoundingClientRect();
+    if (!rect || !rect.width || !rect.height) return;
+    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    const width = Math.max(1, Math.round(rect.width * dpr));
+    const height = Math.max(1, Math.round(rect.height * dpr));
+    argBossAscii.dpr = dpr;
+
+    const canvases = [argBossAscii.originalCanvas, argBossAscii.asciiCanvas, argBossAscii.compositeCanvas];
+    for (const canvas of canvases) {
+      if (!canvas) continue;
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+      canvas.style.width = `${Math.round(rect.width)}px`;
+      canvas.style.height = `${Math.round(rect.height)}px`;
+    }
   }
 
   async function animateArgPopupText(textEl, text) {
@@ -977,6 +1083,7 @@ let DITHER_ENABLED = false;
 
   function stopArgPongLoop() {
     argPongState.running = false;
+    argBossAscii.ready = false;
     if (argPongRafId) {
       cancelAnimationFrame(argPongRafId);
       argPongRafId = 0;
@@ -999,7 +1106,23 @@ let DITHER_ENABLED = false;
     if (countdownLayer) countdownLayer.textContent = '';
     if (scoreLayer) scoreLayer.hidden = true;
     if (popupText) popupText.textContent = '';
-    if (eyeLayer) eyeLayer.innerHTML = '';
+    if (eyeLayer) {
+      eyeLayer.querySelectorAll('.arg-scene-visor').forEach((el) => el.remove());
+      const bossOriginal = eyeLayer.querySelector('#boss-original');
+      const bossAscii = eyeLayer.querySelector('#boss-ascii');
+      const bossRoot = eyeLayer.querySelector('#boss-root');
+      if (bossOriginal) {
+        const originalCtx = bossOriginal.getContext('2d');
+        if (originalCtx) originalCtx.clearRect(0, 0, bossOriginal.width, bossOriginal.height);
+        bossOriginal.hidden = true;
+      }
+      if (bossAscii) {
+        const asciiCtx = bossAscii.getContext('2d');
+        if (asciiCtx) asciiCtx.clearRect(0, 0, bossAscii.width, bossAscii.height);
+        bossAscii.hidden = true;
+      }
+      if (bossRoot) bossRoot.dataset.asciiReady = '0';
+    }
     if (ballStickLayer) ballStickLayer.innerHTML = '';
     overlay.hidden = true;
   }
@@ -1161,6 +1284,25 @@ let DITHER_ENABLED = false;
     resetArgBall(Math.random() > 0.5);
     bindArgPlayerControls(overlay);
     const visorBackSlices = visorBack.querySelectorAll('.arg-scene-visor-slice');
+    const bossRoot = overlay.querySelector('#boss-root');
+    const bossOriginal = overlay.querySelector('#boss-original');
+    const bossAscii = overlay.querySelector('#boss-ascii');
+    const runBossAscii = async () => {
+      const ok = await initArgBossAscii(overlay);
+      if (!ok) {
+        if (bossRoot) bossRoot.dataset.asciiReady = '0';
+        if (bossOriginal) bossOriginal.hidden = true;
+        if (bossAscii) bossAscii.hidden = true;
+        return;
+      }
+      if (bossOriginal) bossOriginal.hidden = false;
+      if (bossAscii) bossAscii.hidden = false;
+    };
+    runBossAscii().catch(() => {
+      if (bossRoot) bossRoot.dataset.asciiReady = '0';
+      if (bossOriginal) bossOriginal.hidden = true;
+      if (bossAscii) bossAscii.hidden = true;
+    });
 
     let serveLocked = false;
     let prevTs = 0;
@@ -1174,6 +1316,7 @@ let DITHER_ENABLED = false;
         argPongRafId = requestAnimationFrame(loop);
         return;
       }
+      ensureArgBossCanvasSize(overlay);
 
       const paddleHalfNorm = (ARG_PONG.paddleWidthPx * 0.5) / rect.width;
       argPongState.playerX += (argPongState.targetPlayerX - argPongState.playerX) * ARG_PONG.playerPointerSmoothing;
@@ -1380,6 +1523,92 @@ let DITHER_ENABLED = false;
       }
       visorFront.style.transform = `translate(${argPongState.visorShiftX + argPongState.shakeX + argPongState.visorEngineShakeX * 0.22}px, ${argPongState.visorShiftY + argPongState.shakeY + argPongState.visorEngineShakeY * 0.22}px)`;
 
+      if (argPongState.running && argBossAscii.ready && argBossAscii.compositeCtx && argBossAscii.originalCtx && argBossAscii.asciiCtx && argBossAscii.backImage && argBossAscii.frontImage) {
+        const compositeCanvas = argBossAscii.compositeCanvas;
+        const compositeCtx = argBossAscii.compositeCtx;
+        const originalCtx = argBossAscii.originalCtx;
+        const asciiCtx = argBossAscii.asciiCtx;
+        const width = compositeCanvas.width;
+        const height = compositeCanvas.height;
+        if (width > 1 && height > 1) {
+          const drawCoverImage = (context, image, tx, ty) => {
+            const imgRatio = image.naturalWidth / Math.max(1, image.naturalHeight);
+            const dstRatio = width / Math.max(1, height);
+            let drawW = width;
+            let drawH = height;
+            if (imgRatio > dstRatio) drawW = height * imgRatio;
+            else drawH = width / imgRatio;
+            const dx = (width - drawW) * 0.5 + tx * argBossAscii.dpr;
+            const dy = (height - drawH) * 0.5 + ty * argBossAscii.dpr;
+            context.drawImage(image, dx, dy, drawW, drawH);
+          };
+          const applySliceClip = (context, index) => {
+            context.beginPath();
+            if (index === 0) {
+              context.moveTo(0, 0);
+              context.lineTo(width, 0);
+              context.lineTo(width, height * 0.38);
+              context.lineTo(0, height * 0.44);
+            } else if (index === 1) {
+              context.moveTo(0, height * 0.31);
+              context.lineTo(width, height * 0.26);
+              context.lineTo(width, height * 0.72);
+              context.lineTo(0, height * 0.7);
+            } else {
+              context.moveTo(0, height * 0.58);
+              context.lineTo(width, height * 0.64);
+              context.lineTo(width, height);
+              context.lineTo(0, height);
+            }
+            context.closePath();
+            context.clip();
+          };
+
+          compositeCtx.setTransform(1, 0, 0, 1, 0, 0);
+          compositeCtx.clearRect(0, 0, width, height);
+
+          const warpWaveA = now * ARG_PONG.visorBackWarpSpeedX + argPongState.visorBackWarpPhaseA;
+          const warpWaveB = now * ARG_PONG.visorBackWarpSpeedY + argPongState.visorBackWarpPhaseB;
+          for (let i = 0; i < 3; i += 1) {
+            const depth = i - 1;
+            const waveX = Math.sin(warpWaveA + depth * 1.9) + Math.cos(warpWaveB * 1.11 - depth * 1.37);
+            const waveY = Math.cos(warpWaveB + depth * 1.73) - Math.sin(warpWaveA * 0.92 - depth * 1.26);
+            const localShiftX = waveX * ARG_PONG.visorBackWarpAmpXPx * (0.46 + i * 0.22);
+            const localShiftY = waveY * ARG_PONG.visorBackWarpAmpYPx * (0.4 + i * 0.2);
+            const localRotate = waveX * 0.24 + waveY * 0.14;
+
+            compositeCtx.save();
+            applySliceClip(compositeCtx, i);
+            compositeCtx.translate(width * 0.5, height * 0.5);
+            compositeCtx.translate((visorBackX + localShiftX) * argBossAscii.dpr, (visorBackY + localShiftY) * argBossAscii.dpr);
+            compositeCtx.rotate((localRotate * Math.PI) / 180);
+            compositeCtx.translate(-width * 0.5, -height * 0.5);
+            drawCoverImage(compositeCtx, argBossAscii.backImage, 0, 0);
+            compositeCtx.restore();
+          }
+
+          compositeCtx.save();
+          compositeCtx.translate(width * 0.5, height * 0.5);
+          compositeCtx.translate(
+            (argPongState.visorShiftX + argPongState.shakeX + argPongState.visorEngineShakeX * 0.22) * argBossAscii.dpr,
+            (argPongState.visorShiftY + argPongState.shakeY + argPongState.visorEngineShakeY * 0.22) * argBossAscii.dpr
+          );
+          compositeCtx.translate(-width * 0.5, -height * 0.5);
+          drawCoverImage(compositeCtx, argBossAscii.frontImage, 0, 0);
+          compositeCtx.restore();
+
+          originalCtx.clearRect(0, 0, width, height);
+          originalCtx.drawImage(compositeCanvas, 0, 0);
+          const asciiResult = renderAsciiFromSource(compositeCanvas, asciiCtx, ARG_BOSS_ASCII_PRESET);
+          if (!asciiResult.ok) {
+            if (bossAscii) bossAscii.hidden = true;
+            if (bossOriginal) bossOriginal.hidden = false;
+          } else {
+            if (bossAscii) bossAscii.hidden = false;
+          }
+        }
+      }
+
       argPongRafId = requestAnimationFrame(loop);
     };
     argPongRafId = requestAnimationFrame(loop);
@@ -1406,7 +1635,21 @@ let DITHER_ENABLED = false;
     overlay.hidden = false;
     stopStartBlinkTickerForArg();
     if (startDateTimer) { clearInterval(startDateTimer); startDateTimer = null; }
-    eyeLayer.innerHTML = '';
+    eyeLayer.querySelectorAll('.arg-scene-visor').forEach((el) => el.remove());
+    const bossOriginalCanvas = eyeLayer.querySelector('#boss-original');
+    const bossAsciiCanvas = eyeLayer.querySelector('#boss-ascii');
+    const bossRoot = eyeLayer.querySelector('#boss-root');
+    if (bossOriginalCanvas) {
+      const ctxOriginal = bossOriginalCanvas.getContext('2d');
+      if (ctxOriginal) ctxOriginal.clearRect(0, 0, bossOriginalCanvas.width, bossOriginalCanvas.height);
+      bossOriginalCanvas.hidden = true;
+    }
+    if (bossAsciiCanvas) {
+      const ctxAscii = bossAsciiCanvas.getContext('2d');
+      if (ctxAscii) ctxAscii.clearRect(0, 0, bossAsciiCanvas.width, bossAsciiCanvas.height);
+      bossAsciiCanvas.hidden = true;
+    }
+    if (bossRoot) bossRoot.dataset.asciiReady = '0';
     ballStickLayer.innerHTML = '';
     countdownLayer.textContent = '';
     scoreLayer.hidden = true;
@@ -3045,6 +3288,75 @@ function buildAsciiFromCurrentSource(src, cols, rows) {
   }
 
   return out;
+}
+
+function renderAsciiFromSource(sourceCanvas, targetCtx, options = {}) {
+  if (!sourceCanvas || !targetCtx) return { ok: false, reason: 'missing-target' };
+  const sourceW = sourceCanvas.width | 0;
+  const sourceH = sourceCanvas.height | 0;
+  if (sourceW < 2 || sourceH < 2) return { ok: false, reason: 'invalid-source-size' };
+
+  const prevState = {
+    widthChars: state.widthChars,
+    contrast: state.contrast,
+    gamma: state.gamma,
+    color: state.color,
+    background: state.background,
+    charset: state.charset,
+    renderCharset10: state.renderCharset10
+  };
+
+  try {
+    state.widthChars = Number(options.size) || ARG_BOSS_ASCII_PRESET.size;
+    state.contrast = Number(options.contrast) || ARG_BOSS_ASCII_PRESET.contrast;
+    state.gamma = Number(options.gamma) || ARG_BOSS_ASCII_PRESET.gamma;
+    state.color = String(options.color || ARG_BOSS_ASCII_PRESET.color);
+    state.background = String(options.background || ARG_BOSS_ASCII_PRESET.background);
+    state.charset = String(options.charset || ARG_BOSS_ASCII_PRESET.charset);
+    state.renderCharset10 = state.charset;
+
+    const src = { el: sourceCanvas, w: sourceW, h: sourceH, kind: 'canvas' };
+    const { w, h } = updateGridSize(src);
+    const asciiText = buildAsciiFromCurrentSource(src, w, h);
+    if (!asciiText) return { ok: false, reason: 'empty-ascii' };
+
+    const canvas = targetCtx.canvas;
+    const targetW = canvas.width | 0;
+    const targetH = canvas.height | 0;
+    if (targetW < 2 || targetH < 2) return { ok: false, reason: 'invalid-target-size' };
+
+    targetCtx.clearRect(0, 0, targetW, targetH);
+    targetCtx.fillStyle = state.background;
+    targetCtx.fillRect(0, 0, targetW, targetH);
+
+    const ff = getComputedStyle(app.out).fontFamily || 'monospace';
+    const lines = asciiText.split('\n');
+    const maxRows = Math.min(h, lines.length);
+    const fontSize = Math.max(1, Math.floor(targetH / Math.max(1, h)));
+    const stepY = targetH / Math.max(1, h);
+
+    targetCtx.fillStyle = state.color;
+    targetCtx.font = `${fontSize}px ${ff}`;
+    targetCtx.textBaseline = 'top';
+    targetCtx.textAlign = 'left';
+    for (let y = 0; y < maxRows; y += 1) {
+      const rowText = lines[y];
+      if (!rowText) continue;
+      targetCtx.fillText(rowText, 0, y * stepY);
+    }
+
+    return { ok: true, asciiText, cols: w, rows: h };
+  } catch (_) {
+    return { ok: false, reason: 'exception' };
+  } finally {
+    state.widthChars = prevState.widthChars;
+    state.contrast = prevState.contrast;
+    state.gamma = prevState.gamma;
+    state.color = prevState.color;
+    state.background = prevState.background;
+    state.charset = prevState.charset;
+    state.renderCharset10 = prevState.renderCharset10;
+  }
 }
 
 function asciiDebugHash(text) {
