@@ -1587,7 +1587,7 @@ let DITHER_ENABLED = false;
         argPongState.ballY = 0.5;
       }
 
-      const ballOffsetFromEyeX = argPongState.ballX - 0.5;
+      const ballOffsetFromEyeX = 0.5 - argPongState.ballX;
       const ballOffsetFromEyeY = argPongState.ballY - 0.5;
       const ballTargetX = ballOffsetFromEyeX * 2 * ARG_PONG.visorEyeMaxShiftXPx;
       const ballTargetY = ballOffsetFromEyeY * 2 * ARG_PONG.visorEyeMaxShiftYPx;
