@@ -1384,15 +1384,16 @@ input[type="color"] {
 .arg-scene-stick--top{ top:4vh; }
 .arg-scene-stick--bottom{ bottom:4vh; }
 
-.arg-scene-visor{
+.arg-scene-boss-layer{
   position:absolute;
   inset:0;
   width:100%;
   height:100%;
-  object-fit:cover;
+  object-fit:contain;
   object-position:center;
   image-rendering:pixelated;
   will-change:transform;
+  transform-origin:50% 50%;
 }
 
 .arg-scene-boss-root{
@@ -1427,19 +1428,41 @@ input[type="color"] {
   pointer-events:none;
 }
 
-.arg-scene-boss-root[data-ascii-ready="1"] ~ .arg-scene-visor{
+.arg-scene-boss-root[data-ascii-ready="1"] ~ .arg-scene-boss-layer{
   opacity:0;
 }
 
-.arg-scene-visor-slice{
-  position:absolute;
-  inset:0;
-  width:100%;
-  height:100%;
-  object-fit:cover;
-  object-position:center;
-  image-rendering:pixelated;
-  will-change:transform;
+.arg-scene-boss-layer--body{
+  z-index:1;
+  animation:argBossBodyWarm 2.45s ease-in-out infinite;
+}
+
+.arg-scene-boss-layer--eye{
+  z-index:2;
+  animation:argBossEyeWarm 1.85s ease-in-out infinite;
+}
+
+.arg-scene-boss-layer--pupil{
+  z-index:3;
+  animation:argBossPupilWarm 1.2s ease-in-out infinite;
+}
+
+@keyframes argBossBodyWarm{
+  0%,100%{ transform:translate(0,0) scale(1); }
+  35%{ transform:translate(1px,-1px) scale(1.009,0.995) rotate(0.18deg); }
+  65%{ transform:translate(-1px,1px) scale(0.996,1.007) rotate(-0.16deg); }
+}
+
+@keyframes argBossEyeWarm{
+  0%,100%{ transform:translate(0,0) scale(1); }
+  45%{ transform:translate(0.7px,-0.5px) scale(1.01); }
+  72%{ transform:translate(-0.5px,0.7px) scale(0.997); }
+}
+
+@keyframes argBossPupilWarm{
+  0%,100%{ transform:translate(0,0); }
+  30%{ transform:translate(0.9px,-0.7px); }
+  60%{ transform:translate(-0.9px,0.6px); }
 }
 
 .arg-scene-countdown{

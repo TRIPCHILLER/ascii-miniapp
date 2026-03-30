@@ -296,8 +296,9 @@ const ARG_SCENE_ASSETS = {
   ball: 'assets/pongball.svg',
   topStick: 'assets/pongstick1.svg',
   bottomStick: 'assets/pongstick2.svg',
-  visorBack: 'assets/VISOR1.svg',
-  visorFront: 'assets/VISOR2.svg'
+  visorBody: 'assets/VISORBODY.png',
+  visorEye: 'assets/VISOREYE.png',
+  visorPupil: 'assets/VISORPUPIL.png'
 };
 const ARG_SCENE_TIMINGS = {
   afterBlackMs: 3000,
@@ -345,28 +346,40 @@ const ARG_PONG = {
   visorEyeSpring: 0.2,
   visorEyeDamping: 0.78,
   visorEyeMaxSpeedPx: 3.2,
-  visorBackParallaxFollow: 0.2,
-  visorBackParallaxMaxXPx: 3.2,
-  visorBackParallaxMaxYPx: 2.2,
-  visorBackDriftAmpXPx: 7.4,
-  visorBackDriftAmpYPx: 5.1,
-  visorBackMicroJitterAmpXPx: 2.25,
-  visorBackMicroJitterAmpYPx: 1.75,
-  visorBackDriftSpeedX: 0.00072,
-  visorBackDriftSpeedY: 0.00053,
-  visorBackMicroJitterSpeedX: 0.0031,
-  visorBackMicroJitterSpeedY: 0.0027,
-  visorBackPulseAmpXPx: 3.5,
-  visorBackPulseAmpYPx: 2.8,
-  visorBackPulseSpeedX: 0.00128,
-  visorBackPulseSpeedY: 0.00105,
-  visorBackWarpAmpXPx: 2.2,
-  visorBackWarpAmpYPx: 1.65,
-  visorBackWarpSpeedX: 0.00235,
-  visorBackWarpSpeedY: 0.00195,
-  visorEngineJitterAmpXPx: 0.95,
-  visorEngineJitterAmpYPx: 0.78,
-  visorEngineJitterResponse: 0.48,
+  visorBodyDriftAmpXPx: 6.4,
+  visorBodyDriftAmpYPx: 4.3,
+  visorBodyMicroJitterAmpXPx: 1.95,
+  visorBodyMicroJitterAmpYPx: 1.55,
+  visorBodyDriftSpeedX: 0.00066,
+  visorBodyDriftSpeedY: 0.0005,
+  visorBodyMicroJitterSpeedX: 0.0028,
+  visorBodyMicroJitterSpeedY: 0.0025,
+  visorBodyPulseAmpXPx: 2.6,
+  visorBodyPulseAmpYPx: 2.2,
+  visorBodyPulseSpeedX: 0.00108,
+  visorBodyPulseSpeedY: 0.00096,
+  visorBodyScaleBreathAmp: 0.016,
+  visorBodyScaleBreathSpeed: 0.00082,
+  visorBodySwayDegAmp: 0.42,
+  visorBodySwaySpeed: 0.00073,
+  visorBodySqueezeAmp: 0.009,
+  visorBodySqueezeSpeed: 0.00114,
+  visorEyeParallaxFollow: 0.38,
+  visorEyeParallaxMaxXPx: 7.4,
+  visorEyeParallaxMaxYPx: 5.6,
+  visorEyeDriftAmpXPx: 1.8,
+  visorEyeDriftAmpYPx: 1.4,
+  visorEyeDriftSpeedX: 0.00105,
+  visorEyeDriftSpeedY: 0.00094,
+  visorEyeMicroJitterAmpXPx: 0.65,
+  visorEyeMicroJitterAmpYPx: 0.52,
+  visorEyeMicroJitterSpeedX: 0.0034,
+  visorEyeMicroJitterSpeedY: 0.0031,
+  visorEyeBreathScaleAmp: 0.01,
+  visorEyeBreathScaleSpeed: 0.00102,
+  visorEngineJitterAmpXPx: 0.62,
+  visorEngineJitterAmpYPx: 0.52,
+  visorEngineJitterResponse: 0.44,
   shakeHitAmountPx: 2.2,
   shakeDecay: 0.82
 };
@@ -836,6 +849,7 @@ let DITHER_ENABLED = false;
   let startArgScenePending = false;
   let startArgSceneRunning = false;
   let startArgSceneStarted = false;
+  let argSceneActive = false;
   let startArgSessionLocked = false;
   let startLaunchSoundPlayed = false;
   let startLaunchSoundPendingAfterUnlock = false;
@@ -868,10 +882,14 @@ let DITHER_ENABLED = false;
     visorShiftY: 0,
     visorVX: 0,
     visorVY: 0,
-    visorBackPhaseX: 0,
-    visorBackPhaseY: 0,
-    visorBackWarpPhaseA: 0,
-    visorBackWarpPhaseB: 0,
+    visorBodyPhaseX: 0,
+    visorBodyPhaseY: 0,
+    visorBodyPhaseBreath: 0,
+    visorBodyPhaseSway: 0,
+    visorEyePhaseX: 0,
+    visorEyePhaseY: 0,
+    visorEyeShiftX: 0,
+    visorEyeShiftY: 0,
     visorEngineShakeX: 0,
     visorEngineShakeY: 0,
     shakeX: 0,
@@ -885,8 +903,9 @@ let DITHER_ENABLED = false;
     asciiCtx: null,
     compositeCanvas: null,
     compositeCtx: null,
-    backImage: null,
-    frontImage: null,
+    bodyImage: null,
+    eyeImage: null,
+    pupilImage: null,
     ready: false,
     failed: false,
     dpr: 1
@@ -980,12 +999,16 @@ let DITHER_ENABLED = false;
     argBossAscii.failed = false;
 
     try {
-      const [backImage, frontImage] = await Promise.all([
-        loadArgSceneImage(ARG_SCENE_ASSETS.visorBack),
-        loadArgSceneImage(ARG_SCENE_ASSETS.visorFront)
-      ]);
-      argBossAscii.backImage = backImage;
-      argBossAscii.frontImage = frontImage;
+      if (!argBossAscii.bodyImage || !argBossAscii.eyeImage || !argBossAscii.pupilImage) {
+        const [bodyImage, eyeImage, pupilImage] = await Promise.all([
+          loadArgSceneImage(ARG_SCENE_ASSETS.visorBody),
+          loadArgSceneImage(ARG_SCENE_ASSETS.visorEye),
+          loadArgSceneImage(ARG_SCENE_ASSETS.visorPupil)
+        ]);
+        argBossAscii.bodyImage = bodyImage;
+        argBossAscii.eyeImage = eyeImage;
+        argBossAscii.pupilImage = pupilImage;
+      }
       argBossAscii.ready = true;
       root.dataset.asciiReady = '1';
       return true;
@@ -1018,32 +1041,69 @@ let DITHER_ENABLED = false;
     }
   }
 
+  function drawArgBossLayer(context, image, drawRect, transform = null) {
+    if (!context || !image || !drawRect) return;
+    const { cx, cy, drawW, drawH } = drawRect;
+    context.save();
+    if (transform) {
+      context.translate(cx + (transform.tx || 0), cy + (transform.ty || 0));
+      if (transform.rotateDeg) context.rotate((transform.rotateDeg * Math.PI) / 180);
+      context.scale(transform.scaleX || 1, transform.scaleY || 1);
+      context.translate(-cx, -cy);
+    }
+    context.drawImage(image, cx - drawW * 0.5, cy - drawH * 0.5, drawW, drawH);
+    context.restore();
+  }
+
+  function getArgBossDrawRects(width, height) {
+    const bodyImage = argBossAscii.bodyImage;
+    const eyeImage = argBossAscii.eyeImage;
+    const pupilImage = argBossAscii.pupilImage;
+    if (!bodyImage || !eyeImage || !pupilImage || width < 2 || height < 2) return null;
+
+    const safeBodyRatio = Math.max(0.2, Math.min(3.5, bodyImage.naturalWidth / Math.max(1, bodyImage.naturalHeight)));
+    const baseBodyH = height * 1.02;
+    const maxBodyW = width * 1.09;
+    let bodyW = Math.min(maxBodyW, baseBodyH * safeBodyRatio);
+    let bodyH = bodyW / safeBodyRatio;
+    if (bodyH < height * 0.86) {
+      bodyH = height * 0.86;
+      bodyW = Math.min(maxBodyW, bodyH * safeBodyRatio);
+    }
+    const bodyCx = width * 0.5;
+    const bodyCy = height * 0.5;
+
+    const eyeBase = Math.min(bodyW, bodyH);
+    const eyeW = eyeBase * 0.308;
+    const eyeH = eyeW;
+    const eyeCx = bodyCx;
+    const eyeCy = bodyCy - bodyH * 0.06;
+    const pupilW = eyeW * 0.226;
+    const pupilH = eyeH * 0.64;
+
+    return {
+      body: { cx: bodyCx, cy: bodyCy, drawW: bodyW, drawH: bodyH },
+      eye: { cx: eyeCx, cy: eyeCy, drawW: eyeW, drawH: eyeH },
+      pupil: { cx: eyeCx, cy: eyeCy, drawW: pupilW, drawH: pupilH }
+    };
+  }
+
   function renderArgBossAsciiIdleFrame() {
-    if (!argBossAscii.ready || !argBossAscii.compositeCtx || !argBossAscii.originalCtx || !argBossAscii.asciiCtx || !argBossAscii.backImage || !argBossAscii.frontImage) return false;
+    if (!argBossAscii.ready || !argBossAscii.compositeCtx || !argBossAscii.originalCtx || !argBossAscii.asciiCtx || !argBossAscii.bodyImage || !argBossAscii.eyeImage || !argBossAscii.pupilImage) return false;
     const compositeCanvas = argBossAscii.compositeCanvas;
     const compositeCtx = argBossAscii.compositeCtx;
     const originalCtx = argBossAscii.originalCtx;
     const asciiCtx = argBossAscii.asciiCtx;
     const width = compositeCanvas.width;
     const height = compositeCanvas.height;
-    if (width < 2 || height < 2) return false;
-
-    const drawCoverImage = (context, image) => {
-      const imgRatio = image.naturalWidth / Math.max(1, image.naturalHeight);
-      const dstRatio = width / Math.max(1, height);
-      let drawW = width;
-      let drawH = height;
-      if (imgRatio > dstRatio) drawW = height * imgRatio;
-      else drawH = width / imgRatio;
-      const dx = (width - drawW) * 0.5;
-      const dy = (height - drawH) * 0.5;
-      context.drawImage(image, dx, dy, drawW, drawH);
-    };
+    const drawRects = getArgBossDrawRects(width, height);
+    if (!drawRects) return false;
 
     compositeCtx.setTransform(1, 0, 0, 1, 0, 0);
     compositeCtx.clearRect(0, 0, width, height);
-    drawCoverImage(compositeCtx, argBossAscii.backImage);
-    drawCoverImage(compositeCtx, argBossAscii.frontImage);
+    drawArgBossLayer(compositeCtx, argBossAscii.bodyImage, drawRects.body);
+    drawArgBossLayer(compositeCtx, argBossAscii.eyeImage, drawRects.eye);
+    drawArgBossLayer(compositeCtx, argBossAscii.pupilImage, drawRects.pupil);
 
     originalCtx.clearRect(0, 0, width, height);
     originalCtx.drawImage(compositeCanvas, 0, 0);
@@ -1118,6 +1178,7 @@ let DITHER_ENABLED = false;
   function stopArgPongLoop() {
     argPongState.running = false;
     argBossAscii.ready = false;
+    argSceneActive = false;
     if (argPongRafId) {
       cancelAnimationFrame(argPongRafId);
       argPongRafId = 0;
@@ -1130,6 +1191,7 @@ let DITHER_ENABLED = false;
 
   function resetArgOverlayState() {
     const overlay = ensureArgOverlay();
+    argSceneActive = false;
     const popupLayer = overlay.querySelector('#argScenePopupLayer');
     const countdownLayer = overlay.querySelector('#argSceneCountdownLayer');
     const scoreLayer = overlay.querySelector('#argSceneScoreLayer');
@@ -1141,7 +1203,7 @@ let DITHER_ENABLED = false;
     if (scoreLayer) scoreLayer.hidden = true;
     if (popupText) popupText.textContent = '';
     if (eyeLayer) {
-      eyeLayer.querySelectorAll('.arg-scene-visor').forEach((el) => el.remove());
+      eyeLayer.querySelectorAll('.arg-scene-boss-layer').forEach((el) => el.remove());
       const bossOriginal = eyeLayer.querySelector('#boss-original');
       const bossAscii = eyeLayer.querySelector('#boss-ascii');
       const bossRoot = eyeLayer.querySelector('#boss-root');
@@ -1284,8 +1346,8 @@ let DITHER_ENABLED = false;
     return clamp(projectedX, paddleHalfNorm, 1 - paddleHalfNorm);
   }
 
-  function startArgPong({ overlay, ballStickLayer, ball, topStick, bottomStick, visorBack, visorFront, scoreLayer, aiScoreEl, playerScoreEl }) {
-    if (!overlay || !ballStickLayer || !ball || !topStick || !bottomStick || !visorBack || !visorFront || !scoreLayer || !aiScoreEl || !playerScoreEl) return;
+  function startArgPong({ overlay, ballStickLayer, ball, topStick, bottomStick, visorBody, visorEye, visorPupil, scoreLayer, aiScoreEl, playerScoreEl }) {
+    if (!overlay || !ballStickLayer || !ball || !topStick || !bottomStick || !visorBody || !visorEye || !visorPupil || !scoreLayer || !aiScoreEl || !playerScoreEl) return;
     if (argPongRafId) cancelAnimationFrame(argPongRafId);
     argPongState.running = true;
     argPongState.ended = false;
@@ -1300,10 +1362,14 @@ let DITHER_ENABLED = false;
     argPongState.targetPlayerX = 0.5;
     argPongState.visorShiftX = 0;
     argPongState.visorShiftY = 0;
-    argPongState.visorBackPhaseX = Math.random() * Math.PI * 2;
-    argPongState.visorBackPhaseY = Math.random() * Math.PI * 2;
-    argPongState.visorBackWarpPhaseA = Math.random() * Math.PI * 2;
-    argPongState.visorBackWarpPhaseB = Math.random() * Math.PI * 2;
+    argPongState.visorEyeShiftX = 0;
+    argPongState.visorEyeShiftY = 0;
+    argPongState.visorBodyPhaseX = Math.random() * Math.PI * 2;
+    argPongState.visorBodyPhaseY = Math.random() * Math.PI * 2;
+    argPongState.visorBodyPhaseBreath = Math.random() * Math.PI * 2;
+    argPongState.visorBodyPhaseSway = Math.random() * Math.PI * 2;
+    argPongState.visorEyePhaseX = Math.random() * Math.PI * 2;
+    argPongState.visorEyePhaseY = Math.random() * Math.PI * 2;
     argPongState.visorEngineShakeX = 0;
     argPongState.visorEngineShakeY = 0;
     argPongState.shakeX = 0;
@@ -1317,7 +1383,6 @@ let DITHER_ENABLED = false;
     scoreLayer.hidden = false;
     resetArgBall(Math.random() > 0.5);
     bindArgPlayerControls(overlay);
-    const visorBackSlices = visorBack.querySelectorAll('.arg-scene-visor-slice');
     const bossRoot = overlay.querySelector('#boss-root');
     const bossOriginal = overlay.querySelector('#boss-original');
     const bossAscii = overlay.querySelector('#boss-ascii');
@@ -1506,24 +1571,36 @@ let DITHER_ENABLED = false;
       argPongState.visorVY = clamp(argPongState.visorVY, -ARG_PONG.visorEyeMaxSpeedPx, ARG_PONG.visorEyeMaxSpeedPx);
       argPongState.visorShiftX = clamp(argPongState.visorShiftX + argPongState.visorVX, -ARG_PONG.visorEyeMaxShiftXPx, ARG_PONG.visorEyeMaxShiftXPx);
       argPongState.visorShiftY = clamp(argPongState.visorShiftY + argPongState.visorVY, -ARG_PONG.visorEyeMaxShiftYPx, ARG_PONG.visorEyeMaxShiftYPx);
-      const visorBackOffsetX =
-        Math.sin(now * ARG_PONG.visorBackDriftSpeedX + argPongState.visorBackPhaseX) * ARG_PONG.visorBackDriftAmpXPx
-        + Math.cos(now * ARG_PONG.visorBackMicroJitterSpeedX + argPongState.visorBackPhaseY * 0.67) * ARG_PONG.visorBackMicroJitterAmpXPx
-        + Math.sin(now * ARG_PONG.visorBackPulseSpeedX + argPongState.visorBackPhaseX * 1.37 + argPongState.visorBackPhaseY * 0.41) * ARG_PONG.visorBackPulseAmpXPx;
-      const visorBackOffsetY =
-        Math.cos(now * ARG_PONG.visorBackDriftSpeedY + argPongState.visorBackPhaseY) * ARG_PONG.visorBackDriftAmpYPx
-        + Math.sin(now * ARG_PONG.visorBackMicroJitterSpeedY + argPongState.visorBackPhaseX * 0.83) * ARG_PONG.visorBackMicroJitterAmpYPx
-        + Math.cos(now * ARG_PONG.visorBackPulseSpeedY + argPongState.visorBackPhaseY * 1.19 + argPongState.visorBackPhaseX * 0.28) * ARG_PONG.visorBackPulseAmpYPx;
-      const visorBackParallaxX = clamp(
-        clampedTargetX * ARG_PONG.visorBackParallaxFollow,
-        -ARG_PONG.visorBackParallaxMaxXPx,
-        ARG_PONG.visorBackParallaxMaxXPx
+      const visorBodyOffsetX =
+        Math.sin(now * ARG_PONG.visorBodyDriftSpeedX + argPongState.visorBodyPhaseX) * ARG_PONG.visorBodyDriftAmpXPx
+        + Math.cos(now * ARG_PONG.visorBodyMicroJitterSpeedX + argPongState.visorBodyPhaseY * 0.67) * ARG_PONG.visorBodyMicroJitterAmpXPx
+        + Math.sin(now * ARG_PONG.visorBodyPulseSpeedX + argPongState.visorBodyPhaseBreath) * ARG_PONG.visorBodyPulseAmpXPx;
+      const visorBodyOffsetY =
+        Math.cos(now * ARG_PONG.visorBodyDriftSpeedY + argPongState.visorBodyPhaseY) * ARG_PONG.visorBodyDriftAmpYPx
+        + Math.sin(now * ARG_PONG.visorBodyMicroJitterSpeedY + argPongState.visorBodyPhaseX * 0.83) * ARG_PONG.visorBodyMicroJitterAmpYPx
+        + Math.cos(now * ARG_PONG.visorBodyPulseSpeedY + argPongState.visorBodyPhaseBreath * 1.19) * ARG_PONG.visorBodyPulseAmpYPx;
+      const visorEyeTargetX = clamp(
+        clampedTargetX * ARG_PONG.visorEyeParallaxFollow,
+        -ARG_PONG.visorEyeParallaxMaxXPx,
+        ARG_PONG.visorEyeParallaxMaxXPx
       );
-      const visorBackParallaxY = clamp(
-        clampedTargetY * ARG_PONG.visorBackParallaxFollow,
-        -ARG_PONG.visorBackParallaxMaxYPx,
-        ARG_PONG.visorBackParallaxMaxYPx
+      const visorEyeTargetY = clamp(
+        clampedTargetY * ARG_PONG.visorEyeParallaxFollow,
+        -ARG_PONG.visorEyeParallaxMaxYPx,
+        ARG_PONG.visorEyeParallaxMaxYPx
       );
+      argPongState.visorEyeShiftX += (visorEyeTargetX - argPongState.visorEyeShiftX) * 0.14;
+      argPongState.visorEyeShiftY += (visorEyeTargetY - argPongState.visorEyeShiftY) * 0.14;
+      const visorEyeDriftX =
+        Math.sin(now * ARG_PONG.visorEyeDriftSpeedX + argPongState.visorEyePhaseX) * ARG_PONG.visorEyeDriftAmpXPx
+        + Math.cos(now * ARG_PONG.visorEyeMicroJitterSpeedX + argPongState.visorEyePhaseY) * ARG_PONG.visorEyeMicroJitterAmpXPx;
+      const visorEyeDriftY =
+        Math.cos(now * ARG_PONG.visorEyeDriftSpeedY + argPongState.visorEyePhaseY) * ARG_PONG.visorEyeDriftAmpYPx
+        + Math.sin(now * ARG_PONG.visorEyeMicroJitterSpeedY + argPongState.visorEyePhaseX * 0.91) * ARG_PONG.visorEyeMicroJitterAmpYPx;
+      const visorEyeX = argPongState.visorEyeShiftX + visorEyeDriftX + argPongState.shakeX * 0.22 + argPongState.visorEngineShakeX * 0.2;
+      const visorEyeY = argPongState.visorEyeShiftY + visorEyeDriftY + argPongState.shakeY * 0.22 + argPongState.visorEngineShakeY * 0.2;
+      const visorPupilX = argPongState.visorShiftX + argPongState.shakeX + argPongState.visorEngineShakeX * 0.24;
+      const visorPupilY = argPongState.visorShiftY + argPongState.shakeY + argPongState.visorEngineShakeY * 0.24;
       argPongState.visorEngineShakeX += (
         (Math.random() * 2 - 1) * ARG_PONG.visorEngineJitterAmpXPx - argPongState.visorEngineShakeX
       ) * ARG_PONG.visorEngineJitterResponse;
@@ -1538,26 +1615,17 @@ let DITHER_ENABLED = false;
       topStick.style.left = `${argPongState.aiX * 100}%`;
       bottomStick.style.left = `${argPongState.playerX * 100}%`;
       ballStickLayer.style.transform = `translate(${argPongState.shakeX}px, ${argPongState.shakeY}px)`;
-      const visorBackX = visorBackOffsetX + visorBackParallaxX + argPongState.shakeX * 0.12 + argPongState.visorEngineShakeX;
-      const visorBackY = visorBackOffsetY + visorBackParallaxY + argPongState.shakeY * 0.12 + argPongState.visorEngineShakeY;
-      visorBack.style.transform = `translate(${visorBackX}px, ${visorBackY}px)`;
-      if (visorBackSlices.length) {
-        const warpWaveA = now * ARG_PONG.visorBackWarpSpeedX + argPongState.visorBackWarpPhaseA;
-        const warpWaveB = now * ARG_PONG.visorBackWarpSpeedY + argPongState.visorBackWarpPhaseB;
-        for (let i = 0; i < visorBackSlices.length; i += 1) {
-          const slice = visorBackSlices[i];
-          const depth = i - 1;
-          const waveX = Math.sin(warpWaveA + depth * 1.9) + Math.cos(warpWaveB * 1.11 - depth * 1.37);
-          const waveY = Math.cos(warpWaveB + depth * 1.73) - Math.sin(warpWaveA * 0.92 - depth * 1.26);
-          const localShiftX = waveX * ARG_PONG.visorBackWarpAmpXPx * (0.46 + i * 0.22);
-          const localShiftY = waveY * ARG_PONG.visorBackWarpAmpYPx * (0.4 + i * 0.2);
-          const localRotate = waveX * 0.24 + waveY * 0.14;
-          slice.style.transform = `translate(${localShiftX}px, ${localShiftY}px) rotate(${localRotate}deg) scale(1.004)`;
-        }
-      }
-      visorFront.style.transform = `translate(${argPongState.visorShiftX + argPongState.shakeX + argPongState.visorEngineShakeX * 0.22}px, ${argPongState.visorShiftY + argPongState.shakeY + argPongState.visorEngineShakeY * 0.22}px)`;
+      const visorBodyX = visorBodyOffsetX + argPongState.shakeX * 0.12 + argPongState.visorEngineShakeX * 0.9;
+      const visorBodyY = visorBodyOffsetY + argPongState.shakeY * 0.12 + argPongState.visorEngineShakeY * 0.9;
+      const bodyScale = 1 + Math.sin(now * ARG_PONG.visorBodyScaleBreathSpeed + argPongState.visorBodyPhaseBreath) * ARG_PONG.visorBodyScaleBreathAmp;
+      const bodySqueeze = Math.sin(now * ARG_PONG.visorBodySqueezeSpeed + argPongState.visorBodyPhaseY * 1.2) * ARG_PONG.visorBodySqueezeAmp;
+      const bodyRotate = Math.sin(now * ARG_PONG.visorBodySwaySpeed + argPongState.visorBodyPhaseSway) * ARG_PONG.visorBodySwayDegAmp;
+      visorBody.style.transform = `translate(${visorBodyX}px, ${visorBodyY}px) rotate(${bodyRotate}deg) scale(${bodyScale + bodySqueeze}, ${bodyScale - bodySqueeze * 0.75})`;
+      const eyeScale = 1 + Math.sin(now * ARG_PONG.visorEyeBreathScaleSpeed + argPongState.visorEyePhaseX) * ARG_PONG.visorEyeBreathScaleAmp;
+      visorEye.style.transform = `translate(${visorEyeX}px, ${visorEyeY}px) scale(${eyeScale})`;
+      visorPupil.style.transform = `translate(${visorPupilX}px, ${visorPupilY}px)`;
 
-      if (argPongState.running && argBossAscii.ready && argBossAscii.compositeCtx && argBossAscii.originalCtx && argBossAscii.asciiCtx && argBossAscii.backImage && argBossAscii.frontImage) {
+      if (argPongState.running && argBossAscii.ready && argBossAscii.compositeCtx && argBossAscii.originalCtx && argBossAscii.asciiCtx && argBossAscii.bodyImage && argBossAscii.eyeImage && argBossAscii.pupilImage) {
         const compositeCanvas = argBossAscii.compositeCanvas;
         const compositeCtx = argBossAscii.compositeCtx;
         const originalCtx = argBossAscii.originalCtx;
@@ -1565,71 +1633,31 @@ let DITHER_ENABLED = false;
         const width = compositeCanvas.width;
         const height = compositeCanvas.height;
         if (width > 1 && height > 1) {
-          const drawCoverImage = (context, image, tx, ty) => {
-            const imgRatio = image.naturalWidth / Math.max(1, image.naturalHeight);
-            const dstRatio = width / Math.max(1, height);
-            let drawW = width;
-            let drawH = height;
-            if (imgRatio > dstRatio) drawW = height * imgRatio;
-            else drawH = width / imgRatio;
-            const dx = (width - drawW) * 0.5 + tx * argBossAscii.dpr;
-            const dy = (height - drawH) * 0.5 + ty * argBossAscii.dpr;
-            context.drawImage(image, dx, dy, drawW, drawH);
-          };
-          const applySliceClip = (context, index) => {
-            context.beginPath();
-            if (index === 0) {
-              context.moveTo(0, 0);
-              context.lineTo(width, 0);
-              context.lineTo(width, height * 0.38);
-              context.lineTo(0, height * 0.44);
-            } else if (index === 1) {
-              context.moveTo(0, height * 0.31);
-              context.lineTo(width, height * 0.26);
-              context.lineTo(width, height * 0.72);
-              context.lineTo(0, height * 0.7);
-            } else {
-              context.moveTo(0, height * 0.58);
-              context.lineTo(width, height * 0.64);
-              context.lineTo(width, height);
-              context.lineTo(0, height);
-            }
-            context.closePath();
-            context.clip();
-          };
+          const drawRects = getArgBossDrawRects(width, height);
+          if (!drawRects) {
+            argPongRafId = requestAnimationFrame(loop);
+            return;
+          }
 
           compositeCtx.setTransform(1, 0, 0, 1, 0, 0);
           compositeCtx.clearRect(0, 0, width, height);
-
-          const warpWaveA = now * ARG_PONG.visorBackWarpSpeedX + argPongState.visorBackWarpPhaseA;
-          const warpWaveB = now * ARG_PONG.visorBackWarpSpeedY + argPongState.visorBackWarpPhaseB;
-          for (let i = 0; i < 3; i += 1) {
-            const depth = i - 1;
-            const waveX = Math.sin(warpWaveA + depth * 1.9) + Math.cos(warpWaveB * 1.11 - depth * 1.37);
-            const waveY = Math.cos(warpWaveB + depth * 1.73) - Math.sin(warpWaveA * 0.92 - depth * 1.26);
-            const localShiftX = waveX * ARG_PONG.visorBackWarpAmpXPx * (0.46 + i * 0.22);
-            const localShiftY = waveY * ARG_PONG.visorBackWarpAmpYPx * (0.4 + i * 0.2);
-            const localRotate = waveX * 0.24 + waveY * 0.14;
-
-            compositeCtx.save();
-            applySliceClip(compositeCtx, i);
-            compositeCtx.translate(width * 0.5, height * 0.5);
-            compositeCtx.translate((visorBackX + localShiftX) * argBossAscii.dpr, (visorBackY + localShiftY) * argBossAscii.dpr);
-            compositeCtx.rotate((localRotate * Math.PI) / 180);
-            compositeCtx.translate(-width * 0.5, -height * 0.5);
-            drawCoverImage(compositeCtx, argBossAscii.backImage, 0, 0);
-            compositeCtx.restore();
-          }
-
-          compositeCtx.save();
-          compositeCtx.translate(width * 0.5, height * 0.5);
-          compositeCtx.translate(
-            (argPongState.visorShiftX + argPongState.shakeX + argPongState.visorEngineShakeX * 0.22) * argBossAscii.dpr,
-            (argPongState.visorShiftY + argPongState.shakeY + argPongState.visorEngineShakeY * 0.22) * argBossAscii.dpr
-          );
-          compositeCtx.translate(-width * 0.5, -height * 0.5);
-          drawCoverImage(compositeCtx, argBossAscii.frontImage, 0, 0);
-          compositeCtx.restore();
+          drawArgBossLayer(compositeCtx, argBossAscii.bodyImage, drawRects.body, {
+            tx: visorBodyX * argBossAscii.dpr,
+            ty: visorBodyY * argBossAscii.dpr,
+            rotateDeg: bodyRotate,
+            scaleX: bodyScale + bodySqueeze,
+            scaleY: bodyScale - bodySqueeze * 0.75
+          });
+          drawArgBossLayer(compositeCtx, argBossAscii.eyeImage, drawRects.eye, {
+            tx: visorEyeX * argBossAscii.dpr,
+            ty: visorEyeY * argBossAscii.dpr,
+            scaleX: eyeScale,
+            scaleY: eyeScale
+          });
+          drawArgBossLayer(compositeCtx, argBossAscii.pupilImage, drawRects.pupil, {
+            tx: visorPupilX * argBossAscii.dpr,
+            ty: visorPupilY * argBossAscii.dpr
+          });
 
           originalCtx.clearRect(0, 0, width, height);
           originalCtx.drawImage(compositeCanvas, 0, 0);
@@ -1667,9 +1695,10 @@ let DITHER_ENABLED = false;
     }
 
     overlay.hidden = false;
+    argSceneActive = true;
     stopStartBlinkTickerForArg();
     if (startDateTimer) { clearInterval(startDateTimer); startDateTimer = null; }
-    eyeLayer.querySelectorAll('.arg-scene-visor').forEach((el) => el.remove());
+    eyeLayer.querySelectorAll('.arg-scene-boss-layer').forEach((el) => el.remove());
     const bossOriginalCanvas = eyeLayer.querySelector('#boss-original');
     const bossAsciiCanvas = eyeLayer.querySelector('#boss-ascii');
     const bossRoot = eyeLayer.querySelector('#boss-root');
@@ -1740,30 +1769,28 @@ let DITHER_ENABLED = false;
       popupClass: 'arg-scene-popup-box--score'
     });
 
-    const visorBack = document.createElement('div');
-    visorBack.className = 'arg-scene-visor arg-scene-visor--back';
-    for (let i = 0; i < 3; i += 1) {
-      const slice = document.createElement('img');
-      slice.className = `arg-scene-visor-slice arg-scene-visor-slice--${i + 1}`;
-      slice.src = ARG_SCENE_ASSETS.visorBack;
-      slice.alt = '';
-      if (i === 0) slice.style.clipPath = 'polygon(0 0, 100% 0, 100% 38%, 0 44%)';
-      else if (i === 1) slice.style.clipPath = 'polygon(0 31%, 100% 26%, 100% 72%, 0 70%)';
-      else slice.style.clipPath = 'polygon(0 58%, 100% 64%, 100% 100%, 0 100%)';
-      visorBack.appendChild(slice);
-    }
-    const visorFront = document.createElement('img');
-    visorFront.className = 'arg-scene-visor arg-scene-visor--front';
-    visorFront.src = ARG_SCENE_ASSETS.visorFront;
-    visorFront.alt = '';
-    eyeLayer.appendChild(visorBack);
-    eyeLayer.appendChild(visorFront);
+    const visorBody = document.createElement('img');
+    visorBody.className = 'arg-scene-boss-layer arg-scene-boss-layer--body';
+    visorBody.src = ARG_SCENE_ASSETS.visorBody;
+    visorBody.alt = '';
+    const visorEye = document.createElement('img');
+    visorEye.className = 'arg-scene-boss-layer arg-scene-boss-layer--eye';
+    visorEye.src = ARG_SCENE_ASSETS.visorEye;
+    visorEye.alt = '';
+    const visorPupil = document.createElement('img');
+    visorPupil.className = 'arg-scene-boss-layer arg-scene-boss-layer--pupil';
+    visorPupil.src = ARG_SCENE_ASSETS.visorPupil;
+    visorPupil.alt = '';
+    eyeLayer.appendChild(visorBody);
+    eyeLayer.appendChild(visorEye);
+    eyeLayer.appendChild(visorPupil);
     playUiSoundNoThrow(ARG_SCENE_SOUNDS.turnOff);
 
     const bossInitOk = await initArgBossAscii(overlay);
     if (bossInitOk) {
       if (bossOriginalCanvas) bossOriginalCanvas.hidden = false;
       if (bossAsciiCanvas) bossAsciiCanvas.hidden = false;
+      ensureArgBossCanvasSize(overlay);
       const bossAsciiOk = renderArgBossAsciiIdleFrame();
       if (!bossAsciiOk) {
         if (bossAsciiCanvas) bossAsciiCanvas.hidden = true;
@@ -1773,7 +1800,7 @@ let DITHER_ENABLED = false;
 
     await sleep(ARG_SCENE_TIMINGS.eyeToCountdownMs);
     await runArgCountdown();
-    startArgPong({ overlay, ballStickLayer, ball, topStick, bottomStick, visorBack, visorFront, scoreLayer, aiScoreEl, playerScoreEl });
+    startArgPong({ overlay, ballStickLayer, ball, topStick, bottomStick, visorBody, visorEye, visorPupil, scoreLayer, aiScoreEl, playerScoreEl });
 
     startArgSceneRunning = false;
   }
@@ -3598,6 +3625,7 @@ function updateGifFrame(ts) {
     raf = requestAnimationFrame(loop);
 
     if (state.textInitPending) return;
+    if (argSceneActive) return;
 
     // FPS-ограничитель
     const frameInterval = 1000 / state.fps;
