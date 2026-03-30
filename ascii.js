@@ -364,6 +364,8 @@ const ARG_PONG = {
   visorBodySwaySpeed: 0.00073,
   visorBodySqueezeAmp: 0.014,
   visorBodySqueezeSpeed: 0.00114,
+  visorBodyMediumShakeAmpYPx: 3.6,
+  visorBodyMediumShakeSpeedY: Math.PI * 2 / 1000,
   visorEyeParallaxFollow: 0.44,
   visorEyeParallaxMaxXPx: 13.2,
   visorEyeParallaxMaxYPx: 9.8,
@@ -377,6 +379,10 @@ const ARG_PONG = {
   visorEyeMicroJitterSpeedY: 0.0031,
   visorEyeBreathScaleAmp: 0.01,
   visorEyeBreathScaleSpeed: 0.00102,
+  visorEyeMediumShakeAmpYPx: 2.9,
+  visorEyeMediumShakeSpeedY: Math.PI * 2 / 980,
+  visorPupilMediumShakeAmpYPx: 2.35,
+  visorPupilMediumShakeSpeedY: Math.PI * 2 / 1030,
   visorPupilEdgeRecoilThreshold: 0.92,
   visorPupilEdgeRecoilPx: 0.72,
   visorPupilEdgeRecoilSpring: 0.15,
@@ -1685,8 +1691,17 @@ let DITHER_ENABLED = false;
       argPongState.visorEngineShakePupilY += (
         argPongState.visorEngineShakeY * ARG_PONG.visorEngineShakePupilScale - argPongState.visorEngineShakePupilY
       ) * ARG_PONG.visorEngineShakePupilResponse;
+      const visorBodyShakeY = Math.sin(
+        now * ARG_PONG.visorBodyMediumShakeSpeedY + argPongState.visorBodyPhaseY * 1.07 + 0.21
+      ) * ARG_PONG.visorBodyMediumShakeAmpYPx;
+      const visorEyeShakeY = Math.sin(
+        now * ARG_PONG.visorEyeMediumShakeSpeedY + argPongState.visorEyePhaseY * 1.13 + 1.02
+      ) * ARG_PONG.visorEyeMediumShakeAmpYPx;
+      const visorPupilShakeY = Math.sin(
+        now * ARG_PONG.visorPupilMediumShakeSpeedY + argPongState.visorEyePhaseX * 0.86 + 2.07
+      ) * ARG_PONG.visorPupilMediumShakeAmpYPx;
       const visorEyeX = argPongState.visorEyeShiftX + visorEyeDriftX + argPongState.shakeX * 0.22 + argPongState.visorEngineShakeEyeX * 0.22;
-      const visorEyeY = argPongState.visorEyeShiftY + visorEyeDriftY + argPongState.shakeY * 0.22 + argPongState.visorEngineShakeEyeY * 0.22;
+      const visorEyeY = argPongState.visorEyeShiftY + visorEyeDriftY + argPongState.shakeY * 0.22 + argPongState.visorEngineShakeEyeY * 0.22 + visorEyeShakeY;
       const xEdgeRatio = Math.abs(argPongState.visorShiftX) / Math.max(1, ARG_PONG.visorEyeMaxShiftXPx);
       const yEdgeRatio = Math.abs(argPongState.visorShiftY) / Math.max(1, ARG_PONG.visorEyeMaxShiftYPx);
       const xEdgePressure = clamp(
@@ -1714,7 +1729,7 @@ let DITHER_ENABLED = false;
       argPongState.visorPupilShiftX += (visorPupilTargetOffsetX - argPongState.visorPupilShiftX) * ARG_PONG.visorPupilFollowLerp;
       argPongState.visorPupilShiftY += (visorPupilTargetOffsetY - argPongState.visorPupilShiftY) * ARG_PONG.visorPupilFollowLerp;
       const visorPupilOffsetX = argPongState.visorPupilShiftX + argPongState.shakeX * 0.78 + argPongState.visorEngineShakePupilX * 0.26;
-      const visorPupilOffsetY = argPongState.visorPupilShiftY + argPongState.shakeY * 0.78 + argPongState.visorEngineShakePupilY * 0.26;
+      const visorPupilOffsetY = argPongState.visorPupilShiftY + argPongState.shakeY * 0.78 + argPongState.visorEngineShakePupilY * 0.26 + visorPupilShakeY;
       const visorPupilX = visorEyeX + visorPupilOffsetX;
       const visorPupilY = visorEyeY + visorPupilOffsetY;
       argPongState.shakeX *= ARG_PONG.shakeDecay;
@@ -1726,10 +1741,16 @@ let DITHER_ENABLED = false;
       bottomStick.style.left = `${argPongState.playerX * 100}%`;
       ballStickLayer.style.transform = `translate(${argPongState.shakeX}px, ${argPongState.shakeY}px)`;
       const visorBodyX = 0;
-      const visorBodyY = 0;
-      const bodyScale = 1;
-      const bodySqueeze = 0;
-      const bodyRotate = 0;
+      const visorBodyY = visorBodyShakeY;
+      const bodyScale = 1 + Math.sin(
+        now * ARG_PONG.visorBodyScaleBreathSpeed + argPongState.visorBodyPhaseBreath
+      ) * (ARG_PONG.visorBodyScaleBreathAmp * 1.65);
+      const bodySqueeze = Math.cos(
+        now * ARG_PONG.visorBodySqueezeSpeed + argPongState.visorBodyPhaseSway * 0.91
+      ) * (ARG_PONG.visorBodySqueezeAmp * 1.35);
+      const bodyRotate = Math.sin(
+        now * ARG_PONG.visorBodySwaySpeed + argPongState.visorBodyPhaseSway
+      ) * 0.28;
       visorBody.style.transform = `translate(${visorBodyX}px, ${visorBodyY}px) rotate(${bodyRotate}deg) scale(${bodyScale + bodySqueeze}, ${bodyScale - bodySqueeze * 0.75})`;
       const eyeScale = 1 + Math.sin(now * ARG_PONG.visorEyeBreathScaleSpeed + argPongState.visorEyePhaseX) * ARG_PONG.visorEyeBreathScaleAmp;
       visorEye.style.transform = `translate(${visorEyeX}px, ${visorEyeY}px) scale(${eyeScale})`;
