@@ -17,9 +17,10 @@ html, body, .wrap { overflow-x: hidden; }
 .wrap{ display:flex; flex-direction:column; height:100%; }
 /* ===== АНТИ-ВЫДЕЛЕНИЕ UI ===== */
 /* На всём приложении — нельзя выделять, вызывать callout, перетаскивать */
-.wrap, .toolbar, .panel, .modebar,
+html, body, .wrap, .toolbar, .panel, .modebar,
 button, .btn, label, output {
   -webkit-user-select: none;
+     -moz-user-select: none;
       -ms-user-select: none;
           user-select: none;
   -webkit-touch-callout: none;        /* отключает лонгтап-меню iOS */
@@ -29,6 +30,7 @@ button, .btn, label, output {
 /* Но полям ввода — можно (иначе нельзя править кастомный набор и т.п.) */
 input, textarea, select {
   -webkit-user-select: text;
+     -moz-user-select: text;
           user-select: text;
   -webkit-touch-callout: default;
 }
@@ -42,6 +44,7 @@ img, video, canvas, pre {
 /* На всякий: ссылки в тулбарах (если появятся) тоже без выделения */
 .toolbar a, .modebar a { 
   -webkit-user-select: none;
+     -moz-user-select: none;
           user-select: none;
   -webkit-touch-callout: none;
 }
@@ -1397,6 +1400,12 @@ input[type="color"] {
   inset:0;
   width:100%;
   height:100%;
+  -webkit-user-select:none;
+     -moz-user-select:none;
+      -ms-user-select:none;
+          user-select:none;
+  -webkit-touch-callout:none;
+  -webkit-tap-highlight-color:transparent;
 }
 
 #boss-original,
@@ -1406,6 +1415,12 @@ input[type="color"] {
   width:100%;
   height:100%;
   image-rendering:pixelated;
+  -webkit-user-select:none;
+     -moz-user-select:none;
+      -ms-user-select:none;
+          user-select:none;
+  -webkit-touch-callout:none;
+  -webkit-tap-highlight-color:transparent;
 }
 
 #boss-ascii{

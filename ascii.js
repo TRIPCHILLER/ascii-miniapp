@@ -375,8 +375,9 @@ const ARG_BOSS_ASCII_PRESET = Object.freeze({
   size: 100,
   contrast: 1.30,
   gamma: 1.50,
-  color: '#bf0003',
-  background: '#000000'
+  color: '#bfbfbf',
+  background: '#000000',
+  invert: true
 });
 const AUDIO_UNLOCK_STORAGE_KEY = 'asciiVisorAudioUnlocked';
 let errorSoundAudio = null;
@@ -1015,6 +1016,39 @@ let DITHER_ENABLED = false;
       canvas.style.width = `${Math.round(rect.width)}px`;
       canvas.style.height = `${Math.round(rect.height)}px`;
     }
+  }
+
+  function renderArgBossAsciiIdleFrame() {
+    if (!argBossAscii.ready || !argBossAscii.compositeCtx || !argBossAscii.originalCtx || !argBossAscii.asciiCtx || !argBossAscii.backImage || !argBossAscii.frontImage) return false;
+    const compositeCanvas = argBossAscii.compositeCanvas;
+    const compositeCtx = argBossAscii.compositeCtx;
+    const originalCtx = argBossAscii.originalCtx;
+    const asciiCtx = argBossAscii.asciiCtx;
+    const width = compositeCanvas.width;
+    const height = compositeCanvas.height;
+    if (width < 2 || height < 2) return false;
+
+    const drawCoverImage = (context, image) => {
+      const imgRatio = image.naturalWidth / Math.max(1, image.naturalHeight);
+      const dstRatio = width / Math.max(1, height);
+      let drawW = width;
+      let drawH = height;
+      if (imgRatio > dstRatio) drawW = height * imgRatio;
+      else drawH = width / imgRatio;
+      const dx = (width - drawW) * 0.5;
+      const dy = (height - drawH) * 0.5;
+      context.drawImage(image, dx, dy, drawW, drawH);
+    };
+
+    compositeCtx.setTransform(1, 0, 0, 1, 0, 0);
+    compositeCtx.clearRect(0, 0, width, height);
+    drawCoverImage(compositeCtx, argBossAscii.backImage);
+    drawCoverImage(compositeCtx, argBossAscii.frontImage);
+
+    originalCtx.clearRect(0, 0, width, height);
+    originalCtx.drawImage(compositeCanvas, 0, 0);
+    const asciiResult = renderAsciiFromSource(compositeCanvas, asciiCtx, ARG_BOSS_ASCII_PRESET);
+    return asciiResult.ok;
   }
 
   async function animateArgPopupText(textEl, text) {
@@ -1725,6 +1759,17 @@ let DITHER_ENABLED = false;
     eyeLayer.appendChild(visorBack);
     eyeLayer.appendChild(visorFront);
     playUiSoundNoThrow(ARG_SCENE_SOUNDS.turnOff);
+
+    const bossInitOk = await initArgBossAscii(overlay);
+    if (bossInitOk) {
+      if (bossOriginalCanvas) bossOriginalCanvas.hidden = false;
+      if (bossAsciiCanvas) bossAsciiCanvas.hidden = false;
+      const bossAsciiOk = renderArgBossAsciiIdleFrame();
+      if (!bossAsciiOk) {
+        if (bossAsciiCanvas) bossAsciiCanvas.hidden = true;
+        if (bossOriginalCanvas) bossOriginalCanvas.hidden = false;
+      }
+    }
 
     await sleep(ARG_SCENE_TIMINGS.eyeToCountdownMs);
     await runArgCountdown();
@@ -3303,7 +3348,8 @@ function renderAsciiFromSource(sourceCanvas, targetCtx, options = {}) {
     color: state.color,
     background: state.background,
     charset: state.charset,
-    renderCharset10: state.renderCharset10
+    renderCharset10: state.renderCharset10,
+    invert: state.invert
   };
 
   try {
@@ -3313,6 +3359,8 @@ function renderAsciiFromSource(sourceCanvas, targetCtx, options = {}) {
     state.color = String(options.color || ARG_BOSS_ASCII_PRESET.color);
     state.background = String(options.background || ARG_BOSS_ASCII_PRESET.background);
     state.charset = String(options.charset || ARG_BOSS_ASCII_PRESET.charset);
+    if (typeof options.invert === 'boolean') state.invert = options.invert;
+    else if (typeof ARG_BOSS_ASCII_PRESET.invert === 'boolean') state.invert = ARG_BOSS_ASCII_PRESET.invert;
     state.renderCharset10 = state.charset;
 
     const src = { el: sourceCanvas, w: sourceW, h: sourceH, kind: 'canvas' };
@@ -3356,6 +3404,7 @@ function renderAsciiFromSource(sourceCanvas, targetCtx, options = {}) {
     state.background = prevState.background;
     state.charset = prevState.charset;
     state.renderCharset10 = prevState.renderCharset10;
+    state.invert = prevState.invert;
   }
 }
 
