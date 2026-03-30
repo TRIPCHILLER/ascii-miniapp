@@ -185,7 +185,10 @@ function createThrottle(fn, waitMs) {
 }
 
 const tgTextHaptic = createThrottle(() => tgHaptic('impactOccurred', 'light'), TEXT_HAPTIC_THROTTLE_MS);
-const tgPongHitHaptic = createThrottle(() => tgHaptic('impactOccurred', 'light'), 55);
+
+function tgEventHaptic() {
+  tgHaptic('impactOccurred', 'light');
+}
 
 const TERM_RANGE_STEPS = 10;
 const START_EASTER_EGG_MAX_SOUND = 10;
@@ -258,6 +261,7 @@ const ARG_PONG = {
     { maxSpeedPx: 7.2, reaction: 0.2, autoAim: 0.45, accelPx: 0.65, deadZonePx: 8 },
     { maxSpeedPx: 11.8, reaction: 0.35, autoAim: 0.82, accelPx: 1.2, deadZonePx: 2 }
   ],
+  aiFinalStand: { maxSpeedPx: 15.2, reaction: 0.82, autoAim: 1, accelPx: 2.25, deadZonePx: 0.8 },
   syncDistancePx: 54,
   syncHoldMs: 2400,
   syncMaxDurationMs: 3000,
@@ -763,6 +767,7 @@ let DITHER_ENABLED = false;
   let audioUnlockHandled = false;
   let audioUnlockProbe = null;
   let argPongRafId = 0;
+  let argPongServeTimer = 0;
   const argPongState = {
     running: false,
     ended: false,
@@ -847,6 +852,8 @@ let DITHER_ENABLED = false;
     };
 
     textEl.textContent = '|';
+    startPrintNextSound = 0;
+    startLastPrintSoundAt = 0;
     for (let i = 0; i < text.length; i += 1) {
       const fixedPart = text.slice(0, i);
       textEl.classList.add('is-glitching');
@@ -854,6 +861,7 @@ let DITHER_ENABLED = false;
       await sleep(ARG_SCENE_TIMINGS.popupGlitchMs);
       textEl.classList.remove('is-glitching');
       textEl.textContent = `${fixedPart}${text[i]}|`;
+      playStartPrintSound();
       tgTextHaptic();
       await sleep(text[i] === ' ' ? ARG_SCENE_TIMINGS.popupSpaceTypeMs : ARG_SCENE_TIMINGS.popupCharTypeMs);
     }
@@ -898,6 +906,36 @@ let DITHER_ENABLED = false;
       cancelAnimationFrame(argPongRafId);
       argPongRafId = 0;
     }
+    if (argPongServeTimer) {
+      clearTimeout(argPongServeTimer);
+      argPongServeTimer = 0;
+    }
+  }
+
+  function resetArgOverlayState() {
+    const overlay = ensureArgOverlay();
+    const popupLayer = overlay.querySelector('#argScenePopupLayer');
+    const countdownLayer = overlay.querySelector('#argSceneCountdownLayer');
+    const scoreLayer = overlay.querySelector('#argSceneScoreLayer');
+    const eyeLayer = overlay.querySelector('#argSceneEyeLayer');
+    const ballStickLayer = overlay.querySelector('#argSceneBallStickLayer');
+    const popupText = overlay.querySelector('#argScenePopupText');
+    if (popupLayer) popupLayer.hidden = true;
+    if (countdownLayer) countdownLayer.textContent = '';
+    if (scoreLayer) scoreLayer.hidden = true;
+    if (popupText) popupText.textContent = '';
+    if (eyeLayer) eyeLayer.innerHTML = '';
+    if (ballStickLayer) ballStickLayer.innerHTML = '';
+    overlay.hidden = true;
+  }
+
+  function returnToStartMenu() {
+    if (app.ui.modeChooser) app.ui.modeChooser.hidden = false;
+    startModeChooserFx();
+  }
+
+  function isArgAiFinalStand() {
+    return argPongState.playerScore >= (ARG_PONG.scoreToWin - 1);
   }
 
   async function finishArgMatch(result = 'lose') {
@@ -906,14 +944,20 @@ let DITHER_ENABLED = false;
     stopArgPongLoop();
     if (result === 'win') {
       await showArgPopup('ТЫ ОДОЛЕЛ СИСТЕМУ');
+      resetArgOverlayState();
+      returnToStartMenu();
+      startArgSessionLocked = true;
+      startArgScenePending = false;
       startArgSceneRunning = false;
+      startArgSceneStarted = false;
       return;
     }
 
     await showArgPopup('ТЫ ТАК И НЕ УВИДЕЛ СУТЬ...');
-    const overlay = ensureArgOverlay();
-    overlay.hidden = true;
+    resetArgOverlayState();
+    returnToStartMenu();
     startArgSessionLocked = true;
+    startArgScenePending = false;
     startArgSceneRunning = false;
     startArgSceneStarted = false;
   }
@@ -987,6 +1031,27 @@ let DITHER_ENABLED = false;
     overlay.dataset.argControlsBound = '1';
   }
 
+  function predictArgAiInterceptX({ rect, paddleHalfNorm, wallNorm, topY, paddleHalfH, ballHalfY, ballHalfX }) {
+    const targetY = topY + paddleHalfH + ballHalfY;
+    if (argPongState.ballVY >= 0) return clamp(argPongState.ballX, paddleHalfNorm, 1 - paddleHalfNorm);
+    const vyNorm = argPongState.ballVY / rect.height;
+    if (Math.abs(vyNorm) < 1e-6) return clamp(argPongState.ballX, paddleHalfNorm, 1 - paddleHalfNorm);
+    const timeToPaddle = (targetY - argPongState.ballY) / vyNorm;
+    if (!(timeToPaddle > 0)) return clamp(argPongState.ballX, paddleHalfNorm, 1 - paddleHalfNorm);
+
+    const minX = wallNorm + ballHalfX;
+    const maxX = 1 - wallNorm - ballHalfX;
+    let projectedX = argPongState.ballX + (argPongState.ballVX / rect.width) * timeToPaddle;
+    const span = maxX - minX;
+    if (span <= 0) return clamp(projectedX, paddleHalfNorm, 1 - paddleHalfNorm);
+
+    while (projectedX < minX || projectedX > maxX) {
+      if (projectedX < minX) projectedX = minX + (minX - projectedX);
+      if (projectedX > maxX) projectedX = maxX - (projectedX - maxX);
+    }
+    return clamp(projectedX, paddleHalfNorm, 1 - paddleHalfNorm);
+  }
+
   function startArgPong({ overlay, ballStickLayer, ball, topStick, bottomStick, visorBack, visorFront, scoreLayer, aiScoreEl, playerScoreEl }) {
     if (!overlay || !ballStickLayer || !ball || !topStick || !bottomStick || !visorBack || !visorFront || !scoreLayer || !aiScoreEl || !playerScoreEl) return;
     if (argPongRafId) cancelAnimationFrame(argPongRafId);
@@ -1056,6 +1121,15 @@ let DITHER_ENABLED = false;
         argPongState.syncStartedAt = 0;
       }
 
+      const topY = ARG_PONG.topPaddleYVh / 100;
+      const bottomY = ARG_PONG.bottomPaddleYVh / 100;
+      const paddleHalfW = (ARG_PONG.paddleWidthPx * 0.5) / rect.width;
+      const paddleHalfH = (ARG_PONG.paddleHeightPx * 0.5) / rect.height;
+      const ballSizePx = ARG_PONG.paddleHeightPx * ARG_PONG.ballSizeToPaddleHeightRatio;
+      const ballHalfX = (ballSizePx * 0.5) / rect.width;
+      const ballHalfY = (ballSizePx * 0.5) / rect.height;
+      const wallNorm = ARG_PONG.sideWallPaddingPx / rect.width;
+
       let aiTargetX = argPongState.ballX;
       let aiMaxSpeedPx = ARG_PONG.aiMaxSpeedPx;
       let aiAccelPx = 0.6;
@@ -1066,9 +1140,14 @@ let DITHER_ENABLED = false;
         aiAccelPx = ARG_PONG.syncFollowAccelPx;
         aiDeadZonePx = 1;
       } else {
-        const aiLevel = ARG_PONG.aiLevels[Math.min(argPongState.playerScore, ARG_PONG.aiLevels.length - 1)];
+        const aiLevel = isArgAiFinalStand()
+          ? ARG_PONG.aiFinalStand
+          : ARG_PONG.aiLevels[Math.min(argPongState.playerScore, ARG_PONG.aiLevels.length - 1)];
+        const predictedX = isArgAiFinalStand()
+          ? predictArgAiInterceptX({ rect, paddleHalfNorm, wallNorm, topY, paddleHalfH, ballHalfY, ballHalfX })
+          : argPongState.ballX;
         const lookAheadNorm = clamp(argPongState.ballVX * aiLevel.autoAim * 6 / rect.width, -0.2, 0.2);
-        const aimX = clamp(argPongState.ballX + lookAheadNorm, paddleHalfNorm, 1 - paddleHalfNorm);
+        const aimX = clamp(predictedX + lookAheadNorm, paddleHalfNorm, 1 - paddleHalfNorm);
         aiTargetX += (aimX - aiTargetX) * aiLevel.reaction;
         aiMaxSpeedPx = aiLevel.maxSpeedPx;
         aiAccelPx = aiLevel.accelPx;
@@ -1091,22 +1170,12 @@ let DITHER_ENABLED = false;
 
       argPongState.ballX += argPongState.ballVX / rect.width;
       argPongState.ballY += argPongState.ballVY / rect.height;
-
-      const ballSizePx = ARG_PONG.paddleHeightPx * ARG_PONG.ballSizeToPaddleHeightRatio;
-      const ballHalfX = (ballSizePx * 0.5) / rect.width;
-      const ballHalfY = (ballSizePx * 0.5) / rect.height;
-      const wallNorm = ARG_PONG.sideWallPaddingPx / rect.width;
       if (argPongState.ballX - ballHalfX <= wallNorm || argPongState.ballX + ballHalfX >= 1 - wallNorm) {
         argPongState.ballX = clamp(argPongState.ballX, wallNorm + ballHalfX, 1 - wallNorm - ballHalfX);
         argPongState.ballVX *= -1;
         applyTinyShake();
-        tgPongHitHaptic();
+        tgEventHaptic();
       }
-
-      const topY = ARG_PONG.topPaddleYVh / 100;
-      const bottomY = ARG_PONG.bottomPaddleYVh / 100;
-      const paddleHalfW = (ARG_PONG.paddleWidthPx * 0.5) / rect.width;
-      const paddleHalfH = (ARG_PONG.paddleHeightPx * 0.5) / rect.height;
 
       const hitTop = argPongState.ballVY < 0
         && (argPongState.ballY - ballHalfY <= topY + paddleHalfH)
@@ -1119,7 +1188,7 @@ let DITHER_ENABLED = false;
         argPongState.ballVX = clamp(argPongState.ballVX, -ARG_PONG.ballMaxSpeedPx, ARG_PONG.ballMaxSpeedPx);
         argPongState.ballY = topY + paddleHalfH + ballHalfY;
         applyTinyShake();
-        tgPongHitHaptic();
+        tgEventHaptic();
       }
 
       const hitBottom = argPongState.ballVY > 0
@@ -1133,7 +1202,7 @@ let DITHER_ENABLED = false;
         argPongState.ballVX = clamp(argPongState.ballVX, -ARG_PONG.ballMaxSpeedPx, ARG_PONG.ballMaxSpeedPx);
         argPongState.ballY = bottomY - paddleHalfH - ballHalfY;
         applyTinyShake();
-        tgPongHitHaptic();
+        tgEventHaptic();
       }
 
       const topGoalLine = topY + paddleHalfH + ballHalfY;
@@ -1146,10 +1215,11 @@ let DITHER_ENABLED = false;
           return;
         }
         serveLocked = true;
-        setTimeout(() => {
+        argPongServeTimer = setTimeout(() => {
           if (!argPongState.running) return;
           resetArgBall(false);
           serveLocked = false;
+          argPongServeTimer = 0;
         }, ARG_SCENE_TIMINGS.serveDelayMs);
       } else if (!serveLocked && argPongState.ballVY > 0 && argPongState.ballY > bottomGoalLine) {
         argPongState.aiScore += 1;
@@ -1159,10 +1229,11 @@ let DITHER_ENABLED = false;
           return;
         }
         serveLocked = true;
-        setTimeout(() => {
+        argPongServeTimer = setTimeout(() => {
           if (!argPongState.running) return;
           resetArgBall(true);
           serveLocked = false;
+          argPongServeTimer = 0;
         }, ARG_SCENE_TIMINGS.serveDelayMs);
       }
 
@@ -1277,7 +1348,7 @@ let DITHER_ENABLED = false;
     ball.style.height = `${ballSizePx}px`;
     ballStickLayer.appendChild(ball);
     playUiSoundNoThrow(ARG_SCENE_SOUNDS.bitClick);
-    tgHaptic('impactOccurred', 'light');
+    tgEventHaptic();
 
     await sleep(ARG_SCENE_TIMINGS.ballToPopupMs);
     await showArgPopup('NH73ЛЛЗК7 - Э70\nСПОСОБНОС7Ь\n4Д4П7NР0847ЬСЯ\nК ИЗМ3Н3НNЯМ', {
@@ -1294,7 +1365,7 @@ let DITHER_ENABLED = false;
     topStick.style.bottom = '';
     ballStickLayer.appendChild(topStick);
     playUiSoundNoThrow(ARG_SCENE_SOUNDS.bitClick);
-    tgHaptic('impactOccurred', 'light');
+    tgEventHaptic();
 
     await sleep(ARG_SCENE_TIMINGS.topToBottomStickMs);
 
@@ -1308,7 +1379,7 @@ let DITHER_ENABLED = false;
     bottomStick.style.top = '';
     ballStickLayer.appendChild(bottomStick);
     playUiSoundNoThrow(ARG_SCENE_SOUNDS.bitClick);
-    tgHaptic('impactOccurred', 'light');
+    tgEventHaptic();
 
     await sleep(ARG_SCENE_TIMINGS.bottomToSecondPopupMs);
     await showArgPopup('3/3', {
