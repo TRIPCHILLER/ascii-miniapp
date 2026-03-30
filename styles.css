@@ -1392,6 +1392,30 @@ input[type="color"] {
   will-change:transform;
 }
 
+.arg-scene-boss-root{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+}
+
+#boss-original,
+#boss-ascii{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  image-rendering:pixelated;
+}
+
+#boss-ascii{
+  pointer-events:none;
+}
+
+.arg-scene-boss-root[data-ascii-ready="1"] ~ .arg-scene-visor{
+  opacity:0;
+}
+
 .arg-scene-visor-slice{
   position:absolute;
   inset:0;
