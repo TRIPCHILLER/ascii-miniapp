@@ -907,6 +907,7 @@ let DITHER_ENABLED = false;
     eyeImage: null,
     pupilImage: null,
     ready: false,
+    visualReady: false,
     failed: false,
     dpr: 1
   };
@@ -997,6 +998,10 @@ let DITHER_ENABLED = false;
     argBossAscii.asciiCanvas = asciiCanvas;
     argBossAscii.asciiCtx = asciiCtx;
     argBossAscii.failed = false;
+    argBossAscii.visualReady = false;
+    root.dataset.asciiReady = '0';
+    originalCanvas.hidden = true;
+    asciiCanvas.hidden = true;
 
     try {
       if (!argBossAscii.bodyImage || !argBossAscii.eyeImage || !argBossAscii.pupilImage) {
@@ -1010,14 +1015,30 @@ let DITHER_ENABLED = false;
         argBossAscii.pupilImage = pupilImage;
       }
       argBossAscii.ready = true;
-      root.dataset.asciiReady = '1';
       return true;
     } catch (_) {
       argBossAscii.ready = false;
+      argBossAscii.visualReady = false;
       argBossAscii.failed = true;
       root.dataset.asciiReady = '0';
       return false;
     }
+  }
+
+  function setArgBossVisualReady(overlay, { showAscii = true } = {}) {
+    const root = overlay?.querySelector('#boss-root');
+    const originalCanvas = overlay?.querySelector('#boss-original');
+    const asciiCanvas = overlay?.querySelector('#boss-ascii');
+    if (!root || !originalCanvas || !asciiCanvas) return;
+    if (!argBossAscii.visualReady) {
+      root.dataset.asciiReady = '0';
+      originalCanvas.hidden = true;
+      asciiCanvas.hidden = true;
+      return;
+    }
+    root.dataset.asciiReady = '1';
+    originalCanvas.hidden = false;
+    asciiCanvas.hidden = !showAscii;
   }
 
   function ensureArgBossCanvasSize(overlay) {
@@ -1077,7 +1098,7 @@ let DITHER_ENABLED = false;
     const eyeW = eyeBase * 0.308;
     const eyeH = eyeW;
     const eyeCx = bodyCx;
-    const eyeCy = bodyCy - bodyH * 0.06;
+    const eyeCy = bodyCy;
     const pupilW = eyeW * 0.226;
     const pupilH = eyeH * 0.64;
 
@@ -1108,6 +1129,7 @@ let DITHER_ENABLED = false;
     originalCtx.clearRect(0, 0, width, height);
     originalCtx.drawImage(compositeCanvas, 0, 0);
     const asciiResult = renderAsciiFromSource(compositeCanvas, asciiCtx, ARG_BOSS_ASCII_PRESET);
+    argBossAscii.visualReady = asciiResult.ok;
     return asciiResult.ok;
   }
 
@@ -1178,6 +1200,7 @@ let DITHER_ENABLED = false;
   function stopArgPongLoop() {
     argPongState.running = false;
     argBossAscii.ready = false;
+    argBossAscii.visualReady = false;
     argSceneActive = false;
     if (argPongRafId) {
       cancelAnimationFrame(argPongRafId);
@@ -1192,6 +1215,7 @@ let DITHER_ENABLED = false;
   function resetArgOverlayState() {
     const overlay = ensureArgOverlay();
     argSceneActive = false;
+    argBossAscii.visualReady = false;
     const popupLayer = overlay.querySelector('#argScenePopupLayer');
     const countdownLayer = overlay.querySelector('#argSceneCountdownLayer');
     const scoreLayer = overlay.querySelector('#argSceneScoreLayer');
@@ -1384,23 +1408,19 @@ let DITHER_ENABLED = false;
     resetArgBall(Math.random() > 0.5);
     bindArgPlayerControls(overlay);
     const bossRoot = overlay.querySelector('#boss-root');
-    const bossOriginal = overlay.querySelector('#boss-original');
-    const bossAscii = overlay.querySelector('#boss-ascii');
     const runBossAscii = async () => {
       const ok = await initArgBossAscii(overlay);
       if (!ok) {
         if (bossRoot) bossRoot.dataset.asciiReady = '0';
-        if (bossOriginal) bossOriginal.hidden = true;
-        if (bossAscii) bossAscii.hidden = true;
+        argBossAscii.visualReady = false;
+        setArgBossVisualReady(overlay, { showAscii: false });
         return;
       }
-      if (bossOriginal) bossOriginal.hidden = false;
-      if (bossAscii) bossAscii.hidden = false;
     };
     runBossAscii().catch(() => {
       if (bossRoot) bossRoot.dataset.asciiReady = '0';
-      if (bossOriginal) bossOriginal.hidden = true;
-      if (bossAscii) bossAscii.hidden = true;
+      argBossAscii.visualReady = false;
+      setArgBossVisualReady(overlay, { showAscii: false });
     });
 
     let serveLocked = false;
@@ -1663,10 +1683,10 @@ let DITHER_ENABLED = false;
           originalCtx.drawImage(compositeCanvas, 0, 0);
           const asciiResult = renderAsciiFromSource(compositeCanvas, asciiCtx, ARG_BOSS_ASCII_PRESET);
           if (!asciiResult.ok) {
-            if (bossAscii) bossAscii.hidden = true;
-            if (bossOriginal) bossOriginal.hidden = false;
+            setArgBossVisualReady(overlay, { showAscii: false });
           } else {
-            if (bossAscii) bossAscii.hidden = false;
+            argBossAscii.visualReady = true;
+            setArgBossVisualReady(overlay, { showAscii: true });
           }
         }
       }
@@ -1713,6 +1733,7 @@ let DITHER_ENABLED = false;
       bossAsciiCanvas.hidden = true;
     }
     if (bossRoot) bossRoot.dataset.asciiReady = '0';
+    argBossAscii.visualReady = false;
     ballStickLayer.innerHTML = '';
     countdownLayer.textContent = '';
     scoreLayer.hidden = true;
@@ -1773,14 +1794,17 @@ let DITHER_ENABLED = false;
     visorBody.className = 'arg-scene-boss-layer arg-scene-boss-layer--body';
     visorBody.src = ARG_SCENE_ASSETS.visorBody;
     visorBody.alt = '';
+    visorBody.hidden = true;
     const visorEye = document.createElement('img');
     visorEye.className = 'arg-scene-boss-layer arg-scene-boss-layer--eye';
     visorEye.src = ARG_SCENE_ASSETS.visorEye;
     visorEye.alt = '';
+    visorEye.hidden = true;
     const visorPupil = document.createElement('img');
     visorPupil.className = 'arg-scene-boss-layer arg-scene-boss-layer--pupil';
     visorPupil.src = ARG_SCENE_ASSETS.visorPupil;
     visorPupil.alt = '';
+    visorPupil.hidden = true;
     eyeLayer.appendChild(visorBody);
     eyeLayer.appendChild(visorEye);
     eyeLayer.appendChild(visorPupil);
@@ -1788,14 +1812,10 @@ let DITHER_ENABLED = false;
 
     const bossInitOk = await initArgBossAscii(overlay);
     if (bossInitOk) {
-      if (bossOriginalCanvas) bossOriginalCanvas.hidden = false;
-      if (bossAsciiCanvas) bossAsciiCanvas.hidden = false;
       ensureArgBossCanvasSize(overlay);
       const bossAsciiOk = renderArgBossAsciiIdleFrame();
-      if (!bossAsciiOk) {
-        if (bossAsciiCanvas) bossAsciiCanvas.hidden = true;
-        if (bossOriginalCanvas) bossOriginalCanvas.hidden = false;
-      }
+      if (!bossAsciiOk) argBossAscii.visualReady = true;
+      setArgBossVisualReady(overlay, { showAscii: bossAsciiOk });
     }
 
     await sleep(ARG_SCENE_TIMINGS.eyeToCountdownMs);
