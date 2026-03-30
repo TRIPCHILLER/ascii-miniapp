@@ -86,6 +86,77 @@ function busyHide(force = false){
   if (app.ui.busy) app.ui.busy.hidden = true;
 }
 
+let busyTextAnimationToken = 0;
+
+function startBusyServiceTextAnimation(targetText, {
+  glitchMs = 18,
+  charMs = 30,
+  spaceMs = 16,
+  withDots = false,
+  dotsMs = 500
+} = {}) {
+  const localToken = ++busyTextAnimationToken;
+  const noiseAlphabet = '0123456789АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ';
+  const randomNoiseChar = () => noiseAlphabet[Math.floor(Math.random() * noiseAlphabet.length)];
+  let dotsTimer = null;
+
+  const isActive = () => (
+    localToken === busyTextAnimationToken &&
+    !!app?.ui?.busyText &&
+    !!app?.ui?.busy &&
+    !app.ui.busy.hidden
+  );
+
+  busyShow('');
+
+  (async () => {
+    if (!isActive()) return;
+    app.ui.busyText.textContent = '|';
+    startPrintNextSound = 0;
+    startLastPrintSoundAt = 0;
+
+    for (let i = 0; i < targetText.length; i += 1) {
+      if (!isActive()) return;
+      const fixedPart = targetText.slice(0, i);
+      const ch = targetText[i];
+
+      if (ch === ' ') {
+        app.ui.busyText.textContent = `${fixedPart} |`;
+        await sleep(spaceMs);
+        continue;
+      }
+
+      app.ui.busyText.textContent = `${fixedPart}${randomNoiseChar()}|`;
+      await sleep(glitchMs);
+      if (!isActive()) return;
+      app.ui.busyText.textContent = `${fixedPart}${ch}|`;
+      playStartPrintSound();
+      tgTextHaptic();
+      await sleep(charMs);
+    }
+
+    if (!isActive()) return;
+    app.ui.busyText.textContent = targetText;
+
+    if (withDots) {
+      let dots = 0;
+      dotsTimer = setInterval(() => {
+        if (!isActive()) return;
+        dots = (dots + 1) % 4;
+        app.ui.busyText.textContent = targetText + '.'.repeat(dots);
+      }, dotsMs);
+    }
+  })();
+
+  return () => {
+    if (dotsTimer) {
+      clearInterval(dotsTimer);
+      dotsTimer = null;
+    }
+    if (busyTextAnimationToken === localToken) busyTextAnimationToken += 1;
+  };
+}
+
 // ==== /HUD ====
 
   const app = {
@@ -869,13 +940,16 @@ let DITHER_ENABLED = false;
     textEl.textContent = text;
   }
 
-  async function showArgPopup(text, { openSoundSrc = '' } = {}) {
+  async function showArgPopup(text, { openSoundSrc = '', popupClass = '' } = {}) {
     const overlay = ensureArgOverlay();
     const popupLayer = overlay.querySelector('#argScenePopupLayer');
+    const popupBox = overlay.querySelector('.arg-scene-popup-box');
     const textEl = overlay.querySelector('#argScenePopupText');
-    if (!popupLayer || !textEl) return;
+    if (!popupLayer || !popupBox || !textEl) return;
 
     popupLayer.hidden = false;
+    popupBox.className = 'arg-scene-popup-box';
+    if (popupClass) popupBox.classList.add(popupClass);
     if (openSoundSrc) playUiSoundNoThrow(openSoundSrc);
     await animateArgPopupText(textEl, text);
 
@@ -886,6 +960,7 @@ let DITHER_ENABLED = false;
         closed = true;
         popupLayer.removeEventListener('pointerup', onClose, true);
         popupLayer.removeEventListener('click', onClose, true);
+        popupBox.className = 'arg-scene-popup-box';
         popupLayer.hidden = true;
         playUiSoundNoThrow(ARG_SCENE_SOUNDS.click);
         resolve();
@@ -1352,7 +1427,8 @@ let DITHER_ENABLED = false;
 
     await sleep(ARG_SCENE_TIMINGS.ballToPopupMs);
     await showArgPopup('NH73ЛЛЗК7 - Э70\nСПОСОБНОС7Ь\n4Д4П7NР0847ЬСЯ\nК ИЗМ3Н3НNЯМ', {
-      openSoundSrc: ARG_SCENE_SOUNDS.danger
+      openSoundSrc: ARG_SCENE_SOUNDS.danger,
+      popupClass: 'arg-scene-popup-box--intel'
     });
 
     const topStick = document.createElement('img');
@@ -1383,7 +1459,8 @@ let DITHER_ENABLED = false;
 
     await sleep(ARG_SCENE_TIMINGS.bottomToSecondPopupMs);
     await showArgPopup('3/3', {
-      openSoundSrc: ARG_SCENE_SOUNDS.danger2
+      openSoundSrc: ARG_SCENE_SOUNDS.danger2,
+      popupClass: 'arg-scene-popup-box--score'
     });
 
     const visorBack = document.createElement('div');
@@ -3523,6 +3600,7 @@ function saveVideo(){
   }
 
   state.recorder = recorder;
+  let stopBusyRecordAnimation = () => {};
 
   // временно отключаем loop у <video>, чтобы поймать ended
   const wasLoop = !!(app.vid && app.vid.loop === true);
@@ -3540,6 +3618,7 @@ function saveVideo(){
   };
 
   recorder.onstop = async () => {
+    stopBusyRecordAnimation();
     busyHide();
 
     const blob = new Blob(state.recordChunks, { type: mime });
@@ -3571,7 +3650,7 @@ function saveVideo(){
   }
 
   state.isRecording = true;
-  busyShow('ЗАПИСЬ ASCII-ВИДЕО…');
+  stopBusyRecordAnimation = startBusyServiceTextAnimation('ЗАПИСЬ ASCII-ВИДЕО…');
   recorder.start(200);
 
   const onEnded = () => {
@@ -3657,9 +3736,7 @@ async function downloadBlob(blob, filename) {
     // объявляем заранее → доступны в finally
     const ctrl = new AbortController();
     let to = null;
-    let pulse = null;
-    let dotsPulse = null;
-    let dots = 0;
+    let stopBusyUploadAnimation = () => {};
 
     try {
       tgHaptic('impactOccurred', 'light');
@@ -3676,61 +3753,7 @@ async function downloadBlob(blob, filename) {
       form.append('fps', String(Math.max(5, Math.min(60, Math.round(state.fps || 30)))));
       // показываем «длинный» overlay на всё время запроса
       busyLock = true;
-      const busyTargetText = 'ОТПРАВКА ФАЙЛА В ЧАТ';
-      const busyNoiseAlphabet = '0123456789АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЙЧШЩЪЫЬЭЮЯ"';
-      const placeholderMap = { 'О': '0', 'А': '4' };
-      const revealableIndexes = [];
-
-      for (let i = 0; i < busyTargetText.length; i++) {
-        const ch = busyTargetText[i];
-        if (ch !== ' ' && !placeholderMap[ch]) revealableIndexes.push(i);
-      }
-
-      const randomNoiseChar = () => busyNoiseAlphabet[Math.floor(Math.random() * busyNoiseAlphabet.length)];
-      const buildBusyText = (fixedCount, revealPlaceholders) => {
-        let out = '';
-        for (let i = 0; i < busyTargetText.length; i++) {
-          const ch = busyTargetText[i];
-          if (ch === ' ') {
-            out += ' ';
-            continue;
-          }
-          if (placeholderMap[ch]) {
-            out += revealPlaceholders ? ch : placeholderMap[ch];
-            continue;
-          }
-          const revealPos = revealableIndexes.indexOf(i);
-          out += (revealPos >= 0 && revealPos < fixedCount) ? ch : randomNoiseChar();
-        }
-        return out;
-      };
-
-      let fixedCount = 0;
-      let phase = 'scramble';
-      busyShow(buildBusyText(0, false));
-      pulse = setInterval(() => {
-        if (!app?.ui?.busyText) return;
-
-        if (phase === 'scramble') {
-          fixedCount = Math.min(fixedCount + 1, revealableIndexes.length);
-          app.ui.busyText.textContent = buildBusyText(fixedCount, false);
-          if (fixedCount >= revealableIndexes.length) phase = 'finalize';
-          return;
-        }
-
-        if (phase === 'finalize') {
-          app.ui.busyText.textContent = busyTargetText;
-          phase = 'dots';
-          clearInterval(pulse);
-          pulse = null;
-          dotsPulse = setInterval(() => {
-            if (!app?.ui?.busyText) return;
-            dots = (dots + 1) % 4;
-            app.ui.busyText.textContent = busyTargetText + '.'.repeat(dots);
-          }, 500);
-          return;
-        }
-      }, 90);
+      stopBusyUploadAnimation = startBusyServiceTextAnimation('ОТПРАВКА ФАЙЛА В ЧАТ', { withDots: true });
 
       // общий таймаут (120s)
       to = setTimeout(() => ctrl.abort(), 120000);
@@ -3790,8 +3813,7 @@ async function downloadBlob(blob, filename) {
 
     } finally {
       if (to) clearTimeout(to);
-      if (pulse) clearInterval(pulse);
-      if (dotsPulse) clearInterval(dotsPulse);
+      stopBusyUploadAnimation();
 
       window.Telegram?.WebApp?.MainButton?.hideProgress?.();
       uploadInFlight = false;

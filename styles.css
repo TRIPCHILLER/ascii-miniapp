@@ -1445,6 +1445,19 @@ input[type="color"] {
   justify-content:center;
 }
 
+.arg-scene-popup-box--intel{
+  width:min(76vw, 700px);
+  min-height:124px;
+  padding:20px 22px;
+}
+
+.arg-scene-popup-box--score{
+  width:auto;
+  min-width:96px;
+  min-height:64px;
+  padding:10px 16px;
+}
+
 .arg-scene-popup-text{
   font-family:'PixPlus', monospace;
   font-size:clamp(22px, 3.5vw, 44px);
