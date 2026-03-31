@@ -1265,14 +1265,16 @@ input[type="color"] {
 
 
 .mode-chooser{
+  --start-menu-fg:#fff;
+  --start-menu-bg:#000;
   position:fixed;
   inset:0;
   z-index:120000;
   display:flex;
   justify-content:center;
   align-items:stretch;
-  background:#000;
-  color:#fff;
+  background:var(--start-menu-bg);
+  color:var(--start-menu-fg);
   font-family:'PxPlus IBM VGA', monospace;
   font-size:21px;
 }
@@ -1287,7 +1289,7 @@ input[type="color"] {
 }
 
 .start-frame-stack{
-  border:4px double #d8d8d8;
+  border:4px double var(--start-menu-fg);
   flex:1 1 auto;
   min-height:0;
   display:flex;
@@ -1296,8 +1298,8 @@ input[type="color"] {
 }
 
 .start-datetime{
-  background:#fff;
-  color:#000;
+  background:var(--start-menu-fg);
+  color:var(--start-menu-bg);
   min-height:3.2em;
   display:flex;
   align-items:center;
@@ -1305,12 +1307,12 @@ input[type="color"] {
   text-align:center;
   padding:8px;
   font-size:21px;
-  border:1px solid #fff;
+  border:1px solid var(--start-menu-fg);
   white-space:pre;
 }
 
 .start-core-box{
-  border-bottom:4px double #d8d8d8;
+  border-bottom:4px double var(--start-menu-fg);
   padding:10px 12px;
 }
 
@@ -1354,9 +1356,9 @@ input[type="color"] {
 }
 
 .start-mode-btn{
-  border:1px solid #fff;
-  background:#fff;
-  color:#000;
+  border:1px solid var(--start-menu-fg);
+  background:var(--start-menu-fg);
+  color:var(--start-menu-bg);
   min-width:140px;
   padding:8px 10px;
   font-family:'PxPlus IBM VGA', monospace;
@@ -1373,7 +1375,7 @@ input[type="color"] {
 
 .start-footer-box{
   margin-top:auto;
-  border-top:4px double #d8d8d8;
+  border-top:4px double var(--start-menu-fg);
   padding:14px 10px 8px;
   text-align:center;
 }
@@ -1394,6 +1396,8 @@ input[type="color"] {
 .start-hidden{visibility:hidden;}
 
 .arg-scene-overlay{
+  --arg-popup-fg:#fff;
+  --arg-popup-bg:#000;
   position:fixed;
   inset:0;
   z-index:300000;
@@ -1587,8 +1591,8 @@ input[type="color"] {
 .arg-scene-popup-box{
   width:min(84vw, 880px);
   min-height:136px;
-  border:2px solid #fff;
-  background:#000;
+  border:2px solid var(--arg-popup-fg);
+  background:var(--arg-popup-bg);
   padding:24px 28px;
   display:flex;
   align-items:center;
@@ -1609,6 +1613,7 @@ input[type="color"] {
 }
 
 .arg-scene-popup-text{
+  color:var(--arg-popup-fg);
   font-family:'PixPlus', monospace;
   font-size:clamp(22px, 3.5vw, 44px);
   text-align:center;
