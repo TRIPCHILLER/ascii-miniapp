@@ -1585,7 +1585,7 @@ input[type="color"] {
   text-align:center;
   color:inherit;
   background:var(--arg-score-bg, #000000);
-  border:1px solid var(--arg-score-fg, #808080);
+  border:2px solid var(--arg-score-fg, #808080);
 }
 
 .arg-scene-score-top{ top:10vh; }

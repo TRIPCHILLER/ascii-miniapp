@@ -1170,6 +1170,40 @@ let DITHER_ENABLED = false;
     context.restore();
   }
 
+  function drawArgBossBodySegmented(context, image, drawRect, baseTransform = null, segmentMotion = null) {
+    if (!context || !image || !drawRect) return;
+    const { cx, cy, drawW, drawH } = drawRect;
+    const left = cx - drawW * 0.5;
+    const top = cy - drawH * 0.5;
+    const third = drawH / 3;
+    const bandOverlap = Math.max(0.5, drawH * 0.0018);
+
+    const drawBand = (clipTop, clipHeight, extraTransform = null) => {
+      context.save();
+      if (baseTransform) {
+        context.translate(cx + (baseTransform.tx || 0), cy + (baseTransform.ty || 0));
+        if (baseTransform.rotateDeg) context.rotate((baseTransform.rotateDeg * Math.PI) / 180);
+        context.scale(baseTransform.scaleX || 1, baseTransform.scaleY || 1);
+        context.translate(-cx, -cy);
+      }
+      if (extraTransform) {
+        context.translate(cx + (extraTransform.tx || 0), cy + (extraTransform.ty || 0));
+        if (extraTransform.rotateDeg) context.rotate((extraTransform.rotateDeg * Math.PI) / 180);
+        context.scale(extraTransform.scaleX || 1, extraTransform.scaleY || 1);
+        context.translate(-cx, -cy);
+      }
+      context.beginPath();
+      context.rect(left, clipTop, drawW, clipHeight);
+      context.clip();
+      context.drawImage(image, left, top, drawW, drawH);
+      context.restore();
+    };
+
+    drawBand(top - bandOverlap, third + bandOverlap * 2, segmentMotion?.top || null);
+    drawBand(top + third - bandOverlap, third + bandOverlap * 2, null);
+    drawBand(top + third * 2 - bandOverlap, third + bandOverlap * 2, segmentMotion?.bottom || null);
+  }
+
   function getArgBossDrawRects(width, height) {
     const bodyImage = argBossAscii.bodyImage;
     const eyeImage = argBossAscii.eyeImage;
@@ -1651,6 +1685,8 @@ let DITHER_ENABLED = false;
       bodyRotate = 0,
       bodyScaleX = 1,
       bodyScaleY = 1,
+      bodyBandPulse = 0,
+      bodyBandSway = 0,
       visorEyeX = 0,
       visorEyeY = 0,
       eyeScale = 1,
@@ -1676,12 +1712,25 @@ let DITHER_ENABLED = false;
       if (drawRects && argBossAscii.bodyImage && argBossAscii.eyeImage && argBossAscii.pupilImage) {
         compositeCtx.save();
         compositeCtx.globalAlpha = 0.5;
-        drawArgBossLayer(compositeCtx, argBossAscii.bodyImage, drawRects.body, {
+        drawArgBossBodySegmented(compositeCtx, argBossAscii.bodyImage, drawRects.body, {
           tx: visorBodyX * dpr,
           ty: visorBodyY * dpr,
           rotateDeg: bodyRotate,
           scaleX: bodyScaleX,
           scaleY: bodyScaleY
+        }, {
+          top: {
+            ty: (-Math.abs(bodyBandPulse) * 2.1 + bodyBandSway * 0.9) * dpr,
+            rotateDeg: bodyBandSway * 0.38,
+            scaleX: 1 + bodyBandPulse * 0.022,
+            scaleY: 1 - Math.abs(bodyBandPulse) * 0.03
+          },
+          bottom: {
+            ty: (Math.abs(bodyBandPulse) * 2.4 - bodyBandSway * 0.95) * dpr,
+            rotateDeg: -bodyBandSway * 0.42,
+            scaleX: 1 - bodyBandPulse * 0.02,
+            scaleY: 1 + Math.abs(bodyBandPulse) * 0.034
+          }
         });
         drawArgBossLayer(compositeCtx, argBossAscii.eyeImage, drawRects.eye, {
           tx: visorEyeX * dpr,
@@ -2012,6 +2061,12 @@ let DITHER_ENABLED = false;
       const bodyRotate = Math.sin(
         now * ARG_PONG.visorBodySwaySpeed + argPongState.visorBodyPhaseSway
       ) * 0.28;
+      const bodyBandPulse = Math.sin(
+        now * ARG_PONG.visorBodyScaleBreathSpeed * 1.14 + argPongState.visorBodyPhaseBreath * 1.65
+      );
+      const bodyBandSway = Math.cos(
+        now * ARG_PONG.visorBodySwaySpeed * 1.21 + argPongState.visorBodyPhaseSway * 1.24
+      );
       visorBody.style.transform = `translate(${visorBodyX}px, ${visorBodyY}px) rotate(${bodyRotate}deg) scale(${bodyScale + bodySqueeze}, ${bodyScale - bodySqueeze * 0.75})`;
       const eyeScale = 1 + Math.sin(now * ARG_PONG.visorEyeBreathScaleSpeed + argPongState.visorEyePhaseX) * ARG_PONG.visorEyeBreathScaleAmp;
       visorEye.style.transform = `translate(${visorEyeX}px, ${visorEyeY}px) scale(${eyeScale})`;
@@ -2024,6 +2079,8 @@ let DITHER_ENABLED = false;
         bodyRotate,
         bodyScaleX: bodyScale + bodySqueeze,
         bodyScaleY: bodyScale - bodySqueeze * 0.75,
+        bodyBandPulse,
+        bodyBandSway,
         visorEyeX,
         visorEyeY,
         eyeScale,
