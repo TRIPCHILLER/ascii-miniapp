@@ -910,6 +910,7 @@ let DITHER_ENABLED = false;
   let startArgSceneStarted = false;
   let argSceneActive = false;
   let startArgSessionLocked = false;
+  let startMenuPresetId = null;
   let startLaunchSoundPlayed = false;
   let startLaunchSoundPendingAfterUnlock = false;
   let startPrintNextSound = 0;
@@ -1587,6 +1588,8 @@ let DITHER_ENABLED = false;
       ball.style.backgroundColor = safeText;
       topStick.style.backgroundColor = safeText;
       bottomStick.style.backgroundColor = safeText;
+      overlay.style.setProperty('--arg-popup-fg', safeText);
+      overlay.style.setProperty('--arg-popup-bg', safeBg);
       const popupLayer = overlay.querySelector('#argScenePopupLayer');
       if (popupLayer) popupLayer.style.filter = 'none';
     };
@@ -2366,6 +2369,24 @@ let DITHER_ENABLED = false;
   function bindModeChooserOnce() {
     if (!app.ui.modeChooser || modeChooserListenerBound) return;
     const footerSelector = '.start-footer-box, .start-footer-title, .start-footer-sub';
+    const applyStartMenuPalette = ({ text, bg, presetId = null } = {}) => {
+      const safeText = toHex(text || '#ffffff');
+      const safeBg = toHex(bg || '#000000');
+      app.ui.modeChooser.style.setProperty('--start-menu-fg', safeText);
+      app.ui.modeChooser.style.setProperty('--start-menu-bg', safeBg);
+      startMenuPresetId = presetId;
+    };
+    const applyRandomStartMenuPreset = () => {
+      if (!PRESETS.length) return;
+      let nextPreset = PRESETS[Math.floor(Math.random() * PRESETS.length)];
+      if (nextPreset && PRESETS.length > 1 && nextPreset.id === startMenuPresetId) {
+        nextPreset = PRESETS[Math.floor(Math.random() * PRESETS.length)];
+      }
+      const colors = getPresetColorsById(nextPreset?.id);
+      if (!colors) return;
+      applyStartMenuPalette({ ...colors, presetId: nextPreset.id });
+    };
+    applyStartMenuPalette({ text: '#ffffff', bg: '#000000', presetId: null });
 
     const playStartEasterEggSound = () => {
       if (startArgSessionLocked || startEasterEggDone || startEasterEggPlaying || startArgScenePending || startArgSceneRunning) return;
@@ -2410,15 +2431,18 @@ let DITHER_ENABLED = false;
     if (typeof PointerEvent !== 'undefined') {
       app.ui.modeChooser.addEventListener('pointerup', (e) => {
         if (!e.target.closest(footerSelector)) return;
+        applyRandomStartMenuPreset();
         playStartEasterEggSound();
       });
     } else {
       app.ui.modeChooser.addEventListener('touchend', (e) => {
         if (!e.target.closest(footerSelector)) return;
+        applyRandomStartMenuPreset();
         playStartEasterEggSound();
       }, { passive: true });
       app.ui.modeChooser.addEventListener('click', (e) => {
         if (!e.target.closest(footerSelector)) return;
+        applyRandomStartMenuPreset();
         playStartEasterEggSound();
       });
     }
