@@ -1524,17 +1524,17 @@ input[type="color"] {
 
 .arg-scene-boss-layer--body{
   z-index:1;
-  animation:argBossBodyWarm 2.45s ease-in-out infinite;
+  animation:none;
 }
 
 .arg-scene-boss-layer--eye{
   z-index:2;
-  animation:argBossEyeWarm 1.85s ease-in-out infinite;
+  animation:none;
 }
 
 .arg-scene-boss-layer--pupil{
   z-index:3;
-  animation:argBossPupilWarm 1.2s ease-in-out infinite;
+  animation:none;
 }
 
 @keyframes argBossBodyWarm{
