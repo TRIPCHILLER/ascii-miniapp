@@ -5298,6 +5298,8 @@ app.ui.toggle.addEventListener('click', () => {
 (function enableStagePinchZoom(){
   const el = app.stage;
   const pts = new Map();
+  const MIN_VIEW_SCALE = 1; // initialFitScale в относительной модели fit=1
+  const MAX_VIEW_SCALE = 3;
 
   let pinchActive = false;
   let d0 = 0, s0 = 1;
@@ -5305,6 +5307,7 @@ app.ui.toggle.addEventListener('click', () => {
   let panId = null;
   let panStartX = 0, panStartY = 0;
   let viewStartX = 0.5, viewStartY = 0.5;
+  const canUseStageTransform = () => state.mode !== 'video';
 
   const getDist = () => {
     const a = Array.from(pts.values());
@@ -5317,8 +5320,52 @@ app.ui.toggle.addEventListener('click', () => {
     if (panId === id) panId = null;
   };
 
+  const getStageMetrics = () => {
+    const out = app.out;
+    const stage = app.stage;
+    if (!out || !stage) return null;
+
+    const w = out.scrollWidth;
+    const h = out.scrollHeight;
+    const fitSize = getStageFitSize();
+    const W = fitSize.w;
+    const H = fitSize.h;
+    if (!w || !h || !W || !H) return null;
+
+    const S = Math.min(W / w, H / h);
+    return { stage, w, h, W, H, S };
+  };
+
+  const applyScaleAtPoint = (nextScale, clientX, clientY) => {
+    const m = getStageMetrics();
+    if (!m) return;
+
+    const prevScale = Math.max(MIN_VIEW_SCALE, state.viewScale || MIN_VIEW_SCALE);
+    const clampedScale = Math.max(MIN_VIEW_SCALE, Math.min(MAX_VIEW_SCALE, nextScale));
+    if (!Number.isFinite(clampedScale)) return;
+
+    const rect = m.stage.getBoundingClientRect();
+    const px = clientX - rect.left - (m.W / 2);
+    const py = clientY - rect.top - (m.H / 2);
+
+    const prevBase = m.S * prevScale;
+    const nextBase = m.S * clampedScale;
+    const curVx = (typeof state.viewX === 'number') ? state.viewX : 0.5;
+    const curVy = (typeof state.viewY === 'number') ? state.viewY : 0.5;
+    const anchorUx = curVx + (px / (m.w * prevBase));
+    const anchorUy = curVy + (py / (m.h * prevBase));
+
+    state.viewScale = clampedScale;
+    state.viewX = anchorUx - (px / (m.w * nextBase));
+    state.viewY = anchorUy - (py / (m.h * nextBase));
+
+    clampViewToBounds(m.w, m.h, m.W, m.H, nextBase);
+    fitAsciiToViewport();
+  };
+
   el.addEventListener('pointerdown', e => {
-    if (isTextMode()) return;
+    if (!canUseStageTransform()) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
     if (e.pointerType === 'touch') e.preventDefault?.();
     el.setPointerCapture?.(e.pointerId);
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -5340,7 +5387,7 @@ app.ui.toggle.addEventListener('click', () => {
   }, { passive:false });
 
   el.addEventListener('pointermove', e => {
-    if (isTextMode()) return;
+    if (!canUseStageTransform()) return;
     if (!pts.has(e.pointerId)) return;
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
@@ -5363,7 +5410,7 @@ app.ui.toggle.addEventListener('click', () => {
       const ratio = d / d0;
 
       // ограничиваем общий масштаб
-      state.viewScale = Math.max(1, Math.min(3, s0 * ratio));
+      state.viewScale = Math.max(MIN_VIEW_SCALE, Math.min(MAX_VIEW_SCALE, s0 * ratio));
 
       const base = S * (state.viewScale || 1);
       clampViewToBounds(w, h, W, H, base);
@@ -5403,7 +5450,7 @@ app.ui.toggle.addEventListener('click', () => {
   }, { passive:false });
 
   const up = e => {
-    if (isTextMode()) return;
+    if (!canUseStageTransform()) return;
     pts.delete(e.pointerId);
     resetPanIf(e.pointerId);
     if (pts.size < 2) pinchActive = false;
@@ -5411,6 +5458,17 @@ app.ui.toggle.addEventListener('click', () => {
   el.addEventListener('pointerup', up);
   el.addEventListener('pointercancel', up);
   el.addEventListener('pointerleave', up);
+
+  el.addEventListener('wheel', e => {
+    if (!canUseStageTransform()) return;
+    e.preventDefault();
+
+    const currentScale = Math.max(MIN_VIEW_SCALE, state.viewScale || MIN_VIEW_SCALE);
+    const direction = (e.deltaY < 0) ? 1 : -1;
+    const step = (e.ctrlKey ? 0.08 : 0.12) * direction;
+    const nextScale = currentScale * (1 + step);
+    applyScaleAtPoint(nextScale, e.clientX, e.clientY);
+  }, { passive:false });
 })();
 
     // Кнопка "Фронт/Тыл"
