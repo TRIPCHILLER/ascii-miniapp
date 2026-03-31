@@ -1141,7 +1141,7 @@ body.flash-front-ui input[type="range"]::-ms-thumb {
 
 /* Контейнеры режимов */
 .cp-body{
-  background:#202020;
+  background:#181818;
   padding:10px 10px 12px;
   box-sizing:border-box;
 }
@@ -1183,38 +1183,69 @@ body.flash-front-ui input[type="range"]::-ms-thumb {
   pointer-events:none;
 }
 
-/* Строка чекбокса (фикс видимости внизу попапа) */
+/* Строка чекбокса: отдельный явный блок между палитрой и кнопками */
 #cp-modal .cp-transparent-row{
   display:flex;
   align-items:center;
-  min-height:22px;
-  margin:8px 0 4px;
+  min-height:28px;
+  margin:14px 0 10px;
   padding:0 2px;
 }
 
 #cp-modal .cp-transparent-check{
   display:inline-flex;
   align-items:center;
+  cursor:pointer;
+}
+
+#cp-modal .cp-transparent-check input{
+  display:none;
 }
 
 #cp-modal .cp-transparent-check span{
   display:inline-flex;
   align-items:center;
   font-family:'PixPlus', monospace;
-  font-size:16px;
-  line-height:1.1;
+  font-size:21px;
+  line-height:1;
   letter-spacing:0.04em;
+  color:#fff;
+}
+
+/* кастомный квадрат: unchecked = черный квадрат */
+#cp-modal .cp-transparent-check span::before{
+  content:'';
+  width:20px;
+  height:20px;
+  margin-right:12px;
+  display:inline-block;
+  background:#000;
+  border:1px solid #000;
+  box-sizing:border-box;
+}
+
+/* checked = черный квадрат + белый квадрат по центру */
+#cp-modal .cp-transparent-check input:checked + span::before{
+  background:
+    linear-gradient(#fff, #fff) center / 10px 10px no-repeat,
+    #000;
 }
 
 /* === FIX: компактная карточка цветового пикера === */
 #cp-modal .cp-card{
   width: auto;         /* не 92vw, а по содержимому */
   max-width: 360px;    /* как на макете */
+  max-height: min(92dvh, 620px);
+  overflow-y: auto;
 }
 
 /* выравниваем контент по центру, чтобы не было ощущения полосы справа */
 #cp-modal .cp-row{
   justify-content: center;
+}
+
+#cp-modal .cp-actions{
+  margin-top:0;
 }
 
 /* сетку тоже центруем внутри карточки */

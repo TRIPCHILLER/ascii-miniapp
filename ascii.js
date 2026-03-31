@@ -5148,7 +5148,7 @@ const CP = (() => {
     // Показываем чекбокс только для ФОНА в режиме ФОТО
     const isBG = (targetInput && targetInput.id === 'bg');
     const isPhotoMode = (state.mode === 'photo') ||
-      (app?.ui?.tabPhoto?.classList?.contains('active'));
+      (app?.ui?.modePhoto?.classList?.contains('active'));
 
     rowTransparent.hidden = !(isBG && isPhotoMode);
 
@@ -5179,7 +5179,7 @@ const CP = (() => {
   ok.addEventListener('click', ()=> {
     const pickedIsBG  = (targetInput && targetInput.id === 'bg');
     const isPhotoMode = (state.mode === 'photo') ||
-      (app?.ui?.tabPhoto?.classList?.contains('active'));
+      (app?.ui?.modePhoto?.classList?.contains('active'));
     const wantTransparent = cbTransparent.checked && pickedIsBG && isPhotoMode;
 
     if (wantTransparent) {
