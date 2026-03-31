@@ -1595,6 +1595,8 @@ let DITHER_ENABLED = false;
       bottomStick.style.backgroundColor = safeText;
       overlay.style.setProperty('--arg-popup-fg', safeText);
       overlay.style.setProperty('--arg-popup-bg', safeBg);
+      overlay.style.setProperty('--arg-score-fg', bossShade);
+      overlay.style.setProperty('--arg-score-bg', safeBg);
       const popupLayer = overlay.querySelector('#argScenePopupLayer');
       if (popupLayer) popupLayer.style.filter = 'none';
     };

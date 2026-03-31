@@ -1415,6 +1415,14 @@ input[type="color"] {
   inset:0;
 }
 
+.arg-scene-bg{ z-index:1; }
+.arg-scene-eye{ z-index:10; }
+.arg-scene-score{ z-index:20; }
+.arg-scene-ball-stick{ z-index:30; }
+.arg-scene-countdown{ z-index:40; }
+.arg-scene-goal-flash{ z-index:45; }
+.arg-scene-popup{ z-index:50; }
+
 .arg-scene-eye,
 .arg-scene-ball-stick,
 .arg-scene-countdown,
@@ -1559,7 +1567,7 @@ input[type="color"] {
 .arg-scene-score{
   pointer-events:none;
   font-family:'PixPlus', monospace;
-  color:#bfbfbf;
+  color:var(--arg-score-fg, #808080);
   text-shadow:none;
   -webkit-font-smoothing:none;
   text-rendering:optimizeSpeed;
@@ -1572,6 +1580,12 @@ input[type="color"] {
   transform:translateX(-50%);
   font-size:clamp(32px, 5vw, 58px);
   line-height:1;
+  min-width:1.4em;
+  padding:0.12em 0.26em;
+  text-align:center;
+  color:inherit;
+  background:var(--arg-score-bg, #000000);
+  border:1px solid var(--arg-score-fg, #808080);
 }
 
 .arg-scene-score-top{ top:10vh; }
