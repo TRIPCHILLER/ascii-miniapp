@@ -1825,6 +1825,9 @@ body.visor-text #textSizeWrap{display:flex !important;}
   font-size:18px;
   text-transform:uppercase;
 }
+.ascii-popup__close:active{
+  color:#bfbfbf;
+}
 body.ascii-popup-open{
   overflow:hidden;
 }
