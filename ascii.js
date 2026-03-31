@@ -308,7 +308,7 @@ const ARG_SCENE_TIMINGS = {
   eyeToCountdownMs: 1000,
   countdownStepMs: 1000,
   serveDelayMs: 700,
-  goalFlashBurstMs: 1000,
+  goalFlashBurstMs: 333,
   goalRespawnDelayMs: 2000,
   popupGlitchMs: 19,
   popupSpaceTypeMs: 12,
@@ -1584,9 +1584,9 @@ let DITHER_ENABLED = false;
       argPongState.bossAsciiOptions.background = safeBg;
       argPongState.bossAsciiOptions.bossColor = bossShade;
       overlay.style.backgroundColor = safeBg;
-      ball.style.filter = 'none';
-      topStick.style.filter = 'none';
-      bottomStick.style.filter = 'none';
+      ball.style.backgroundColor = safeText;
+      topStick.style.backgroundColor = safeText;
+      bottomStick.style.backgroundColor = safeText;
       const popupLayer = overlay.querySelector('#argScenePopupLayer');
       if (popupLayer) popupLayer.style.filter = 'none';
     };
@@ -2101,13 +2101,13 @@ let DITHER_ENABLED = false;
     argPongState.aiX = 0.5;
     argPongState.playerX = 0.5;
 
-    const ball = document.createElement('img');
+    const ball = document.createElement('div');
     ball.className = 'arg-scene-ball';
-    ball.src = ARG_SCENE_ASSETS.ball;
-    ball.alt = '';
+    ball.style.setProperty('--arg-sprite-url', `url("${ARG_SCENE_ASSETS.ball}")`);
     const ballSizePx = ARG_PONG.paddleHeightPx * ARG_PONG.ballSizeToPaddleHeightRatio;
     ball.style.width = `${ballSizePx}px`;
     ball.style.height = `${ballSizePx}px`;
+    ball.style.backgroundColor = '#ffffff';
     ballStickLayer.appendChild(ball);
     ballStickLayer.style.opacity = '1';
     renderArgSceneStaticAscii({ ballEl: ball });
@@ -2120,14 +2120,14 @@ let DITHER_ENABLED = false;
       popupClass: 'arg-scene-popup-box--intel'
     });
 
-    const topStick = document.createElement('img');
+    const topStick = document.createElement('div');
     topStick.className = 'arg-scene-stick arg-scene-stick--top';
-    topStick.src = ARG_SCENE_ASSETS.topStick;
-    topStick.alt = '';
+    topStick.style.setProperty('--arg-sprite-url', `url("${ARG_SCENE_ASSETS.topStick}")`);
     topStick.style.width = `${ARG_PONG.paddleWidthPx}px`;
     topStick.style.height = `${ARG_PONG.paddleHeightPx}px`;
     topStick.style.top = `${ARG_PONG.topPaddleYVh}vh`;
     topStick.style.bottom = '';
+    topStick.style.backgroundColor = '#ffffff';
     ballStickLayer.appendChild(topStick);
     renderArgSceneStaticAscii({ ballEl: ball, topStickEl: topStick });
     playUiSoundNoThrow(ARG_SCENE_SOUNDS.bitClick);
@@ -2135,14 +2135,14 @@ let DITHER_ENABLED = false;
 
     await sleep(ARG_SCENE_TIMINGS.topToBottomStickMs);
 
-    const bottomStick = document.createElement('img');
+    const bottomStick = document.createElement('div');
     bottomStick.className = 'arg-scene-stick arg-scene-stick--bottom';
-    bottomStick.src = ARG_SCENE_ASSETS.bottomStick;
-    bottomStick.alt = '';
+    bottomStick.style.setProperty('--arg-sprite-url', `url("${ARG_SCENE_ASSETS.bottomStick}")`);
     bottomStick.style.width = `${ARG_PONG.paddleWidthPx}px`;
     bottomStick.style.height = `${ARG_PONG.paddleHeightPx}px`;
     bottomStick.style.bottom = `${100 - ARG_PONG.bottomPaddleYVh}vh`;
     bottomStick.style.top = '';
+    bottomStick.style.backgroundColor = '#ffffff';
     ballStickLayer.appendChild(bottomStick);
     renderArgSceneStaticAscii({ ballEl: ball, topStickEl: topStick, bottomStickEl: bottomStick });
     playUiSoundNoThrow(ARG_SCENE_SOUNDS.bitClick);
