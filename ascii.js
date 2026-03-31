@@ -3991,10 +3991,20 @@ function savePNG(){
   const full = app.out.textContent || '';
   if (!full.trim()) { showAsciiPopup({ type:'info', title:'ЗДЕСЬ ПУСТО...', message:'МНЕ НЕЧЕГО СОХРАНЯТЬ.' }); clearShotVisualEffects(); return; }
 
-  const crop = getCropWindow();
-  const text = cropAsciiText(full, crop);
+  let text = full;
+  let cols = Math.max(1, state.lastGrid?.w || 1);
+  let rows = Math.max(1, state.lastGrid?.h || 1);
 
-  renderAsciiToCanvas(text, crop.cols, crop.rows, 2.5);
+  // Временный флаг: crop по viewport оставляем только на мобильных.
+  // На десктопе сохраняем полный ASCII-кадр, даже если пользователь зумил/панорамировал превью.
+  if (isMobile) {
+    const crop = getCropWindow();
+    text = cropAsciiText(full, crop);
+    cols = crop.cols;
+    rows = crop.rows;
+  }
+
+  renderAsciiToCanvas(text, cols, rows, 2.5);
   app.ui.render.toBlob(blob=>{
     if(!blob) { showAsciiPopup({ type:'error', title:'ОШИБКА', message:'НЕ УДАЛОСЬ ПРЕОБРАЗОВАТЬ ИЗОБРАЖЕНИЕ.' }); clearShotVisualEffects(); return; }
     downloadBlob(blob, 'ascii_visor.png');
