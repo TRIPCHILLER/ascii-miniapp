@@ -329,11 +329,51 @@ const ARG_PONG = {
   aiMaxSpeedPx: 6,
   aiTrackDeadZonePx: 6,
   aiLevels: [
-    { maxSpeedPx: 4.2, reaction: 0.1, autoAim: 0.2, accelPx: 0.35, deadZonePx: 14 },
-    { maxSpeedPx: 7.2, reaction: 0.2, autoAim: 0.45, accelPx: 0.65, deadZonePx: 8 },
-    { maxSpeedPx: 11.8, reaction: 0.35, autoAim: 0.82, accelPx: 1.2, deadZonePx: 2 }
+    {
+      maxSpeedPx: 8.4,
+      reaction: 0.56,
+      autoAim: 0.62,
+      accelPx: 1.25,
+      deadZonePx: 3.4,
+      predictiveBlend: 0.74,
+      repositionBlend: 0.52,
+      humanizePx: 1.35,
+      idleDamping: 0.9
+    },
+    {
+      maxSpeedPx: 11.2,
+      reaction: 0.76,
+      autoAim: 0.86,
+      accelPx: 1.95,
+      deadZonePx: 1.8,
+      predictiveBlend: 0.9,
+      repositionBlend: 0.72,
+      humanizePx: 0.85,
+      idleDamping: 0.93
+    },
+    {
+      maxSpeedPx: 14.3,
+      reaction: 0.94,
+      autoAim: 1.05,
+      accelPx: 2.8,
+      deadZonePx: 0.55,
+      predictiveBlend: 0.99,
+      repositionBlend: 0.94,
+      humanizePx: 0.12,
+      idleDamping: 0.96
+    }
   ],
-  aiFinalStand: { maxSpeedPx: 15.2, reaction: 0.82, autoAim: 1, accelPx: 2.25, deadZonePx: 0.8 },
+  aiFinalStand: {
+    maxSpeedPx: 15.2,
+    reaction: 0.97,
+    autoAim: 1.1,
+    accelPx: 3.2,
+    deadZonePx: 0.4,
+    predictiveBlend: 1,
+    repositionBlend: 0.96,
+    humanizePx: 0.05,
+    idleDamping: 0.97
+  },
   syncDistancePx: 54,
   syncHoldMs: 2400,
   syncMaxDurationMs: 3000,
@@ -1387,12 +1427,19 @@ let DITHER_ENABLED = false;
     overlay.dataset.argControlsBound = '1';
   }
 
-  function predictArgAiInterceptX({ rect, paddleHalfNorm, wallNorm, topY, paddleHalfH, ballHalfY, ballHalfX }) {
+  function predictArgAiInterceptX({ rect, paddleHalfNorm, wallNorm, topY, bottomY, paddleHalfH, ballHalfY, ballHalfX }) {
     const targetY = topY + paddleHalfH + ballHalfY;
-    if (argPongState.ballVY >= 0) return clamp(argPongState.ballX, paddleHalfNorm, 1 - paddleHalfNorm);
     const vyNorm = argPongState.ballVY / rect.height;
     if (Math.abs(vyNorm) < 1e-6) return clamp(argPongState.ballX, paddleHalfNorm, 1 - paddleHalfNorm);
-    const timeToPaddle = (targetY - argPongState.ballY) / vyNorm;
+    let timeToPaddle = 0;
+    if (vyNorm < 0) {
+      timeToPaddle = (targetY - argPongState.ballY) / vyNorm;
+    } else {
+      const bottomTargetY = bottomY - paddleHalfH - ballHalfY;
+      const downDistance = Math.max(0, bottomTargetY - argPongState.ballY);
+      const upDistance = Math.max(0, bottomTargetY - targetY);
+      timeToPaddle = (downDistance + upDistance) / vyNorm;
+    }
     if (!(timeToPaddle > 0)) return clamp(argPongState.ballX, paddleHalfNorm, 1 - paddleHalfNorm);
 
     const minX = wallNorm + ballHalfX;
@@ -1522,6 +1569,7 @@ let DITHER_ENABLED = false;
       let aiMaxSpeedPx = ARG_PONG.aiMaxSpeedPx;
       let aiAccelPx = 0.6;
       let aiDeadZonePx = ARG_PONG.aiTrackDeadZonePx;
+      let aiIdleDamping = 0.8;
       if (argPongState.syncActive) {
         aiTargetX = argPongState.playerX;
         aiMaxSpeedPx = ARG_PONG.syncFollowMaxSpeedPx;
@@ -1531,15 +1579,30 @@ let DITHER_ENABLED = false;
         const aiLevel = isArgAiFinalStand()
           ? ARG_PONG.aiFinalStand
           : ARG_PONG.aiLevels[Math.min(argPongState.playerScore, ARG_PONG.aiLevels.length - 1)];
-        const predictedX = isArgAiFinalStand()
-          ? predictArgAiInterceptX({ rect, paddleHalfNorm, wallNorm, topY, paddleHalfH, ballHalfY, ballHalfX })
-          : argPongState.ballX;
+        const predictedX = predictArgAiInterceptX({
+          rect,
+          paddleHalfNorm,
+          wallNorm,
+          topY,
+          bottomY,
+          paddleHalfH,
+          ballHalfY,
+          ballHalfX
+        });
+        const predictiveBlend = argPongState.ballVY < 0
+          ? aiLevel.predictiveBlend
+          : aiLevel.repositionBlend;
+        const baseTrackX = argPongState.ballX + (predictedX - argPongState.ballX) * predictiveBlend;
         const lookAheadNorm = clamp(argPongState.ballVX * aiLevel.autoAim * 6 / rect.width, -0.2, 0.2);
-        const aimX = clamp(predictedX + lookAheadNorm, paddleHalfNorm, 1 - paddleHalfNorm);
+        const humanizeNorm = aiLevel.humanizePx > 0
+          ? ((Math.sin(now * 0.0127) + Math.cos((now + argPongState.playerScore * 137) * 0.0091)) * 0.5 * aiLevel.humanizePx) / rect.width
+          : 0;
+        const aimX = clamp(baseTrackX + lookAheadNorm + humanizeNorm, paddleHalfNorm, 1 - paddleHalfNorm);
         aiTargetX += (aimX - aiTargetX) * aiLevel.reaction;
         aiMaxSpeedPx = aiLevel.maxSpeedPx;
         aiAccelPx = aiLevel.accelPx;
         aiDeadZonePx = aiLevel.deadZonePx;
+        aiIdleDamping = aiLevel.idleDamping;
       }
 
       const aiDelta = aiTargetX - argPongState.aiX;
@@ -1552,7 +1615,7 @@ let DITHER_ENABLED = false;
           argPongState.aiVX = Math.max(targetAiVx, argPongState.aiVX - aiAccelNorm);
         }
       } else {
-        argPongState.aiVX *= 0.8;
+        argPongState.aiVX *= aiIdleDamping;
       }
       argPongState.aiX = clamp(argPongState.aiX + argPongState.aiVX, paddleHalfNorm, 1 - paddleHalfNorm);
 
