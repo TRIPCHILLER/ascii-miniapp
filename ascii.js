@@ -5054,6 +5054,20 @@ const CP = (() => {
   h.addEventListener('mousedown',  dragHue(hueFromEvent), { passive:false });
   h.addEventListener('touchstart', dragHue(hueFromEvent), { passive:false });
 
+  function bindPressedTextButton(btn){
+    if (!btn) return;
+    const pressOn = () => btn.classList.add('is-pressed');
+    const pressOff = () => btn.classList.remove('is-pressed');
+    btn.addEventListener('pointerdown', pressOn, { passive:true });
+    btn.addEventListener('pointerup', pressOff, { passive:true });
+    btn.addEventListener('pointercancel', pressOff, { passive:true });
+    btn.addEventListener('pointerleave', pressOff, { passive:true });
+    btn.addEventListener('blur', pressOff, { passive:true });
+  }
+
+  bindPressedTextButton(cancel);
+  bindPressedTextButton(ok);
+
   // ---------- СЕТКА ГОТОВЫХ ЦВЕТОВ ----------
   const GRID_COLORS = [
     // 1. cерый ряд: от белого к чёрному
