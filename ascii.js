@@ -261,6 +261,10 @@ function tgEventHaptic() {
   tgHaptic('impactOccurred', 'light');
 }
 
+function tgGoalFlashHaptic() {
+  tgHaptic('impactOccurred', 'medium');
+}
+
 const TERM_RANGE_STEPS = 10;
 const START_EASTER_EGG_MAX_SOUND = 10;
 const START_EASTER_EGG_TEST_TAP_COUNT = 1;
@@ -1622,7 +1626,9 @@ let DITHER_ENABLED = false;
           resolve();
           return;
         }
-        goalFlashLayer.style.opacity = (step % 2 === 0) ? '1' : '0';
+        const flashOn = (step % 2 === 0);
+        goalFlashLayer.style.opacity = flashOn ? '1' : '0';
+        if (flashOn) tgGoalFlashHaptic();
         step += 1;
         if (step >= 6) {
           goalFlashLayer.style.opacity = '0';
