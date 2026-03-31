@@ -390,6 +390,7 @@ const ARG_PONG = {
   syncFollowAccelPx: 1.15,
   visorEyeMaxShiftXPx: 27,
   visorEyeMaxShiftYPx: 18,
+  visorFollowRadiusBoost: 1.1,
   visorEyeSpring: 0.28,
   visorEyeDamping: 0.74,
   visorEyeMaxSpeedPx: 4.4,
@@ -1461,48 +1462,20 @@ let DITHER_ENABLED = false;
         return;
       }
       const now = ts || performance.now();
-      const deltaMs = Math.max(0, now - lastTs);
       lastTs = now;
       argPongState.visorShiftX += (0 - argPongState.visorShiftX) * 0.2;
       argPongState.visorShiftY += (0 - argPongState.visorShiftY) * 0.2;
       argPongState.visorEyeShiftX += (0 - argPongState.visorEyeShiftX) * 0.22;
       argPongState.visorEyeShiftY += (0 - argPongState.visorEyeShiftY) * 0.22;
-      const visorEyeDriftX =
-        Math.sin(now * ARG_PONG.visorEyeDriftSpeedX + argPongState.visorEyePhaseX) * ARG_PONG.visorEyeDriftAmpXPx
-        + Math.cos(now * ARG_PONG.visorEyeMicroJitterSpeedX + argPongState.visorEyePhaseY) * ARG_PONG.visorEyeMicroJitterAmpXPx;
-      const visorEyeDriftY =
-        Math.cos(now * ARG_PONG.visorEyeDriftSpeedY + argPongState.visorEyePhaseY) * ARG_PONG.visorEyeDriftAmpYPx
-        + Math.sin(now * ARG_PONG.visorEyeMicroJitterSpeedY + argPongState.visorEyePhaseX * 0.91) * ARG_PONG.visorEyeMicroJitterAmpYPx;
-      argPongState.visorEngineShakePulseLeftMs -= deltaMs;
-      if (argPongState.visorEngineShakePulseLeftMs <= 0) {
-        argPongState.visorEngineShakePulseLeftMs =
-          ARG_PONG.visorEngineShakePulseMs + (Math.random() * 2 - 1) * ARG_PONG.visorEngineShakePulseJitterMs;
-        argPongState.visorEngineShakeTargetX = (Math.random() * 2 - 1) * ARG_PONG.visorEngineJitterAmpXPx;
-        argPongState.visorEngineShakeTargetY = (Math.random() * 2 - 1) * ARG_PONG.visorEngineJitterAmpYPx;
-      }
-      argPongState.visorEngineShakeX += (argPongState.visorEngineShakeTargetX - argPongState.visorEngineShakeX) * ARG_PONG.visorEngineJitterResponse;
-      argPongState.visorEngineShakeY += (argPongState.visorEngineShakeTargetY - argPongState.visorEngineShakeY) * ARG_PONG.visorEngineJitterResponse;
-      argPongState.visorEngineShakeEyeX += (
-        argPongState.visorEngineShakeX * ARG_PONG.visorEngineShakeEyeScale - argPongState.visorEngineShakeEyeX
-      ) * ARG_PONG.visorEngineShakeEyeResponse;
-      argPongState.visorEngineShakeEyeY += (
-        argPongState.visorEngineShakeY * ARG_PONG.visorEngineShakeEyeScale - argPongState.visorEngineShakeEyeY
-      ) * ARG_PONG.visorEngineShakeEyeResponse;
-      argPongState.visorEngineShakePupilX += (
-        argPongState.visorEngineShakeX * ARG_PONG.visorEngineShakePupilScale - argPongState.visorEngineShakePupilX
-      ) * ARG_PONG.visorEngineShakePupilResponse;
-      argPongState.visorEngineShakePupilY += (
-        argPongState.visorEngineShakeY * ARG_PONG.visorEngineShakePupilScale - argPongState.visorEngineShakePupilY
-      ) * ARG_PONG.visorEngineShakePupilResponse;
-      const visorBodyShakeY = Math.abs(
-        Math.sin(now * ARG_PONG.visorBodyEpilepticShakeSpeedY)
-      ) * ARG_PONG.visorBodyEpilepticShakeAmpYPx;
-      const visorEyeX = argPongState.visorEyeShiftX + visorEyeDriftX + argPongState.visorEngineShakeEyeX * 0.22;
-      const visorEyeY = argPongState.visorEyeShiftY + visorEyeDriftY + argPongState.visorEngineShakeEyeY * 0.22;
+      const visorEyeDriftX = Math.sin(now * ARG_PONG.visorEyeDriftSpeedX + argPongState.visorEyePhaseX) * ARG_PONG.visorEyeDriftAmpXPx;
+      const visorEyeDriftY = Math.cos(now * ARG_PONG.visorEyeDriftSpeedY + argPongState.visorEyePhaseY) * ARG_PONG.visorEyeDriftAmpYPx;
+      const visorBodyShakeY = 0;
+      const visorEyeX = argPongState.visorEyeShiftX + visorEyeDriftX;
+      const visorEyeY = argPongState.visorEyeShiftY + visorEyeDriftY;
       argPongState.visorPupilShiftX += (0 - argPongState.visorPupilShiftX) * ARG_PONG.visorPupilFollowLerp;
       argPongState.visorPupilShiftY += (0 - argPongState.visorPupilShiftY) * ARG_PONG.visorPupilFollowLerp;
-      const visorPupilX = visorEyeX + argPongState.visorPupilShiftX + argPongState.visorEngineShakePupilX * 0.26;
-      const visorPupilY = visorEyeY + argPongState.visorPupilShiftY + argPongState.visorEngineShakePupilY * 0.26;
+      const visorPupilX = visorEyeX + argPongState.visorPupilShiftX;
+      const visorPupilY = visorEyeY + argPongState.visorPupilShiftY;
       const bodyScale = 1 + Math.sin(
         now * ARG_PONG.visorBodyScaleBreathSpeed + argPongState.visorBodyPhaseBreath
       ) * (ARG_PONG.visorBodyScaleBreathAmp * 1.65);
@@ -2044,18 +2017,20 @@ let DITHER_ENABLED = false;
 
       const ballOffsetFromEyeX = 0.5 - argPongState.ballX;
       const ballOffsetFromEyeY = argPongState.ballY - 0.5;
-      const ballTargetX = ballOffsetFromEyeX * 2 * ARG_PONG.visorEyeMaxShiftXPx;
-      const ballTargetY = ballOffsetFromEyeY * 2 * ARG_PONG.visorEyeMaxShiftYPx;
-      const clampedTargetX = clamp(ballTargetX, -ARG_PONG.visorEyeMaxShiftXPx, ARG_PONG.visorEyeMaxShiftXPx);
-      const clampedTargetY = clamp(ballTargetY, -ARG_PONG.visorEyeMaxShiftYPx, ARG_PONG.visorEyeMaxShiftYPx);
+      const maxShiftX = ARG_PONG.visorEyeMaxShiftXPx * ARG_PONG.visorFollowRadiusBoost;
+      const maxShiftY = ARG_PONG.visorEyeMaxShiftYPx * ARG_PONG.visorFollowRadiusBoost;
+      const ballTargetX = ballOffsetFromEyeX * 2 * maxShiftX;
+      const ballTargetY = ballOffsetFromEyeY * 2 * maxShiftY;
+      const clampedTargetX = clamp(ballTargetX, -maxShiftX, maxShiftX);
+      const clampedTargetY = clamp(ballTargetY, -maxShiftY, maxShiftY);
       argPongState.visorVX += (clampedTargetX - argPongState.visorShiftX) * ARG_PONG.visorEyeSpring;
       argPongState.visorVY += (clampedTargetY - argPongState.visorShiftY) * ARG_PONG.visorEyeSpring;
       argPongState.visorVX *= ARG_PONG.visorEyeDamping;
       argPongState.visorVY *= ARG_PONG.visorEyeDamping;
       argPongState.visorVX = clamp(argPongState.visorVX, -ARG_PONG.visorEyeMaxSpeedPx, ARG_PONG.visorEyeMaxSpeedPx);
       argPongState.visorVY = clamp(argPongState.visorVY, -ARG_PONG.visorEyeMaxSpeedPx, ARG_PONG.visorEyeMaxSpeedPx);
-      argPongState.visorShiftX = clamp(argPongState.visorShiftX + argPongState.visorVX, -ARG_PONG.visorEyeMaxShiftXPx, ARG_PONG.visorEyeMaxShiftXPx);
-      argPongState.visorShiftY = clamp(argPongState.visorShiftY + argPongState.visorVY, -ARG_PONG.visorEyeMaxShiftYPx, ARG_PONG.visorEyeMaxShiftYPx);
+      argPongState.visorShiftX = clamp(argPongState.visorShiftX + argPongState.visorVX, -maxShiftX, maxShiftX);
+      argPongState.visorShiftY = clamp(argPongState.visorShiftY + argPongState.visorVY, -maxShiftY, maxShiftY);
       const visorBodyOffsetX =
         Math.sin(now * ARG_PONG.visorBodyDriftSpeedX + argPongState.visorBodyPhaseX) * ARG_PONG.visorBodyDriftAmpXPx
         + Math.cos(now * ARG_PONG.visorBodyMicroJitterSpeedX + argPongState.visorBodyPhaseY * 0.67) * ARG_PONG.visorBodyMicroJitterAmpXPx
@@ -2066,52 +2041,24 @@ let DITHER_ENABLED = false;
         + Math.cos(now * ARG_PONG.visorBodyPulseSpeedY + argPongState.visorBodyPhaseBreath * 1.19) * ARG_PONG.visorBodyPulseAmpYPx;
       const visorEyeTargetX = clamp(
         clampedTargetX * ARG_PONG.visorEyeParallaxFollow,
-        -ARG_PONG.visorEyeParallaxMaxXPx,
-        ARG_PONG.visorEyeParallaxMaxXPx
+        -ARG_PONG.visorEyeParallaxMaxXPx * ARG_PONG.visorFollowRadiusBoost,
+        ARG_PONG.visorEyeParallaxMaxXPx * ARG_PONG.visorFollowRadiusBoost
       );
       const visorEyeTargetY = clamp(
         clampedTargetY * ARG_PONG.visorEyeParallaxFollow,
-        -ARG_PONG.visorEyeParallaxMaxYPx,
-        ARG_PONG.visorEyeParallaxMaxYPx
+        -ARG_PONG.visorEyeParallaxMaxYPx * ARG_PONG.visorFollowRadiusBoost,
+        ARG_PONG.visorEyeParallaxMaxYPx * ARG_PONG.visorFollowRadiusBoost
       );
       argPongState.visorEyeShiftX += (visorEyeTargetX - argPongState.visorEyeShiftX) * 0.22;
       argPongState.visorEyeShiftY += (visorEyeTargetY - argPongState.visorEyeShiftY) * 0.22;
-      const visorEyeDriftX =
-        Math.sin(now * ARG_PONG.visorEyeDriftSpeedX + argPongState.visorEyePhaseX) * ARG_PONG.visorEyeDriftAmpXPx
-        + Math.cos(now * ARG_PONG.visorEyeMicroJitterSpeedX + argPongState.visorEyePhaseY) * ARG_PONG.visorEyeMicroJitterAmpXPx;
-      const visorEyeDriftY =
-        Math.cos(now * ARG_PONG.visorEyeDriftSpeedY + argPongState.visorEyePhaseY) * ARG_PONG.visorEyeDriftAmpYPx
-        + Math.sin(now * ARG_PONG.visorEyeMicroJitterSpeedY + argPongState.visorEyePhaseX * 0.91) * ARG_PONG.visorEyeMicroJitterAmpYPx;
-      argPongState.visorEngineShakePulseLeftMs -= deltaMs;
-      if (argPongState.visorEngineShakePulseLeftMs <= 0) {
-        argPongState.visorEngineShakePulseLeftMs =
-          ARG_PONG.visorEngineShakePulseMs + (Math.random() * 2 - 1) * ARG_PONG.visorEngineShakePulseJitterMs;
-        argPongState.visorEngineShakeTargetX = (Math.random() * 2 - 1) * ARG_PONG.visorEngineJitterAmpXPx;
-        argPongState.visorEngineShakeTargetY = (Math.random() * 2 - 1) * ARG_PONG.visorEngineJitterAmpYPx;
-      }
-      argPongState.visorEngineShakeX += (argPongState.visorEngineShakeTargetX - argPongState.visorEngineShakeX) * ARG_PONG.visorEngineJitterResponse;
-      argPongState.visorEngineShakeY += (argPongState.visorEngineShakeTargetY - argPongState.visorEngineShakeY) * ARG_PONG.visorEngineJitterResponse;
-      argPongState.visorEngineShakeEyeX += (
-        argPongState.visorEngineShakeX * ARG_PONG.visorEngineShakeEyeScale - argPongState.visorEngineShakeEyeX
-      ) * ARG_PONG.visorEngineShakeEyeResponse;
-      argPongState.visorEngineShakeEyeY += (
-        argPongState.visorEngineShakeY * ARG_PONG.visorEngineShakeEyeScale - argPongState.visorEngineShakeEyeY
-      ) * ARG_PONG.visorEngineShakeEyeResponse;
-      argPongState.visorEngineShakePupilX += (
-        argPongState.visorEngineShakeX * ARG_PONG.visorEngineShakePupilScale - argPongState.visorEngineShakePupilX
-      ) * ARG_PONG.visorEngineShakePupilResponse;
-      argPongState.visorEngineShakePupilY += (
-        argPongState.visorEngineShakeY * ARG_PONG.visorEngineShakePupilScale - argPongState.visorEngineShakePupilY
-      ) * ARG_PONG.visorEngineShakePupilResponse;
-      const visorBodyShakeY = Math.abs(
-        Math.sin(now * ARG_PONG.visorBodyEpilepticShakeSpeedY)
-      ) * ARG_PONG.visorBodyEpilepticShakeAmpYPx;
-      const visorEyeShakeY = 0;
+      const visorEyeDriftX = Math.sin(now * ARG_PONG.visorEyeDriftSpeedX + argPongState.visorEyePhaseX) * ARG_PONG.visorEyeDriftAmpXPx;
+      const visorEyeDriftY = Math.cos(now * ARG_PONG.visorEyeDriftSpeedY + argPongState.visorEyePhaseY) * ARG_PONG.visorEyeDriftAmpYPx;
+      const visorBodyShakeY = 0;
       const visorPupilShakeY = 0;
-      const visorEyeX = argPongState.visorEyeShiftX + visorEyeDriftX + argPongState.shakeX * 0.22 + argPongState.visorEngineShakeEyeX * 0.22;
-      const visorEyeY = argPongState.visorEyeShiftY + visorEyeDriftY + argPongState.shakeY * 0.22 + argPongState.visorEngineShakeEyeY * 0.22 + visorEyeShakeY;
-      const xEdgeRatio = Math.abs(argPongState.visorShiftX) / Math.max(1, ARG_PONG.visorEyeMaxShiftXPx);
-      const yEdgeRatio = Math.abs(argPongState.visorShiftY) / Math.max(1, ARG_PONG.visorEyeMaxShiftYPx);
+      const visorEyeX = argPongState.visorEyeShiftX + visorEyeDriftX;
+      const visorEyeY = argPongState.visorEyeShiftY + visorEyeDriftY;
+      const xEdgeRatio = Math.abs(argPongState.visorShiftX) / Math.max(1, maxShiftX);
+      const yEdgeRatio = Math.abs(argPongState.visorShiftY) / Math.max(1, maxShiftY);
       const xEdgePressure = clamp(
         (xEdgeRatio - ARG_PONG.visorPupilEdgeRecoilThreshold) / (1 - ARG_PONG.visorPupilEdgeRecoilThreshold),
         0,
@@ -2136,8 +2083,8 @@ let DITHER_ENABLED = false;
       const visorPupilTargetOffsetY = argPongState.visorShiftY * 1.25 + argPongState.visorPupilRecoilY;
       argPongState.visorPupilShiftX += (visorPupilTargetOffsetX - argPongState.visorPupilShiftX) * ARG_PONG.visorPupilFollowLerp;
       argPongState.visorPupilShiftY += (visorPupilTargetOffsetY - argPongState.visorPupilShiftY) * ARG_PONG.visorPupilFollowLerp;
-      const visorPupilOffsetX = argPongState.visorPupilShiftX + argPongState.shakeX * 0.78 + argPongState.visorEngineShakePupilX * 0.26;
-      const visorPupilOffsetY = argPongState.visorPupilShiftY + argPongState.shakeY * 0.78 + argPongState.visorEngineShakePupilY * 0.26 + visorPupilShakeY;
+      const visorPupilOffsetX = argPongState.visorPupilShiftX;
+      const visorPupilOffsetY = argPongState.visorPupilShiftY + visorPupilShakeY;
       const visorPupilX = visorEyeX + visorPupilOffsetX;
       const visorPupilY = visorEyeY + visorPupilOffsetY;
       argPongState.shakeX *= ARG_PONG.shakeDecay;
