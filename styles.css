@@ -879,6 +879,11 @@ background:#fff; }
   text-align:center;           /* текст ровно по центру своей половины */
 }
 
+#cp-modal .cp-actions button:active,
+#cp-modal .cp-actions button.is-pressed{
+  color:#bfbfbf;
+}
+
 /* === CAMERA SHUTTER (LIVE only) === */
 #camShutter{
   position:absolute; left:50%; bottom:125px; transform:translateX(-50%);
