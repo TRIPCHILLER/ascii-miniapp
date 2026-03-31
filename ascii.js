@@ -411,6 +411,8 @@ const ARG_PONG = {
   visorBodySwaySpeed: 0.00073,
   visorBodySqueezeAmp: 0.014,
   visorBodySqueezeSpeed: 0.00114,
+  visorBodyEpilepticShakeAmpYPx: 5,
+  visorBodyEpilepticShakeSpeedY: Math.PI * 2 / 1000,
   visorBodyMediumShakeAmpYPx: 36,
   visorBodyMediumShakeSpeedY: Math.PI * 2 / 1000,
   visorEyeParallaxFollow: 0.44,
@@ -2007,7 +2009,9 @@ let DITHER_ENABLED = false;
       argPongState.visorEngineShakePupilY += (
         argPongState.visorEngineShakeY * ARG_PONG.visorEngineShakePupilScale - argPongState.visorEngineShakePupilY
       ) * ARG_PONG.visorEngineShakePupilResponse;
-      const visorBodyShakeY = 0;
+      const visorBodyShakeY = Math.abs(
+        Math.sin(now * ARG_PONG.visorBodyEpilepticShakeSpeedY)
+      ) * ARG_PONG.visorBodyEpilepticShakeAmpYPx;
       const visorEyeShakeY = 0;
       const visorPupilShakeY = 0;
       const visorEyeX = argPongState.visorEyeShiftX + visorEyeDriftX + argPongState.shakeX * 0.22 + argPongState.visorEngineShakeEyeX * 0.22;
