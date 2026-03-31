@@ -1225,12 +1225,14 @@ let DITHER_ENABLED = false;
     const bodyCy = height * 0.5;
 
     const eyeBase = Math.min(bodyW, bodyH);
-    const eyeW = eyeBase * 0.308;
+    const eyeScale = 1.05;
+    const pupilScale = 1.05;
+    const eyeW = eyeBase * 0.308 * eyeScale;
     const eyeH = eyeW;
     const eyeCx = bodyCx;
     const eyeCy = bodyCy;
-    const pupilW = eyeW * 0.226;
-    const pupilH = eyeH * 0.64;
+    const pupilW = eyeBase * 0.308 * 0.226 * pupilScale;
+    const pupilH = eyeBase * 0.308 * 0.64 * pupilScale;
 
     return {
       body: { cx: bodyCx, cy: bodyCy, drawW: bodyW, drawH: bodyH },
