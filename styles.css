@@ -1560,6 +1560,12 @@ input[type="color"] {
   cursor:pointer;
 }
 
+.arg-scene-goal-flash{
+  pointer-events:none;
+  background:#fff;
+  opacity:0;
+}
+
 .arg-scene-popup-box{
   width:min(84vw, 880px);
   min-height:136px;
