@@ -3,7 +3,6 @@
 html,body{ height:100%; margin:0; }
 body.theme-dark{ background:#000; color:#fff; }
 html, body, .wrap { overflow-x: hidden; }
-.panel label { flex-wrap: wrap; }
 
 :root{
   --ui-bg:#151515;     /* тулбар/фон панели */
@@ -154,9 +153,11 @@ button:focus, .btn:focus{
 #settings.panel{
   flex-direction:row;
   flex-wrap:wrap;
-  align-items:flex-start;
+  align-items:center;
   justify-content:flex-start;
-  gap:6px 10px;
+  --settings-gap-inner:6px;
+  --settings-gap-groups:18px;
+  gap:8px var(--settings-gap-groups);
 }
 
 #settings.panel > label,
@@ -167,7 +168,7 @@ button:focus, .btn:focus{
   margin:0;
   padding-top:1px;
   padding-bottom:1px;
-  flex:0 1 auto;
+  flex:0 0 auto;
   min-width:max-content;
   max-width:100%;
 }
@@ -176,9 +177,9 @@ button:focus, .btn:focus{
   width:auto;
   max-width:100%;
   display:flex;
-  gap:6px;
+  gap:var(--settings-gap-inner);
   align-items:center;
-  flex-wrap:wrap;
+  flex-wrap:nowrap;
   background:transparent;
   padding:1px 8px;
   margin:0;
@@ -188,9 +189,9 @@ button:focus, .btn:focus{
   width:auto;
   max-width:100%;
   display:flex;
-  gap:6px;
+  gap:var(--settings-gap-inner);
   align-items:center;
-  flex-wrap:wrap;
+  flex-wrap:nowrap;
   background:transparent;
   padding:1px 8px;
   margin:0;
@@ -203,10 +204,10 @@ button:focus, .btn:focus{
 }
 
 #settings.panel label{
-  gap:6px;
+  gap:var(--settings-gap-inner);
   flex-wrap:nowrap;
-  flex:1 1 clamp(240px, 30vw, 360px);
-  min-width:240px;
+  flex:0 0 auto;
+  min-width:0;
   max-width:100%;
 }
 
@@ -216,7 +217,7 @@ button:focus, .btn:focus{
 }
 
 #settings.panel .term-range-wrap{
-  width:clamp(9ch, 11vw, 14ch);
+  width:clamp(9ch, 8vw, 13ch);
   flex:0 1 auto;
 }
 
@@ -232,8 +233,8 @@ button:focus, .btn:focus{
 
 .panel .row.colors{
   display:flex;
-  flex-wrap: wrap;     /* можно переносить на следующую строку */
-  gap:6px;             /* небольшой зазор между ТЕКСТ и ФОН */
+  flex-wrap: nowrap;
+  gap:12px;
   width:auto;          /* не занимать всю строку насильно */
   align-items:center;
 }
@@ -1609,40 +1610,36 @@ body.visor-text #textSizeWrap{display:flex !important;}
   width:auto;
   max-width:100%;
   display:flex;
-  gap:6px;
+  gap:var(--settings-gap-inner);
   align-items:center;
-  flex-wrap:wrap;
+  flex-wrap:nowrap;
   background:transparent;
   padding:1px 8px;
   margin:0;
 }
 
-@media (max-width: 900px){
-  #settings.panel > label,
-  #settings.panel > .row.colors,
-  #settings.panel > .select-trigger-row,
-  #settings.panel > .mode-switch-row,
-  #settings.panel > .check-row{
-    flex:1 1 calc(50% - 10px);
-    min-width:220px;
-  }
-}
-
 @media (max-width: 680px){
+  #settings.panel{
+    --settings-gap-inner:6px;
+    --settings-gap-groups:8px;
+    flex-direction:column;
+    align-items:flex-start;
+    gap:4px;
+  }
+
   #settings.panel > label,
   #settings.panel > .row.colors,
   #settings.panel > .select-trigger-row,
   #settings.panel > .mode-switch-row,
   #settings.panel > .check-row{
-    flex:1 1 100%;
+    width:auto;
     min-width:0;
+    max-width:100%;
   }
 
-  #settings.panel label,
-  #settings.panel .select-trigger-row,
-  #settings.panel .mode-switch-row,
-  #settings.panel .check-row{
+  .panel .row.colors{
     flex-wrap:wrap;
+    gap:6px;
   }
 }
 
