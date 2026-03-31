@@ -3119,6 +3119,10 @@ function renderBrailleDots(src, cropRect, cols, rows) {
   const cfg = DOTS_BRAILLE_CFG;
   const sampleW = Math.max(1, cols * cfg.CELL_W);
   const sampleH = Math.max(1, Math.round(rows * cfg.CELL_H * cfg.SAMPLE_ASPECT_Y));
+  const contrast = Math.max(0.01, Number(state.contrast) || 1);
+  const gamma = Math.max(1e-6, Number(state.gamma) || 1);
+  const bp = Number(state.blackPoint) || 0;
+  const wp = Number(state.whitePoint) || 1;
 
   off.width = sampleW;
   off.height = sampleH;
@@ -3167,7 +3171,7 @@ function renderBrailleDots(src, cropRect, cols, rows) {
           const idx = py * sampleW + px;
 
           let v01 = (luma[idx] - minLum) / span;
-          v01 = ((v01 - 0.5) * cfg.CONTRAST) + 0.5;
+          v01 = ((v01 - 0.5) * contrast) + 0.5;
 
           if (cfg.LOCAL_CONTRAST > 0) {
             const lx0 = Math.max(px0, px - 1);
@@ -3187,7 +3191,9 @@ function renderBrailleDots(src, cropRect, cols, rows) {
           }
 
           v01 = Math.max(0, Math.min(1, v01));
-          v01 = Math.pow(v01, 1 / Math.max(1e-6, cfg.GAMMA));
+          v01 = Math.pow(v01, 1 / gamma);
+          v01 = (v01 - bp) / Math.max(1e-6, (wp - bp));
+          v01 = Math.max(0, Math.min(1, v01));
           const onScore = bias + inv * v01;
           const dotOn = onScore >= threshold;
 
