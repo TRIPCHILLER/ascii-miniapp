@@ -963,7 +963,13 @@ let DITHER_ENABLED = false;
     visorEngineShakePupilY: 0,
     visorEngineShakePulseLeftMs: 0,
     shakeX: 0,
-    shakeY: 0
+    shakeY: 0,
+    bossPresetId: null,
+    bossAsciiOptions: {
+      ...ARG_BOSS_ASCII_PRESET,
+      color: '#ffffff',
+      background: '#000000'
+    }
   };
   const argBossAscii = {
     root: null,
@@ -1206,7 +1212,7 @@ let DITHER_ENABLED = false;
 
     originalCtx.clearRect(0, 0, width, height);
     originalCtx.drawImage(compositeCanvas, 0, 0);
-    const asciiResult = renderAsciiFromSource(compositeCanvas, asciiCtx, ARG_BOSS_ASCII_PRESET);
+    const asciiResult = renderAsciiFromSource(compositeCanvas, asciiCtx, argPongState.bossAsciiOptions);
     argBossAscii.visualReady = asciiResult.ok;
     return asciiResult.ok;
   }
@@ -1520,6 +1526,31 @@ let DITHER_ENABLED = false;
       argBossAscii.visualReady = false;
       setArgBossVisualReady(overlay, { showAscii: false });
     });
+    const applyBossFightPalette = ({ text, bg, presetId = null } = {}) => {
+      const safeText = toHex(text || '#ffffff');
+      const safeBg = toHex(bg || '#000000');
+      argPongState.bossPresetId = presetId;
+      argPongState.bossAsciiOptions.color = safeText;
+      argPongState.bossAsciiOptions.background = safeBg;
+      overlay.style.backgroundColor = safeBg;
+      const spriteHue = Math.round((hue(safeText) * 360) % 360);
+      const spriteBrightness = (lum(safeText) > 0.6) ? '1.05' : '0.9';
+      const spriteFilter = `sepia(1) saturate(6) hue-rotate(${spriteHue}deg) brightness(${spriteBrightness})`;
+      ball.style.filter = spriteFilter;
+      topStick.style.filter = spriteFilter;
+      bottomStick.style.filter = spriteFilter;
+    };
+    const applyRandomBossFightPreset = () => {
+      if (!PRESETS.length) return;
+      let nextPreset = PRESETS[Math.floor(Math.random() * PRESETS.length)];
+      if (nextPreset && PRESETS.length > 1 && nextPreset.id === argPongState.bossPresetId) {
+        nextPreset = PRESETS[Math.floor(Math.random() * PRESETS.length)];
+      }
+      const colors = getPresetColorsById(nextPreset?.id);
+      if (!colors) return;
+      applyBossFightPalette({ ...colors, presetId: nextPreset.id });
+    };
+    applyBossFightPalette({ text: '#ffffff', bg: '#000000', presetId: null });
 
     let serveLocked = false;
     let prevTs = 0;
@@ -1624,6 +1655,7 @@ let DITHER_ENABLED = false;
       if (argPongState.ballX - ballHalfX <= wallNorm || argPongState.ballX + ballHalfX >= 1 - wallNorm) {
         argPongState.ballX = clamp(argPongState.ballX, wallNorm + ballHalfX, 1 - wallNorm - ballHalfX);
         argPongState.ballVX *= -1;
+        applyRandomBossFightPreset();
         applyTinyShake();
         tgEventHaptic();
       }
@@ -1849,7 +1881,7 @@ let DITHER_ENABLED = false;
 
           originalCtx.clearRect(0, 0, width, height);
           originalCtx.drawImage(compositeCanvas, 0, 0);
-          const asciiResult = renderAsciiFromSource(compositeCanvas, asciiCtx, ARG_BOSS_ASCII_PRESET);
+          const asciiResult = renderAsciiFromSource(compositeCanvas, asciiCtx, argPongState.bossAsciiOptions);
           if (!asciiResult.ok) {
             setArgBossVisualReady(overlay, { showAscii: false });
           } else {
@@ -2437,9 +2469,31 @@ function isFullscreenLike() {
     const a=[r,g,b].map(c=> (c<=0.03928)? c/12.92 : Math.pow((c+0.055)/1.055,2.4));
     return 0.2126*a[0] + 0.7152*a[1] + 0.0722*a[2];
   };
+  const hue = (hex) => {
+    const h = norm(hex);
+    if (h.length < 6) return 0;
+    const r = parseInt(h.slice(0, 2), 16) / 255;
+    const g = parseInt(h.slice(2, 4), 16) / 255;
+    const b = parseInt(h.slice(4, 6), 16) / 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const d = max - min;
+    if (d === 0) return 0;
+    let hOut = 0;
+    if (max === r) hOut = ((g - b) / d) % 6;
+    else if (max === g) hOut = ((b - r) / d) + 2;
+    else hOut = ((r - g) / d) + 4;
+    return (hOut * 60 + 360) % 360 / 360;
+  };
   // разложить пару на bg/text (тёмный/светлый)
   function splitToBgText(pair){
     const [c1,c2]=pair; return (lum(c1)<=lum(c2))? {bg:c1,text:c2}:{bg:c2,text:c1};
+  }
+  function getPresetColorsById(id) {
+    const preset = PRESETS.find((p) => p.id === id);
+    if (!preset) return null;
+    const { bg, text } = splitToBgText(preset.colors);
+    return { bg: toHex(bg), text: toHex(text) };
   }
   function detectPreset(textHex, bgHex){
     const t=norm(textHex), b=norm(bgHex);
