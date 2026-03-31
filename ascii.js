@@ -289,6 +289,7 @@ const ARG_SCENE_SOUNDS = {
   turnOff: `assets/sounds/turnoff.mp3?v=${SOUND_ASSET_VERSION}`,
   click: `assets/sounds/clicksound1.mp3?v=${SOUND_ASSET_VERSION}`,
   bitClick: `assets/sounds/bitclick.mp3?v=${SOUND_ASSET_VERSION}`,
+  bitClick2: `assets/sounds/bitclick2.mp3?v=${SOUND_ASSET_VERSION}`,
   danger: `assets/sounds/dangersound.mp3?v=${SOUND_ASSET_VERSION}`,
   danger2: `assets/sounds/dangersound2.mp3?v=${SOUND_ASSET_VERSION}`
 };
@@ -1838,6 +1839,7 @@ let DITHER_ENABLED = false;
       const topGoalLine = topY + paddleHalfH + ballHalfY;
       const bottomGoalLine = bottomY - paddleHalfH - ballHalfY;
       if (!serveLocked && argPongState.ballVY < 0 && argPongState.ballY < topGoalLine) {
+        playUiSoundNoThrow(ARG_SCENE_SOUNDS.bitClick2);
         argPongState.playerScore += 1;
         playerScoreEl.textContent = String(argPongState.playerScore);
         if (argPongState.playerScore >= ARG_PONG.scoreToWin) {
@@ -1859,6 +1861,7 @@ let DITHER_ENABLED = false;
           });
         }, ARG_SCENE_TIMINGS.serveDelayMs);
       } else if (!serveLocked && argPongState.ballVY > 0 && argPongState.ballY > bottomGoalLine) {
+        playUiSoundNoThrow(ARG_SCENE_SOUNDS.bitClick2);
         argPongState.aiScore += 1;
         aiScoreEl.textContent = String(argPongState.aiScore);
         if (argPongState.aiScore >= ARG_PONG.scoreToWin) {
