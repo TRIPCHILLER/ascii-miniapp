@@ -212,13 +212,16 @@ button:focus, .btn:focus{
 }
 
 #settings.panel output{
-  min-width:3.5ch;
+  min-width:4ch;
+  width:4ch;
+  flex:0 0 4ch;
+  margin:0;
   text-align:left;
 }
 
 #settings.panel .term-range-wrap{
-  width:clamp(9ch, 8vw, 13ch);
-  flex:0 1 auto;
+  width:max-content;
+  flex:0 0 auto;
 }
 
 #settings.panel .row.colors .color,
