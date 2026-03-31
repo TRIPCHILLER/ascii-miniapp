@@ -308,6 +308,8 @@ const ARG_SCENE_TIMINGS = {
   eyeToCountdownMs: 1000,
   countdownStepMs: 1000,
   serveDelayMs: 700,
+  goalFlashBurstMs: 1000,
+  goalRespawnDelayMs: 2000,
   popupGlitchMs: 19,
   popupSpaceTypeMs: 12,
   popupCharTypeMs: 23
@@ -919,6 +921,7 @@ let DITHER_ENABLED = false;
   let audioUnlockProbe = null;
   let argPongRafId = 0;
   let argPongServeTimer = 0;
+  let argPongFlashTimers = [];
   const argPongState = {
     running: false,
     ended: false,
@@ -1025,6 +1028,7 @@ let DITHER_ENABLED = false;
         <div class="arg-scene-score-top" id="argSceneAiScore">0</div>
         <div class="arg-scene-score-bottom" id="argScenePlayerScore">0</div>
       </div>
+      <div class="arg-scene-layer arg-scene-goal-flash" id="argSceneGoalFlashLayer" hidden></div>
       <div class="arg-scene-layer arg-scene-popup" id="argScenePopupLayer" hidden>
         <div class="arg-scene-popup-box">
           <div class="arg-scene-popup-text" id="argScenePopupText"></div>
@@ -1294,6 +1298,13 @@ let DITHER_ENABLED = false;
       clearTimeout(argPongServeTimer);
       argPongServeTimer = 0;
     }
+    if (argPongFlashTimers.length) {
+      argPongFlashTimers.forEach((id) => clearTimeout(id));
+      argPongFlashTimers = [];
+    }
+    const overlay = document.getElementById('argSceneOverlay');
+    const goalFlashLayer = overlay?.querySelector('#argSceneGoalFlashLayer');
+    if (goalFlashLayer) goalFlashLayer.hidden = true;
   }
 
   function resetArgOverlayState() {
@@ -1301,12 +1312,14 @@ let DITHER_ENABLED = false;
     argSceneActive = false;
     argBossAscii.visualReady = false;
     const popupLayer = overlay.querySelector('#argScenePopupLayer');
+    const goalFlashLayer = overlay.querySelector('#argSceneGoalFlashLayer');
     const countdownLayer = overlay.querySelector('#argSceneCountdownLayer');
     const scoreLayer = overlay.querySelector('#argSceneScoreLayer');
     const eyeLayer = overlay.querySelector('#argSceneEyeLayer');
     const ballStickLayer = overlay.querySelector('#argSceneBallStickLayer');
     const popupText = overlay.querySelector('#argScenePopupText');
     if (popupLayer) popupLayer.hidden = true;
+    if (goalFlashLayer) goalFlashLayer.hidden = true;
     if (countdownLayer) countdownLayer.textContent = '';
     if (scoreLayer) scoreLayer.hidden = true;
     if (popupText) popupText.textContent = '';
@@ -1522,7 +1535,7 @@ let DITHER_ENABLED = false;
         setArgBossVisualReady(overlay, { showAscii: false });
         return;
       }
-      ballStickLayer.style.opacity = '0';
+      ballStickLayer.style.opacity = '1';
     };
     runBossAscii().catch(() => {
       if (bossRoot) bossRoot.dataset.asciiReady = '0';
@@ -1588,7 +1601,36 @@ let DITHER_ENABLED = false;
       applyBossFightPalette({ ...colors, presetId: nextPreset.id });
     };
     applyBossFightPalette({ text: '#ffffff', bg: '#000000', presetId: null });
-    ballStickLayer.style.opacity = argBossAscii.ready ? '0' : '1';
+    ballStickLayer.style.opacity = '1';
+
+    const playGoalFlashBurst = () => new Promise((resolve) => {
+      const goalFlashLayer = overlay.querySelector('#argSceneGoalFlashLayer');
+      if (!goalFlashLayer) {
+        resolve();
+        return;
+      }
+      const stepMs = Math.max(1, Math.floor(ARG_SCENE_TIMINGS.goalFlashBurstMs / 6));
+      let step = 0;
+      goalFlashLayer.hidden = false;
+      const tick = () => {
+        if (!argPongState.running) {
+          goalFlashLayer.hidden = true;
+          resolve();
+          return;
+        }
+        goalFlashLayer.style.opacity = (step % 2 === 0) ? '1' : '0';
+        step += 1;
+        if (step >= 6) {
+          goalFlashLayer.style.opacity = '0';
+          goalFlashLayer.hidden = true;
+          resolve();
+          return;
+        }
+        const timerId = setTimeout(tick, stepMs);
+        argPongFlashTimers.push(timerId);
+      };
+      tick();
+    });
 
     const renderFightAsciiFrame = ({
       rect,
@@ -1617,38 +1659,6 @@ let DITHER_ENABLED = false;
       const sy = height / Math.max(1, rect.height);
       compositeCtx.setTransform(1, 0, 0, 1, 0, 0);
       compositeCtx.clearRect(0, 0, width, height);
-
-      const ballSizePx = ARG_PONG.paddleHeightPx * ARG_PONG.ballSizeToPaddleHeightRatio;
-      const ballDrawX = (argPongState.ballX * rect.width - ballSizePx * 0.5) * sx;
-      const ballDrawY = (argPongState.ballY * rect.height - ballSizePx * 0.5) * sy;
-      const ballDrawW = ballSizePx * sx;
-      const ballDrawH = ballSizePx * sy;
-      if (ball?.complete && ball.naturalWidth > 0) {
-        compositeCtx.drawImage(ball, ballDrawX, ballDrawY, ballDrawW, ballDrawH);
-      }
-
-      const paddleDrawW = ARG_PONG.paddleWidthPx * sx;
-      const paddleDrawH = ARG_PONG.paddleHeightPx * sy;
-      const topPaddleY = (ARG_PONG.topPaddleYVh / 100) * rect.height;
-      const bottomPaddleY = (ARG_PONG.bottomPaddleYVh / 100) * rect.height;
-      if (topStick?.complete && topStick.naturalWidth > 0) {
-        compositeCtx.drawImage(
-          topStick,
-          (argPongState.aiX * rect.width - ARG_PONG.paddleWidthPx * 0.5) * sx,
-          (topPaddleY - ARG_PONG.paddleHeightPx * 0.5) * sy,
-          paddleDrawW,
-          paddleDrawH
-        );
-      }
-      if (bottomStick?.complete && bottomStick.naturalWidth > 0) {
-        compositeCtx.drawImage(
-          bottomStick,
-          (argPongState.playerX * rect.width - ARG_PONG.paddleWidthPx * 0.5) * sx,
-          (bottomPaddleY - ARG_PONG.paddleHeightPx * 0.5) * sy,
-          paddleDrawW,
-          paddleDrawH
-        );
-      }
 
       const drawRects = getArgBossDrawRects(width, height);
       if (drawRects && argBossAscii.bodyImage && argBossAscii.eyeImage && argBossAscii.pupilImage) {
@@ -1834,9 +1844,16 @@ let DITHER_ENABLED = false;
         serveLocked = true;
         argPongServeTimer = setTimeout(() => {
           if (!argPongState.running) return;
-          resetArgBall(false);
-          serveLocked = false;
           argPongServeTimer = 0;
+          playGoalFlashBurst().then(() => {
+            if (!argPongState.running) return;
+            argPongServeTimer = setTimeout(() => {
+              if (!argPongState.running) return;
+              resetArgBall(false);
+              serveLocked = false;
+              argPongServeTimer = 0;
+            }, ARG_SCENE_TIMINGS.goalRespawnDelayMs);
+          });
         }, ARG_SCENE_TIMINGS.serveDelayMs);
       } else if (!serveLocked && argPongState.ballVY > 0 && argPongState.ballY > bottomGoalLine) {
         argPongState.aiScore += 1;
@@ -1848,9 +1865,16 @@ let DITHER_ENABLED = false;
         serveLocked = true;
         argPongServeTimer = setTimeout(() => {
           if (!argPongState.running) return;
-          resetArgBall(true);
-          serveLocked = false;
           argPongServeTimer = 0;
+          playGoalFlashBurst().then(() => {
+            if (!argPongState.running) return;
+            argPongServeTimer = setTimeout(() => {
+              if (!argPongState.running) return;
+              resetArgBall(true);
+              serveLocked = false;
+              argPongServeTimer = 0;
+            }, ARG_SCENE_TIMINGS.goalRespawnDelayMs);
+          });
         }, ARG_SCENE_TIMINGS.serveDelayMs);
       }
 
@@ -2036,36 +2060,8 @@ let DITHER_ENABLED = false;
       const height = compositeCanvas.height;
       const sx = width / Math.max(1, rect.width);
       const sy = height / Math.max(1, rect.height);
-      const ballSizePx = ARG_PONG.paddleHeightPx * ARG_PONG.ballSizeToPaddleHeightRatio;
       compositeCtx.setTransform(1, 0, 0, 1, 0, 0);
       compositeCtx.clearRect(0, 0, width, height);
-      if (ballEl?.complete && ballEl.naturalWidth > 0) {
-        compositeCtx.drawImage(
-          ballEl,
-          (argPongState.ballX * rect.width - ballSizePx * 0.5) * sx,
-          (argPongState.ballY * rect.height - ballSizePx * 0.5) * sy,
-          ballSizePx * sx,
-          ballSizePx * sy
-        );
-      }
-      if (topStickEl?.complete && topStickEl.naturalWidth > 0) {
-        compositeCtx.drawImage(
-          topStickEl,
-          (argPongState.aiX * rect.width - ARG_PONG.paddleWidthPx * 0.5) * sx,
-          ((ARG_PONG.topPaddleYVh / 100) * rect.height - ARG_PONG.paddleHeightPx * 0.5) * sy,
-          ARG_PONG.paddleWidthPx * sx,
-          ARG_PONG.paddleHeightPx * sy
-        );
-      }
-      if (bottomStickEl?.complete && bottomStickEl.naturalWidth > 0) {
-        compositeCtx.drawImage(
-          bottomStickEl,
-          (argPongState.playerX * rect.width - ARG_PONG.paddleWidthPx * 0.5) * sx,
-          ((ARG_PONG.bottomPaddleYVh / 100) * rect.height - ARG_PONG.paddleHeightPx * 0.5) * sy,
-          ARG_PONG.paddleWidthPx * sx,
-          ARG_PONG.paddleHeightPx * sy
-        );
-      }
       renderAsciiFromSource(compositeCanvas, asciiCtx, argPongState.bossAsciiOptions);
       setArgBossVisualReady(overlay, { showAscii: true });
     };
@@ -2113,7 +2109,7 @@ let DITHER_ENABLED = false;
     ball.style.width = `${ballSizePx}px`;
     ball.style.height = `${ballSizePx}px`;
     ballStickLayer.appendChild(ball);
-    ballStickLayer.style.opacity = bossInitOk ? '0' : '1';
+    ballStickLayer.style.opacity = '1';
     renderArgSceneStaticAscii({ ballEl: ball });
     playUiSoundNoThrow(ARG_SCENE_SOUNDS.bitClick);
     tgEventHaptic();
