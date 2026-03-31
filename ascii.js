@@ -1328,6 +1328,7 @@ let DITHER_ENABLED = false;
       if (bossRoot) bossRoot.dataset.asciiReady = '0';
     }
     if (ballStickLayer) ballStickLayer.innerHTML = '';
+    if (ballStickLayer) ballStickLayer.style.opacity = '1';
     overlay.hidden = true;
   }
 
@@ -1517,28 +1518,64 @@ let DITHER_ENABLED = false;
       if (!ok) {
         if (bossRoot) bossRoot.dataset.asciiReady = '0';
         argBossAscii.visualReady = false;
+        ballStickLayer.style.opacity = '1';
         setArgBossVisualReady(overlay, { showAscii: false });
         return;
       }
+      ballStickLayer.style.opacity = '0';
     };
     runBossAscii().catch(() => {
       if (bossRoot) bossRoot.dataset.asciiReady = '0';
       argBossAscii.visualReady = false;
+      ballStickLayer.style.opacity = '1';
       setArgBossVisualReady(overlay, { showAscii: false });
     });
+    const parseHexColor = (hex, fallback = '#ffffff') => {
+      const safe = norm(toHex(hex || fallback));
+      const full = safe.length === 3
+        ? safe.split('').map((ch) => ch + ch).join('')
+        : safe;
+      if (!/^[0-9a-f]{6}$/i.test(full)) {
+        const fallbackSafe = norm(toHex(fallback));
+        return {
+          r: parseInt(fallbackSafe.slice(0, 2), 16) || 255,
+          g: parseInt(fallbackSafe.slice(2, 4), 16) || 255,
+          b: parseInt(fallbackSafe.slice(4, 6), 16) || 255
+        };
+      }
+      return {
+        r: parseInt(full.slice(0, 2), 16),
+        g: parseInt(full.slice(2, 4), 16),
+        b: parseInt(full.slice(4, 6), 16)
+      };
+    };
+    const rgbToHex = ({ r, g, b }) => `#${
+      [r, g, b]
+        .map((v) => clamp(Math.round(v), 0, 255).toString(16).padStart(2, '0'))
+        .join('')
+    }`;
+    const getBossShadeFromText = (textHex) => {
+      const rgb = parseHexColor(textHex, '#ffffff');
+      return rgbToHex({
+        r: rgb.r * 0.5,
+        g: rgb.g * 0.5,
+        b: rgb.b * 0.5
+      });
+    };
     const applyBossFightPalette = ({ text, bg, presetId = null } = {}) => {
       const safeText = toHex(text || '#ffffff');
       const safeBg = toHex(bg || '#000000');
+      const bossShade = getBossShadeFromText(safeText);
       argPongState.bossPresetId = presetId;
       argPongState.bossAsciiOptions.color = safeText;
       argPongState.bossAsciiOptions.background = safeBg;
+      argPongState.bossAsciiOptions.bossColor = bossShade;
       overlay.style.backgroundColor = safeBg;
-      const spriteHue = Math.round((hue(safeText) * 360) % 360);
-      const spriteBrightness = (lum(safeText) > 0.6) ? '1.05' : '0.9';
-      const spriteFilter = `sepia(1) saturate(6) hue-rotate(${spriteHue}deg) brightness(${spriteBrightness})`;
-      ball.style.filter = spriteFilter;
-      topStick.style.filter = spriteFilter;
-      bottomStick.style.filter = spriteFilter;
+      ball.style.filter = 'none';
+      topStick.style.filter = 'none';
+      bottomStick.style.filter = 'none';
+      const popupLayer = overlay.querySelector('#argScenePopupLayer');
+      if (popupLayer) popupLayer.style.filter = 'none';
     };
     const applyRandomBossFightPreset = () => {
       if (!PRESETS.length) return;
@@ -1551,6 +1588,103 @@ let DITHER_ENABLED = false;
       applyBossFightPalette({ ...colors, presetId: nextPreset.id });
     };
     applyBossFightPalette({ text: '#ffffff', bg: '#000000', presetId: null });
+    ballStickLayer.style.opacity = argBossAscii.ready ? '0' : '1';
+
+    const renderFightAsciiFrame = ({
+      rect,
+      visorBodyX = 0,
+      visorBodyY = 0,
+      bodyRotate = 0,
+      bodyScaleX = 1,
+      bodyScaleY = 1,
+      visorEyeX = 0,
+      visorEyeY = 0,
+      eyeScale = 1,
+      visorPupilX = 0,
+      visorPupilY = 0
+    } = {}) => {
+      if (!argBossAscii.ready || !argBossAscii.compositeCtx || !argBossAscii.originalCtx || !argBossAscii.asciiCtx) return;
+      const compositeCanvas = argBossAscii.compositeCanvas;
+      const compositeCtx = argBossAscii.compositeCtx;
+      const originalCtx = argBossAscii.originalCtx;
+      const asciiCtx = argBossAscii.asciiCtx;
+      const width = compositeCanvas.width;
+      const height = compositeCanvas.height;
+      if (width < 2 || height < 2 || !rect?.width || !rect?.height) return;
+
+      const dpr = argBossAscii.dpr || 1;
+      const sx = width / Math.max(1, rect.width);
+      const sy = height / Math.max(1, rect.height);
+      compositeCtx.setTransform(1, 0, 0, 1, 0, 0);
+      compositeCtx.clearRect(0, 0, width, height);
+
+      const ballSizePx = ARG_PONG.paddleHeightPx * ARG_PONG.ballSizeToPaddleHeightRatio;
+      const ballDrawX = (argPongState.ballX * rect.width - ballSizePx * 0.5) * sx;
+      const ballDrawY = (argPongState.ballY * rect.height - ballSizePx * 0.5) * sy;
+      const ballDrawW = ballSizePx * sx;
+      const ballDrawH = ballSizePx * sy;
+      if (ball?.complete && ball.naturalWidth > 0) {
+        compositeCtx.drawImage(ball, ballDrawX, ballDrawY, ballDrawW, ballDrawH);
+      }
+
+      const paddleDrawW = ARG_PONG.paddleWidthPx * sx;
+      const paddleDrawH = ARG_PONG.paddleHeightPx * sy;
+      const topPaddleY = (ARG_PONG.topPaddleYVh / 100) * rect.height;
+      const bottomPaddleY = (ARG_PONG.bottomPaddleYVh / 100) * rect.height;
+      if (topStick?.complete && topStick.naturalWidth > 0) {
+        compositeCtx.drawImage(
+          topStick,
+          (argPongState.aiX * rect.width - ARG_PONG.paddleWidthPx * 0.5) * sx,
+          (topPaddleY - ARG_PONG.paddleHeightPx * 0.5) * sy,
+          paddleDrawW,
+          paddleDrawH
+        );
+      }
+      if (bottomStick?.complete && bottomStick.naturalWidth > 0) {
+        compositeCtx.drawImage(
+          bottomStick,
+          (argPongState.playerX * rect.width - ARG_PONG.paddleWidthPx * 0.5) * sx,
+          (bottomPaddleY - ARG_PONG.paddleHeightPx * 0.5) * sy,
+          paddleDrawW,
+          paddleDrawH
+        );
+      }
+
+      const drawRects = getArgBossDrawRects(width, height);
+      if (drawRects && argBossAscii.bodyImage && argBossAscii.eyeImage && argBossAscii.pupilImage) {
+        compositeCtx.save();
+        compositeCtx.globalAlpha = 0.5;
+        drawArgBossLayer(compositeCtx, argBossAscii.bodyImage, drawRects.body, {
+          tx: visorBodyX * dpr,
+          ty: visorBodyY * dpr,
+          rotateDeg: bodyRotate,
+          scaleX: bodyScaleX,
+          scaleY: bodyScaleY
+        });
+        drawArgBossLayer(compositeCtx, argBossAscii.eyeImage, drawRects.eye, {
+          tx: visorEyeX * dpr,
+          ty: visorEyeY * dpr,
+          scaleX: eyeScale,
+          scaleY: eyeScale
+        });
+        drawArgBossLayer(compositeCtx, argBossAscii.pupilImage, drawRects.pupil, {
+          tx: visorPupilX * dpr,
+          ty: visorPupilY * dpr
+        });
+        compositeCtx.restore();
+      }
+
+      originalCtx.clearRect(0, 0, width, height);
+      originalCtx.drawImage(compositeCanvas, 0, 0);
+      const asciiResult = renderAsciiFromSource(compositeCanvas, asciiCtx, argPongState.bossAsciiOptions);
+      if (!asciiResult.ok) {
+        setArgBossVisualReady(overlay, { showAscii: false });
+        return;
+      }
+
+      argBossAscii.visualReady = true;
+      setArgBossVisualReady(overlay, { showAscii: true });
+    };
 
     let serveLocked = false;
     let prevTs = 0;
@@ -1845,51 +1979,19 @@ let DITHER_ENABLED = false;
       visorEye.style.transform = `translate(${visorEyeX}px, ${visorEyeY}px) scale(${eyeScale})`;
       visorPupil.style.transform = `translate(${visorPupilX}px, ${visorPupilY}px)`;
 
-      if (argPongState.running && argBossAscii.ready && argBossAscii.compositeCtx && argBossAscii.originalCtx && argBossAscii.asciiCtx && argBossAscii.bodyImage && argBossAscii.eyeImage && argBossAscii.pupilImage) {
-        const compositeCanvas = argBossAscii.compositeCanvas;
-        const compositeCtx = argBossAscii.compositeCtx;
-        const originalCtx = argBossAscii.originalCtx;
-        const asciiCtx = argBossAscii.asciiCtx;
-        const width = compositeCanvas.width;
-        const height = compositeCanvas.height;
-        if (width > 1 && height > 1) {
-          const drawRects = getArgBossDrawRects(width, height);
-          if (!drawRects) {
-            argPongRafId = requestAnimationFrame(loop);
-            return;
-          }
-
-          compositeCtx.setTransform(1, 0, 0, 1, 0, 0);
-          compositeCtx.clearRect(0, 0, width, height);
-          drawArgBossLayer(compositeCtx, argBossAscii.bodyImage, drawRects.body, {
-            tx: visorBodyX * argBossAscii.dpr,
-            ty: visorBodyY * argBossAscii.dpr,
-            rotateDeg: bodyRotate,
-            scaleX: bodyScale + bodySqueeze,
-            scaleY: bodyScale - bodySqueeze * 0.75
-          });
-          drawArgBossLayer(compositeCtx, argBossAscii.eyeImage, drawRects.eye, {
-            tx: visorEyeX * argBossAscii.dpr,
-            ty: visorEyeY * argBossAscii.dpr,
-            scaleX: eyeScale,
-            scaleY: eyeScale
-          });
-          drawArgBossLayer(compositeCtx, argBossAscii.pupilImage, drawRects.pupil, {
-            tx: visorPupilX * argBossAscii.dpr,
-            ty: visorPupilY * argBossAscii.dpr
-          });
-
-          originalCtx.clearRect(0, 0, width, height);
-          originalCtx.drawImage(compositeCanvas, 0, 0);
-          const asciiResult = renderAsciiFromSource(compositeCanvas, asciiCtx, argPongState.bossAsciiOptions);
-          if (!asciiResult.ok) {
-            setArgBossVisualReady(overlay, { showAscii: false });
-          } else {
-            argBossAscii.visualReady = true;
-            setArgBossVisualReady(overlay, { showAscii: true });
-          }
-        }
-      }
+      renderFightAsciiFrame({
+        rect,
+        visorBodyX,
+        visorBodyY,
+        bodyRotate,
+        bodyScaleX: bodyScale + bodySqueeze,
+        bodyScaleY: bodyScale - bodySqueeze * 0.75,
+        visorEyeX,
+        visorEyeY,
+        eyeScale,
+        visorPupilX,
+        visorPupilY
+      });
 
       argPongRafId = requestAnimationFrame(loop);
     };
@@ -1916,6 +2018,57 @@ let DITHER_ENABLED = false;
 
     overlay.hidden = false;
     argSceneActive = true;
+    argPongState.bossPresetId = null;
+    argPongState.bossAsciiOptions.color = '#ffffff';
+    argPongState.bossAsciiOptions.background = '#000000';
+    argPongState.bossAsciiOptions.bossColor = '#808080';
+    overlay.style.backgroundColor = '#000000';
+    let bossInitOk = false;
+    const renderArgSceneStaticAscii = ({ ballEl = null, topStickEl = null, bottomStickEl = null } = {}) => {
+      if (!bossInitOk) return;
+      ensureArgBossCanvasSize(overlay);
+      const rect = overlay.getBoundingClientRect();
+      const compositeCanvas = argBossAscii.compositeCanvas;
+      const compositeCtx = argBossAscii.compositeCtx;
+      const asciiCtx = argBossAscii.asciiCtx;
+      if (!compositeCanvas || !compositeCtx || !asciiCtx || !rect.width || !rect.height) return;
+      const width = compositeCanvas.width;
+      const height = compositeCanvas.height;
+      const sx = width / Math.max(1, rect.width);
+      const sy = height / Math.max(1, rect.height);
+      const ballSizePx = ARG_PONG.paddleHeightPx * ARG_PONG.ballSizeToPaddleHeightRatio;
+      compositeCtx.setTransform(1, 0, 0, 1, 0, 0);
+      compositeCtx.clearRect(0, 0, width, height);
+      if (ballEl?.complete && ballEl.naturalWidth > 0) {
+        compositeCtx.drawImage(
+          ballEl,
+          (argPongState.ballX * rect.width - ballSizePx * 0.5) * sx,
+          (argPongState.ballY * rect.height - ballSizePx * 0.5) * sy,
+          ballSizePx * sx,
+          ballSizePx * sy
+        );
+      }
+      if (topStickEl?.complete && topStickEl.naturalWidth > 0) {
+        compositeCtx.drawImage(
+          topStickEl,
+          (argPongState.aiX * rect.width - ARG_PONG.paddleWidthPx * 0.5) * sx,
+          ((ARG_PONG.topPaddleYVh / 100) * rect.height - ARG_PONG.paddleHeightPx * 0.5) * sy,
+          ARG_PONG.paddleWidthPx * sx,
+          ARG_PONG.paddleHeightPx * sy
+        );
+      }
+      if (bottomStickEl?.complete && bottomStickEl.naturalWidth > 0) {
+        compositeCtx.drawImage(
+          bottomStickEl,
+          (argPongState.playerX * rect.width - ARG_PONG.paddleWidthPx * 0.5) * sx,
+          ((ARG_PONG.bottomPaddleYVh / 100) * rect.height - ARG_PONG.paddleHeightPx * 0.5) * sy,
+          ARG_PONG.paddleWidthPx * sx,
+          ARG_PONG.paddleHeightPx * sy
+        );
+      }
+      renderAsciiFromSource(compositeCanvas, asciiCtx, argPongState.bossAsciiOptions);
+      setArgBossVisualReady(overlay, { showAscii: true });
+    };
     stopStartBlinkTickerForArg();
     if (startDateTimer) { clearInterval(startDateTimer); startDateTimer = null; }
     eyeLayer.querySelectorAll('.arg-scene-boss-layer').forEach((el) => el.remove());
@@ -1937,9 +2090,20 @@ let DITHER_ENABLED = false;
     ballStickLayer.innerHTML = '';
     countdownLayer.textContent = '';
     scoreLayer.hidden = true;
+    bossInitOk = await initArgBossAscii(overlay);
+    if (bossInitOk) {
+      ensureArgBossCanvasSize(overlay);
+      argBossAscii.visualReady = true;
+      setArgBossVisualReady(overlay, { showAscii: true });
+    }
 
     playUiSoundNoThrow(ARG_SCENE_SOUNDS.turnOff);
     await sleep(ARG_SCENE_TIMINGS.afterBlackMs);
+
+    argPongState.ballX = 0.5;
+    argPongState.ballY = 0.5;
+    argPongState.aiX = 0.5;
+    argPongState.playerX = 0.5;
 
     const ball = document.createElement('img');
     ball.className = 'arg-scene-ball';
@@ -1949,6 +2113,8 @@ let DITHER_ENABLED = false;
     ball.style.width = `${ballSizePx}px`;
     ball.style.height = `${ballSizePx}px`;
     ballStickLayer.appendChild(ball);
+    ballStickLayer.style.opacity = bossInitOk ? '0' : '1';
+    renderArgSceneStaticAscii({ ballEl: ball });
     playUiSoundNoThrow(ARG_SCENE_SOUNDS.bitClick);
     tgEventHaptic();
 
@@ -1967,6 +2133,7 @@ let DITHER_ENABLED = false;
     topStick.style.top = `${ARG_PONG.topPaddleYVh}vh`;
     topStick.style.bottom = '';
     ballStickLayer.appendChild(topStick);
+    renderArgSceneStaticAscii({ ballEl: ball, topStickEl: topStick });
     playUiSoundNoThrow(ARG_SCENE_SOUNDS.bitClick);
     tgEventHaptic();
 
@@ -1981,6 +2148,7 @@ let DITHER_ENABLED = false;
     bottomStick.style.bottom = `${100 - ARG_PONG.bottomPaddleYVh}vh`;
     bottomStick.style.top = '';
     ballStickLayer.appendChild(bottomStick);
+    renderArgSceneStaticAscii({ ballEl: ball, topStickEl: topStick, bottomStickEl: bottomStick });
     playUiSoundNoThrow(ARG_SCENE_SOUNDS.bitClick);
     tgEventHaptic();
 
@@ -2010,12 +2178,11 @@ let DITHER_ENABLED = false;
     eyeLayer.appendChild(visorPupil);
     playUiSoundNoThrow(ARG_SCENE_SOUNDS.turnOff);
 
-    const bossInitOk = await initArgBossAscii(overlay);
     if (bossInitOk) {
       ensureArgBossCanvasSize(overlay);
       const bossAsciiOk = renderArgBossAsciiIdleFrame();
       if (!bossAsciiOk) argBossAscii.visualReady = true;
-      setArgBossVisualReady(overlay, { showAscii: bossAsciiOk });
+      setArgBossVisualReady(overlay, { showAscii: true });
     }
 
     await sleep(ARG_SCENE_TIMINGS.eyeToCountdownMs);
