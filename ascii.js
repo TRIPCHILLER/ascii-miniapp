@@ -1691,15 +1691,9 @@ let DITHER_ENABLED = false;
       argPongState.visorEngineShakePupilY += (
         argPongState.visorEngineShakeY * ARG_PONG.visorEngineShakePupilScale - argPongState.visorEngineShakePupilY
       ) * ARG_PONG.visorEngineShakePupilResponse;
-      const visorBodyShakeY = Math.sin(
-        now * ARG_PONG.visorBodyMediumShakeSpeedY + argPongState.visorBodyPhaseY * 1.07 + 0.21
-      ) * ARG_PONG.visorBodyMediumShakeAmpYPx;
-      const visorEyeShakeY = Math.sin(
-        now * ARG_PONG.visorEyeMediumShakeSpeedY + argPongState.visorEyePhaseY * 1.13 + 1.02
-      ) * ARG_PONG.visorEyeMediumShakeAmpYPx;
-      const visorPupilShakeY = Math.sin(
-        now * ARG_PONG.visorPupilMediumShakeSpeedY + argPongState.visorEyePhaseX * 0.86 + 2.07
-      ) * ARG_PONG.visorPupilMediumShakeAmpYPx;
+      const visorBodyShakeY = 0;
+      const visorEyeShakeY = 0;
+      const visorPupilShakeY = 0;
       const visorEyeX = argPongState.visorEyeShiftX + visorEyeDriftX + argPongState.shakeX * 0.22 + argPongState.visorEngineShakeEyeX * 0.22;
       const visorEyeY = argPongState.visorEyeShiftY + visorEyeDriftY + argPongState.shakeY * 0.22 + argPongState.visorEngineShakeEyeY * 0.22 + visorEyeShakeY;
       const xEdgeRatio = Math.abs(argPongState.visorShiftX) / Math.max(1, ARG_PONG.visorEyeMaxShiftXPx);
