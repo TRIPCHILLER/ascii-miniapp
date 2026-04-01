@@ -747,8 +747,22 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 
 /* ===== НИЖНИЙ РЯД РЕЖИМОВ ===== */
 .modebar{
-  display:flex; justify-content:center; gap:12px;
-  padding:10px; background:#000; border-top:1px solid #111;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:0;
+  padding:0;
+  background:#000;
+  border-top:1px solid #111;
+}
+
+.modebar .btn{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex:1 1 0;
+  margin:0;
+  padding:calc(8px + var(--button-text-drop)) 12px calc(8px - var(--button-text-drop));
 }
 
 /* GRAPHIC -> CAMERA: панели только оверлеем, без влияния на layout сцены */
