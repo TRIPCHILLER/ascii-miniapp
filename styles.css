@@ -11,6 +11,7 @@ html, body, .wrap { overflow-x: hidden; }
   --vintage-light:#808080;
   --vintage-dark:#404040;
   --button-text-drop:2px;
+  --modebar-height:54px;
 }
 
 .wrap{ display:flex; flex-direction:column; height:100%; }
@@ -751,6 +752,7 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   align-items:center;
   justify-content:center;
   gap:0;
+  min-height:var(--modebar-height);
   padding:0;
   background:#000;
   border-top:1px solid #111;
@@ -793,7 +795,7 @@ body:not(.visor-text)[data-mode="live"] .modebar{
 }
 
 body:not(.visor-text)[data-mode="live"] .cam-controls{
-  bottom: calc(57px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--modebar-height) + env(safe-area-inset-bottom, 0px));
 }
 
 /* ===== ПЛЕЙСХОЛДЕР ДЛЯ ФОТО/ВИДЕО ===== */
