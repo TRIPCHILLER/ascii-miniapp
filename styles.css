@@ -369,6 +369,22 @@ body.flash-front-ui .modebar {
   border-top:1px solid #e0e0e0;
 }
 
+/* верхние кнопки тоже инвертируем в светлую тему */
+body.flash-front-ui #flip,
+body.flash-front-ui #toggle,
+body.flash-front-ui #fs,
+body.flash-front-ui #save{
+  background:#ffffff;
+  color:#000000;
+}
+
+body.flash-front-ui #flip:active,
+body.flash-front-ui #toggle:active,
+body.flash-front-ui #fs:active,
+body.flash-front-ui #save:active{
+  color:#bfbfbf;
+}
+
 /* панель настроек, если открыта */
 body.flash-front-ui .panel {
   background:#ffffff;
@@ -380,6 +396,24 @@ body.flash-front-ui .modebar .btn {
 }
 body.flash-front-ui .modebar .btn.active {
   color:#000000;
+}
+
+/* тёмно-серые контролы в панели настроек при вспышке */
+body.flash-front-ui #charsetTrigger,
+body.flash-front-ui #styleTrigger,
+body.flash-front-ui #resetModeBtn,
+body.flash-front-ui #settings.panel .check,
+body.flash-front-ui .ascii-select-trigger{
+  background:#bfbfbf;
+  color:#000000;
+}
+
+body.flash-front-ui #charsetTrigger:active,
+body.flash-front-ui #styleTrigger:active,
+body.flash-front-ui #resetModeBtn:active,
+body.flash-front-ui #settings.panel .check:active,
+body.flash-front-ui .ascii-select-trigger:active{
+  color:#7a7a7a;
 }
 
 /* иконки вспышки/таймеров инвертируем */
