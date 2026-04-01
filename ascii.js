@@ -1427,11 +1427,16 @@ let DITHER_ENABLED = false;
     const overlay = ensureArgOverlay();
     const layer = overlay.querySelector('#argSceneCountdownLayer');
     if (!layer) return;
-    for (const value of ['3', '2', '1']) {
-      layer.textContent = value;
-      await sleep(ARG_SCENE_TIMINGS.countdownStepMs);
+    layer.classList.add('arg-scene-countdown--dim');
+    try {
+      for (const value of ['3', '2', '1']) {
+        layer.textContent = value;
+        await sleep(ARG_SCENE_TIMINGS.countdownStepMs);
+      }
+      layer.textContent = '';
+    } finally {
+      layer.classList.remove('arg-scene-countdown--dim');
     }
-    layer.textContent = '';
   }
 
   function clamp(value, min, max) {
@@ -1492,9 +1497,10 @@ let DITHER_ENABLED = false;
         now * ARG_PONG.visorBodySwaySpeed * 1.21 + argPongState.visorBodyPhaseSway * 1.24
       ) * 0.16;
       visorBody.style.transform = `translate(0px, ${visorBodyShakeY}px) rotate(${bodyRotate}deg) scale(${bodyScale + bodySqueeze}, ${bodyScale - bodySqueeze * 0.75})`;
-      const eyeScale = 1 + Math.sin(now * ARG_PONG.visorEyeBreathScaleSpeed + argPongState.visorEyePhaseX) * ARG_PONG.visorEyeBreathScaleAmp;
+      const eyeScale = 1.1 + Math.sin(now * ARG_PONG.visorEyeBreathScaleSpeed + argPongState.visorEyePhaseX) * ARG_PONG.visorEyeBreathScaleAmp;
+      const pupilScale = 1.1;
       visorEye.style.transform = `translate(${visorEyeX}px, ${visorEyeY}px) scale(${eyeScale})`;
-      visorPupil.style.transform = `translate(${visorPupilX}px, ${visorPupilY}px)`;
+      visorPupil.style.transform = `translate(${visorPupilX}px, ${visorPupilY}px) scale(${pupilScale})`;
       const rect = overlay.getBoundingClientRect();
       renderFightAsciiFrame({
         rect,
@@ -1508,6 +1514,7 @@ let DITHER_ENABLED = false;
         visorEyeX,
         visorEyeY,
         eyeScale,
+        pupilScale,
         visorPupilX,
         visorPupilY
       });
@@ -1759,6 +1766,7 @@ let DITHER_ENABLED = false;
       visorEyeX = 0,
       visorEyeY = 0,
       eyeScale = 1,
+      pupilScale = 1,
       visorPupilX = 0,
       visorPupilY = 0
     } = {}) => {
@@ -1809,7 +1817,9 @@ let DITHER_ENABLED = false;
         });
         drawArgBossLayer(compositeCtx, argBossAscii.pupilImage, drawRects.pupil, {
           tx: visorPupilX * dpr,
-          ty: visorPupilY * dpr
+          ty: visorPupilY * dpr,
+          scaleX: pupilScale,
+          scaleY: pupilScale
         });
         compositeCtx.restore();
       }
@@ -2113,9 +2123,10 @@ let DITHER_ENABLED = false;
         now * ARG_PONG.visorBodySwaySpeed * 1.21 + argPongState.visorBodyPhaseSway * 1.24
       );
       visorBody.style.transform = `translate(${visorBodyX}px, ${visorBodyY}px) rotate(${bodyRotate}deg) scale(${bodyScale + bodySqueeze}, ${bodyScale - bodySqueeze * 0.75})`;
-      const eyeScale = 1 + Math.sin(now * ARG_PONG.visorEyeBreathScaleSpeed + argPongState.visorEyePhaseX) * ARG_PONG.visorEyeBreathScaleAmp;
+      const eyeScale = 1.1 + Math.sin(now * ARG_PONG.visorEyeBreathScaleSpeed + argPongState.visorEyePhaseX) * ARG_PONG.visorEyeBreathScaleAmp;
+      const pupilScale = 1.1;
       visorEye.style.transform = `translate(${visorEyeX}px, ${visorEyeY}px) scale(${eyeScale})`;
-      visorPupil.style.transform = `translate(${visorPupilX}px, ${visorPupilY}px)`;
+      visorPupil.style.transform = `translate(${visorPupilX}px, ${visorPupilY}px) scale(${pupilScale})`;
 
       renderFightAsciiFrame({
         rect,
@@ -2129,6 +2140,7 @@ let DITHER_ENABLED = false;
         visorEyeX,
         visorEyeY,
         eyeScale,
+        pupilScale,
         visorPupilX,
         visorPupilY
       });
@@ -2279,12 +2291,12 @@ let DITHER_ENABLED = false;
     visorEye.className = 'arg-scene-boss-layer arg-scene-boss-layer--eye';
     visorEye.src = ARG_SCENE_ASSETS.visorEye;
     visorEye.alt = '';
-    visorEye.hidden = true;
+    visorEye.hidden = false;
     const visorPupil = document.createElement('img');
     visorPupil.className = 'arg-scene-boss-layer arg-scene-boss-layer--pupil';
     visorPupil.src = ARG_SCENE_ASSETS.visorPupil;
     visorPupil.alt = '';
-    visorPupil.hidden = true;
+    visorPupil.hidden = false;
     eyeLayer.appendChild(visorBody);
     eyeLayer.appendChild(visorEye);
     eyeLayer.appendChild(visorPupil);
