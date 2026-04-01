@@ -789,6 +789,7 @@ body:not(.visor-text)[data-mode="live"] .toolbar{
 
 body:not(.visor-text)[data-mode="live"] .modebar{
   bottom: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 body:not(.visor-text)[data-mode="live"] .cam-controls{
