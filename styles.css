@@ -1406,8 +1406,8 @@ input[type="color"] {
   z-index:1;
   pointer-events:none;
   background-color:var(--start-easter-eye-color);
-  -webkit-mask: url('assets/VISOREYE.png') center / min(86vmin, 76vw) auto no-repeat;
-  mask: url('assets/VISOREYE.png') center / min(86vmin, 76vw) auto no-repeat;
+  -webkit-mask: url('assets/visoreyebig.png') center / min(86vmin, 76vw) auto no-repeat;
+  mask: url('assets/visoreyebig.png') center / min(86vmin, 76vw) auto no-repeat;
 }
 
 .start-easter-eye-layer[hidden]{
