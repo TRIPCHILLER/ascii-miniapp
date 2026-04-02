@@ -1385,15 +1385,42 @@ input[type="color"] {
   color:var(--start-menu-fg);
   font-family:'PxPlus IBM VGA', monospace;
   font-size:21px;
+  overflow:hidden;
 }
 
 .start-shell{
+  position:relative;
+  z-index:2;
   width:100%;
   min-height:100dvh;
   padding:14px 4px 10px;
   display:flex;
   flex-direction:column;
   gap:10px;
+}
+
+.start-easter-eye-layer{
+  --start-easter-eye-color:#000000;
+  position:absolute;
+  inset:0;
+  z-index:1;
+  pointer-events:none;
+  background-color:var(--start-easter-eye-color);
+  -webkit-mask: url('assets/VISOREYE.png') center / min(86vmin, 76vw) auto no-repeat;
+  mask: url('assets/VISOREYE.png') center / min(86vmin, 76vw) auto no-repeat;
+}
+
+.start-easter-eye-layer[hidden]{
+  display:none !important;
+}
+
+.start-easter-roulette-shake{
+  animation:start-easter-roulette-shake 80ms linear 1;
+}
+
+@keyframes start-easter-roulette-shake{
+  0%{ transform:translate(0, 0); }
+  100%{ transform:translate(var(--start-easter-shake-x, 0px), var(--start-easter-shake-y, 0px)); }
 }
 
 .start-frame-stack{
