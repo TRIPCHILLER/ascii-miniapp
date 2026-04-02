@@ -1496,13 +1496,27 @@ let DITHER_ENABLED = false;
       argPongState.visorShiftY += (0 - argPongState.visorShiftY) * 0.2;
       argPongState.visorEyeShiftX += (0 - argPongState.visorEyeShiftX) * 0.22;
       argPongState.visorEyeShiftY += (0 - argPongState.visorEyeShiftY) * 0.22;
-      const visorBodyShakeY = 0;
-      const visorEyeX = 0;
-      const visorEyeY = 0;
+      const visorBodyOffsetX =
+        Math.sin(now * ARG_PONG.visorBodyDriftSpeedX + argPongState.visorBodyPhaseX) * ARG_PONG.visorBodyDriftAmpXPx
+        + Math.cos(now * ARG_PONG.visorBodyMicroJitterSpeedX + argPongState.visorBodyPhaseY * 0.67) * ARG_PONG.visorBodyMicroJitterAmpXPx
+        + Math.sin(now * ARG_PONG.visorBodyPulseSpeedX + argPongState.visorBodyPhaseBreath) * ARG_PONG.visorBodyPulseAmpXPx;
+      const visorBodyOffsetY =
+        Math.cos(now * ARG_PONG.visorBodyDriftSpeedY + argPongState.visorBodyPhaseY) * ARG_PONG.visorBodyDriftAmpYPx
+        + Math.sin(now * ARG_PONG.visorBodyMicroJitterSpeedY + argPongState.visorBodyPhaseX * 0.83) * ARG_PONG.visorBodyMicroJitterAmpYPx
+        + Math.cos(now * ARG_PONG.visorBodyPulseSpeedY + argPongState.visorBodyPhaseBreath * 1.19) * ARG_PONG.visorBodyPulseAmpYPx;
+      const eyeJitterX =
+        Math.sin(now * 0.028 + argPongState.visorEyePhaseX * 1.7) * 0.48
+        + Math.cos(now * 0.043 + argPongState.visorEyePhaseY * 0.9) * 0.38;
+      const eyeJitterY =
+        Math.cos(now * 0.031 + argPongState.visorEyePhaseY * 1.4) * 0.42
+        + Math.sin(now * 0.047 + argPongState.visorEyePhaseX * 0.8) * 0.34;
+      const visorBodyShakeY = visorBodyOffsetY;
+      const visorEyeX = eyeJitterX;
+      const visorEyeY = eyeJitterY;
       argPongState.visorPupilShiftX += (0 - argPongState.visorPupilShiftX) * ARG_PONG.visorPupilFollowLerp;
       argPongState.visorPupilShiftY += (0 - argPongState.visorPupilShiftY) * ARG_PONG.visorPupilFollowLerp;
-      const visorPupilX = visorEyeX;
-      const visorPupilY = visorEyeY;
+      const visorPupilX = visorEyeX * 1.08;
+      const visorPupilY = visorEyeY * 1.08;
       const bodyScale = 1 + Math.sin(
         now * ARG_PONG.visorBodyScaleBreathSpeed + argPongState.visorBodyPhaseBreath
       ) * (ARG_PONG.visorBodyScaleBreathAmp * 1.65);
@@ -1518,7 +1532,7 @@ let DITHER_ENABLED = false;
       const bodyBandSway = Math.cos(
         now * ARG_PONG.visorBodySwaySpeed * 1.21 + argPongState.visorBodyPhaseSway * 1.24
       );
-      visorBody.style.transform = `translate(0px, ${visorBodyShakeY}px) rotate(${bodyRotate}deg) scale(${bodyScale + bodySqueeze}, ${bodyScale - bodySqueeze * 0.75})`;
+      visorBody.style.transform = `translate(${visorBodyOffsetX}px, ${visorBodyShakeY}px) rotate(${bodyRotate}deg) scale(${bodyScale + bodySqueeze}, ${bodyScale - bodySqueeze * 0.75})`;
       const eyeScale = 1.1 + Math.sin(now * ARG_PONG.visorEyeBreathScaleSpeed + argPongState.visorEyePhaseX) * ARG_PONG.visorEyeBreathScaleAmp;
       const pupilScale = 1.1;
       visorEye.style.transform = `translate(${visorEyeX}px, ${visorEyeY}px) scale(${eyeScale})`;
@@ -1526,7 +1540,7 @@ let DITHER_ENABLED = false;
       const rect = overlay.getBoundingClientRect();
       renderFightAsciiFrame({
         rect,
-        visorBodyX: 0,
+        visorBodyX: visorBodyOffsetX,
         visorBodyY: visorBodyShakeY,
         bodyRotate,
         bodyScaleX: bodyScale + bodySqueeze,
@@ -2337,6 +2351,8 @@ let DITHER_ENABLED = false;
 
     argPongState.visorShiftX = 0;
     argPongState.visorShiftY = 0;
+    argPongState.visorVX = 0;
+    argPongState.visorVY = 0;
     argPongState.visorEyeShiftX = 0;
     argPongState.visorEyeShiftY = 0;
     argPongState.visorPupilRecoilX = 0;
