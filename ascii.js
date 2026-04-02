@@ -2724,6 +2724,10 @@ let DITHER_ENABLED = false;
     tgHaptic('impactOccurred', 'light');
     if (navigator.vibrate) navigator.vibrate(35);
   }
+  function triggerStartEasterEggMicroVibration() {
+    tgHaptic('impactOccurred', 'light');
+    if (navigator.vibrate) navigator.vibrate(12);
+  }
 
   function bindModeChooserOnce() {
     if (!app.ui.modeChooser || modeChooserListenerBound) return;
@@ -2871,6 +2875,7 @@ let DITHER_ENABLED = false;
         }
         applyRandomStartMenuPreset();
         updateEyeOverlayBySound(soundIndex, startMenuCurrentBg);
+        triggerStartEasterEggMicroVibration();
         if (startShell) {
           const offsetX = (Math.random() - 0.5) * 3.2;
           const offsetY = (Math.random() - 0.5) * 3.2;
