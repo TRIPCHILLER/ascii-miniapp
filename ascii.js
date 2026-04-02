@@ -931,6 +931,9 @@ let DITHER_ENABLED = false;
   let startMenuCurrentBg = '#000000';
   let startEasterEggRouletteTimer = 0;
   let startEasterEggRouletteStartAt = 0;
+  let startWordGlitchTimer = 0;
+  let startWordGlitchBrokenChars = 0;
+  let startWordGlitchFullChaos = false;
   let startLaunchSoundPlayed = false;
   let startLaunchSoundPendingAfterUnlock = false;
   let startPrintNextSound = 0;
@@ -2650,6 +2653,9 @@ let DITHER_ENABLED = false;
     if (startDateTimer) { clearInterval(startDateTimer); startDateTimer = null; }
     if (startBlinkTimer) { clearInterval(startBlinkTimer); startBlinkTimer = null; }
     if (startTypeTimer) { clearInterval(startTypeTimer); startTypeTimer = null; }
+    if (startWordGlitchTimer) { clearInterval(startWordGlitchTimer); startWordGlitchTimer = 0; }
+    startWordGlitchBrokenChars = 0;
+    startWordGlitchFullChaos = false;
   }
 
   function stopStartBlinkTickerForArg() {
@@ -2724,6 +2730,76 @@ let DITHER_ENABLED = false;
       }
       if (startShell) startShell.classList.remove('start-easter-roulette-shake');
     };
+    const GLITCH_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*+-?/\\|';
+    const getRandomGlitchChar = () => GLITCH_CHARS[Math.floor(Math.random() * GLITCH_CHARS.length)];
+    const glitchWord = (word, brokenChars, fullChaos) => {
+      if (!word || !/\S/.test(word)) return word;
+      const chars = word.split('');
+      const available = [];
+      for (let i = 0; i < chars.length; i += 1) {
+        if (chars[i] !== ' ') available.push(i);
+      }
+      if (!available.length) return word;
+      if (fullChaos) {
+        for (const idx of available) chars[idx] = getRandomGlitchChar();
+        return chars.join('');
+      }
+      const target = Math.min(available.length, Math.max(1, brokenChars));
+      const used = new Set();
+      while (used.size < target) {
+        const idx = available[Math.floor(Math.random() * available.length)];
+        used.add(idx);
+      }
+      used.forEach((idx) => {
+        chars[idx] = getRandomGlitchChar();
+      });
+      return chars.join('');
+    };
+    const collectGlitchTargets = () => {
+      if (!app.ui.modeChooser) return [];
+      return Array.from(app.ui.modeChooser.querySelectorAll('*')).filter((el) => {
+        if (el === eyeOverlay) return false;
+        if (el.children.length > 0) return false;
+        const text = el.textContent || '';
+        return text.trim().length > 0;
+      });
+    };
+    const applyWordGlitchTick = () => {
+      const targets = collectGlitchTargets();
+      for (const el of targets) {
+        const source = el.textContent || '';
+        if (!source.trim()) continue;
+        const glitched = source
+          .split(/(\s+)/)
+          .map((part) => (/\s+/.test(part)
+            ? part
+            : glitchWord(part, startWordGlitchBrokenChars, startWordGlitchFullChaos)))
+          .join('');
+        el.textContent = glitched;
+      }
+    };
+    const startWordGlitchFx = () => {
+      if (startWordGlitchTimer) return;
+      applyWordGlitchTick();
+      startWordGlitchTimer = setInterval(applyWordGlitchTick, 500);
+    };
+    const stopWordGlitchFx = () => {
+      if (startWordGlitchTimer) {
+        clearInterval(startWordGlitchTimer);
+        startWordGlitchTimer = 0;
+      }
+      startWordGlitchBrokenChars = 0;
+      startWordGlitchFullChaos = false;
+    };
+    const updateWordGlitchStage = (soundIndex) => {
+      if (soundIndex < 5) return;
+      if (soundIndex >= START_EASTER_EGG_MAX_SOUND) {
+        startWordGlitchFullChaos = true;
+      } else {
+        startWordGlitchBrokenChars = Math.max(startWordGlitchBrokenChars, soundIndex - 4);
+      }
+      startWordGlitchFx();
+    };
     const startEasterRoulette = (soundIndex) => {
       stopEasterRoulette();
       startEasterEggRouletteStartAt = performance.now();
@@ -2791,10 +2867,15 @@ let DITHER_ENABLED = false;
       const unlock = () => {
         startEasterEggPlaying = false;
         stopEasterRoulette();
+        if (startEasterEggDone || soundIndex >= START_EASTER_EGG_MAX_SOUND) {
+          stopWordGlitchFx();
+        }
       };
 
       updateEyeOverlayBySound(soundIndex, startMenuCurrentBg);
+      updateWordGlitchStage(soundIndex);
       if (soundIndex === START_EASTER_EGG_MAX_SOUND) {
+        startWordGlitchFullChaos = true;
         startEasterRoulette(soundIndex);
       }
 
