@@ -938,6 +938,7 @@ let DITHER_ENABLED = false;
   let startWordGlitchTimer = 0;
   let startWordGlitchBrokenChars = 0;
   let startWordGlitchFullChaos = false;
+  let startWordGlitchSourceMap = null;
   let startLaunchSoundPlayed = false;
   let startLaunchSoundPendingAfterUnlock = false;
   let startPrintNextSound = 0;
@@ -2687,6 +2688,7 @@ let DITHER_ENABLED = false;
     if (startWordGlitchTimer) { clearInterval(startWordGlitchTimer); startWordGlitchTimer = 0; }
     startWordGlitchBrokenChars = 0;
     startWordGlitchFullChaos = false;
+    startWordGlitchSourceMap = null;
   }
 
   function stopStartBlinkTickerForArg() {
@@ -2763,14 +2765,14 @@ let DITHER_ENABLED = false;
     };
     const GLITCH_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*+-?/\\|';
     const getRandomGlitchChar = () => GLITCH_CHARS[Math.floor(Math.random() * GLITCH_CHARS.length)];
-    const glitchWord = (word, brokenChars, fullChaos) => {
-      if (!word || !/\S/.test(word)) return word;
-      const chars = word.split('');
+    const glitchTextNodeValue = (value, brokenChars, fullChaos) => {
+      if (!value || !/\S/.test(value)) return value;
+      const chars = value.split('');
       const available = [];
       for (let i = 0; i < chars.length; i += 1) {
         if (chars[i] !== ' ') available.push(i);
       }
-      if (!available.length) return word;
+      if (!available.length) return value;
       if (fullChaos) {
         for (const idx of available) chars[idx] = getRandomGlitchChar();
         return chars.join('');
@@ -2806,16 +2808,15 @@ let DITHER_ENABLED = false;
     };
     const applyWordGlitchTick = () => {
       const targets = collectGlitchTargets();
+      if (!startWordGlitchSourceMap) startWordGlitchSourceMap = new WeakMap();
       for (const node of targets) {
-        const source = node.nodeValue || '';
-        if (!source.trim()) continue;
-        const glitched = source
-          .split(/(\s+)/)
-          .map((part) => (/\s+/.test(part)
-            ? part
-            : glitchWord(part, startWordGlitchBrokenChars, startWordGlitchFullChaos)))
-          .join('');
-        node.nodeValue = glitched;
+        const raw = node.nodeValue || '';
+        if (!raw.trim()) continue;
+        const source = startWordGlitchSourceMap.get(node) ?? raw;
+        if (!startWordGlitchSourceMap.has(node)) {
+          startWordGlitchSourceMap.set(node, source);
+        }
+        node.nodeValue = glitchTextNodeValue(source, startWordGlitchBrokenChars, startWordGlitchFullChaos);
       }
     };
     const startWordGlitchFx = () => {
@@ -2830,6 +2831,7 @@ let DITHER_ENABLED = false;
       }
       startWordGlitchBrokenChars = 0;
       startWordGlitchFullChaos = false;
+      startWordGlitchSourceMap = null;
     };
     const updateWordGlitchStage = (soundIndex) => {
       if (soundIndex < 5) return;
