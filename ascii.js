@@ -305,6 +305,7 @@ const ARG_SCENE_ASSETS = {
   visorPupil: 'assets/VISORPUPIL.png'
 };
 const FINGERPRINT_GATE_HOLD_MS = 500;
+const FINGERPRINT_GATE_ACTIVE_MS = 1000;
 const FINGERPRINT_GATE_TYPE_MS = 1000;
 const FINGERPRINT_GATE_BLINK_MS = 1000;
 const FINGERPRINT_GATE_TEXT_TOP = 'ПРИЛОЖИТЕ ПАЛЕЦ\nК СКАНЕРУ ОТПЕЧАТКОВ';
@@ -2521,7 +2522,9 @@ let DITHER_ENABLED = false;
           topText.classList.add('is-hidden');
           bottomText.classList.add('is-hidden');
           playUiSound(`assets/sounds/authorisation.mp3?v=${SOUND_ASSET_VERSION}`);
-          finish();
+          setTimeout(() => {
+            finish();
+          }, FINGERPRINT_GATE_ACTIVE_MS);
         }, FINGERPRINT_GATE_HOLD_MS);
       };
 
