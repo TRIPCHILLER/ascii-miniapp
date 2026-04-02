@@ -1514,7 +1514,11 @@ input[type="color"] {
 }
 
 .start-mode-btn:hover,
-.start-mode-btn:focus,
+.start-mode-btn:focus{
+  background:var(--start-menu-fg);
+  color:var(--start-menu-bg);
+}
+
 .start-mode-btn:active{
   background:#bfbfbf;
   color:var(--start-menu-bg);
