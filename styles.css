@@ -1314,6 +1314,63 @@ input[type="color"] {
   pointer-events: none !important;
 }
 
+.fingerprint-gate{
+  position:fixed;
+  inset:0;
+  z-index:130000;
+  background:#000;
+  color:#fff;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:clamp(18px, 2.2vh, 34px);
+  font-family:'PxPlus IBM VGA', monospace;
+  text-align:center;
+}
+
+.fingerprint-gate[hidden]{
+  display:none !important;
+}
+
+.fingerprint-gate.is-fading{
+  opacity:0;
+  transition:opacity .12s linear;
+}
+
+.fingerprint-gate__text{
+  white-space:pre-line;
+  line-height:1.25;
+  font-size:clamp(20px, 2.8vw, 28px);
+  min-height:2.8em;
+}
+
+.fingerprint-gate__touch{
+  width:clamp(132px, 24vw, 192px);
+  height:clamp(164px, 30vw, 228px);
+  border:0;
+  background:transparent;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:0;
+  cursor:pointer;
+  touch-action:manipulation;
+}
+
+.fingerprint-gate__touch img{
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  user-select:none;
+  -webkit-user-drag:none;
+  pointer-events:none;
+}
+
+.fingerprint-gate__text.is-hidden{
+  visibility:hidden;
+}
+
 
 .mode-chooser{
   --start-menu-fg:#fff;
