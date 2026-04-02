@@ -1491,30 +1491,28 @@ let DITHER_ENABLED = false;
       argPongState.visorShiftY += (0 - argPongState.visorShiftY) * 0.2;
       argPongState.visorEyeShiftX += (0 - argPongState.visorEyeShiftX) * 0.22;
       argPongState.visorEyeShiftY += (0 - argPongState.visorEyeShiftY) * 0.22;
-      const visorEyeDriftX = Math.sin(now * ARG_PONG.visorEyeDriftSpeedX + argPongState.visorEyePhaseX) * ARG_PONG.visorEyeDriftAmpXPx;
-      const visorEyeDriftY = Math.cos(now * ARG_PONG.visorEyeDriftSpeedY + argPongState.visorEyePhaseY) * ARG_PONG.visorEyeDriftAmpYPx;
       const visorBodyShakeY = 0;
-      const visorEyeX = argPongState.visorEyeShiftX + visorEyeDriftX;
-      const visorEyeY = argPongState.visorEyeShiftY + visorEyeDriftY;
+      const visorEyeX = 0;
+      const visorEyeY = 0;
       argPongState.visorPupilShiftX += (0 - argPongState.visorPupilShiftX) * ARG_PONG.visorPupilFollowLerp;
       argPongState.visorPupilShiftY += (0 - argPongState.visorPupilShiftY) * ARG_PONG.visorPupilFollowLerp;
-      const visorPupilX = visorEyeX + argPongState.visorPupilShiftX;
-      const visorPupilY = visorEyeY + argPongState.visorPupilShiftY;
+      const visorPupilX = visorEyeX;
+      const visorPupilY = visorEyeY;
       const bodyScale = 1 + Math.sin(
         now * ARG_PONG.visorBodyScaleBreathSpeed + argPongState.visorBodyPhaseBreath
       ) * (ARG_PONG.visorBodyScaleBreathAmp * 1.65);
-      const bodySqueeze = Math.sin(
+      const bodySqueeze = Math.cos(
         now * ARG_PONG.visorBodySqueezeSpeed + argPongState.visorBodyPhaseSway * 0.91
       ) * (ARG_PONG.visorBodySqueezeAmp * 1.35);
       const bodyRotate = Math.sin(
         now * ARG_PONG.visorBodySwaySpeed + argPongState.visorBodyPhaseSway
-      ) * ARG_PONG.visorBodySwayDegAmp * 1.8;
-      const bodyBandPulse = 1 + Math.sin(
+      ) * 0.28;
+      const bodyBandPulse = Math.sin(
         now * ARG_PONG.visorBodyScaleBreathSpeed * 1.14 + argPongState.visorBodyPhaseBreath * 1.65
-      ) * 0.24;
-      const bodyBandSway = Math.sin(
+      );
+      const bodyBandSway = Math.cos(
         now * ARG_PONG.visorBodySwaySpeed * 1.21 + argPongState.visorBodyPhaseSway * 1.24
-      ) * 0.16;
+      );
       visorBody.style.transform = `translate(0px, ${visorBodyShakeY}px) rotate(${bodyRotate}deg) scale(${bodyScale + bodySqueeze}, ${bodyScale - bodySqueeze * 0.75})`;
       const eyeScale = 1.1 + Math.sin(now * ARG_PONG.visorEyeBreathScaleSpeed + argPongState.visorEyePhaseX) * ARG_PONG.visorEyeBreathScaleAmp;
       const pupilScale = 1.1;
@@ -1610,7 +1608,7 @@ let DITHER_ENABLED = false;
     return clamp(projectedX, paddleHalfNorm, 1 - paddleHalfNorm);
   }
 
-  function startArgPong({ overlay, ballStickLayer, ball, topStick, bottomStick, visorBody, visorEye, visorPupil, scoreLayer, aiScoreEl, playerScoreEl }) {
+  function startArgPong({ overlay, ballStickLayer, ball, topStick, bottomStick, visorBody, visorEye, visorPupil, scoreLayer, aiScoreEl, playerScoreEl, preserveBossState = false }) {
     if (!overlay || !ballStickLayer || !ball || !topStick || !bottomStick || !visorBody || !visorEye || !visorPupil || !scoreLayer || !aiScoreEl || !playerScoreEl) return;
     if (argPongRafId) cancelAnimationFrame(argPongRafId);
     argPongState.running = true;
@@ -1624,22 +1622,24 @@ let DITHER_ENABLED = false;
     argPongState.syncActive = false;
     argPongState.syncStartedAt = 0;
     argPongState.targetPlayerX = 0.5;
-    argPongState.visorShiftX = 0;
-    argPongState.visorShiftY = 0;
-    argPongState.visorEyeShiftX = 0;
-    argPongState.visorEyeShiftY = 0;
-    argPongState.visorPupilRecoilX = 0;
-    argPongState.visorPupilRecoilY = 0;
-    argPongState.visorPupilRecoilVX = 0;
-    argPongState.visorPupilRecoilVY = 0;
-    argPongState.visorPupilShiftX = 0;
-    argPongState.visorPupilShiftY = 0;
-    argPongState.visorBodyPhaseX = Math.random() * Math.PI * 2;
-    argPongState.visorBodyPhaseY = Math.random() * Math.PI * 2;
-    argPongState.visorBodyPhaseBreath = Math.random() * Math.PI * 2;
-    argPongState.visorBodyPhaseSway = Math.random() * Math.PI * 2;
-    argPongState.visorEyePhaseX = Math.random() * Math.PI * 2;
-    argPongState.visorEyePhaseY = Math.random() * Math.PI * 2;
+    if (!preserveBossState) {
+      argPongState.visorShiftX = 0;
+      argPongState.visorShiftY = 0;
+      argPongState.visorEyeShiftX = 0;
+      argPongState.visorEyeShiftY = 0;
+      argPongState.visorPupilRecoilX = 0;
+      argPongState.visorPupilRecoilY = 0;
+      argPongState.visorPupilRecoilVX = 0;
+      argPongState.visorPupilRecoilVY = 0;
+      argPongState.visorPupilShiftX = 0;
+      argPongState.visorPupilShiftY = 0;
+      argPongState.visorBodyPhaseX = Math.random() * Math.PI * 2;
+      argPongState.visorBodyPhaseY = Math.random() * Math.PI * 2;
+      argPongState.visorBodyPhaseBreath = Math.random() * Math.PI * 2;
+      argPongState.visorBodyPhaseSway = Math.random() * Math.PI * 2;
+      argPongState.visorEyePhaseX = Math.random() * Math.PI * 2;
+      argPongState.visorEyePhaseY = Math.random() * Math.PI * 2;
+    }
     argPongState.visorEngineShakeX = 0;
     argPongState.visorEngineShakeY = 0;
     argPongState.visorEngineShakeTargetX = 0;
@@ -2305,7 +2305,7 @@ let DITHER_ENABLED = false;
     visorBody.className = 'arg-scene-boss-layer arg-scene-boss-layer--body';
     visorBody.src = ARG_SCENE_ASSETS.visorBody;
     visorBody.alt = '';
-    visorBody.hidden = true;
+    visorBody.hidden = false;
     const visorEye = document.createElement('img');
     visorEye.className = 'arg-scene-boss-layer arg-scene-boss-layer--eye';
     visorEye.src = ARG_SCENE_ASSETS.visorEye;
@@ -2357,7 +2357,7 @@ let DITHER_ENABLED = false;
 
     await sleep(ARG_SCENE_TIMINGS.eyeToCountdownMs);
     await runArgCountdown();
-    startArgPong({ overlay, ballStickLayer, ball, topStick, bottomStick, visorBody, visorEye, visorPupil, scoreLayer, aiScoreEl, playerScoreEl });
+    startArgPong({ overlay, ballStickLayer, ball, topStick, bottomStick, visorBody, visorEye, visorPupil, scoreLayer, aiScoreEl, playerScoreEl, preserveBossState: true });
 
     startArgSceneRunning = false;
   }
