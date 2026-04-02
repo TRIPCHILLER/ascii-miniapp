@@ -2875,7 +2875,9 @@ let DITHER_ENABLED = false;
     const applyStartMenuPalette = ({ text, bg, presetId = null } = {}) => {
       const safeText = toHex(text || '#ffffff');
       const safeBg = toHex(bg || '#000000');
+      const pressedText = darkenHex(safeText, 0.25);
       app.ui.modeChooser.style.setProperty('--start-menu-fg', safeText);
+      app.ui.modeChooser.style.setProperty('--start-menu-fg-pressed', pressedText);
       app.ui.modeChooser.style.setProperty('--start-menu-bg', safeBg);
       startMenuCurrentBg = safeBg;
       startMenuPresetId = presetId;
@@ -3194,6 +3196,16 @@ function isFullscreenLike() {
     else if (max === g) hOut = ((b - r) / d) + 2;
     else hOut = ((r - g) / d) + 4;
     return (hOut * 60 + 360) % 360 / 360;
+  };
+  const darkenHex = (hex, amount = 0.25) => {
+    const h = norm(hex);
+    if (h.length < 6) return toHex(hex || '#000000');
+    const factor = 1 - Math.min(1, Math.max(0, amount));
+    const to2 = (n) => Math.round(Math.min(255, Math.max(0, n))).toString(16).padStart(2, '0');
+    const r = parseInt(h.slice(0, 2), 16) * factor;
+    const g = parseInt(h.slice(2, 4), 16) * factor;
+    const b = parseInt(h.slice(4, 6), 16) * factor;
+    return `#${to2(r)}${to2(g)}${to2(b)}`;
   };
   // разложить пару на bg/text (тёмный/светлый)
   function splitToBgText(pair){
