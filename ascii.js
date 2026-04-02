@@ -928,6 +928,9 @@ let DITHER_ENABLED = false;
   let argSceneActive = false;
   let startArgSessionLocked = false;
   let startMenuPresetId = null;
+  let startMenuCurrentBg = '#000000';
+  let startEasterEggRouletteTimer = 0;
+  let startEasterEggRouletteStartAt = 0;
   let startLaunchSoundPlayed = false;
   let startLaunchSoundPendingAfterUnlock = false;
   let startPrintNextSound = 0;
@@ -2662,11 +2665,96 @@ let DITHER_ENABLED = false;
   function bindModeChooserOnce() {
     if (!app.ui.modeChooser || modeChooserListenerBound) return;
     const footerSelector = '.start-footer-box, .start-footer-title, .start-footer-sub';
+    const eyeOverlay = document.createElement('div');
+    eyeOverlay.className = 'start-easter-eye-layer';
+    eyeOverlay.hidden = true;
+    app.ui.modeChooser.appendChild(eyeOverlay);
+    const startShell = app.ui.modeChooser.querySelector('.start-shell');
+    if (startShell) startShell.classList.remove('start-easter-roulette-shake');
+
+    const clampColor = (value) => Math.max(0, Math.min(255, value));
+    const hexToRgb = (hex) => {
+      const safe = toHex(hex || '#000000').replace('#', '');
+      const normalized = safe.length === 3
+        ? safe.split('').map((ch) => ch + ch).join('')
+        : safe;
+      const num = parseInt(normalized, 16);
+      return {
+        r: (num >> 16) & 255,
+        g: (num >> 8) & 255,
+        b: num & 255
+      };
+    };
+    const rgbToHexLocal = ({ r, g, b }) => `#${[r, g, b]
+      .map((val) => clampColor(Math.round(val)).toString(16).padStart(2, '0'))
+      .join('')}`;
+    const adjustColorBrightness = (hex, ratio) => {
+      const rgb = hexToRgb(hex);
+      const isBlack = rgb.r === 0 && rgb.g === 0 && rgb.b === 0;
+      if (isBlack) {
+        const towardWhite = (c) => c + (255 - c) * ratio;
+        return rgbToHexLocal({ r: towardWhite(rgb.r), g: towardWhite(rgb.g), b: towardWhite(rgb.b) });
+      }
+      const towardDark = (c) => c * (1 - ratio);
+      return rgbToHexLocal({ r: towardDark(rgb.r), g: towardDark(rgb.g), b: towardDark(rgb.b) });
+    };
+    const getEyeShadeRatioBySound = (soundIndex) => {
+      const stage = Math.max(0, soundIndex - 4);
+      return Math.min(0.3, stage * 0.05);
+    };
+    const updateEyeOverlayBySound = (soundIndex, bgHex) => {
+      const ratio = getEyeShadeRatioBySound(soundIndex);
+      if (ratio <= 0) {
+        eyeOverlay.hidden = true;
+        eyeOverlay.style.removeProperty('--start-easter-eye-color');
+        return;
+      }
+      eyeOverlay.hidden = false;
+      eyeOverlay.style.setProperty('--start-easter-eye-color', adjustColorBrightness(bgHex, ratio));
+    };
+    const stopEasterRoulette = () => {
+      if (startEasterEggRouletteTimer) {
+        clearTimeout(startEasterEggRouletteTimer);
+        startEasterEggRouletteTimer = 0;
+      }
+      if (startShell) startShell.classList.remove('start-easter-roulette-shake');
+    };
+    const startEasterRoulette = (soundIndex) => {
+      stopEasterRoulette();
+      startEasterEggRouletteStartAt = performance.now();
+      const tick = () => {
+        if (!startEasterEggPlaying || startEasterEggNextSound !== soundIndex) {
+          stopEasterRoulette();
+          return;
+        }
+        applyRandomStartMenuPreset();
+        updateEyeOverlayBySound(soundIndex, startMenuCurrentBg);
+        if (startShell) {
+          const offsetX = (Math.random() - 0.5) * 3.2;
+          const offsetY = (Math.random() - 0.5) * 3.2;
+          startShell.style.setProperty('--start-easter-shake-x', `${offsetX.toFixed(2)}px`);
+          startShell.style.setProperty('--start-easter-shake-y', `${offsetY.toFixed(2)}px`);
+          startShell.classList.remove('start-easter-roulette-shake');
+          void startShell.offsetWidth;
+          startShell.classList.add('start-easter-roulette-shake');
+        }
+
+        const elapsed = performance.now() - startEasterEggRouletteStartAt;
+        const phase = Math.min(1, elapsed / 1600);
+        const minDelay = 24;
+        const maxDelay = 170;
+        const nextDelay = minDelay + (maxDelay - minDelay) * phase;
+        startEasterEggRouletteTimer = setTimeout(tick, nextDelay);
+      };
+      tick();
+    };
+
     const applyStartMenuPalette = ({ text, bg, presetId = null } = {}) => {
       const safeText = toHex(text || '#ffffff');
       const safeBg = toHex(bg || '#000000');
       app.ui.modeChooser.style.setProperty('--start-menu-fg', safeText);
       app.ui.modeChooser.style.setProperty('--start-menu-bg', safeBg);
+      startMenuCurrentBg = safeBg;
       startMenuPresetId = presetId;
     };
     const applyRandomStartMenuPreset = () => {
@@ -2693,7 +2781,16 @@ let DITHER_ENABLED = false;
 
       startEasterEggPlaying = true;
       const audio = new Audio(src);
-      const unlock = () => { startEasterEggPlaying = false; };
+      const soundIndex = startEasterEggNextSound;
+      const unlock = () => {
+        startEasterEggPlaying = false;
+        stopEasterRoulette();
+      };
+
+      updateEyeOverlayBySound(soundIndex, startMenuCurrentBg);
+      if (soundIndex === START_EASTER_EGG_MAX_SOUND) {
+        startEasterRoulette(soundIndex);
+      }
 
       audio.addEventListener('ended', () => {
         startEasterEggNextSound += 1;
@@ -2722,22 +2819,25 @@ let DITHER_ENABLED = false;
       chooseVisorMode(btn.dataset.visorMode);
     });
 
-    if (typeof PointerEvent !== 'undefined') {
+      if (typeof PointerEvent !== 'undefined') {
       app.ui.modeChooser.addEventListener('pointerup', (e) => {
         if (!e.target.closest(footerSelector)) return;
         if (!playStartEasterEggSound()) return;
         applyRandomStartMenuPreset();
+        updateEyeOverlayBySound(startEasterEggNextSound, startMenuCurrentBg);
       });
     } else {
       app.ui.modeChooser.addEventListener('touchend', (e) => {
         if (!e.target.closest(footerSelector)) return;
         if (!playStartEasterEggSound()) return;
         applyRandomStartMenuPreset();
+        updateEyeOverlayBySound(startEasterEggNextSound, startMenuCurrentBg);
       }, { passive: true });
       app.ui.modeChooser.addEventListener('click', (e) => {
         if (!e.target.closest(footerSelector)) return;
         if (!playStartEasterEggSound()) return;
         applyRandomStartMenuPreset();
+        updateEyeOverlayBySound(startEasterEggNextSound, startMenuCurrentBg);
       });
     }
 
