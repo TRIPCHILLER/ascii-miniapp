@@ -16,6 +16,14 @@
   <link rel="stylesheet" href="styles.css?v=fit1" />
 </head>
 <body class="theme-dark">
+  <div id="fingerprintGate" class="fingerprint-gate" hidden>
+    <div class="fingerprint-gate__text fingerprint-gate__text--top" id="fingerprintGateTop"></div>
+    <button type="button" class="fingerprint-gate__touch" id="fingerprintGateTouch" aria-label="Сканер отпечатка">
+      <img id="fingerprintGateIcon" src="assets/fingerprintnoactive.svg" alt="" />
+    </button>
+    <div class="fingerprint-gate__text fingerprint-gate__text--bottom" id="fingerprintGateBottom"></div>
+  </div>
+
   <div id="modeChooser" class="mode-chooser" hidden>
     <div class="start-shell">
       <div class="start-datetime" id="startDateTime"></div>

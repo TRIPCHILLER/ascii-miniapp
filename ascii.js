@@ -267,7 +267,6 @@ function tgGoalFlashHaptic() {
 
 const TERM_RANGE_STEPS = 10;
 const START_EASTER_EGG_MAX_SOUND = 10;
-const START_EASTER_EGG_TEST_TAP_COUNT = 1;
 // Версия ассетов звуков для принудительного обновления кэша в WebView/браузере.
 const SOUND_ASSET_VERSION = '20260313-1';
 const START_EASTER_EGG_SOUNDS = Array.from(
@@ -304,6 +303,16 @@ const ARG_SCENE_ASSETS = {
   visorBody: 'assets/VISORBODY.png',
   visorEye: 'assets/VISOREYE.png',
   visorPupil: 'assets/VISORPUPIL.png'
+};
+const FINGERPRINT_GATE_HOLD_MS = 500;
+const FINGERPRINT_GATE_TYPE_MS = 1000;
+const FINGERPRINT_GATE_BLINK_MS = 1000;
+const FINGERPRINT_GATE_TEXT_TOP = 'ПРИЛОЖИТЕ ПАЛЕЦ\nК СКАНЕРУ ОТПЕЧАТКОВ';
+const FINGERPRINT_GATE_TEXT_BOTTOM = 'ДЛЯ ЗАПУСКА СИСТЕМЫ...';
+const FINGERPRINT_GATE_STATES = {
+  idle: 'assets/fingerprintnoactive.svg',
+  pressed: 'assets/fingerpintnoactiveturn.svg',
+  active: 'assets/fingerprintactive.svg'
 };
 const ARG_SCENE_TIMINGS = {
   afterBlackMs: 3000,
@@ -910,7 +919,7 @@ let DITHER_ENABLED = false;
   let startDateTimer = null;
   let startBlinkTimer = null;
   let startTypeTimer = null;
-  let startEasterEggNextSound = Math.max(1, START_EASTER_EGG_MAX_SOUND - START_EASTER_EGG_TEST_TAP_COUNT + 1);
+  let startEasterEggNextSound = 1;
   let startEasterEggPlaying = false;
   let startEasterEggDone = false;
   let startArgScenePending = false;
@@ -928,6 +937,10 @@ let DITHER_ENABLED = false;
   let audioUnlockListenerBound = false;
   let audioUnlockHandled = false;
   let audioUnlockProbe = null;
+  let fingerprintGateStarted = false;
+  let fingerprintGateAuthStarted = false;
+  let fingerprintGateHoldTimer = null;
+  let fingerprintGateBlinkTimer = null;
   let argPongRafId = 0;
   let argPongServeTimer = 0;
   let argPongFlashTimers = [];
@@ -2357,29 +2370,157 @@ let DITHER_ENABLED = false;
     } catch (_) {}
   }
 
+  function isTouchMobileStartup() {
+    const coarse = window.matchMedia?.('(pointer: coarse)')?.matches || false;
+    const hasTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    const smallViewport = Math.min(window.innerWidth || 0, window.innerHeight || 0) <= 1024;
+    return (coarse || hasTouch) && smallViewport;
+  }
+
+  function setFingerprintGateIcon(iconEl, src) {
+    if (!iconEl) return;
+    iconEl.src = src;
+  }
+
+  function animateFingerprintGateText(el, target, totalMs = 1000) {
+    if (!el) return Promise.resolve();
+    const noiseAlphabet = '0123456789АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ';
+    const chars = Array.from(target || '');
+    const nonSpaceCount = chars.reduce((acc, ch) => acc + (ch === ' ' || ch === '\n' ? 0 : 1), 0);
+    const stepMs = Math.max(16, Math.round(totalMs / Math.max(1, nonSpaceCount)));
+
+    return new Promise((resolve) => {
+      let i = 0;
+      el.textContent = '|';
+      const timer = setInterval(() => {
+        if (i >= chars.length) {
+          clearInterval(timer);
+          el.textContent = target;
+          resolve();
+          return;
+        }
+        const ch = chars[i];
+        if (ch === '\n' || ch === ' ') {
+          i += 1;
+          el.textContent = `${target.slice(0, i)}|`;
+          return;
+        }
+        const fixedPart = target.slice(0, i);
+        const noise = noiseAlphabet[Math.floor(Math.random() * noiseAlphabet.length)];
+        el.textContent = `${fixedPart}${noise}|`;
+        requestAnimationFrame(() => {
+          el.textContent = `${fixedPart}${ch}|`;
+        });
+        i += 1;
+      }, stepMs);
+    });
+  }
+
+  function triggerAudioUnlockFromGesture() {
+    if (audioUnlockHandled) return;
+    audioUnlockHandled = true;
+    if (!audioUnlockProbe) {
+      audioUnlockProbe = new Audio(START_UI_SOUNDS.blinkOn);
+      audioUnlockProbe.preload = 'auto';
+    }
+    audioUnlockProbe.pause();
+    audioUnlockProbe.currentTime = 0;
+    audioUnlockProbe.play().then(() => {
+      rememberAudioUnlock();
+      if (startLaunchSoundPendingAfterUnlock && !startLaunchSoundPlayed) {
+        startLaunchSoundPlayed = true;
+        startLaunchSoundPendingAfterUnlock = false;
+        playUiSound(START_UI_SOUNDS.launch);
+      }
+    }).catch(() => {});
+  }
+
+  async function runFingerprintGate() {
+    const gate = document.getElementById('fingerprintGate');
+    const topText = document.getElementById('fingerprintGateTop');
+    const bottomText = document.getElementById('fingerprintGateBottom');
+    const touchBtn = document.getElementById('fingerprintGateTouch');
+    const icon = document.getElementById('fingerprintGateIcon');
+    if (!gate || !topText || !bottomText || !touchBtn || !icon) return;
+
+    gate.hidden = false;
+    setFingerprintGateIcon(icon, FINGERPRINT_GATE_STATES.idle);
+
+    await Promise.all([
+      animateFingerprintGateText(topText, FINGERPRINT_GATE_TEXT_TOP, FINGERPRINT_GATE_TYPE_MS),
+      animateFingerprintGateText(bottomText, FINGERPRINT_GATE_TEXT_BOTTOM, FINGERPRINT_GATE_TYPE_MS)
+    ]);
+
+    const toggleBlink = () => {
+      topText.classList.toggle('is-hidden');
+      bottomText.classList.toggle('is-hidden');
+    };
+    if (fingerprintGateBlinkTimer) clearInterval(fingerprintGateBlinkTimer);
+    fingerprintGateBlinkTimer = setInterval(toggleBlink, FINGERPRINT_GATE_BLINK_MS);
+
+    return new Promise((resolve) => {
+      const clearHold = () => {
+        if (fingerprintGateHoldTimer) {
+          clearTimeout(fingerprintGateHoldTimer);
+          fingerprintGateHoldTimer = null;
+        }
+      };
+
+      const finish = () => {
+        clearHold();
+        if (fingerprintGateBlinkTimer) {
+          clearInterval(fingerprintGateBlinkTimer);
+          fingerprintGateBlinkTimer = null;
+        }
+        topText.classList.add('is-hidden');
+        bottomText.classList.add('is-hidden');
+        gate.classList.add('is-fading');
+        setTimeout(() => {
+          gate.hidden = true;
+          gate.classList.remove('is-fading');
+          resolve();
+        }, 120);
+      };
+
+      const onPressStart = (e) => {
+        e.preventDefault();
+        if (fingerprintGateAuthStarted) return;
+        triggerAudioUnlockFromGesture();
+        setFingerprintGateIcon(icon, FINGERPRINT_GATE_STATES.pressed);
+        clearHold();
+        fingerprintGateHoldTimer = setTimeout(() => {
+          if (fingerprintGateAuthStarted) return;
+          fingerprintGateAuthStarted = true;
+          setFingerprintGateIcon(icon, FINGERPRINT_GATE_STATES.active);
+          tgHaptic('impactOccurred', 'medium');
+          if (navigator.vibrate) navigator.vibrate(120);
+          topText.classList.add('is-hidden');
+          bottomText.classList.add('is-hidden');
+          playUiSound(`assets/sounds/authorisation.mp3?v=${SOUND_ASSET_VERSION}`);
+          finish();
+        }, FINGERPRINT_GATE_HOLD_MS);
+      };
+
+      const onPressCancel = () => {
+        if (fingerprintGateAuthStarted) return;
+        clearHold();
+        setFingerprintGateIcon(icon, FINGERPRINT_GATE_STATES.idle);
+      };
+
+      touchBtn.addEventListener('pointerdown', onPressStart);
+      touchBtn.addEventListener('pointerup', onPressCancel);
+      touchBtn.addEventListener('pointercancel', onPressCancel);
+      touchBtn.addEventListener('pointerleave', onPressCancel);
+      touchBtn.addEventListener('touchstart', onPressStart, { passive: false });
+      touchBtn.addEventListener('touchend', onPressCancel);
+      touchBtn.addEventListener('touchcancel', onPressCancel);
+    });
+  }
+
   function bindAudioUnlockOnce() {
     if (!app.ui.modeChooser || audioUnlockListenerBound) return;
 
-    const tryUnlockAudio = () => {
-      if (audioUnlockHandled) return;
-      audioUnlockHandled = true;
-
-      if (!audioUnlockProbe) {
-        audioUnlockProbe = new Audio(START_UI_SOUNDS.blinkOn);
-        audioUnlockProbe.preload = 'auto';
-      }
-
-      audioUnlockProbe.pause();
-      audioUnlockProbe.currentTime = 0;
-      audioUnlockProbe.play().then(() => {
-        rememberAudioUnlock();
-        if (startLaunchSoundPendingAfterUnlock && !startLaunchSoundPlayed) {
-          startLaunchSoundPlayed = true;
-          startLaunchSoundPendingAfterUnlock = false;
-          playUiSound(START_UI_SOUNDS.launch);
-        }
-      }).catch(() => {});
-    };
+    const tryUnlockAudio = () => triggerAudioUnlockFromGesture();
 
     app.ui.modeChooser.addEventListener('pointerup', tryUnlockAudio, { once: true, passive: true });
     app.ui.modeChooser.addEventListener('touchend', tryUnlockAudio, { once: true, passive: true });
@@ -2541,14 +2682,14 @@ let DITHER_ENABLED = false;
     applyStartMenuPalette({ text: '#ffffff', bg: '#000000', presetId: null });
 
     const playStartEasterEggSound = () => {
-      if (startArgSessionLocked || startEasterEggDone || startEasterEggPlaying || startArgScenePending || startArgSceneRunning) return;
+      if (startArgSessionLocked || startEasterEggDone || startEasterEggPlaying || startArgScenePending || startArgSceneRunning) return false;
       if (startEasterEggNextSound > START_EASTER_EGG_MAX_SOUND) {
         startEasterEggDone = true;
-        return;
+        return false;
       }
 
       const src = START_EASTER_EGG_SOUNDS[startEasterEggNextSound - 1];
-      if (!src) return;
+      if (!src) return false;
 
       startEasterEggPlaying = true;
       const audio = new Audio(src);
@@ -2571,6 +2712,7 @@ let DITHER_ENABLED = false;
       }, { once: true });
       audio.addEventListener('error', unlock, { once: true });
       audio.play().catch(unlock);
+      return true;
     };
 
     app.ui.modeChooser.addEventListener('click', (e) => {
@@ -2583,19 +2725,19 @@ let DITHER_ENABLED = false;
     if (typeof PointerEvent !== 'undefined') {
       app.ui.modeChooser.addEventListener('pointerup', (e) => {
         if (!e.target.closest(footerSelector)) return;
+        if (!playStartEasterEggSound()) return;
         applyRandomStartMenuPreset();
-        playStartEasterEggSound();
       });
     } else {
       app.ui.modeChooser.addEventListener('touchend', (e) => {
         if (!e.target.closest(footerSelector)) return;
+        if (!playStartEasterEggSound()) return;
         applyRandomStartMenuPreset();
-        playStartEasterEggSound();
       }, { passive: true });
       app.ui.modeChooser.addEventListener('click', (e) => {
         if (!e.target.closest(footerSelector)) return;
+        if (!playStartEasterEggSound()) return;
         applyRandomStartMenuPreset();
-        playStartEasterEggSound();
       });
     }
 
@@ -6920,6 +7062,10 @@ if (app.ui.invert) app.ui.invert.checked = false;
     }
 
 bindUI();
+if (!fingerprintGateStarted && isTouchMobileStartup()) {
+  fingerprintGateStarted = true;
+  await runFingerprintGate();
+}
 initVisorMode();
 applyVisorModeUi();
 window.addEventListener('resize', () => {
