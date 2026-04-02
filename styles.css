@@ -1341,7 +1341,7 @@ input[type="color"] {
 .fingerprint-gate__text{
   white-space:pre-line;
   line-height:1.25;
-  font-size:clamp(13px, 1.9vw, 19px);
+  font-size:clamp(20px, 2.85vw, 29px);
   min-height:2.8em;
 }
 
