@@ -1345,6 +1345,10 @@ input[type="color"] {
   min-height:2.8em;
 }
 
+.fingerprint-gate__text--bottom{
+  margin-top:-10px;
+}
+
 .fingerprint-gate__touch{
   width:clamp(88px, 16vw, 128px);
   height:clamp(109px, 20vw, 152px);
