@@ -2431,14 +2431,20 @@ let DITHER_ENABLED = false;
     }
     audioUnlockProbe.pause();
     audioUnlockProbe.currentTime = 0;
+    audioUnlockProbe.muted = true;
     audioUnlockProbe.play().then(() => {
+      audioUnlockProbe.pause();
+      audioUnlockProbe.currentTime = 0;
+      audioUnlockProbe.muted = false;
       rememberAudioUnlock();
       if (startLaunchSoundPendingAfterUnlock && !startLaunchSoundPlayed) {
         startLaunchSoundPlayed = true;
         startLaunchSoundPendingAfterUnlock = false;
         playUiSound(START_UI_SOUNDS.launch);
       }
-    }).catch(() => {});
+    }).catch(() => {
+      audioUnlockProbe.muted = false;
+    });
   }
 
   async function runFingerprintGate() {
