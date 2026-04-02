@@ -438,6 +438,9 @@ const ARG_PONG = {
   visorEyeMicroJitterSpeedY: 0.0031,
   visorEyeBreathScaleAmp: 0.01,
   visorEyeBreathScaleSpeed: 0.00102,
+  visorClutchBreathBoost: 1.1,
+  visorClutchSpringShakeAmpRatio: 0.12,
+  visorClutchSpringShakeSpeedY: Math.PI * 2 / 72,
   visorEyeMediumShakeAmpYPx: 29,
   visorEyeMediumShakeSpeedY: Math.PI * 2 / 98,
   visorPupilMediumShakeAmpYPx: 23.5,
@@ -2084,8 +2087,16 @@ let DITHER_ENABLED = false;
       const visorEyeDriftY = Math.cos(now * ARG_PONG.visorEyeDriftSpeedY + argPongState.visorEyePhaseY) * ARG_PONG.visorEyeDriftAmpYPx;
       const visorBodyShakeY = 0;
       const visorPupilShakeY = 0;
+      const isClutchPhase = argPongState.playerScore === (ARG_PONG.scoreToWin - 1);
+      const clutchSpringShakeAmpPx = maxShiftY * ARG_PONG.visorClutchSpringShakeAmpRatio;
+      const clutchSpringShakeY = isClutchPhase
+        ? (
+          Math.sin(now * ARG_PONG.visorClutchSpringShakeSpeedY + argPongState.visorEyePhaseY * 1.37)
+          + Math.sin(now * ARG_PONG.visorClutchSpringShakeSpeedY * 1.91 + argPongState.visorEyePhaseX * 0.92) * 0.45
+        ) * clutchSpringShakeAmpPx
+        : 0;
       const visorEyeX = argPongState.visorEyeShiftX + visorEyeDriftX;
-      const visorEyeY = argPongState.visorEyeShiftY + visorEyeDriftY;
+      const visorEyeY = argPongState.visorEyeShiftY + visorEyeDriftY + clutchSpringShakeY;
       const xEdgeRatio = Math.abs(argPongState.visorShiftX) / Math.max(1, maxShiftX);
       const yEdgeRatio = Math.abs(argPongState.visorShiftY) / Math.max(1, maxShiftY);
       const xEdgePressure = clamp(
@@ -2126,9 +2137,10 @@ let DITHER_ENABLED = false;
       ballStickLayer.style.transform = `translate(${argPongState.shakeX}px, ${argPongState.shakeY}px)`;
       const visorBodyX = 0;
       const visorBodyY = visorBodyShakeY;
+      const breathBoost = isClutchPhase ? ARG_PONG.visorClutchBreathBoost : 1;
       const bodyScale = 1 + Math.sin(
         now * ARG_PONG.visorBodyScaleBreathSpeed + argPongState.visorBodyPhaseBreath
-      ) * (ARG_PONG.visorBodyScaleBreathAmp * 1.65);
+      ) * (ARG_PONG.visorBodyScaleBreathAmp * 1.65 * breathBoost);
       const bodySqueeze = Math.cos(
         now * ARG_PONG.visorBodySqueezeSpeed + argPongState.visorBodyPhaseSway * 0.91
       ) * (ARG_PONG.visorBodySqueezeAmp * 1.35);
