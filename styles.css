@@ -1383,6 +1383,7 @@ input[type="color"] {
 
 .mode-chooser{
   --start-menu-fg:#fff;
+  --start-menu-fg-pressed:#bfbfbf;
   --start-menu-bg:#000;
   position:fixed;
   inset:0;
@@ -1525,7 +1526,7 @@ input[type="color"] {
 }
 
 .start-mode-btn:active{
-  background:#bfbfbf;
+  background:var(--start-menu-fg-pressed);
   color:var(--start-menu-bg);
 }
 
