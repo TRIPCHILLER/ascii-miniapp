@@ -1324,7 +1324,7 @@ input[type="color"] {
   flex-direction:column;
   align-items:center;
   justify-content:center;
-  gap:clamp(18px, 2.2vh, 34px);
+  gap:clamp(12px, 1.5vh, 23px);
   font-family:'PxPlus IBM VGA', monospace;
   text-align:center;
 }
@@ -1341,13 +1341,13 @@ input[type="color"] {
 .fingerprint-gate__text{
   white-space:pre-line;
   line-height:1.25;
-  font-size:clamp(20px, 2.8vw, 28px);
+  font-size:clamp(13px, 1.9vw, 19px);
   min-height:2.8em;
 }
 
 .fingerprint-gate__touch{
-  width:clamp(132px, 24vw, 192px);
-  height:clamp(164px, 30vw, 228px);
+  width:clamp(88px, 16vw, 128px);
+  height:clamp(109px, 20vw, 152px);
   border:0;
   background:transparent;
   display:flex;

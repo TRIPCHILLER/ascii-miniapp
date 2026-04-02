@@ -2659,6 +2659,11 @@ let DITHER_ENABLED = false;
     }
   }
 
+  function triggerStartEasterEggVibration() {
+    tgHaptic('impactOccurred', 'light');
+    if (navigator.vibrate) navigator.vibrate(35);
+  }
+
   function bindModeChooserOnce() {
     if (!app.ui.modeChooser || modeChooserListenerBound) return;
     const footerSelector = '.start-footer-box, .start-footer-title, .start-footer-sub';
@@ -2692,6 +2697,7 @@ let DITHER_ENABLED = false;
       if (!src) return false;
 
       startEasterEggPlaying = true;
+      triggerStartEasterEggVibration();
       const audio = new Audio(src);
       const unlock = () => { startEasterEggPlaying = false; };
 
