@@ -1346,7 +1346,7 @@ input[type="color"] {
 }
 
 .fingerprint-gate__text--bottom{
-  margin-top:-10px;
+  margin-top:2px;
 }
 
 .fingerprint-gate__touch{
