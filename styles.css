@@ -1345,7 +1345,12 @@ input[type="color"] {
   min-height:2.8em;
 }
 
+.fingerprint-gate__text--top{
+  transform:translateY(-10%);
+}
+
 .fingerprint-gate__text--bottom{
+  transform:translateY(10%);
   margin-top:2px;
 }
 
