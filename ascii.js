@@ -2499,6 +2499,15 @@ let DITHER_ENABLED = false;
       animateFingerprintGateText(bottomText, FINGERPRINT_GATE_TEXT_BOTTOM, FINGERPRINT_GATE_TYPE_MS)
     ]);
 
+    const hideTextsPermanently = () => {
+      if (fingerprintGateBlinkTimer) {
+        clearInterval(fingerprintGateBlinkTimer);
+        fingerprintGateBlinkTimer = null;
+      }
+      topText.classList.add('is-hidden');
+      bottomText.classList.add('is-hidden');
+    };
+
     const toggleBlink = () => {
       topText.classList.toggle('is-hidden');
       bottomText.classList.toggle('is-hidden');
@@ -2516,13 +2525,8 @@ let DITHER_ENABLED = false;
 
       const finish = () => {
         clearHold();
-        if (fingerprintGateBlinkTimer) {
-          clearInterval(fingerprintGateBlinkTimer);
-          fingerprintGateBlinkTimer = null;
-        }
+        hideTextsPermanently();
         setFingerprintGatePressedState(touchBtn, false);
-        topText.classList.add('is-hidden');
-        bottomText.classList.add('is-hidden');
         gate.classList.add('is-fading');
         setTimeout(() => {
           gate.hidden = true;
@@ -2545,8 +2549,7 @@ let DITHER_ENABLED = false;
           setFingerprintGateIcon(icon, FINGERPRINT_GATE_STATES.active);
           tgHaptic('impactOccurred', 'medium');
           if (navigator.vibrate) navigator.vibrate(120);
-          topText.classList.add('is-hidden');
-          bottomText.classList.add('is-hidden');
+          hideTextsPermanently();
           playUiSound(`assets/sounds/authorisation.mp3?v=${SOUND_ASSET_VERSION}`);
           setTimeout(() => {
             finish();
