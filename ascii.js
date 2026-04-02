@@ -312,7 +312,7 @@ const FINGERPRINT_GATE_TEXT_TOP = 'ПРИЛОЖИТЕ ПАЛЕЦ\nК СКАНЕ�
 const FINGERPRINT_GATE_TEXT_BOTTOM = 'ДЛЯ ЗАПУСКА СИСТЕМЫ...';
 const FINGERPRINT_GATE_STATES = {
   idle: 'assets/fingerprintnoactive.svg',
-  pressed: 'assets/fingerpintnoactiveturn.svg',
+  pressed: 'assets/fingerprintnoactiveturn.svg',
   active: 'assets/fingerprintactive.svg'
 };
 const ARG_SCENE_TIMINGS = {
@@ -2401,6 +2401,11 @@ let DITHER_ENABLED = false;
     iconEl.src = src;
   }
 
+  function setFingerprintGatePressedState(touchEl, isPressed) {
+    if (!touchEl) return;
+    touchEl.classList.toggle('is-pressed', Boolean(isPressed));
+  }
+
   function animateFingerprintGateText(el, target, totalMs = 1000) {
     if (!el) return Promise.resolve();
     const noiseAlphabet = '0123456789АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ';
@@ -2469,6 +2474,7 @@ let DITHER_ENABLED = false;
     if (!gate || !topText || !bottomText || !touchBtn || !icon) return;
 
     gate.hidden = false;
+    setFingerprintGatePressedState(touchBtn, false);
     setFingerprintGateIcon(icon, FINGERPRINT_GATE_STATES.idle);
 
     await Promise.all([
@@ -2497,6 +2503,7 @@ let DITHER_ENABLED = false;
           clearInterval(fingerprintGateBlinkTimer);
           fingerprintGateBlinkTimer = null;
         }
+        setFingerprintGatePressedState(touchBtn, false);
         topText.classList.add('is-hidden');
         bottomText.classList.add('is-hidden');
         gate.classList.add('is-fading');
@@ -2512,10 +2519,12 @@ let DITHER_ENABLED = false;
         if (fingerprintGateAuthStarted) return;
         triggerAudioUnlockFromGesture();
         setFingerprintGateIcon(icon, FINGERPRINT_GATE_STATES.pressed);
+        setFingerprintGatePressedState(touchBtn, true);
         clearHold();
         fingerprintGateHoldTimer = setTimeout(() => {
           if (fingerprintGateAuthStarted) return;
           fingerprintGateAuthStarted = true;
+          setFingerprintGatePressedState(touchBtn, false);
           setFingerprintGateIcon(icon, FINGERPRINT_GATE_STATES.active);
           tgHaptic('impactOccurred', 'medium');
           if (navigator.vibrate) navigator.vibrate(120);
@@ -2531,6 +2540,7 @@ let DITHER_ENABLED = false;
       const onPressCancel = () => {
         if (fingerprintGateAuthStarted) return;
         clearHold();
+        setFingerprintGatePressedState(touchBtn, false);
         setFingerprintGateIcon(icon, FINGERPRINT_GATE_STATES.idle);
       };
 
