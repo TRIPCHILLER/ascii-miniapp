@@ -2788,17 +2788,26 @@ let DITHER_ENABLED = false;
     };
     const collectGlitchTargets = () => {
       if (!app.ui.modeChooser) return [];
-      return Array.from(app.ui.modeChooser.querySelectorAll('*')).filter((el) => {
-        if (el === eyeOverlay) return false;
-        if (el.children.length > 0) return false;
-        const text = el.textContent || '';
-        return text.trim().length > 0;
-      });
+      const walker = document.createTreeWalker(app.ui.modeChooser, NodeFilter.SHOW_TEXT, null);
+      const nodes = [];
+      let node = walker.nextNode();
+      while (node) {
+        const parent = node.parentElement;
+        if (parent && parent.closest('.start-easter-eye-layer')) {
+          node = walker.nextNode();
+          continue;
+        }
+        if ((node.nodeValue || '').trim().length > 0) {
+          nodes.push(node);
+        }
+        node = walker.nextNode();
+      }
+      return nodes;
     };
     const applyWordGlitchTick = () => {
       const targets = collectGlitchTargets();
-      for (const el of targets) {
-        const source = el.textContent || '';
+      for (const node of targets) {
+        const source = node.nodeValue || '';
         if (!source.trim()) continue;
         const glitched = source
           .split(/(\s+)/)
@@ -2806,7 +2815,7 @@ let DITHER_ENABLED = false;
             ? part
             : glitchWord(part, startWordGlitchBrokenChars, startWordGlitchFullChaos)))
           .join('');
-        el.textContent = glitched;
+        node.nodeValue = glitched;
       }
     };
     const startWordGlitchFx = () => {
