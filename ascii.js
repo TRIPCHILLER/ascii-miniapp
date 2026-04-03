@@ -939,7 +939,7 @@ let DITHER_ENABLED = false;
   let startWordGlitchTimer = 0;
   let startWordGlitchBrokenChars = 0;
   let startWordGlitchFullChaos = false;
-  let startWordGlitchSourceMap = null;
+  let startWordGlitchStateMap = null;
   let startLaunchSoundPlayed = false;
   let startLaunchSoundPendingAfterUnlock = false;
   let startPrintNextSound = 0;
@@ -2088,15 +2088,17 @@ let DITHER_ENABLED = false;
         Math.cos(now * ARG_PONG.visorBodyDriftSpeedY + argPongState.visorBodyPhaseY) * ARG_PONG.visorBodyDriftAmpYPx
         + Math.sin(now * ARG_PONG.visorBodyMicroJitterSpeedY + argPongState.visorBodyPhaseX * 0.83) * ARG_PONG.visorBodyMicroJitterAmpYPx
         + Math.cos(now * ARG_PONG.visorBodyPulseSpeedY + argPongState.visorBodyPhaseBreath * 1.19) * ARG_PONG.visorBodyPulseAmpYPx;
+      const isClutchPhase = argPongState.playerScore === (ARG_PONG.scoreToWin - 1);
+      const clutchParallaxBoost = isClutchPhase ? 1.1 : 1;
       const visorEyeTargetX = clamp(
-        clampedTargetX * ARG_PONG.visorEyeParallaxFollow,
-        -ARG_PONG.visorEyeParallaxMaxXPx * ARG_PONG.visorFollowRadiusBoost,
-        ARG_PONG.visorEyeParallaxMaxXPx * ARG_PONG.visorFollowRadiusBoost
+        clampedTargetX * ARG_PONG.visorEyeParallaxFollow * clutchParallaxBoost,
+        -ARG_PONG.visorEyeParallaxMaxXPx * ARG_PONG.visorFollowRadiusBoost * clutchParallaxBoost,
+        ARG_PONG.visorEyeParallaxMaxXPx * ARG_PONG.visorFollowRadiusBoost * clutchParallaxBoost
       );
       const visorEyeTargetY = clamp(
-        clampedTargetY * ARG_PONG.visorEyeParallaxFollow,
-        -ARG_PONG.visorEyeParallaxMaxYPx * ARG_PONG.visorFollowRadiusBoost,
-        ARG_PONG.visorEyeParallaxMaxYPx * ARG_PONG.visorFollowRadiusBoost
+        clampedTargetY * ARG_PONG.visorEyeParallaxFollow * clutchParallaxBoost,
+        -ARG_PONG.visorEyeParallaxMaxYPx * ARG_PONG.visorFollowRadiusBoost * clutchParallaxBoost,
+        ARG_PONG.visorEyeParallaxMaxYPx * ARG_PONG.visorFollowRadiusBoost * clutchParallaxBoost
       );
       argPongState.visorEyeShiftX += (visorEyeTargetX - argPongState.visorEyeShiftX) * 0.22;
       argPongState.visorEyeShiftY += (visorEyeTargetY - argPongState.visorEyeShiftY) * 0.22;
@@ -2104,7 +2106,6 @@ let DITHER_ENABLED = false;
       const visorEyeDriftY = Math.cos(now * ARG_PONG.visorEyeDriftSpeedY + argPongState.visorEyePhaseY) * ARG_PONG.visorEyeDriftAmpYPx;
       const visorBodyShakeY = 0;
       const visorPupilShakeY = 0;
-      const isClutchPhase = argPongState.playerScore === (ARG_PONG.scoreToWin - 1);
       const clutchSpringShakeAmpPx = maxShiftY * ARG_PONG.visorClutchSpringShakeAmpRatio;
       const clutchSpringShakeY = isClutchPhase
         ? (
@@ -2713,7 +2714,7 @@ let DITHER_ENABLED = false;
     if (startWordGlitchTimer) { clearInterval(startWordGlitchTimer); startWordGlitchTimer = 0; }
     startWordGlitchBrokenChars = 0;
     startWordGlitchFullChaos = false;
-    startWordGlitchSourceMap = null;
+    startWordGlitchStateMap = null;
   }
 
   function stopStartBlinkTickerForArg() {
@@ -2794,25 +2795,45 @@ let DITHER_ENABLED = false;
     };
     const GLITCH_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*+-?/\\|';
     const getRandomGlitchChar = () => GLITCH_CHARS[Math.floor(Math.random() * GLITCH_CHARS.length)];
-    const glitchTextNodeValue = (value, brokenChars, fullChaos) => {
+    const getRandomIndices = (pool, count) => {
+      const safeCount = Math.max(0, Math.min(pool.length, count));
+      const next = pool.slice();
+      for (let i = next.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [next[i], next[j]] = [next[j], next[i]];
+      }
+      return next.slice(0, safeCount);
+    };
+    const ensureGlitchState = (state, brokenChars, fullChaos) => {
+      if (!state || !state.source) return state;
+      if (!state.indices || !Array.isArray(state.indices)) state.indices = [];
+      if (!state.available || !Array.isArray(state.available) || state.available.length === 0) {
+        const available = [];
+        const chars = state.source.split('');
+        for (let i = 0; i < chars.length; i += 1) {
+          if (chars[i] !== ' ') available.push(i);
+        }
+        state.available = available;
+      }
+      if (!state.available.length) return state;
+      if (fullChaos) {
+        state.indices = state.available.slice();
+        return state;
+      }
+      const target = Math.min(state.available.length, Math.max(1, brokenChars));
+      if (state.indices.length >= target) return state;
+      const used = new Set(state.indices);
+      const remaining = state.available.filter((idx) => !used.has(idx));
+      const additions = getRandomIndices(remaining, target - state.indices.length);
+      state.indices.push(...additions);
+      return state;
+    };
+    const glitchTextNodeValue = (value, indices) => {
       if (!value || !/\S/.test(value)) return value;
       const chars = value.split('');
-      const available = [];
-      for (let i = 0; i < chars.length; i += 1) {
-        if (chars[i] !== ' ') available.push(i);
-      }
-      if (!available.length) return value;
-      if (fullChaos) {
-        for (const idx of available) chars[idx] = getRandomGlitchChar();
-        return chars.join('');
-      }
-      const target = Math.min(available.length, Math.max(1, brokenChars));
-      const used = new Set();
-      while (used.size < target) {
-        const idx = available[Math.floor(Math.random() * available.length)];
-        used.add(idx);
-      }
-      used.forEach((idx) => {
+      if (!indices?.length) return value;
+      indices.forEach((idx) => {
+        if (idx < 0 || idx >= chars.length || chars[idx] === ' ') return;
         chars[idx] = getRandomGlitchChar();
       });
       return chars.join('');
@@ -2837,15 +2858,20 @@ let DITHER_ENABLED = false;
     };
     const applyWordGlitchTick = () => {
       const targets = collectGlitchTargets();
-      if (!startWordGlitchSourceMap) startWordGlitchSourceMap = new WeakMap();
+      if (!startWordGlitchStateMap) startWordGlitchStateMap = new WeakMap();
       for (const node of targets) {
         const raw = node.nodeValue || '';
         if (!raw.trim()) continue;
-        const source = startWordGlitchSourceMap.get(node) ?? raw;
-        if (!startWordGlitchSourceMap.has(node)) {
-          startWordGlitchSourceMap.set(node, source);
+        if (!startWordGlitchStateMap.has(node)) {
+          startWordGlitchStateMap.set(node, {
+            source: raw,
+            indices: [],
+            available: null
+          });
         }
-        node.nodeValue = glitchTextNodeValue(source, startWordGlitchBrokenChars, startWordGlitchFullChaos);
+        const state = startWordGlitchStateMap.get(node);
+        ensureGlitchState(state, startWordGlitchBrokenChars, startWordGlitchFullChaos);
+        node.nodeValue = glitchTextNodeValue(state.source, state.indices);
       }
     };
     const startWordGlitchFx = () => {
@@ -2860,7 +2886,7 @@ let DITHER_ENABLED = false;
       }
       startWordGlitchBrokenChars = 0;
       startWordGlitchFullChaos = false;
-      startWordGlitchSourceMap = null;
+      startWordGlitchStateMap = null;
     };
     const updateWordGlitchStage = (soundIndex) => {
       if (soundIndex < 5) return;
