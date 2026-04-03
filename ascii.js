@@ -308,6 +308,7 @@ const FINGERPRINT_GATE_HOLD_MS = 500;
 const FINGERPRINT_GATE_ACTIVE_MS = 1000;
 const FINGERPRINT_GATE_TYPE_MS = 1000;
 const FINGERPRINT_GATE_BLINK_MS = 1000;
+const FINGERPRINT_GATE_REVEAL_MS = 700;
 const FINGERPRINT_GATE_TEXT_TOP = 'ПРИЛОЖИТЕ ПАЛЕЦ\nК СКАНЕРУ ОТПЕЧАТКОВ';
 const FINGERPRINT_GATE_TEXT_BOTTOM = 'ДЛЯ ЗАПУСКА СИСТЕМЫ...';
 const FINGERPRINT_GATE_STATES = {
@@ -2491,6 +2492,11 @@ let DITHER_ENABLED = false;
     if (!gate || !topText || !bottomText || !touchBtn || !icon) return;
 
     gate.hidden = false;
+    gate.classList.remove('is-fading');
+    gate.classList.remove('is-revealing');
+    void gate.offsetWidth;
+    gate.classList.add('is-revealing');
+    setTimeout(() => gate.classList.remove('is-revealing'), FINGERPRINT_GATE_REVEAL_MS);
     setFingerprintGatePressedState(touchBtn, false);
     setFingerprintGateIcon(icon, FINGERPRINT_GATE_STATES.idle);
 
