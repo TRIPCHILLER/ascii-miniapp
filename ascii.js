@@ -442,7 +442,7 @@ const ARG_PONG = {
   visorEyeBreathScaleSpeed: 0.00102,
   visorClutchBreathBoost: 1.1,
   visorClutchSpringShakeAmpRatio: 0.12,
-  visorClutchSpringShakeSpeedY: Math.PI * 2 / 144,
+  visorClutchSpringShakeSpeedY: Math.PI * 2 / 288,
   visorEyeMediumShakeAmpYPx: 29,
   visorEyeMediumShakeSpeedY: Math.PI * 2 / 98,
   visorPupilMediumShakeAmpYPx: 23.5,
