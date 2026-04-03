@@ -1430,11 +1430,13 @@ input[type="color"] {
 
 .start-easter-eye-layer{
   --start-easter-eye-color:#000000;
+  --start-easter-eye-opacity:1;
   position:absolute;
   inset:0;
   z-index:1;
   pointer-events:none;
   background-color:var(--start-easter-eye-color);
+  opacity:var(--start-easter-eye-opacity);
   -webkit-mask: url('assets/visoreyebig.png') center / min(86vmin, 76vw) auto no-repeat;
   mask: url('assets/visoreyebig.png') center / min(86vmin, 76vw) auto no-repeat;
 }
