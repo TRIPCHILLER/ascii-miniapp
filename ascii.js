@@ -934,6 +934,7 @@ let DITHER_ENABLED = false;
   let startArgSessionLocked = false;
   let startMenuPresetId = null;
   let startMenuCurrentBg = '#000000';
+  let startMenuCurrentText = '#ffffff';
   let startEasterEggRouletteTimer = 0;
   let startEasterEggRouletteStartAt = 0;
   let startWordGlitchTimer = 0;
@@ -2776,15 +2777,24 @@ let DITHER_ENABLED = false;
       const stage = Math.max(0, soundIndex - 4);
       return Math.min(0.3, stage * 0.05);
     };
-    const updateEyeOverlayBySound = (soundIndex, bgHex) => {
-      const ratio = getEyeShadeRatioBySound(soundIndex);
-      if (ratio <= 0) {
+    const updateEyeOverlayBySound = (soundIndex, { bgHex, textHex } = {}) => {
+      const opacity = getEyeShadeRatioBySound(soundIndex);
+      if (opacity <= 0) {
         eyeOverlay.hidden = true;
         eyeOverlay.style.removeProperty('--start-easter-eye-color');
+        eyeOverlay.style.removeProperty('--start-easter-eye-opacity');
         return;
       }
+      const safeBg = toHex(bgHex || '#000000');
+      const safeText = toHex(textHex || '#ffffff');
+      const bgRgb = hexToRgb(safeBg);
+      const isBlackBg = bgRgb.r === 0 && bgRgb.g === 0 && bgRgb.b === 0;
+      const eyeColor = isBlackBg
+        ? adjustColorBrightness(safeBg, opacity)
+        : safeText;
       eyeOverlay.hidden = false;
-      eyeOverlay.style.setProperty('--start-easter-eye-color', adjustColorBrightness(bgHex, ratio));
+      eyeOverlay.style.setProperty('--start-easter-eye-color', eyeColor);
+      eyeOverlay.style.setProperty('--start-easter-eye-opacity', opacity.toFixed(2));
     };
     const stopEasterRoulette = () => {
       if (startEasterEggRouletteTimer) {
@@ -2906,7 +2916,7 @@ let DITHER_ENABLED = false;
           return;
         }
         applyRandomStartMenuPreset();
-        updateEyeOverlayBySound(soundIndex, startMenuCurrentBg);
+        updateEyeOverlayBySound(soundIndex, { bgHex: startMenuCurrentBg, textHex: startMenuCurrentText });
         triggerStartEasterEggMicroVibration();
         if (startShell) {
           const offsetX = (Math.random() - 0.5) * 3.2;
@@ -2936,6 +2946,7 @@ let DITHER_ENABLED = false;
       app.ui.modeChooser.style.setProperty('--start-menu-fg-pressed', pressedText);
       app.ui.modeChooser.style.setProperty('--start-menu-bg', safeBg);
       startMenuCurrentBg = safeBg;
+      startMenuCurrentText = safeText;
       startMenuPresetId = presetId;
     };
     const applyRandomStartMenuPreset = () => {
@@ -2972,7 +2983,7 @@ let DITHER_ENABLED = false;
         }
       };
 
-      updateEyeOverlayBySound(soundIndex, startMenuCurrentBg);
+      updateEyeOverlayBySound(soundIndex, { bgHex: startMenuCurrentBg, textHex: startMenuCurrentText });
       updateWordGlitchStage(soundIndex);
       if (soundIndex === START_EASTER_EGG_MAX_SOUND) {
         startWordGlitchFullChaos = true;
@@ -3011,20 +3022,20 @@ let DITHER_ENABLED = false;
         if (!e.target.closest(footerSelector)) return;
         if (!playStartEasterEggSound()) return;
         applyRandomStartMenuPreset();
-        updateEyeOverlayBySound(startEasterEggNextSound, startMenuCurrentBg);
+        updateEyeOverlayBySound(startEasterEggNextSound, { bgHex: startMenuCurrentBg, textHex: startMenuCurrentText });
       });
     } else {
       app.ui.modeChooser.addEventListener('touchend', (e) => {
         if (!e.target.closest(footerSelector)) return;
         if (!playStartEasterEggSound()) return;
         applyRandomStartMenuPreset();
-        updateEyeOverlayBySound(startEasterEggNextSound, startMenuCurrentBg);
+        updateEyeOverlayBySound(startEasterEggNextSound, { bgHex: startMenuCurrentBg, textHex: startMenuCurrentText });
       }, { passive: true });
       app.ui.modeChooser.addEventListener('click', (e) => {
         if (!e.target.closest(footerSelector)) return;
         if (!playStartEasterEggSound()) return;
         applyRandomStartMenuPreset();
-        updateEyeOverlayBySound(startEasterEggNextSound, startMenuCurrentBg);
+        updateEyeOverlayBySound(startEasterEggNextSound, { bgHex: startMenuCurrentBg, textHex: startMenuCurrentText });
       });
     }
 
