@@ -1483,6 +1483,7 @@ let DITHER_ENABLED = false;
     try {
       for (const value of ['3', '2', '1']) {
         layer.textContent = value;
+        triggerArgCountdownPulseVibration();
         const countdownSound = ARG_SCENE_SOUNDS.countdown?.[value];
         await playUiSoundAndWaitEnd(countdownSound, ARG_SCENE_TIMINGS.countdownStepMs);
       }
@@ -1490,6 +1491,12 @@ let DITHER_ENABLED = false;
     } finally {
       layer.classList.remove('arg-scene-countdown--dim');
     }
+  }
+
+  function triggerArgCountdownPulseVibration() {
+    tgHaptic('impactOccurred', 'medium');
+    setTimeout(() => tgHaptic('impactOccurred', 'light'), 70);
+    if (navigator.vibrate) navigator.vibrate([35, 40, 55]);
   }
 
   function clamp(value, min, max) {
