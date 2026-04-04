@@ -294,7 +294,12 @@ const ARG_SCENE_SOUNDS = {
   bitClick: `assets/sounds/bitclick.mp3?v=${SOUND_ASSET_VERSION}`,
   bitClick2: `assets/sounds/bitclick2.mp3?v=${SOUND_ASSET_VERSION}`,
   danger: `assets/sounds/dangersound.mp3?v=${SOUND_ASSET_VERSION}`,
-  danger2: `assets/sounds/dangersound2.mp3?v=${SOUND_ASSET_VERSION}`
+  danger2: `assets/sounds/dangersound2.mp3?v=${SOUND_ASSET_VERSION}`,
+  countdown: {
+    '3': `assets/sounds/3.mp3?v=${SOUND_ASSET_VERSION}`,
+    '2': `assets/sounds/2.mp3?v=${SOUND_ASSET_VERSION}`,
+    '1': `assets/sounds/1.mp3?v=${SOUND_ASSET_VERSION}`
+  }
 };
 const ARG_SCENE_ASSETS = {
   ball: 'assets/pongball.svg',
@@ -1041,6 +1046,27 @@ let DITHER_ENABLED = false;
     playUiSound(src).catch(() => {});
   }
 
+  function playUiSoundAndWaitEnd(src, fallbackMs = ARG_SCENE_TIMINGS.countdownStepMs) {
+    if (!src) return sleep(fallbackMs);
+    return new Promise((resolve) => {
+      const audio = new Audio(src);
+      let done = false;
+      let fallbackTimer = null;
+      const unlock = () => {
+        if (done) return;
+        done = true;
+        if (fallbackTimer) clearTimeout(fallbackTimer);
+        resolve();
+      };
+
+      audio.addEventListener('ended', unlock, { once: true });
+      audio.addEventListener('error', unlock, { once: true });
+
+      fallbackTimer = setTimeout(unlock, Math.max(100, Number(fallbackMs) || 0));
+      audio.play().catch(unlock);
+    });
+  }
+
   function ensureArgOverlay() {
     let overlay = document.getElementById('argSceneOverlay');
     if (overlay) return overlay;
@@ -1457,7 +1483,8 @@ let DITHER_ENABLED = false;
     try {
       for (const value of ['3', '2', '1']) {
         layer.textContent = value;
-        await sleep(ARG_SCENE_TIMINGS.countdownStepMs);
+        const countdownSound = ARG_SCENE_SOUNDS.countdown?.[value];
+        await playUiSoundAndWaitEnd(countdownSound, ARG_SCENE_TIMINGS.countdownStepMs);
       }
       layer.textContent = '';
     } finally {
