@@ -448,6 +448,9 @@ const ARG_PONG = {
   visorEyeMicroJitterSpeedY: 0.0031,
   visorEyeBreathScaleAmp: 0.01,
   visorEyeBreathScaleSpeed: 0.00102,
+  visorPupilBreathScaleAmp: 0.014,
+  visorPupilBreathScaleSpeed: 0.00102,
+  visorPupilBreathPhaseOffset: 0.42,
   visorClutchBreathBoost: 1.1,
   visorClutchSpringShakeAmpRatio: 0.12,
   visorClutchSpringShakeSpeedY: Math.PI * 2 / 288,
@@ -1602,8 +1605,14 @@ let DITHER_ENABLED = false;
         now * ARG_PONG.visorBodySwaySpeed * 1.21 + argPongState.visorBodyPhaseSway * 1.24
       );
       visorBody.style.transform = `translate(${visorBodyOffsetX}px, ${visorBodyShakeY}px) rotate(${bodyRotate}deg) scale(${bodyScale + bodySqueeze}, ${bodyScale - bodySqueeze * 0.75})`;
-      const eyeScale = 1.1 + Math.sin(now * ARG_PONG.visorEyeBreathScaleSpeed + argPongState.visorEyePhaseX) * ARG_PONG.visorEyeBreathScaleAmp;
-      const pupilScale = 1.1;
+      const eyeBreathWave = Math.sin(now * ARG_PONG.visorEyeBreathScaleSpeed + argPongState.visorEyePhaseX);
+      const eyeScale = 1.1 + eyeBreathWave * ARG_PONG.visorEyeBreathScaleAmp;
+      const pupilBreathWave = Math.sin(
+        now * ARG_PONG.visorPupilBreathScaleSpeed
+        + argPongState.visorEyePhaseX
+        + ARG_PONG.visorPupilBreathPhaseOffset
+      );
+      const pupilScale = 1.1 + pupilBreathWave * ARG_PONG.visorPupilBreathScaleAmp;
       visorEye.style.transform = `translate(${visorEyeX}px, ${visorEyeY}px) scale(${eyeScale})`;
       visorPupil.style.transform = `translate(${visorPupilX}px, ${visorPupilY}px) scale(${pupilScale})`;
       const rect = overlay.getBoundingClientRect();
@@ -2249,8 +2258,14 @@ let DITHER_ENABLED = false;
         now * ARG_PONG.visorBodySwaySpeed * 1.21 + argPongState.visorBodyPhaseSway * 1.24
       );
       visorBody.style.transform = `translate(${visorBodyX}px, ${visorBodyY}px) rotate(${bodyRotate}deg) scale(${bodyScale + bodySqueeze}, ${bodyScale - bodySqueeze * 0.75})`;
-      const eyeScale = 1.1 + Math.sin(now * ARG_PONG.visorEyeBreathScaleSpeed + argPongState.visorEyePhaseX) * ARG_PONG.visorEyeBreathScaleAmp;
-      const pupilScale = 1.1;
+      const eyeBreathWave = Math.sin(now * ARG_PONG.visorEyeBreathScaleSpeed + argPongState.visorEyePhaseX);
+      const eyeScale = 1.1 + eyeBreathWave * ARG_PONG.visorEyeBreathScaleAmp;
+      const pupilBreathWave = Math.sin(
+        now * ARG_PONG.visorPupilBreathScaleSpeed
+        + argPongState.visorEyePhaseX
+        + ARG_PONG.visorPupilBreathPhaseOffset
+      );
+      const pupilScale = 1.1 + pupilBreathWave * ARG_PONG.visorPupilBreathScaleAmp;
       visorEye.style.transform = `translate(${visorEyeX}px, ${visorEyeY}px) scale(${eyeScale})`;
       visorPupil.style.transform = `translate(${visorPupilX}px, ${visorPupilY}px) scale(${pupilScale})`;
 
