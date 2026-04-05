@@ -350,6 +350,8 @@ const ARG_PONG = {
   sideWallPaddingPx: 8,
   ballBaseSpeedPx: 6,
   ballMaxSpeedPx: 13,
+  ballBreathAmp: 0.028,
+  ballBreathSpeed: 0.0018,
   paddleBounceBoost: 0.3,
   playerPointerSmoothing: 0.4,
   aiMaxSpeedPx: 6,
@@ -978,6 +980,7 @@ let DITHER_ENABLED = false;
     ballY: 0,
     ballVX: 0,
     ballVY: 0,
+    ballBreathPhase: Math.random() * Math.PI * 2,
     playerX: 0.5,
     aiX: 0.5,
     aiVX: 0,
@@ -2240,8 +2243,14 @@ let DITHER_ENABLED = false;
       argPongState.shakeX *= ARG_PONG.shakeDecay;
       argPongState.shakeY *= ARG_PONG.shakeDecay;
 
+      const isBallInFlight = !serveLocked
+        && (Math.abs(argPongState.ballVX) > 0.01 || Math.abs(argPongState.ballVY) > 0.01);
+      const ballScale = isBallInFlight
+        ? 1 + Math.sin(now * ARG_PONG.ballBreathSpeed + argPongState.ballBreathPhase) * ARG_PONG.ballBreathAmp
+        : 1;
       ball.style.left = `${argPongState.ballX * 100}%`;
       ball.style.top = `${argPongState.ballY * 100}%`;
+      ball.style.transform = `translate(-50%, -50%) scale(${ballScale})`;
       topStick.style.left = `${argPongState.aiX * 100}%`;
       bottomStick.style.left = `${argPongState.playerX * 100}%`;
       ballStickLayer.style.transform = `translate(${argPongState.shakeX}px, ${argPongState.shakeY}px)`;
