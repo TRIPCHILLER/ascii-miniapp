@@ -1716,6 +1716,19 @@ input[type="color"] {
   animation:none;
 }
 
+@keyframes argBossCountdownShake{
+  0%{ transform:translateY(0); }
+  25%{ transform:translateY(-4px); }
+  50%{ transform:translateY(3px); }
+  75%{ transform:translateY(-2px); }
+  100%{ transform:translateY(0); }
+}
+
+.arg-scene-eye.arg-scene-eye--countdown-shake #boss-root,
+.arg-scene-eye.arg-scene-eye--countdown-shake .arg-scene-boss-layer{
+  animation:argBossCountdownShake .5s steps(1, end) infinite;
+}
+
 @keyframes argBossBodyWarm{
   0%,100%{ transform:translate(0,0) scale(1); }
   35%{ transform:translate(1px,-1px) scale(1.009,0.995) rotate(0.18deg); }

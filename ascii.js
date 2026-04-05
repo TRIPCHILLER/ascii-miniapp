@@ -1516,8 +1516,10 @@ let DITHER_ENABLED = false;
   async function runArgCountdown() {
     const overlay = ensureArgOverlay();
     const layer = overlay.querySelector('#argSceneCountdownLayer');
+    const eyeLayer = overlay.querySelector('#argSceneEyeLayer');
     if (!layer) return;
     layer.classList.add('arg-scene-countdown--dim');
+    if (eyeLayer) eyeLayer.classList.add('arg-scene-eye--countdown-shake');
     try {
       for (const value of ['3', '2', '1']) {
         layer.textContent = value;
@@ -1529,6 +1531,7 @@ let DITHER_ENABLED = false;
       layer.textContent = '';
     } finally {
       layer.classList.remove('arg-scene-countdown--dim');
+      if (eyeLayer) eyeLayer.classList.remove('arg-scene-eye--countdown-shake');
     }
   }
 
