@@ -293,6 +293,8 @@ const ARG_SCENE_SOUNDS = {
   click: `assets/sounds/clicksound1.mp3?v=${SOUND_ASSET_VERSION}`,
   bitClick: `assets/sounds/bitclick.mp3?v=${SOUND_ASSET_VERSION}`,
   bitClick2: `assets/sounds/bitclick2.mp3?v=${SOUND_ASSET_VERSION}`,
+  pongPunch: `assets/sounds/pongpuch.mp3?v=${SOUND_ASSET_VERSION}`,
+  demoLoop: `assets/sounds/asciidemotrack.mp3?v=${SOUND_ASSET_VERSION}`,
   danger: `assets/sounds/dangersound.mp3?v=${SOUND_ASSET_VERSION}`,
   danger2: `assets/sounds/dangersound2.mp3?v=${SOUND_ASSET_VERSION}`,
   countdown: {
@@ -956,6 +958,7 @@ let DITHER_ENABLED = false;
   let audioUnlockListenerBound = false;
   let audioUnlockHandled = false;
   let audioUnlockProbe = null;
+  let argPongMusicAudio = null;
   let fingerprintGateStarted = false;
   let fingerprintGateAuthStarted = false;
   let fingerprintGateHoldTimer = null;
@@ -1066,6 +1069,33 @@ let DITHER_ENABLED = false;
       fallbackTimer = setTimeout(unlock, Math.max(100, Number(fallbackMs) || 0));
       audio.play().catch(unlock);
     });
+  }
+
+  function ensureArgPongMusicAudio() {
+    if (!argPongMusicAudio) {
+      const audio = new Audio(ARG_SCENE_SOUNDS.demoLoop);
+      audio.preload = 'auto';
+      audio.loop = true;
+      argPongMusicAudio = audio;
+    }
+    return argPongMusicAudio;
+  }
+
+  function startArgPongMusic() {
+    const audio = ensureArgPongMusicAudio();
+    audio.loop = true;
+    audio.currentTime = 0;
+    audio.play().catch(() => {});
+  }
+
+  function stopArgPongMusic({ reset = true } = {}) {
+    if (!argPongMusicAudio) return;
+    argPongMusicAudio.pause();
+    if (reset) {
+      try {
+        argPongMusicAudio.currentTime = 0;
+      } catch (_) {}
+    }
   }
 
   function ensureArgOverlay() {
@@ -1400,6 +1430,7 @@ let DITHER_ENABLED = false;
       argPongFlashTimers.forEach((id) => clearTimeout(id));
       argPongFlashTimers = [];
     }
+    stopArgPongMusic();
     const overlay = document.getElementById('argSceneOverlay');
     const goalFlashLayer = overlay?.querySelector('#argSceneGoalFlashLayer');
     if (goalFlashLayer) goalFlashLayer.hidden = true;
@@ -1407,6 +1438,7 @@ let DITHER_ENABLED = false;
 
   function resetArgOverlayState() {
     const overlay = ensureArgOverlay();
+    stopArgPongMusic();
     argSceneActive = false;
     argBossAscii.visualReady = false;
     const popupLayer = overlay.querySelector('#argScenePopupLayer');
@@ -1715,6 +1747,7 @@ let DITHER_ENABLED = false;
     playerScoreEl.style.top = '';
     scoreLayer.hidden = false;
     resetArgBall(Math.random() > 0.5);
+    startArgPongMusic();
     bindArgPlayerControls(overlay);
     const bossRoot = overlay.querySelector('#boss-root');
     const runBossAscii = async () => {
@@ -2014,6 +2047,7 @@ let DITHER_ENABLED = false;
       if (argPongState.ballX - ballHalfX <= wallNorm || argPongState.ballX + ballHalfX >= 1 - wallNorm) {
         argPongState.ballX = clamp(argPongState.ballX, wallNorm + ballHalfX, 1 - wallNorm - ballHalfX);
         argPongState.ballVX *= -1;
+        playUiSoundNoThrow(ARG_SCENE_SOUNDS.pongPunch);
         applyRandomBossFightPreset();
         applyTinyShake();
         tgEventHaptic();
@@ -2029,6 +2063,7 @@ let DITHER_ENABLED = false;
         argPongState.ballVX += offset * ARG_PONG.paddleBounceBoost * ARG_PONG.ballBaseSpeedPx;
         argPongState.ballVX = clamp(argPongState.ballVX, -ARG_PONG.ballMaxSpeedPx, ARG_PONG.ballMaxSpeedPx);
         argPongState.ballY = topY + paddleHalfH + ballHalfY;
+        playUiSoundNoThrow(ARG_SCENE_SOUNDS.pongPunch);
         applyTinyShake();
         tgEventHaptic();
       }
@@ -2043,6 +2078,7 @@ let DITHER_ENABLED = false;
         argPongState.ballVX += offset * ARG_PONG.paddleBounceBoost * ARG_PONG.ballBaseSpeedPx;
         argPongState.ballVX = clamp(argPongState.ballVX, -ARG_PONG.ballMaxSpeedPx, ARG_PONG.ballMaxSpeedPx);
         argPongState.ballY = bottomY - paddleHalfH - ballHalfY;
+        playUiSoundNoThrow(ARG_SCENE_SOUNDS.pongPunch);
         applyTinyShake();
         tgEventHaptic();
       }
@@ -2050,6 +2086,7 @@ let DITHER_ENABLED = false;
       const topGoalLine = topY + paddleHalfH + ballHalfY;
       const bottomGoalLine = bottomY - paddleHalfH - ballHalfY;
       if (!serveLocked && argPongState.ballVY < 0 && argPongState.ballY < topGoalLine) {
+        stopArgPongMusic();
         playUiSoundNoThrow(ARG_SCENE_SOUNDS.bitClick2);
         argPongState.playerScore += 1;
         playerScoreEl.textContent = String(argPongState.playerScore);
@@ -2066,12 +2103,14 @@ let DITHER_ENABLED = false;
             argPongServeTimer = setTimeout(() => {
               if (!argPongState.running) return;
               resetArgBall(false);
+              startArgPongMusic();
               serveLocked = false;
               argPongServeTimer = 0;
             }, ARG_SCENE_TIMINGS.goalRespawnDelayMs);
           });
         }, ARG_SCENE_TIMINGS.serveDelayMs);
       } else if (!serveLocked && argPongState.ballVY > 0 && argPongState.ballY > bottomGoalLine) {
+        stopArgPongMusic();
         playUiSoundNoThrow(ARG_SCENE_SOUNDS.bitClick2);
         argPongState.aiScore += 1;
         aiScoreEl.textContent = String(argPongState.aiScore);
@@ -2088,6 +2127,7 @@ let DITHER_ENABLED = false;
             argPongServeTimer = setTimeout(() => {
               if (!argPongState.running) return;
               resetArgBall(true);
+              startArgPongMusic();
               serveLocked = false;
               argPongServeTimer = 0;
             }, ARG_SCENE_TIMINGS.goalRespawnDelayMs);
