@@ -330,6 +330,7 @@ const ARG_SCENE_TIMINGS = {
   bottomToSecondPopupMs: 1000,
   eyeToCountdownMs: 1000,
   countdownStepMs: 1000,
+  countdownStepPauseMs: 1000,
   serveDelayMs: 700,
   goalFlashBurstMs: 333,
   goalRespawnDelayMs: 2000,
@@ -446,9 +447,9 @@ const ARG_PONG = {
   visorEyeMicroJitterAmpYPx: 0.52,
   visorEyeMicroJitterSpeedX: 0.0034,
   visorEyeMicroJitterSpeedY: 0.0031,
-  visorEyeBreathScaleAmp: 0.01,
+  visorEyeBreathScaleAmp: 0,
   visorEyeBreathScaleSpeed: 0.00102,
-  visorPupilBreathScaleAmp: 0.014,
+  visorPupilBreathScaleAmp: 0,
   visorPupilBreathScaleSpeed: 0.00102,
   visorPupilBreathPhaseOffset: 0.42,
   visorClutchBreathBoost: 1.1,
@@ -937,6 +938,7 @@ let DITHER_ENABLED = false;
   let startTypeTimer = null;
   let startEasterEggNextSound = 1;
   let startEasterEggPlaying = false;
+  let startEasterEggAudio = null;
   let startEasterEggDone = false;
   let startArgScenePending = false;
   let startArgSceneRunning = false;
@@ -1522,6 +1524,7 @@ let DITHER_ENABLED = false;
         triggerArgCountdownPulseVibration();
         const countdownSound = ARG_SCENE_SOUNDS.countdown?.[value];
         await playUiSoundAndWaitEnd(countdownSound, ARG_SCENE_TIMINGS.countdownStepMs);
+        await sleep(ARG_SCENE_TIMINGS.countdownStepPauseMs);
       }
       layer.textContent = '';
     } finally {
@@ -3048,7 +3051,7 @@ let DITHER_ENABLED = false;
     applyStartMenuPalette({ text: '#ffffff', bg: '#000000', presetId: null });
 
     const playStartEasterEggSound = () => {
-      if (startArgSessionLocked || startEasterEggDone || startEasterEggPlaying || startArgScenePending || startArgSceneRunning) return false;
+      if (startArgSessionLocked || startEasterEggDone || startArgScenePending || startArgSceneRunning) return false;
       if (startEasterEggNextSound > START_EASTER_EGG_MAX_SOUND) {
         startEasterEggDone = true;
         return false;
@@ -3057,12 +3060,33 @@ let DITHER_ENABLED = false;
       const src = START_EASTER_EGG_SOUNDS[startEasterEggNextSound - 1];
       if (!src) return false;
 
+      if (startEasterEggAudio) {
+        startEasterEggAudio.pause();
+        startEasterEggAudio.currentTime = 0;
+        startEasterEggAudio = null;
+      }
       startEasterEggPlaying = true;
       triggerStartEasterEggVibration();
       const audio = new Audio(src);
       const soundIndex = startEasterEggNextSound;
+      startEasterEggAudio = audio;
+      startEasterEggNextSound += 1;
+      if (startEasterEggNextSound > START_EASTER_EGG_MAX_SOUND) {
+        startEasterEggDone = true;
+        if (!startArgScenePending && !startArgSceneRunning && !startArgSceneStarted) {
+          stopStartBlinkTickerForArg();
+          startArgScenePending = true;
+          runStartArgScene().catch(() => {
+            startArgScenePending = false;
+            startArgSceneRunning = false;
+          });
+        }
+      }
       const unlock = () => {
-        startEasterEggPlaying = false;
+        if (startEasterEggAudio === audio) {
+          startEasterEggAudio = null;
+          startEasterEggPlaying = false;
+        }
         stopEasterRoulette();
         if (startEasterEggDone || soundIndex >= START_EASTER_EGG_MAX_SOUND) {
           stopWordGlitchFx();
@@ -3077,18 +3101,6 @@ let DITHER_ENABLED = false;
       }
 
       audio.addEventListener('ended', () => {
-        startEasterEggNextSound += 1;
-        if (startEasterEggNextSound > START_EASTER_EGG_MAX_SOUND) {
-          startEasterEggDone = true;
-          if (!startArgScenePending && !startArgSceneRunning && !startArgSceneStarted) {
-            stopStartBlinkTickerForArg();
-            startArgScenePending = true;
-            runStartArgScene().catch(() => {
-              startArgScenePending = false;
-              startArgSceneRunning = false;
-            });
-          }
-        }
         unlock();
       }, { once: true });
       audio.addEventListener('error', unlock, { once: true });
