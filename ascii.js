@@ -1378,6 +1378,86 @@ let DITHER_ENABLED = false;
     return asciiResult.ok;
   }
 
+  function renderArgBossAsciiFrame(overlay, {
+    rect,
+    visorBodyX = 0,
+    visorBodyY = 0,
+    bodyRotate = 0,
+    bodyScaleX = 1,
+    bodyScaleY = 1,
+    bodyBandPulse = 0,
+    bodyBandSway = 0,
+    visorEyeX = 0,
+    visorEyeY = 0,
+    eyeScale = 1,
+    pupilScale = 1,
+    visorPupilX = 0,
+    visorPupilY = 0
+  } = {}) {
+    if (!argBossAscii.ready || !argBossAscii.compositeCtx || !argBossAscii.originalCtx || !argBossAscii.asciiCtx) return;
+    const compositeCanvas = argBossAscii.compositeCanvas;
+    const compositeCtx = argBossAscii.compositeCtx;
+    const originalCtx = argBossAscii.originalCtx;
+    const asciiCtx = argBossAscii.asciiCtx;
+    const width = compositeCanvas.width;
+    const height = compositeCanvas.height;
+    if (width < 2 || height < 2 || !rect?.width || !rect?.height) return;
+
+    const dpr = argBossAscii.dpr || 1;
+    compositeCtx.setTransform(1, 0, 0, 1, 0, 0);
+    compositeCtx.clearRect(0, 0, width, height);
+
+    const drawRects = getArgBossDrawRects(width, height);
+    if (drawRects && argBossAscii.bodyImage && argBossAscii.eyeImage && argBossAscii.pupilImage) {
+      compositeCtx.save();
+      compositeCtx.globalAlpha = 0.5;
+      drawArgBossBodySegmented(compositeCtx, argBossAscii.bodyImage, drawRects.body, {
+        tx: visorBodyX * dpr,
+        ty: visorBodyY * dpr,
+        rotateDeg: bodyRotate,
+        scaleX: bodyScaleX,
+        scaleY: bodyScaleY
+      }, {
+        top: {
+          ty: (-Math.abs(bodyBandPulse) * 2.1 + bodyBandSway * 0.9) * dpr,
+          rotateDeg: bodyBandSway * 0.38,
+          scaleX: 1 + bodyBandPulse * 0.022,
+          scaleY: 1 - Math.abs(bodyBandPulse) * 0.03
+        },
+        bottom: {
+          ty: (Math.abs(bodyBandPulse) * 2.4 - bodyBandSway * 0.95) * dpr,
+          rotateDeg: -bodyBandSway * 0.42,
+          scaleX: 1 - bodyBandPulse * 0.02,
+          scaleY: 1 + Math.abs(bodyBandPulse) * 0.034
+        }
+      });
+      drawArgBossLayer(compositeCtx, argBossAscii.eyeImage, drawRects.eye, {
+        tx: visorEyeX * dpr,
+        ty: visorEyeY * dpr,
+        scaleX: eyeScale,
+        scaleY: eyeScale
+      });
+      drawArgBossLayer(compositeCtx, argBossAscii.pupilImage, drawRects.pupil, {
+        tx: visorPupilX * dpr,
+        ty: visorPupilY * dpr,
+        scaleX: pupilScale,
+        scaleY: pupilScale
+      });
+      compositeCtx.restore();
+    }
+
+    originalCtx.clearRect(0, 0, width, height);
+    originalCtx.drawImage(compositeCanvas, 0, 0);
+    const asciiResult = renderAsciiFromSource(compositeCanvas, asciiCtx, argPongState.bossAsciiOptions);
+    if (!asciiResult.ok) {
+      setArgBossVisualReady(overlay, { showAscii: false });
+      return;
+    }
+
+    argBossAscii.visualReady = true;
+    setArgBossVisualReady(overlay, { showAscii: true });
+  }
+
   async function animateArgPopupText(textEl, text) {
     if (!textEl) return;
     const alphabet = 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ';
@@ -1681,7 +1761,7 @@ let DITHER_ENABLED = false;
       visorEye.style.transform = `translate(${visorEyeX}px, ${visorEyeY}px) scale(${eyeScale})`;
       visorPupil.style.transform = `translate(${visorPupilX}px, ${visorPupilY}px) scale(${pupilScale})`;
       const rect = overlay.getBoundingClientRect();
-      renderFightAsciiFrame({
+      renderArgBossAsciiFrame(overlay, {
         rect,
         visorBodyX,
         visorBodyY,
@@ -1941,88 +2021,6 @@ let DITHER_ENABLED = false;
       };
       tick();
     });
-
-    const renderFightAsciiFrame = ({
-      rect,
-      visorBodyX = 0,
-      visorBodyY = 0,
-      bodyRotate = 0,
-      bodyScaleX = 1,
-      bodyScaleY = 1,
-      bodyBandPulse = 0,
-      bodyBandSway = 0,
-      visorEyeX = 0,
-      visorEyeY = 0,
-      eyeScale = 1,
-      pupilScale = 1,
-      visorPupilX = 0,
-      visorPupilY = 0
-    } = {}) => {
-      if (!argBossAscii.ready || !argBossAscii.compositeCtx || !argBossAscii.originalCtx || !argBossAscii.asciiCtx) return;
-      const compositeCanvas = argBossAscii.compositeCanvas;
-      const compositeCtx = argBossAscii.compositeCtx;
-      const originalCtx = argBossAscii.originalCtx;
-      const asciiCtx = argBossAscii.asciiCtx;
-      const width = compositeCanvas.width;
-      const height = compositeCanvas.height;
-      if (width < 2 || height < 2 || !rect?.width || !rect?.height) return;
-
-      const dpr = argBossAscii.dpr || 1;
-      const sx = width / Math.max(1, rect.width);
-      const sy = height / Math.max(1, rect.height);
-      compositeCtx.setTransform(1, 0, 0, 1, 0, 0);
-      compositeCtx.clearRect(0, 0, width, height);
-
-      const drawRects = getArgBossDrawRects(width, height);
-      if (drawRects && argBossAscii.bodyImage && argBossAscii.eyeImage && argBossAscii.pupilImage) {
-        compositeCtx.save();
-        compositeCtx.globalAlpha = 0.5;
-        drawArgBossBodySegmented(compositeCtx, argBossAscii.bodyImage, drawRects.body, {
-          tx: visorBodyX * dpr,
-          ty: visorBodyY * dpr,
-          rotateDeg: bodyRotate,
-          scaleX: bodyScaleX,
-          scaleY: bodyScaleY
-        }, {
-          top: {
-            ty: (-Math.abs(bodyBandPulse) * 2.1 + bodyBandSway * 0.9) * dpr,
-            rotateDeg: bodyBandSway * 0.38,
-            scaleX: 1 + bodyBandPulse * 0.022,
-            scaleY: 1 - Math.abs(bodyBandPulse) * 0.03
-          },
-          bottom: {
-            ty: (Math.abs(bodyBandPulse) * 2.4 - bodyBandSway * 0.95) * dpr,
-            rotateDeg: -bodyBandSway * 0.42,
-            scaleX: 1 - bodyBandPulse * 0.02,
-            scaleY: 1 + Math.abs(bodyBandPulse) * 0.034
-          }
-        });
-        drawArgBossLayer(compositeCtx, argBossAscii.eyeImage, drawRects.eye, {
-          tx: visorEyeX * dpr,
-          ty: visorEyeY * dpr,
-          scaleX: eyeScale,
-          scaleY: eyeScale
-        });
-        drawArgBossLayer(compositeCtx, argBossAscii.pupilImage, drawRects.pupil, {
-          tx: visorPupilX * dpr,
-          ty: visorPupilY * dpr,
-          scaleX: pupilScale,
-          scaleY: pupilScale
-        });
-        compositeCtx.restore();
-      }
-
-      originalCtx.clearRect(0, 0, width, height);
-      originalCtx.drawImage(compositeCanvas, 0, 0);
-      const asciiResult = renderAsciiFromSource(compositeCanvas, asciiCtx, argPongState.bossAsciiOptions);
-      if (!asciiResult.ok) {
-        setArgBossVisualReady(overlay, { showAscii: false });
-        return;
-      }
-
-      argBossAscii.visualReady = true;
-      setArgBossVisualReady(overlay, { showAscii: true });
-    };
 
     let serveLocked = false;
     let prevTs = 0;
@@ -2381,7 +2379,7 @@ let DITHER_ENABLED = false;
       visorEye.style.transform = `translate(${visorEyeX}px, ${visorEyeY}px) scale(${eyeScale})`;
       visorPupil.style.transform = `translate(${visorPupilX}px, ${visorPupilY}px) scale(${pupilScale})`;
 
-      renderFightAsciiFrame({
+      renderArgBossAsciiFrame(overlay, {
         rect,
         visorBodyX,
         visorBodyY,
