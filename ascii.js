@@ -354,8 +354,10 @@ const ARG_PONG = {
   ballCenterScaleCurve: 1.35,
   ballScaleSmoothing: 0.22,
   paddleBounceBoost: 0.3,
-  paddleTiltHitBoostDeg: 2.4,
-  paddleTiltOffsetBoostDeg: 1.7,
+  paddleTiltHitBoostDeg: 4.8,
+  paddleTiltOffsetBoostDeg: 3.4,
+  paddleTiltMoveBoostDeg: 0.03,
+  paddleTiltMoveMaxImpulseDeg: 0.45,
   paddleTiltSpring: 0.18,
   paddleTiltDamping: 0.82,
   playerPointerSmoothing: 0.4,
@@ -992,6 +994,7 @@ let DITHER_ENABLED = false;
     bottomPaddleTiltDeg: 0,
     bottomPaddleTiltV: 0,
     playerX: 0.5,
+    playerVX: 0,
     aiX: 0.5,
     aiVX: 0,
     playerScore: 0,
@@ -1749,6 +1752,7 @@ let DITHER_ENABLED = false;
     argPongState.playerScore = 0;
     argPongState.aiScore = 0;
     argPongState.playerX = 0.5;
+    argPongState.playerVX = 0;
     argPongState.aiX = 0.5;
     argPongState.aiVX = 0;
     argPongState.syncProgressMs = 0;
@@ -2009,8 +2013,10 @@ let DITHER_ENABLED = false;
       ensureArgBossCanvasSize(overlay);
 
       const paddleHalfNorm = (ARG_PONG.paddleWidthPx * 0.5) / rect.width;
+      const prevPlayerX = argPongState.playerX;
       argPongState.playerX += (argPongState.targetPlayerX - argPongState.playerX) * ARG_PONG.playerPointerSmoothing;
       argPongState.playerX = clamp(argPongState.playerX, paddleHalfNorm, 1 - paddleHalfNorm);
+      argPongState.playerVX = argPongState.playerX - prevPlayerX;
 
       const syncDistanceNorm = ARG_PONG.syncDistancePx / rect.width;
       const syncDelta = Math.abs(argPongState.playerX - argPongState.aiX);
@@ -2091,6 +2097,18 @@ let DITHER_ENABLED = false;
         argPongState.aiVX *= aiIdleDamping;
       }
       argPongState.aiX = clamp(argPongState.aiX + argPongState.aiVX, paddleHalfNorm, 1 - paddleHalfNorm);
+      const aiMoveTiltImpulse = clamp(
+        argPongState.aiVX * rect.width * ARG_PONG.paddleTiltMoveBoostDeg,
+        -ARG_PONG.paddleTiltMoveMaxImpulseDeg,
+        ARG_PONG.paddleTiltMoveMaxImpulseDeg
+      );
+      const playerMoveTiltImpulse = clamp(
+        argPongState.playerVX * rect.width * ARG_PONG.paddleTiltMoveBoostDeg,
+        -ARG_PONG.paddleTiltMoveMaxImpulseDeg,
+        ARG_PONG.paddleTiltMoveMaxImpulseDeg
+      );
+      argPongState.topPaddleTiltV += aiMoveTiltImpulse;
+      argPongState.bottomPaddleTiltV += playerMoveTiltImpulse;
 
       argPongState.ballX += argPongState.ballVX / rect.width;
       argPongState.ballY += argPongState.ballVY / rect.height;
