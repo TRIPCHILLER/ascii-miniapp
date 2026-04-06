@@ -350,9 +350,10 @@ const ARG_PONG = {
   sideWallPaddingPx: 8,
   ballBaseSpeedPx: 6,
   ballMaxSpeedPx: 13,
-  ballBreathAmp: 0.06,
+  ballBreathAmp: 0.2,
   ballBreathSpeed: 0.0024,
-  ballBreathMotionBoost: 0.03,
+  ballBreathMotionBoost: 0.12,
+  ballScaleSmoothing: 0.22,
   paddleBounceBoost: 0.3,
   playerPointerSmoothing: 0.4,
   aiMaxSpeedPx: 6,
@@ -982,6 +983,8 @@ let DITHER_ENABLED = false;
     ballVX: 0,
     ballVY: 0,
     ballBreathPhase: Math.random() * Math.PI * 2,
+    ballVisualScale: 1,
+    ballTargetScale: 1,
     playerX: 0.5,
     aiX: 0.5,
     aiVX: 0,
@@ -1552,6 +1555,8 @@ let DITHER_ENABLED = false;
   function resetArgBall(serveToPlayer = true) {
     argPongState.ballX = 0.5;
     argPongState.ballY = 0.5;
+    argPongState.ballVisualScale = 1;
+    argPongState.ballTargetScale = 1;
     const dirX = Math.random() > 0.5 ? 1 : -1;
     const dirY = serveToPlayer ? 1 : -1;
     argPongState.ballVX = dirX * ARG_PONG.ballBaseSpeedPx;
@@ -1781,6 +1786,7 @@ let DITHER_ENABLED = false;
     playerScoreEl.style.top = '';
     scoreLayer.hidden = false;
     resetArgBall(Math.random() > 0.5);
+    ball.style.transform = 'translate(-50%, -50%)';
     startArgPongMusic();
     bindArgPlayerControls(overlay);
     const bossRoot = overlay.querySelector('#boss-root');
@@ -2265,12 +2271,18 @@ let DITHER_ENABLED = false;
         ? clamp((ballSpeed - ARG_PONG.ballBaseSpeedPx) / (ARG_PONG.ballMaxSpeedPx - ARG_PONG.ballBaseSpeedPx), 0, 1)
         : 0;
       const ballBreathAmp = ARG_PONG.ballBreathAmp + flightRatio * ARG_PONG.ballBreathMotionBoost;
-      const ballScale = isBallInFlight
+      const targetBallScale = isBallInFlight
         ? 1 + Math.sin(now * ARG_PONG.ballBreathSpeed + argPongState.ballBreathPhase) * ballBreathAmp
         : 1;
+      argPongState.ballTargetScale = targetBallScale;
+      argPongState.ballVisualScale += (argPongState.ballTargetScale - argPongState.ballVisualScale) * ARG_PONG.ballScaleSmoothing;
+      argPongState.ballVisualScale = clamp(argPongState.ballVisualScale, 0.72, 1.42);
+      const ballVisualSizePx = ballSizePx * argPongState.ballVisualScale;
       ball.style.left = `${argPongState.ballX * 100}%`;
       ball.style.top = `${argPongState.ballY * 100}%`;
-      ball.style.transform = `translate(-50%, -50%) scale(${ballScale})`;
+      ball.style.width = `${ballVisualSizePx}px`;
+      ball.style.height = `${ballVisualSizePx}px`;
+      ball.style.transform = 'translate(-50%, -50%)';
       topStick.style.left = `${argPongState.aiX * 100}%`;
       bottomStick.style.left = `${argPongState.playerX * 100}%`;
       ballStickLayer.style.transform = `translate(${argPongState.shakeX}px, ${argPongState.shakeY}px)`;
