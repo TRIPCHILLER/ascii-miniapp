@@ -180,7 +180,7 @@ function esc(s) {
 // Одноразовый привет (первый /start)
 function WELCOME_HTML(name) {
   return (
-`<blockquote><b>ДОБРО ПОЖАЛОВАТЬ В СИСТЕМУ, ${esc(name) || 'ТРИПОНАВТ'}</b></blockquote>
+`<blockquote><b>: ДОБРО ПОЖАЛОВАТЬ В СИСТЕМУ, ${esc(name) || 'ТРИПОНАВТ'} :</b></blockquote>
 ⠀
 В левом нижнем углу расположена кнопка запуска ядра. <b>Относись к нему с уважением.</b>
 ⠀
@@ -201,13 +201,14 @@ function WELCOME_HTML(name) {
 // Повторный /start
 function WELCOME_BACK_HTML(name) {
   return (
-`<blockquote><b>С ВОЗВРАЩЕНИЕМ, ${esc(name) || 'ТРИПОНАВТ'}</b></blockquote>
+`<blockquote><b>: С ВОЗВРАЩЕНИЕМ, ${esc(name) || 'ТРИПОНАВТ'} :</b></blockquote>
 ⠀
 Помни:
 ⠀
 <b>Т3КСТ-4РТ = 1, Ф0Т0 = 5 | ВИД30 = 15</b>
 ⠀
 <blockquote expandable="true"><b>Взаимодействие с Ядром:</b>
+⠀
 <b>/balance</b> — доступная энергия
 <b>/help</b> — манифест по управлению ядром
 <b>/buy_energy</b> — пополнить запасы энергии
