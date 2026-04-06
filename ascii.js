@@ -330,7 +330,7 @@ const ARG_SCENE_TIMINGS = {
   bottomToSecondPopupMs: 1000,
   eyeToCountdownMs: 1000,
   countdownStepMs: 1000,
-  countdownStepPauseMs: 1000,
+  countdownStepPauseMs: 500,
   serveDelayMs: 700,
   goalFlashBurstMs: 333,
   goalRespawnDelayMs: 2000,
