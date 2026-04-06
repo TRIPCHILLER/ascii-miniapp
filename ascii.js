@@ -2452,7 +2452,7 @@ let DITHER_ENABLED = false;
     tgEventHaptic();
 
     await sleep(ARG_SCENE_TIMINGS.ballToPopupMs);
-    await showArgPopup('NH73ЛЛЗК7 - Э70\nСПОСОБНОС7Ь\n4Д4П7NР0847ЬСЯ\nК ИЗМ3Н3НNЯМ', {
+    await showArgPopup('NH73ЛЛЗК7 - Э70\nСП0С06Н0С7Ь\n4Д4П7NР0847ЬСЯ\nК ИЗМ3Н3НNЯМ', {
       openSoundSrc: ARG_SCENE_SOUNDS.danger,
       popupClass: 'arg-scene-popup-box--intel'
     });
