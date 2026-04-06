@@ -350,11 +350,14 @@ const ARG_PONG = {
   sideWallPaddingPx: 8,
   ballBaseSpeedPx: 6,
   ballMaxSpeedPx: 13,
-  ballBreathAmp: 0.2,
-  ballBreathSpeed: 0.0024,
-  ballBreathMotionBoost: 0.12,
+  ballCenterScaleBoost: 0.34,
+  ballCenterScaleCurve: 1.35,
   ballScaleSmoothing: 0.22,
   paddleBounceBoost: 0.3,
+  paddleTiltHitBoostDeg: 2.4,
+  paddleTiltOffsetBoostDeg: 1.7,
+  paddleTiltSpring: 0.18,
+  paddleTiltDamping: 0.82,
   playerPointerSmoothing: 0.4,
   aiMaxSpeedPx: 6,
   aiTrackDeadZonePx: 6,
@@ -982,9 +985,12 @@ let DITHER_ENABLED = false;
     ballY: 0,
     ballVX: 0,
     ballVY: 0,
-    ballBreathPhase: Math.random() * Math.PI * 2,
     ballVisualScale: 1,
     ballTargetScale: 1,
+    topPaddleTiltDeg: 0,
+    topPaddleTiltV: 0,
+    bottomPaddleTiltDeg: 0,
+    bottomPaddleTiltV: 0,
     playerX: 0.5,
     aiX: 0.5,
     aiVX: 0,
@@ -1778,6 +1784,10 @@ let DITHER_ENABLED = false;
     argPongState.visorEngineShakePulseLeftMs = 0;
     argPongState.shakeX = 0;
     argPongState.shakeY = 0;
+    argPongState.topPaddleTiltDeg = 0;
+    argPongState.topPaddleTiltV = 0;
+    argPongState.bottomPaddleTiltDeg = 0;
+    argPongState.bottomPaddleTiltV = 0;
     playerScoreEl.textContent = '0';
     aiScoreEl.textContent = '0';
     aiScoreEl.style.top = `${ARG_PONG.topScoreYVh}vh`;
@@ -2103,6 +2113,8 @@ let DITHER_ENABLED = false;
         argPongState.ballVX += offset * ARG_PONG.paddleBounceBoost * ARG_PONG.ballBaseSpeedPx;
         argPongState.ballVX = clamp(argPongState.ballVX, -ARG_PONG.ballMaxSpeedPx, ARG_PONG.ballMaxSpeedPx);
         argPongState.ballY = topY + paddleHalfH + ballHalfY;
+        const topTiltImpulse = (argPongState.ballVX / ARG_PONG.ballMaxSpeedPx) * ARG_PONG.paddleTiltHitBoostDeg;
+        argPongState.topPaddleTiltV += topTiltImpulse + offset * ARG_PONG.paddleTiltOffsetBoostDeg;
         playUiSoundNoThrow(ARG_SCENE_SOUNDS.pongPunch);
         applyTinyShake();
         tgEventHaptic();
@@ -2118,6 +2130,8 @@ let DITHER_ENABLED = false;
         argPongState.ballVX += offset * ARG_PONG.paddleBounceBoost * ARG_PONG.ballBaseSpeedPx;
         argPongState.ballVX = clamp(argPongState.ballVX, -ARG_PONG.ballMaxSpeedPx, ARG_PONG.ballMaxSpeedPx);
         argPongState.ballY = bottomY - paddleHalfH - ballHalfY;
+        const bottomTiltImpulse = (argPongState.ballVX / ARG_PONG.ballMaxSpeedPx) * ARG_PONG.paddleTiltHitBoostDeg;
+        argPongState.bottomPaddleTiltV += bottomTiltImpulse + offset * ARG_PONG.paddleTiltOffsetBoostDeg;
         playUiSoundNoThrow(ARG_SCENE_SOUNDS.pongPunch);
         applyTinyShake();
         tgEventHaptic();
@@ -2264,15 +2278,20 @@ let DITHER_ENABLED = false;
       const visorPupilY = visorEyeY + visorPupilOffsetY;
       argPongState.shakeX *= ARG_PONG.shakeDecay;
       argPongState.shakeY *= ARG_PONG.shakeDecay;
+      argPongState.topPaddleTiltV += (0 - argPongState.topPaddleTiltDeg) * ARG_PONG.paddleTiltSpring;
+      argPongState.topPaddleTiltV *= ARG_PONG.paddleTiltDamping;
+      argPongState.topPaddleTiltDeg += argPongState.topPaddleTiltV;
+      argPongState.bottomPaddleTiltV += (0 - argPongState.bottomPaddleTiltDeg) * ARG_PONG.paddleTiltSpring;
+      argPongState.bottomPaddleTiltV *= ARG_PONG.paddleTiltDamping;
+      argPongState.bottomPaddleTiltDeg += argPongState.bottomPaddleTiltV;
 
       const ballSpeed = Math.hypot(argPongState.ballVX, argPongState.ballVY);
       const isBallInFlight = !serveLocked && ballSpeed > 0.01;
-      const flightRatio = isBallInFlight
-        ? clamp((ballSpeed - ARG_PONG.ballBaseSpeedPx) / (ARG_PONG.ballMaxSpeedPx - ARG_PONG.ballBaseSpeedPx), 0, 1)
-        : 0;
-      const ballBreathAmp = ARG_PONG.ballBreathAmp + flightRatio * ARG_PONG.ballBreathMotionBoost;
+      const centerDistanceNorm = Math.abs(argPongState.ballY - 0.5) / 0.5;
+      const centerProximity = clamp(1 - centerDistanceNorm, 0, 1);
+      const centerScaleBlend = Math.pow(centerProximity, ARG_PONG.ballCenterScaleCurve);
       const targetBallScale = isBallInFlight
-        ? 1 + Math.sin(now * ARG_PONG.ballBreathSpeed + argPongState.ballBreathPhase) * ballBreathAmp
+        ? 1 + centerScaleBlend * ARG_PONG.ballCenterScaleBoost
         : 1;
       argPongState.ballTargetScale = targetBallScale;
       argPongState.ballVisualScale += (argPongState.ballTargetScale - argPongState.ballVisualScale) * ARG_PONG.ballScaleSmoothing;
@@ -2285,6 +2304,8 @@ let DITHER_ENABLED = false;
       ball.style.transform = 'translate(-50%, -50%)';
       topStick.style.left = `${argPongState.aiX * 100}%`;
       bottomStick.style.left = `${argPongState.playerX * 100}%`;
+      topStick.style.transform = `translateX(-50%) rotate(${argPongState.topPaddleTiltDeg}deg)`;
+      bottomStick.style.transform = `translateX(-50%) rotate(${argPongState.bottomPaddleTiltDeg}deg)`;
       ballStickLayer.style.transform = `translate(${argPongState.shakeX}px, ${argPongState.shakeY}px)`;
       const visorBodyX = 0;
       const visorBodyY = visorBodyShakeY;
