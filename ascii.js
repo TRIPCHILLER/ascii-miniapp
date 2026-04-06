@@ -1712,22 +1712,18 @@ let DITHER_ENABLED = false;
       argPongState.visorPupilShiftY += (0 - argPongState.visorPupilShiftY) * ARG_PONG.visorPupilFollowLerp;
       const isCountdownShakeActive = now < (argPongState.introCountdownShakeUntilMs || 0);
       const isCountdownFastShakeActive = now < (argPongState.introCountdownFastShakeUntilMs || 0);
-      const countdownShakeIntensity = 0.2;
-      const countdownShake = isCountdownShakeActive
-        ? Math.sin(now * ARG_PONG.visorBodyMediumShakeSpeedY + argPongState.visorBodyPhaseY * 1.17) * ARG_PONG.visorBodyMediumShakeAmpYPx * countdownShakeIntensity
-        : 0;
-      const visorBodyShakeY = countdownShake;
+      const countdownEyePupilShakeIntensity = 0.2;
       const visorPupilShakeY = isCountdownShakeActive
-        ? Math.sin(now * ARG_PONG.visorPupilMediumShakeSpeedY + argPongState.visorEyePhaseX * 1.31) * ARG_PONG.visorPupilMediumShakeAmpYPx * countdownShakeIntensity
+        ? Math.sin(now * ARG_PONG.visorPupilMediumShakeSpeedY + argPongState.visorEyePhaseX * 1.31) * ARG_PONG.visorPupilMediumShakeAmpYPx * countdownEyePupilShakeIntensity
         : 0;
       const visorEyeShakeY = isCountdownShakeActive
-        ? Math.sin(now * ARG_PONG.visorEyeMediumShakeSpeedY + argPongState.visorEyePhaseY * 1.11) * ARG_PONG.visorEyeMediumShakeAmpYPx * countdownShakeIntensity
+        ? Math.sin(now * ARG_PONG.visorEyeMediumShakeSpeedY + argPongState.visorEyePhaseY * 1.11) * ARG_PONG.visorEyeMediumShakeAmpYPx * countdownEyePupilShakeIntensity
         : 0;
       const countdownFastEyeShakeY = isCountdownFastShakeActive
-        ? Math.sin(now * ARG_PONG.visorEyeCountdownFastShakeSpeedY + argPongState.visorEyePhaseX * 1.57) * ARG_PONG.visorEyeCountdownFastShakeAmpYPx * countdownShakeIntensity
+        ? Math.sin(now * ARG_PONG.visorEyeCountdownFastShakeSpeedY + argPongState.visorEyePhaseX * 1.57) * ARG_PONG.visorEyeCountdownFastShakeAmpYPx * countdownEyePupilShakeIntensity
         : 0;
       const countdownFastPupilShakeY = isCountdownFastShakeActive
-        ? Math.sin(now * ARG_PONG.visorPupilCountdownFastShakeSpeedY + argPongState.visorEyePhaseY * 1.41) * ARG_PONG.visorPupilCountdownFastShakeAmpYPx * countdownShakeIntensity
+        ? Math.sin(now * ARG_PONG.visorPupilCountdownFastShakeSpeedY + argPongState.visorEyePhaseY * 1.41) * ARG_PONG.visorPupilCountdownFastShakeAmpYPx * countdownEyePupilShakeIntensity
         : 0;
       const visorEyeX = argPongState.visorEyeShiftX + visorEyeDriftX;
       const visorEyeY = argPongState.visorEyeShiftY + visorEyeDriftY + visorEyeShakeY + countdownFastEyeShakeY;
@@ -1749,7 +1745,7 @@ let DITHER_ENABLED = false;
         now * ARG_PONG.visorBodySwaySpeed * 1.21 + argPongState.visorBodyPhaseSway * 1.24
       );
       const visorBodyX = visorBodyOffsetX;
-      const visorBodyY = visorBodyOffsetY + visorBodyShakeY;
+      const visorBodyY = visorBodyOffsetY;
       visorBody.style.transform = `translate(${visorBodyX}px, ${visorBodyY}px) rotate(${bodyRotate}deg) scale(${bodyScale + bodySqueeze}, ${bodyScale - bodySqueeze * 0.75})`;
       const eyeBreathWave = Math.sin(now * ARG_PONG.visorEyeBreathScaleSpeed + argPongState.visorEyePhaseX);
       const eyeScale = 1.1 + eyeBreathWave * ARG_PONG.visorEyeBreathScaleAmp;
