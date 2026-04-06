@@ -1712,21 +1712,22 @@ let DITHER_ENABLED = false;
       argPongState.visorPupilShiftY += (0 - argPongState.visorPupilShiftY) * ARG_PONG.visorPupilFollowLerp;
       const isCountdownShakeActive = now < (argPongState.introCountdownShakeUntilMs || 0);
       const isCountdownFastShakeActive = now < (argPongState.introCountdownFastShakeUntilMs || 0);
+      const countdownShakeIntensity = 0.2;
       const countdownShake = isCountdownShakeActive
-        ? Math.sin(now * ARG_PONG.visorBodyMediumShakeSpeedY + argPongState.visorBodyPhaseY * 1.17) * ARG_PONG.visorBodyMediumShakeAmpYPx
+        ? Math.sin(now * ARG_PONG.visorBodyMediumShakeSpeedY + argPongState.visorBodyPhaseY * 1.17) * ARG_PONG.visorBodyMediumShakeAmpYPx * countdownShakeIntensity
         : 0;
       const visorBodyShakeY = countdownShake;
       const visorPupilShakeY = isCountdownShakeActive
-        ? Math.sin(now * ARG_PONG.visorPupilMediumShakeSpeedY + argPongState.visorEyePhaseX * 1.31) * ARG_PONG.visorPupilMediumShakeAmpYPx
+        ? Math.sin(now * ARG_PONG.visorPupilMediumShakeSpeedY + argPongState.visorEyePhaseX * 1.31) * ARG_PONG.visorPupilMediumShakeAmpYPx * countdownShakeIntensity
         : 0;
       const visorEyeShakeY = isCountdownShakeActive
-        ? Math.sin(now * ARG_PONG.visorEyeMediumShakeSpeedY + argPongState.visorEyePhaseY * 1.11) * ARG_PONG.visorEyeMediumShakeAmpYPx
+        ? Math.sin(now * ARG_PONG.visorEyeMediumShakeSpeedY + argPongState.visorEyePhaseY * 1.11) * ARG_PONG.visorEyeMediumShakeAmpYPx * countdownShakeIntensity
         : 0;
       const countdownFastEyeShakeY = isCountdownFastShakeActive
-        ? Math.sin(now * ARG_PONG.visorEyeCountdownFastShakeSpeedY + argPongState.visorEyePhaseX * 1.57) * ARG_PONG.visorEyeCountdownFastShakeAmpYPx
+        ? Math.sin(now * ARG_PONG.visorEyeCountdownFastShakeSpeedY + argPongState.visorEyePhaseX * 1.57) * ARG_PONG.visorEyeCountdownFastShakeAmpYPx * countdownShakeIntensity
         : 0;
       const countdownFastPupilShakeY = isCountdownFastShakeActive
-        ? Math.sin(now * ARG_PONG.visorPupilCountdownFastShakeSpeedY + argPongState.visorEyePhaseY * 1.41) * ARG_PONG.visorPupilCountdownFastShakeAmpYPx
+        ? Math.sin(now * ARG_PONG.visorPupilCountdownFastShakeSpeedY + argPongState.visorEyePhaseY * 1.41) * ARG_PONG.visorPupilCountdownFastShakeAmpYPx * countdownShakeIntensity
         : 0;
       const visorEyeX = argPongState.visorEyeShiftX + visorEyeDriftX;
       const visorEyeY = argPongState.visorEyeShiftY + visorEyeDriftY + visorEyeShakeY + countdownFastEyeShakeY;
