@@ -1107,8 +1107,7 @@ let DITHER_ENABLED = false;
       audio.preload = 'auto';
       audio.loop = false;
       audio.addEventListener('ended', () => {
-        seekArgPongMusicToStart(audio);
-        audio.play().catch(() => {});
+        playArgPongMusicFromLoopStart(audio);
       });
       argPongMusicAudio = audio;
     }
@@ -1122,10 +1121,36 @@ let DITHER_ENABLED = false;
     } catch (_) {}
   }
 
+  function playArgPongMusicFromLoopStart(audio) {
+    if (!audio) return;
+    if (audio.__argLoopStartPending) return;
+    const playFromLoopStart = () => {
+      seekArgPongMusicToStart(audio);
+      audio.play().catch(() => {});
+    };
+    if (audio.readyState >= 1) {
+      playFromLoopStart();
+      return;
+    }
+    audio.__argLoopStartPending = true;
+    const onReady = () => {
+      audio.__argLoopStartPending = false;
+      audio.removeEventListener('loadedmetadata', onReady);
+      audio.removeEventListener('error', onError);
+      playFromLoopStart();
+    };
+    const onError = () => {
+      audio.__argLoopStartPending = false;
+      audio.removeEventListener('loadedmetadata', onReady);
+    };
+    audio.addEventListener('loadedmetadata', onReady, { once: true });
+    audio.addEventListener('error', onError, { once: true });
+    audio.load();
+  }
+
   function startArgPongMusic() {
     const audio = ensureArgPongMusicAudio();
-    seekArgPongMusicToStart(audio);
-    audio.play().catch(() => {});
+    playArgPongMusicFromLoopStart(audio);
   }
 
   function stopArgPongMusic({ reset = true } = {}) {
