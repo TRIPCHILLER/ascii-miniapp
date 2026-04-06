@@ -303,6 +303,7 @@ const ARG_SCENE_SOUNDS = {
     '1': `assets/sounds/1.mp3?v=${SOUND_ASSET_VERSION}`
   }
 };
+const ARG_SCENE_DEMO_LOOP_START_SEC = 48;
 const ARG_SCENE_ASSETS = {
   ball: 'assets/pongball.svg',
   topStick: 'assets/pongstick1.svg',
@@ -1104,16 +1105,26 @@ let DITHER_ENABLED = false;
     if (!argPongMusicAudio) {
       const audio = new Audio(ARG_SCENE_SOUNDS.demoLoop);
       audio.preload = 'auto';
-      audio.loop = true;
+      audio.loop = false;
+      audio.addEventListener('ended', () => {
+        seekArgPongMusicToStart(audio);
+        audio.play().catch(() => {});
+      });
       argPongMusicAudio = audio;
     }
     return argPongMusicAudio;
   }
 
+  function seekArgPongMusicToStart(audio) {
+    if (!audio) return;
+    try {
+      audio.currentTime = ARG_SCENE_DEMO_LOOP_START_SEC;
+    } catch (_) {}
+  }
+
   function startArgPongMusic() {
     const audio = ensureArgPongMusicAudio();
-    audio.loop = true;
-    audio.currentTime = 0;
+    seekArgPongMusicToStart(audio);
     audio.play().catch(() => {});
   }
 
@@ -1121,9 +1132,7 @@ let DITHER_ENABLED = false;
     if (!argPongMusicAudio) return;
     argPongMusicAudio.pause();
     if (reset) {
-      try {
-        argPongMusicAudio.currentTime = 0;
-      } catch (_) {}
+      seekArgPongMusicToStart(argPongMusicAudio);
     }
   }
 
