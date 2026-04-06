@@ -1625,7 +1625,7 @@ let DITHER_ENABLED = false;
     try {
       for (const value of ['3', '2', '1']) {
         layer.textContent = value;
-        argPongState.introCountdownShakeUntilMs = performance.now() + ARG_SCENE_TIMINGS.countdownStepMs + ARG_SCENE_TIMINGS.countdownStepPauseMs;
+        argPongState.introCountdownShakeUntilMs = performance.now() + ARG_SCENE_TIMINGS.countdownStepMs;
         argPongState.introCountdownFastShakeUntilMs = performance.now() + ARG_SCENE_TIMINGS.countdownStepMs;
         triggerArgCountdownPulseVibration();
         const countdownSound = ARG_SCENE_SOUNDS.countdown?.[value];
