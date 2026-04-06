@@ -2167,10 +2167,11 @@ let DITHER_ENABLED = false;
           return;
         }
         serveLocked = true;
+        const flashBurstPromise = playGoalFlashBurst();
         argPongServeTimer = setTimeout(() => {
           if (!argPongState.running) return;
           argPongServeTimer = 0;
-          playGoalFlashBurst().then(() => {
+          flashBurstPromise.then(() => {
             if (!argPongState.running) return;
             argPongServeTimer = setTimeout(() => {
               if (!argPongState.running) return;
@@ -2191,10 +2192,11 @@ let DITHER_ENABLED = false;
           return;
         }
         serveLocked = true;
+        const flashBurstPromise = playGoalFlashBurst();
         argPongServeTimer = setTimeout(() => {
           if (!argPongState.running) return;
           argPongServeTimer = 0;
-          playGoalFlashBurst().then(() => {
+          flashBurstPromise.then(() => {
             if (!argPongState.running) return;
             argPongServeTimer = setTimeout(() => {
               if (!argPongState.running) return;
