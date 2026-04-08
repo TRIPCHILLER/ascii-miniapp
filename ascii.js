@@ -740,9 +740,10 @@ let DITHER_ENABLED = false;
     MICRO_LEGACY: ' .:*',
     MACRO: ' .`\'^",:;Il!i~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$'
   };
+  const BRAILLE_BLANK = '\u2800';
   const ARG_BOSS_CHARSET_ROTATION = Object.freeze([
     ARG_BOSS_ASCII_PRESET.charset,
-    ' 01²346⁷𝟴⁸9+',
+    `${BRAILLE_BLANK}01²346⁷𝟴⁸9+.,`,
     '█▓▒░'
   ]);
 

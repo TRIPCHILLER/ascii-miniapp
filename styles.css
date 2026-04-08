@@ -1816,11 +1816,11 @@ input[type="color"] {
   font-size:clamp(32px, 5vw, 58px);
   line-height:1;
   min-width:1.4em;
-  padding:0.12em 0.26em;
+  padding:0;
   text-align:center;
   color:inherit;
-  background:var(--arg-score-bg, #000000);
-  border:2px solid var(--arg-score-fg, #808080);
+  background:transparent;
+  border:none;
 }
 
 .arg-scene-score-top{ top:10vh; }
