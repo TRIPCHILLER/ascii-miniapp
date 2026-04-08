@@ -362,6 +362,12 @@ const ARG_PONG = {
   paddleTiltMoveMaxImpulseDeg: 0.45,
   paddleTiltSpring: 0.18,
   paddleTiltDamping: 0.82,
+  floatStickAmpPx: 1.35,
+  floatBallAmpPx: 1.7,
+  floatStickCycleMs: 3900,
+  floatBallCycleMs: 3200,
+  floatSecondaryRatio: 0.37,
+  floatInertia: 0.14,
   playerPointerSmoothing: 0.4,
   aiMaxSpeedPx: 6,
   aiTrackDeadZonePx: 6,
@@ -1006,6 +1012,12 @@ let DITHER_ENABLED = false;
     topPaddleTiltV: 0,
     bottomPaddleTiltDeg: 0,
     bottomPaddleTiltV: 0,
+    topPaddleFloatY: 0,
+    bottomPaddleFloatY: 0,
+    ballFloatY: 0,
+    topPaddleFloatPhase: 0,
+    bottomPaddleFloatPhase: 0,
+    ballFloatPhase: 0,
     playerX: 0.5,
     playerVX: 0,
     aiX: 0.5,
@@ -1978,6 +1990,12 @@ let DITHER_ENABLED = false;
     argPongState.topPaddleTiltV = 0;
     argPongState.bottomPaddleTiltDeg = 0;
     argPongState.bottomPaddleTiltV = 0;
+    argPongState.topPaddleFloatY = 0;
+    argPongState.bottomPaddleFloatY = 0;
+    argPongState.ballFloatY = 0;
+    argPongState.topPaddleFloatPhase = Math.random() * Math.PI * 2;
+    argPongState.bottomPaddleFloatPhase = Math.random() * Math.PI * 2;
+    argPongState.ballFloatPhase = Math.random() * Math.PI * 2;
     playerScoreEl.textContent = '0';
     aiScoreEl.textContent = '0';
     aiScoreEl.style.top = `${ARG_PONG.topScoreYVh}vh`;
@@ -1986,6 +2004,9 @@ let DITHER_ENABLED = false;
     playerScoreEl.style.top = '';
     scoreLayer.hidden = false;
     resetArgBall(Math.random() > 0.5);
+    ball.classList.remove('arg-scene-float-ball');
+    topStick.classList.remove('arg-scene-float-stick');
+    bottomStick.classList.remove('arg-scene-float-stick');
     ball.style.transform = 'translate(-50%, -50%)';
     startArgPongMusic();
     bindArgPlayerControls(overlay);
@@ -2436,6 +2457,26 @@ let DITHER_ENABLED = false;
       argPongState.bottomPaddleTiltV += (0 - argPongState.bottomPaddleTiltDeg) * ARG_PONG.paddleTiltSpring;
       argPongState.bottomPaddleTiltV *= ARG_PONG.paddleTiltDamping;
       argPongState.bottomPaddleTiltDeg += argPongState.bottomPaddleTiltV;
+      const floatCycleMsStick = Math.max(1200, ARG_PONG.floatStickCycleMs);
+      const floatCycleMsBall = Math.max(900, ARG_PONG.floatBallCycleMs);
+      const stickOmega = (Math.PI * 2) / floatCycleMsStick;
+      const ballOmega = (Math.PI * 2) / floatCycleMsBall;
+      const secondaryRatio = ARG_PONG.floatSecondaryRatio;
+      const topFloatTargetY = (
+        Math.sin(now * stickOmega + argPongState.topPaddleFloatPhase)
+        + Math.sin(now * stickOmega * 1.86 + argPongState.topPaddleFloatPhase * 0.7) * secondaryRatio
+      ) * ARG_PONG.floatStickAmpPx;
+      const bottomFloatTargetY = (
+        Math.sin(now * stickOmega + argPongState.bottomPaddleFloatPhase)
+        + Math.sin(now * stickOmega * 1.86 + argPongState.bottomPaddleFloatPhase * 0.7) * secondaryRatio
+      ) * ARG_PONG.floatStickAmpPx;
+      const ballFloatTargetY = (
+        Math.sin(now * ballOmega + argPongState.ballFloatPhase)
+        + Math.sin(now * ballOmega * 1.93 + argPongState.ballFloatPhase * 0.68) * (secondaryRatio + 0.05)
+      ) * ARG_PONG.floatBallAmpPx;
+      argPongState.topPaddleFloatY += (topFloatTargetY - argPongState.topPaddleFloatY) * ARG_PONG.floatInertia;
+      argPongState.bottomPaddleFloatY += (bottomFloatTargetY - argPongState.bottomPaddleFloatY) * ARG_PONG.floatInertia;
+      argPongState.ballFloatY += (ballFloatTargetY - argPongState.ballFloatY) * ARG_PONG.floatInertia;
 
       const ballSpeed = Math.hypot(argPongState.ballVX, argPongState.ballVY);
       const isBallInFlight = !serveLocked && ballSpeed > 0.01;
@@ -2454,11 +2495,11 @@ let DITHER_ENABLED = false;
       ball.style.width = `${ballVisualSizePx}px`;
       ball.style.height = `${ballVisualSizePx}px`;
       updateArgPongSymbolSprites({ ball, topStick, bottomStick, ballSizePx: ballVisualSizePx });
-      ball.style.transform = 'translate(-50%, -50%)';
+      ball.style.transform = `translate(-50%, -50%) translateY(${argPongState.ballFloatY}px)`;
       topStick.style.left = `${argPongState.aiX * 100}%`;
       bottomStick.style.left = `${argPongState.playerX * 100}%`;
-      topStick.style.transform = `translateX(-50%) rotate(${argPongState.topPaddleTiltDeg}deg)`;
-      bottomStick.style.transform = `translateX(-50%) rotate(${argPongState.bottomPaddleTiltDeg}deg)`;
+      topStick.style.transform = `translateX(-50%) translateY(${argPongState.topPaddleFloatY}px) rotate(${argPongState.topPaddleTiltDeg}deg)`;
+      bottomStick.style.transform = `translateX(-50%) translateY(${argPongState.bottomPaddleFloatY}px) rotate(${argPongState.bottomPaddleTiltDeg}deg)`;
       ballStickLayer.style.transform = `translate(${argPongState.shakeX}px, ${argPongState.shakeY}px)`;
       const visorBodyX = 0;
       const visorBodyY = visorBodyShakeY;
@@ -2602,6 +2643,7 @@ let DITHER_ENABLED = false;
 
     const ball = document.createElement('div');
     ball.className = 'arg-scene-ball';
+    ball.classList.add('arg-scene-float-ball');
     ball.style.setProperty('--arg-sprite-url', `url("${ARG_SCENE_ASSETS.ball}")`);
     const ballSizePx = ARG_PONG.paddleHeightPx * ARG_PONG.ballSizeToPaddleHeightRatio;
     ball.style.width = `${ballSizePx}px`;
@@ -2621,6 +2663,7 @@ let DITHER_ENABLED = false;
 
     const topStick = document.createElement('div');
     topStick.className = 'arg-scene-stick arg-scene-stick--top';
+    topStick.classList.add('arg-scene-float-stick');
     topStick.style.setProperty('--arg-sprite-url', `url("${ARG_SCENE_ASSETS.topStick}")`);
     topStick.style.width = `${ARG_PONG.paddleWidthPx}px`;
     topStick.style.height = `${ARG_PONG.paddleHeightPx}px`;
@@ -2636,6 +2679,7 @@ let DITHER_ENABLED = false;
 
     const bottomStick = document.createElement('div');
     bottomStick.className = 'arg-scene-stick arg-scene-stick--bottom';
+    bottomStick.classList.add('arg-scene-float-stick');
     bottomStick.style.setProperty('--arg-sprite-url', `url("${ARG_SCENE_ASSETS.bottomStick}")`);
     bottomStick.style.width = `${ARG_PONG.paddleWidthPx}px`;
     bottomStick.style.height = `${ARG_PONG.paddleHeightPx}px`;
