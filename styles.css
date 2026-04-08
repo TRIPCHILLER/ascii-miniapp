@@ -1636,7 +1636,7 @@ input[type="color"] {
   position:absolute;
   left:50%;
   transform:translateX(-50%);
-  width:132px;
+  width:36px;
   height:12px;
   background:transparent;
   color:#fff;
