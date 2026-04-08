@@ -1929,18 +1929,13 @@ let DITHER_ENABLED = false;
   }
 
   function updateArgPongSymbolSprites({ ball = null, topStick = null, bottomStick = null, ballSizePx = ARG_PONG.paddleHeightPx } = {}) {
-    const charset = String(argPongState.bossAsciiOptions?.charset || ARG_BOSS_ASCII_PRESET.charset);
-    const useBetterVcr = charset === ARG_BOSS_ASCII_PRESET.charset;
     [topStick, bottomStick, ball].forEach((el) => {
       if (!el) return;
-      el.classList.toggle('arg-scene-symbol--bettervcr', useBetterVcr);
+      el.classList.remove('arg-scene-symbol--bettervcr');
+      if (el.textContent) el.textContent = '';
+      delete el.dataset.argSymbolFillKey;
+      el.style.fontSize = '';
     });
-    const symbol = getArgBrightestCharsetSymbol(charset);
-    const paddleCellPx = Math.max(8, ARG_PONG.paddleHeightPx * 0.92);
-    const ballCellPx = Math.max(8, Math.min(20, (Number(ballSizePx) || ARG_PONG.paddleHeightPx) * 0.92));
-    fillArgElementWithSymbol(topStick, symbol, { cellPx: paddleCellPx, glyphCount: 3 });
-    fillArgElementWithSymbol(bottomStick, symbol, { cellPx: paddleCellPx, glyphCount: 3 });
-    fillArgElementWithSymbol(ball, symbol, { cellPx: ballCellPx, glyphCount: 1 });
   }
 
   function startArgPong({ overlay, ballStickLayer, ball, topStick, bottomStick, visorBody, visorEye, visorPupil, scoreLayer, aiScoreEl, playerScoreEl, preserveBossState = false }) {
@@ -2075,7 +2070,7 @@ let DITHER_ENABLED = false;
       bottomStick.style.color = safeText;
       overlay.style.setProperty('--arg-popup-fg', safeText);
       overlay.style.setProperty('--arg-popup-bg', safeBg);
-      overlay.style.setProperty('--arg-score-fg', bossShade);
+      overlay.style.setProperty('--arg-score-fg', safeText);
       overlay.style.setProperty('--arg-score-bg', safeBg);
       const popupLayer = overlay.querySelector('#argScenePopupLayer');
       if (popupLayer) popupLayer.style.filter = 'none';
