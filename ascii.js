@@ -352,7 +352,7 @@ const ARG_PONG = {
   sideWallPaddingPx: 8,
   ballBaseSpeedPx: 6,
   ballMaxSpeedPx: 13,
-  ballCenterScaleBoost: 0.34,
+  ballCenterScaleBoost: 0.5,
   ballCenterScaleCurve: 1.35,
   ballScaleSmoothing: 0.22,
   paddleBounceBoost: 0.6,
@@ -2436,7 +2436,7 @@ let DITHER_ENABLED = false;
         : 1;
       argPongState.ballTargetScale = targetBallScale;
       argPongState.ballVisualScale += (argPongState.ballTargetScale - argPongState.ballVisualScale) * ARG_PONG.ballScaleSmoothing;
-      argPongState.ballVisualScale = clamp(argPongState.ballVisualScale, 0.72, 1.42);
+      argPongState.ballVisualScale = clamp(argPongState.ballVisualScale, 0.72, 1.55);
       const ballVisualSizePx = ballSizePx * argPongState.ballVisualScale;
       ball.style.left = `${argPongState.ballX * 100}%`;
       ball.style.top = `${argPongState.ballY * 100}%`;
