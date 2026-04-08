@@ -342,7 +342,7 @@ const ARG_SCENE_TIMINGS = {
 };
 const ARG_PONG = {
   scoreToWin: 3,
-  paddleWidthPx: 132,
+  paddleWidthPx: 36,
   paddleHeightPx: 12,
   ballSizeToPaddleHeightRatio: 1,
   topPaddleYVh: 4,
@@ -1902,28 +1902,26 @@ let DITHER_ENABLED = false;
     return first || '#';
   }
 
-  function fillArgElementWithSymbol(el, symbol, { cellPx = 10 } = {}) {
+  function fillArgElementWithSymbol(el, symbol, { cellPx = 10, glyphCount = 1 } = {}) {
     if (!el) return;
     const glyph = Array.from(String(symbol || '#'))[0] || '#';
-    const widthPx = parseFloat(el.style.width) || el.getBoundingClientRect().width || 1;
     const heightPx = parseFloat(el.style.height) || el.getBoundingClientRect().height || 1;
-    const safeCellPx = clamp(Number(cellPx) || 10, 4, 20);
-    const cols = Math.max(1, Math.round(widthPx / Math.max(1, safeCellPx * 0.76)));
-    const rows = Math.max(1, Math.round(heightPx / Math.max(1, safeCellPx * 0.9)));
-    const nextKey = `${glyph}|${cols}|${rows}|${safeCellPx.toFixed(2)}`;
+    const safeCellPx = clamp(Math.max(Number(cellPx) || 10, heightPx * 0.9), 8, 28);
+    const safeGlyphCount = Math.max(1, Math.round(Number(glyphCount) || 1));
+    const nextKey = `${glyph}|${safeGlyphCount}|${safeCellPx.toFixed(2)}`;
     if (el.dataset.argSymbolFillKey === nextKey) return;
     el.dataset.argSymbolFillKey = nextKey;
     el.style.fontSize = `${safeCellPx}px`;
-    el.textContent = Array.from({ length: rows }, () => glyph.repeat(cols)).join('\n');
+    el.textContent = glyph.repeat(safeGlyphCount);
   }
 
   function updateArgPongSymbolSprites({ ball = null, topStick = null, bottomStick = null, ballSizePx = ARG_PONG.paddleHeightPx } = {}) {
     const symbol = getArgBrightestCharsetSymbol(argPongState.bossAsciiOptions?.charset || ARG_BOSS_ASCII_PRESET.charset);
-    const paddleCellPx = Math.max(6, ARG_PONG.paddleHeightPx * 0.82);
-    const ballCellPx = Math.max(5, Math.min(16, (Number(ballSizePx) || ARG_PONG.paddleHeightPx) * 0.72));
-    fillArgElementWithSymbol(topStick, symbol, { cellPx: paddleCellPx });
-    fillArgElementWithSymbol(bottomStick, symbol, { cellPx: paddleCellPx });
-    fillArgElementWithSymbol(ball, symbol, { cellPx: ballCellPx });
+    const paddleCellPx = Math.max(8, ARG_PONG.paddleHeightPx * 0.92);
+    const ballCellPx = Math.max(8, Math.min(20, (Number(ballSizePx) || ARG_PONG.paddleHeightPx) * 0.92));
+    fillArgElementWithSymbol(topStick, symbol, { cellPx: paddleCellPx, glyphCount: 3 });
+    fillArgElementWithSymbol(bottomStick, symbol, { cellPx: paddleCellPx, glyphCount: 3 });
+    fillArgElementWithSymbol(ball, symbol, { cellPx: ballCellPx, glyphCount: 1 });
   }
 
   function startArgPong({ overlay, ballStickLayer, ball, topStick, bottomStick, visorBody, visorEye, visorPupil, scoreLayer, aiScoreEl, playerScoreEl, preserveBossState = false }) {
