@@ -355,7 +355,7 @@ const ARG_PONG = {
   ballCenterScaleBoost: 0.34,
   ballCenterScaleCurve: 1.35,
   ballScaleSmoothing: 0.22,
-  paddleBounceBoost: 0.3,
+  paddleBounceBoost: 0.6,
   paddleTiltHitBoostDeg: 4.8,
   paddleTiltOffsetBoostDeg: 3.4,
   paddleTiltMoveBoostDeg: 0.03,
@@ -736,7 +736,7 @@ let DITHER_ENABLED = false;
   };
   const ARG_BOSS_CHARSET_ROTATION = Object.freeze([
     ARG_BOSS_ASCII_PRESET.charset,
-    '01²346⁷𝟴⁸9+. ,',
+    ' 01²346⁷𝟴⁸9+.,',
     '█▓▒░'
   ]);
 
@@ -1888,6 +1888,37 @@ let DITHER_ENABLED = false;
     return clamp(projectedX, paddleHalfNorm, 1 - paddleHalfNorm);
   }
 
+  function getArgBrightestCharsetSymbol(charsetValue) {
+    const densSorted = computeDensities(String(charsetValue || ''));
+    if (densSorted.length) return densSorted[densSorted.length - 1].ch || '#';
+    const first = Array.from(String(charsetValue || '')).find((ch) => ch && ch !== '\n' && ch !== '\r');
+    return first || '#';
+  }
+
+  function fillArgElementWithSymbol(el, symbol, { cellPx = 10 } = {}) {
+    if (!el) return;
+    const glyph = Array.from(String(symbol || '#'))[0] || '#';
+    const widthPx = parseFloat(el.style.width) || el.getBoundingClientRect().width || 1;
+    const heightPx = parseFloat(el.style.height) || el.getBoundingClientRect().height || 1;
+    const safeCellPx = clamp(Number(cellPx) || 10, 4, 20);
+    const cols = Math.max(1, Math.round(widthPx / Math.max(1, safeCellPx * 0.76)));
+    const rows = Math.max(1, Math.round(heightPx / Math.max(1, safeCellPx * 0.9)));
+    const nextKey = `${glyph}|${cols}|${rows}|${safeCellPx.toFixed(2)}`;
+    if (el.dataset.argSymbolFillKey === nextKey) return;
+    el.dataset.argSymbolFillKey = nextKey;
+    el.style.fontSize = `${safeCellPx}px`;
+    el.textContent = Array.from({ length: rows }, () => glyph.repeat(cols)).join('\n');
+  }
+
+  function updateArgPongSymbolSprites({ ball = null, topStick = null, bottomStick = null, ballSizePx = ARG_PONG.paddleHeightPx } = {}) {
+    const symbol = getArgBrightestCharsetSymbol(argPongState.bossAsciiOptions?.charset || ARG_BOSS_ASCII_PRESET.charset);
+    const paddleCellPx = Math.max(6, ARG_PONG.paddleHeightPx * 0.82);
+    const ballCellPx = Math.max(5, Math.min(16, (Number(ballSizePx) || ARG_PONG.paddleHeightPx) * 0.72));
+    fillArgElementWithSymbol(topStick, symbol, { cellPx: paddleCellPx });
+    fillArgElementWithSymbol(bottomStick, symbol, { cellPx: paddleCellPx });
+    fillArgElementWithSymbol(ball, symbol, { cellPx: ballCellPx });
+  }
+
   function startArgPong({ overlay, ballStickLayer, ball, topStick, bottomStick, visorBody, visorEye, visorPupil, scoreLayer, aiScoreEl, playerScoreEl, preserveBossState = false }) {
     if (!overlay || !ballStickLayer || !ball || !topStick || !bottomStick || !visorBody || !visorEye || !visorPupil || !scoreLayer || !aiScoreEl || !playerScoreEl) return;
     if (argPongRafId) cancelAnimationFrame(argPongRafId);
@@ -2006,9 +2037,9 @@ let DITHER_ENABLED = false;
       argPongState.bossAsciiOptions.background = safeBg;
       argPongState.bossAsciiOptions.bossColor = bossShade;
       overlay.style.backgroundColor = safeBg;
-      ball.style.backgroundColor = safeText;
-      topStick.style.backgroundColor = safeText;
-      bottomStick.style.backgroundColor = safeText;
+      ball.style.color = safeText;
+      topStick.style.color = safeText;
+      bottomStick.style.color = safeText;
       overlay.style.setProperty('--arg-popup-fg', safeText);
       overlay.style.setProperty('--arg-popup-bg', safeBg);
       overlay.style.setProperty('--arg-score-fg', bossShade);
@@ -2411,6 +2442,7 @@ let DITHER_ENABLED = false;
       ball.style.top = `${argPongState.ballY * 100}%`;
       ball.style.width = `${ballVisualSizePx}px`;
       ball.style.height = `${ballVisualSizePx}px`;
+      updateArgPongSymbolSprites({ ball, topStick, bottomStick, ballSizePx: ballVisualSizePx });
       ball.style.transform = 'translate(-50%, -50%)';
       topStick.style.left = `${argPongState.aiX * 100}%`;
       bottomStick.style.left = `${argPongState.playerX * 100}%`;
@@ -2500,6 +2532,12 @@ let DITHER_ENABLED = false;
     let bossInitOk = false;
     const renderArgSceneStaticAscii = ({ ballEl = null, topStickEl = null, bottomStickEl = null } = {}) => {
       if (!bossInitOk) return;
+      updateArgPongSymbolSprites({
+        ball: ballEl,
+        topStick: topStickEl,
+        bottomStick: bottomStickEl,
+        ballSizePx: parseFloat(ballEl?.style?.width) || ARG_PONG.paddleHeightPx
+      });
       ensureArgBossCanvasSize(overlay);
       const rect = overlay.getBoundingClientRect();
       const compositeCanvas = argBossAscii.compositeCanvas;
@@ -2557,7 +2595,7 @@ let DITHER_ENABLED = false;
     const ballSizePx = ARG_PONG.paddleHeightPx * ARG_PONG.ballSizeToPaddleHeightRatio;
     ball.style.width = `${ballSizePx}px`;
     ball.style.height = `${ballSizePx}px`;
-    ball.style.backgroundColor = '#ffffff';
+    ball.style.color = '#ffffff';
     ballStickLayer.appendChild(ball);
     ballStickLayer.style.opacity = '1';
     renderArgSceneStaticAscii({ ballEl: ball });
@@ -2577,7 +2615,7 @@ let DITHER_ENABLED = false;
     topStick.style.height = `${ARG_PONG.paddleHeightPx}px`;
     topStick.style.top = `${ARG_PONG.topPaddleYVh}vh`;
     topStick.style.bottom = '';
-    topStick.style.backgroundColor = '#ffffff';
+    topStick.style.color = '#ffffff';
     ballStickLayer.appendChild(topStick);
     renderArgSceneStaticAscii({ ballEl: ball, topStickEl: topStick });
     playUiSoundNoThrow(ARG_SCENE_SOUNDS.bitClick);
@@ -2592,7 +2630,7 @@ let DITHER_ENABLED = false;
     bottomStick.style.height = `${ARG_PONG.paddleHeightPx}px`;
     bottomStick.style.bottom = `${100 - ARG_PONG.bottomPaddleYVh}vh`;
     bottomStick.style.top = '';
-    bottomStick.style.backgroundColor = '#ffffff';
+    bottomStick.style.color = '#ffffff';
     ballStickLayer.appendChild(bottomStick);
     renderArgSceneStaticAscii({ ballEl: ball, topStickEl: topStick, bottomStickEl: bottomStick });
     playUiSoundNoThrow(ARG_SCENE_SOUNDS.bitClick);
