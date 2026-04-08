@@ -1652,6 +1652,13 @@ input[type="color"] {
   image-rendering:pixelated;
 }
 
+.arg-scene-ball.arg-scene-symbol--bettervcr,
+.arg-scene-stick.arg-scene-symbol--bettervcr{
+  font-family:'BetterVCR','PxPlus IBM VGA',monospace;
+  font-weight:400;
+  letter-spacing:0;
+}
+
 .arg-scene-stick--top{ top:4vh; }
 .arg-scene-stick--bottom{ bottom:4vh; }
 

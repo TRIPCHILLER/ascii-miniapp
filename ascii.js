@@ -1916,7 +1916,13 @@ let DITHER_ENABLED = false;
   }
 
   function updateArgPongSymbolSprites({ ball = null, topStick = null, bottomStick = null, ballSizePx = ARG_PONG.paddleHeightPx } = {}) {
-    const symbol = getArgBrightestCharsetSymbol(argPongState.bossAsciiOptions?.charset || ARG_BOSS_ASCII_PRESET.charset);
+    const charset = String(argPongState.bossAsciiOptions?.charset || ARG_BOSS_ASCII_PRESET.charset);
+    const useBetterVcr = charset === ARG_BOSS_ASCII_PRESET.charset;
+    [topStick, bottomStick, ball].forEach((el) => {
+      if (!el) return;
+      el.classList.toggle('arg-scene-symbol--bettervcr', useBetterVcr);
+    });
+    const symbol = getArgBrightestCharsetSymbol(charset);
     const paddleCellPx = Math.max(8, ARG_PONG.paddleHeightPx * 0.92);
     const ballCellPx = Math.max(8, Math.min(20, (Number(ballSizePx) || ARG_PONG.paddleHeightPx) * 0.92));
     fillArgElementWithSymbol(topStick, symbol, { cellPx: paddleCellPx, glyphCount: 3 });
@@ -3004,7 +3010,16 @@ let DITHER_ENABLED = false;
     }, 30);
   }
 
+  function resetStartEasterEyeOverlay() {
+    const eyeOverlay = app.ui.modeChooser?.querySelector('.start-easter-eye-layer');
+    if (!eyeOverlay) return;
+    eyeOverlay.hidden = true;
+    eyeOverlay.style.removeProperty('--start-easter-eye-color');
+    eyeOverlay.style.removeProperty('--start-easter-eye-opacity');
+  }
+
   function startModeChooserFx(){
+    resetStartEasterEyeOverlay();
     updateStartDateTime();
     if (startDateTimer) clearInterval(startDateTimer);
     startDateTimer = setInterval(updateStartDateTime, 1000);
@@ -3026,6 +3041,7 @@ let DITHER_ENABLED = false;
   }
 
   function stopModeChooserFx(){
+    resetStartEasterEyeOverlay();
     if (startDateTimer) { clearInterval(startDateTimer); startDateTimer = null; }
     if (startBlinkTimer) { clearInterval(startBlinkTimer); startBlinkTimer = null; }
     if (startTypeTimer) { clearInterval(startTypeTimer); startTypeTimer = null; }
