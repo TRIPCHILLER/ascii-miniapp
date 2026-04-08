@@ -342,8 +342,8 @@ const ARG_SCENE_TIMINGS = {
 };
 const ARG_PONG = {
   scoreToWin: 3,
-  paddleWidthPx: 54,
-  paddleHeightPx: 18,
+  paddleWidthPx: 36,
+  paddleHeightPx: 12,
   ballSizeToPaddleHeightRatio: 1,
   topPaddleYVh: 4,
   bottomPaddleYVh: 96,
@@ -1986,12 +1986,11 @@ let DITHER_ENABLED = false;
     argPongState.topPaddleTiltV = 0;
     argPongState.bottomPaddleTiltDeg = 0;
     argPongState.bottomPaddleTiltV = 0;
-    argPongState.topPaddleFloatY = 0;
-    argPongState.bottomPaddleFloatY = 0;
-    argPongState.ballFloatY = 0;
-    argPongState.topPaddleFloatPhase = Math.random() * Math.PI * 2;
-    argPongState.bottomPaddleFloatPhase = Math.random() * Math.PI * 2;
-    argPongState.ballFloatPhase = Math.random() * Math.PI * 2;
+    if (argPongState.topPaddleFloatPhase === 0 && argPongState.bottomPaddleFloatPhase === 0 && argPongState.ballFloatPhase === 0) {
+      argPongState.topPaddleFloatPhase = Math.random() * Math.PI * 2;
+      argPongState.bottomPaddleFloatPhase = Math.random() * Math.PI * 2;
+      argPongState.ballFloatPhase = Math.random() * Math.PI * 2;
+    }
     playerScoreEl.textContent = '0';
     aiScoreEl.textContent = '0';
     aiScoreEl.style.top = `${ARG_PONG.topScoreYVh}vh`;
@@ -2000,9 +1999,6 @@ let DITHER_ENABLED = false;
     playerScoreEl.style.top = '';
     scoreLayer.hidden = false;
     resetArgBall(Math.random() > 0.5);
-    ball.classList.remove('arg-scene-float-ball');
-    topStick.classList.remove('arg-scene-float-stick');
-    bottomStick.classList.remove('arg-scene-float-stick');
     ball.style.transform = 'translate(-50%, -50%)';
     startArgPongMusic();
     bindArgPlayerControls(overlay);
