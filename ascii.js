@@ -263,6 +263,7 @@ function tgEventHaptic() {
 
 function tgGoalFlashHaptic() {
   tgHaptic('impactOccurred', 'medium');
+  if (navigator.vibrate) navigator.vibrate(60);
 }
 
 const TERM_RANGE_STEPS = 10;
