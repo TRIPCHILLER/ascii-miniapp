@@ -1438,8 +1438,8 @@ let DITHER_ENABLED = false;
   } = {}) {
     if (!argBossAscii.ready || !argBossAscii.compositeCtx || !argBossAscii.originalCtx || !argBossAscii.asciiCtx) return;
     if (argPongState.bossFlashHidden) {
-      argBossAscii.visualReady = false;
-      setArgBossVisualReady(overlay, { showAscii: false });
+      // Во время flash держим последний ASCII-кадр видимым, чтобы не
+      // показывать fallback-слои (raw visor png) с "сброшенной" геометрией.
       return;
     }
     const compositeCanvas = argBossAscii.compositeCanvas;
