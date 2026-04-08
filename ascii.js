@@ -1366,6 +1366,8 @@ let DITHER_ENABLED = false;
     const eyeImage = argBossAscii.eyeImage;
     const pupilImage = argBossAscii.pupilImage;
     if (!bodyImage || !eyeImage || !pupilImage || width < 2 || height < 2) return null;
+    const viewportAspect = width / Math.max(1, height);
+    const desktopWideStrength = Math.max(0, Math.min(1, (viewportAspect - 1.05) / 1.1));
 
     const safeBodyRatio = Math.max(0.2, Math.min(3.5, bodyImage.naturalWidth / Math.max(1, bodyImage.naturalHeight)));
     const baseBodyH = height * 1.02;
@@ -1376,12 +1378,17 @@ let DITHER_ENABLED = false;
       bodyH = height * 0.86;
       bodyW = Math.min(maxBodyW, bodyH * safeBodyRatio);
     }
+    if (desktopWideStrength > 0) {
+      const desktopZoom = 1 + desktopWideStrength * 1.05;
+      bodyW *= desktopZoom;
+      bodyH *= desktopZoom;
+    }
     const bodyCx = width * 0.5;
-    const bodyCy = height * 0.5;
+    const bodyCy = height * (0.5 - desktopWideStrength * 0.03);
 
     const eyeBase = Math.min(bodyW, bodyH);
-    const eyeScale = 1.05;
-    const pupilScale = 1.05;
+    const eyeScale = 1.05 * (1 + desktopWideStrength * 0.22);
+    const pupilScale = 1.05 * (1 + desktopWideStrength * 0.34);
     const eyeW = eyeBase * 0.308 * eyeScale;
     const eyeH = eyeW;
     const eyeCx = bodyCx;
