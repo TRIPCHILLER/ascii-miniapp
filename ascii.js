@@ -342,8 +342,8 @@ const ARG_SCENE_TIMINGS = {
 };
 const ARG_PONG = {
   scoreToWin: 3,
-  paddleWidthPx: 36,
-  paddleHeightPx: 12,
+  paddleWidthPx: 54,
+  paddleHeightPx: 18,
   ballSizeToPaddleHeightRatio: 1,
   topPaddleYVh: 4,
   bottomPaddleYVh: 96,
@@ -736,7 +736,7 @@ let DITHER_ENABLED = false;
   };
   const ARG_BOSS_CHARSET_ROTATION = Object.freeze([
     ARG_BOSS_ASCII_PRESET.charset,
-    ' 01²346⁷𝟴⁸9+.,',
+    ' 01²346⁷𝟴⁸9+',
     '█▓▒░'
   ]);
 
@@ -3030,9 +3030,23 @@ let DITHER_ENABLED = false;
     if (startBlinkTimer) { clearInterval(startBlinkTimer); startBlinkTimer = null; }
     if (startTypeTimer) { clearInterval(startTypeTimer); startTypeTimer = null; }
     if (startWordGlitchTimer) { clearInterval(startWordGlitchTimer); startWordGlitchTimer = 0; }
+    restoreStartWordGlitchText();
     startWordGlitchBrokenChars = 0;
     startWordGlitchFullChaos = false;
     startWordGlitchStateMap = null;
+  }
+
+  function restoreStartWordGlitchText() {
+    if (!app.ui.modeChooser || !startWordGlitchStateMap) return;
+    const walker = document.createTreeWalker(app.ui.modeChooser, NodeFilter.SHOW_TEXT, null);
+    let node = walker.nextNode();
+    while (node) {
+      const state = startWordGlitchStateMap.get?.(node);
+      if (state?.source != null) {
+        node.nodeValue = state.source;
+      }
+      node = walker.nextNode();
+    }
   }
 
   function stopStartBlinkTickerForArg() {
@@ -3206,6 +3220,7 @@ let DITHER_ENABLED = false;
         clearInterval(startWordGlitchTimer);
         startWordGlitchTimer = 0;
       }
+      restoreStartWordGlitchText();
       startWordGlitchBrokenChars = 0;
       startWordGlitchFullChaos = false;
       startWordGlitchStateMap = null;
