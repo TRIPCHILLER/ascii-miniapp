@@ -733,6 +733,11 @@ let DITHER_ENABLED = false;
     MICRO_LEGACY: ' .:*',
     MACRO: ' .`\'^",:;Il!i~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$'
   };
+  const ARG_BOSS_CHARSET_ROTATION = Object.freeze([
+    ARG_BOSS_ASCII_PRESET.charset,
+    '01²346⁷𝟴⁸9+. ,',
+    '█▓▒░'
+  ]);
 
   function isBrailleDotsCharset(charsetValue) {
     return String(charsetValue || '') === TEXT_CHARSETS.DOTS;
@@ -1041,6 +1046,8 @@ let DITHER_ENABLED = false;
     introCountdownFastShakeUntilMs: 0,
     shakeX: 0,
     shakeY: 0,
+    bossCharsetRotationIndex: 0,
+    bossFlashHidden: false,
     bossPresetId: null,
     bossAsciiOptions: {
       ...ARG_BOSS_ASCII_PRESET,
@@ -1429,6 +1436,11 @@ let DITHER_ENABLED = false;
     visorPupilY = 0
   } = {}) {
     if (!argBossAscii.ready || !argBossAscii.compositeCtx || !argBossAscii.originalCtx || !argBossAscii.asciiCtx) return;
+    if (argPongState.bossFlashHidden) {
+      argBossAscii.visualReady = false;
+      setArgBossVisualReady(overlay, { showAscii: false });
+      return;
+    }
     const compositeCanvas = argBossAscii.compositeCanvas;
     const compositeCtx = argBossAscii.compositeCtx;
     const originalCtx = argBossAscii.originalCtx;
@@ -2013,12 +2025,24 @@ let DITHER_ENABLED = false;
       if (!colors) return;
       applyBossFightPalette({ ...colors, presetId: nextPreset.id });
     };
+    const resetBossCharsetRotation = () => {
+      argPongState.bossCharsetRotationIndex = 0;
+      argPongState.bossAsciiOptions.charset = ARG_BOSS_CHARSET_ROTATION[0] || ARG_BOSS_ASCII_PRESET.charset;
+    };
+    const rotateBossCharset = () => {
+      const total = ARG_BOSS_CHARSET_ROTATION.length || 1;
+      const nextIndex = (argPongState.bossCharsetRotationIndex + 1) % total;
+      argPongState.bossCharsetRotationIndex = nextIndex;
+      argPongState.bossAsciiOptions.charset = ARG_BOSS_CHARSET_ROTATION[nextIndex] || ARG_BOSS_ASCII_PRESET.charset;
+    };
     applyBossFightPalette({ text: '#ffffff', bg: '#000000', presetId: null });
+    resetBossCharsetRotation();
     ballStickLayer.style.opacity = '1';
 
-    const playGoalFlashBurst = () => new Promise((resolve) => {
+    const playGoalFlashBurst = ({ onFlashOnStep = null, onDone = null } = {}) => new Promise((resolve) => {
       const goalFlashLayer = overlay.querySelector('#argSceneGoalFlashLayer');
       if (!goalFlashLayer) {
+        if (typeof onDone === 'function') onDone();
         resolve();
         return;
       }
@@ -2033,11 +2057,17 @@ let DITHER_ENABLED = false;
         }
         const flashOn = (step % 2 === 0);
         goalFlashLayer.style.opacity = flashOn ? '1' : '0';
-        if (flashOn) tgGoalFlashHaptic();
+        if (flashOn) {
+          tgGoalFlashHaptic();
+          if (typeof onFlashOnStep === 'function') {
+            onFlashOnStep(Math.floor(step / 2) + 1);
+          }
+        }
         step += 1;
         if (step >= 6) {
           goalFlashLayer.style.opacity = '0';
           goalFlashLayer.hidden = true;
+          if (typeof onDone === 'function') onDone();
           resolve();
           return;
         }
@@ -2216,7 +2246,19 @@ let DITHER_ENABLED = false;
           return;
         }
         serveLocked = true;
-        const flashBurstPromise = playGoalFlashBurst();
+        const flashBurstPromise = playGoalFlashBurst({
+          onFlashOnStep: (flashStep) => {
+            if (flashStep === 1) {
+              argPongState.bossFlashHidden = true;
+            } else if (flashStep === 3) {
+              rotateBossCharset();
+              argPongState.bossFlashHidden = false;
+            }
+          },
+          onDone: () => {
+            argPongState.bossFlashHidden = false;
+          }
+        });
         argPongServeTimer = setTimeout(() => {
           if (!argPongState.running) return;
           argPongServeTimer = 0;
@@ -2447,9 +2489,12 @@ let DITHER_ENABLED = false;
     overlay.hidden = false;
     argSceneActive = true;
     argPongState.bossPresetId = null;
+    argPongState.bossCharsetRotationIndex = 0;
+    argPongState.bossFlashHidden = false;
     argPongState.bossAsciiOptions.color = '#ffffff';
     argPongState.bossAsciiOptions.background = '#000000';
     argPongState.bossAsciiOptions.bossColor = '#808080';
+    argPongState.bossAsciiOptions.charset = ARG_BOSS_CHARSET_ROTATION[0] || ARG_BOSS_ASCII_PRESET.charset;
     overlay.style.backgroundColor = '#000000';
     let bossInitOk = false;
     const renderArgSceneStaticAscii = ({ ballEl = null, topStickEl = null, bottomStickEl = null } = {}) => {
