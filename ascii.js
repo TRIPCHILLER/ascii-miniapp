@@ -2530,6 +2530,8 @@ const ARG_GOAL_FLASH_STEPS = {
       const floatCycleMsBall = Math.max(900, ARG_PONG.floatBallCycleMs);
       const stickOmega = (Math.PI * 2) / floatCycleMsStick;
       const ballOmega = (Math.PI * 2) / floatCycleMsBall;
+      const ballSpeed = Math.hypot(argPongState.ballVX, argPongState.ballVY);
+      const isBallInFlight = !serveLocked && ballSpeed > 0.01;
       const secondaryRatio = ARG_PONG.floatSecondaryRatio;
       const topFloatTargetY = (
         Math.sin(now * stickOmega + argPongState.topPaddleFloatPhase)
@@ -2542,13 +2544,11 @@ const ARG_GOAL_FLASH_STEPS = {
       const ballFloatTargetY = (
         Math.sin(now * ballOmega + argPongState.ballFloatPhase)
         + Math.sin(now * ballOmega * 1.93 + argPongState.ballFloatPhase * 0.68) * (secondaryRatio + 0.05)
-      ) * ARG_PONG.floatBallAmpPx;
+      ) * (isBallInFlight ? 0 : ARG_PONG.floatBallAmpPx);
       argPongState.topPaddleFloatY += (topFloatTargetY - argPongState.topPaddleFloatY) * ARG_PONG.floatInertia;
       argPongState.bottomPaddleFloatY += (bottomFloatTargetY - argPongState.bottomPaddleFloatY) * ARG_PONG.floatInertia;
       argPongState.ballFloatY += (ballFloatTargetY - argPongState.ballFloatY) * ARG_PONG.floatInertia;
 
-      const ballSpeed = Math.hypot(argPongState.ballVX, argPongState.ballVY);
-      const isBallInFlight = !serveLocked && ballSpeed > 0.01;
       const centerDistanceNorm = Math.abs(argPongState.ballY - 0.5) / 0.5;
       const centerProximity = clamp(1 - centerDistanceNorm, 0, 1);
       const centerScaleBlend = Math.pow(centerProximity, ARG_PONG.ballCenterScaleCurve);
