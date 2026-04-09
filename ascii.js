@@ -2353,8 +2353,8 @@ const ARG_GOAL_FLASH_STEPS = {
         tgEventHaptic();
       }
 
-      const topGoalLine = topY + paddleHalfH + ballHalfY;
-      const bottomGoalLine = bottomY - paddleHalfH - ballHalfY;
+      const topGoalLine = ballHalfY;
+      const bottomGoalLine = 1 - ballHalfY;
       if (!serveLocked && argPongState.ballVY < 0 && argPongState.ballY < topGoalLine) {
         stopArgPongMusic();
         playUiSoundNoThrow(ARG_SCENE_SOUNDS.bitClick2);
