@@ -358,10 +358,14 @@ const ARG_PONG = {
   paddleBounceBoost: 0.6,
   paddleTiltHitBoostDeg: 4.8,
   paddleTiltOffsetBoostDeg: 3.4,
-  paddleTiltMoveBoostDeg: 0.03,
-  paddleTiltMoveMaxImpulseDeg: 0.45,
+  paddleTiltMoveBoostDeg: 0.075,
+  paddleTiltMoveMaxImpulseDeg: 1.2,
   paddleTiltSpring: 0.18,
   paddleTiltDamping: 0.82,
+  paddleHitBounceImpulsePx: 2.2,
+  paddleHitBounceSpring: 0.19,
+  paddleHitBounceDamping: 0.78,
+  paddleHitBounceMaxPx: 5.2,
   floatStickAmpPx: 1.35,
   floatBallAmpPx: 1.7,
   floatStickCycleMs: 3900,
@@ -1013,6 +1017,10 @@ let DITHER_ENABLED = false;
     topPaddleTiltV: 0,
     bottomPaddleTiltDeg: 0,
     bottomPaddleTiltV: 0,
+    topPaddleHitBounceY: 0,
+    topPaddleHitBounceV: 0,
+    bottomPaddleHitBounceY: 0,
+    bottomPaddleHitBounceV: 0,
     topPaddleFloatY: 0,
     bottomPaddleFloatY: 0,
     ballFloatY: 0,
@@ -1986,6 +1994,10 @@ let DITHER_ENABLED = false;
     argPongState.topPaddleTiltV = 0;
     argPongState.bottomPaddleTiltDeg = 0;
     argPongState.bottomPaddleTiltV = 0;
+    argPongState.topPaddleHitBounceY = 0;
+    argPongState.topPaddleHitBounceV = 0;
+    argPongState.bottomPaddleHitBounceY = 0;
+    argPongState.bottomPaddleHitBounceV = 0;
     if (argPongState.topPaddleFloatPhase === 0 && argPongState.bottomPaddleFloatPhase === 0 && argPongState.ballFloatPhase === 0) {
       argPongState.topPaddleFloatPhase = Math.random() * Math.PI * 2;
       argPongState.bottomPaddleFloatPhase = Math.random() * Math.PI * 2;
@@ -2268,6 +2280,7 @@ let DITHER_ENABLED = false;
         argPongState.ballY = topY + paddleHalfH + ballHalfY;
         const topTiltImpulse = (argPongState.ballVX / ARG_PONG.ballMaxSpeedPx) * ARG_PONG.paddleTiltHitBoostDeg;
         argPongState.topPaddleTiltV += topTiltImpulse + offset * ARG_PONG.paddleTiltOffsetBoostDeg;
+        argPongState.topPaddleHitBounceV -= ARG_PONG.paddleHitBounceImpulsePx;
         playUiSoundNoThrow(ARG_SCENE_SOUNDS.pongPunch);
         applyTinyShake();
         tgEventHaptic();
@@ -2285,6 +2298,7 @@ let DITHER_ENABLED = false;
         argPongState.ballY = bottomY - paddleHalfH - ballHalfY;
         const bottomTiltImpulse = (argPongState.ballVX / ARG_PONG.ballMaxSpeedPx) * ARG_PONG.paddleTiltHitBoostDeg;
         argPongState.bottomPaddleTiltV += bottomTiltImpulse + offset * ARG_PONG.paddleTiltOffsetBoostDeg;
+        argPongState.bottomPaddleHitBounceV += ARG_PONG.paddleHitBounceImpulsePx;
         playUiSoundNoThrow(ARG_SCENE_SOUNDS.pongPunch);
         applyTinyShake();
         tgEventHaptic();
@@ -2449,6 +2463,20 @@ let DITHER_ENABLED = false;
       argPongState.bottomPaddleTiltV += (0 - argPongState.bottomPaddleTiltDeg) * ARG_PONG.paddleTiltSpring;
       argPongState.bottomPaddleTiltV *= ARG_PONG.paddleTiltDamping;
       argPongState.bottomPaddleTiltDeg += argPongState.bottomPaddleTiltV;
+      argPongState.topPaddleHitBounceV += (0 - argPongState.topPaddleHitBounceY) * ARG_PONG.paddleHitBounceSpring;
+      argPongState.topPaddleHitBounceV *= ARG_PONG.paddleHitBounceDamping;
+      argPongState.topPaddleHitBounceY = clamp(
+        argPongState.topPaddleHitBounceY + argPongState.topPaddleHitBounceV,
+        -ARG_PONG.paddleHitBounceMaxPx,
+        ARG_PONG.paddleHitBounceMaxPx
+      );
+      argPongState.bottomPaddleHitBounceV += (0 - argPongState.bottomPaddleHitBounceY) * ARG_PONG.paddleHitBounceSpring;
+      argPongState.bottomPaddleHitBounceV *= ARG_PONG.paddleHitBounceDamping;
+      argPongState.bottomPaddleHitBounceY = clamp(
+        argPongState.bottomPaddleHitBounceY + argPongState.bottomPaddleHitBounceV,
+        -ARG_PONG.paddleHitBounceMaxPx,
+        ARG_PONG.paddleHitBounceMaxPx
+      );
       const floatCycleMsStick = Math.max(1200, ARG_PONG.floatStickCycleMs);
       const floatCycleMsBall = Math.max(900, ARG_PONG.floatBallCycleMs);
       const stickOmega = (Math.PI * 2) / floatCycleMsStick;
@@ -2490,8 +2518,10 @@ let DITHER_ENABLED = false;
       ball.style.transform = `translate(-50%, -50%) translateY(${argPongState.ballFloatY}px)`;
       topStick.style.left = `${argPongState.aiX * 100}%`;
       bottomStick.style.left = `${argPongState.playerX * 100}%`;
-      topStick.style.transform = `translateX(-50%) translateY(${argPongState.topPaddleFloatY}px) rotate(${argPongState.topPaddleTiltDeg}deg)`;
-      bottomStick.style.transform = `translateX(-50%) translateY(${argPongState.bottomPaddleFloatY}px) rotate(${argPongState.bottomPaddleTiltDeg}deg)`;
+      const topStickVisualY = argPongState.topPaddleFloatY + argPongState.topPaddleHitBounceY;
+      const bottomStickVisualY = argPongState.bottomPaddleFloatY + argPongState.bottomPaddleHitBounceY;
+      topStick.style.transform = `translateX(-50%) translateY(${topStickVisualY}px) rotate(${argPongState.topPaddleTiltDeg}deg)`;
+      bottomStick.style.transform = `translateX(-50%) translateY(${bottomStickVisualY}px) rotate(${argPongState.bottomPaddleTiltDeg}deg)`;
       ballStickLayer.style.transform = `translate(${argPongState.shakeX}px, ${argPongState.shakeY}px)`;
       const visorBodyX = 0;
       const visorBodyY = visorBodyShakeY;
