@@ -334,7 +334,7 @@ const ARG_SCENE_TIMINGS = {
   countdownStepMs: 1000,
   countdownStepPauseMs: 500,
   serveDelayMs: 700,
-  goalFlashBurstMs: 333,
+  goalFlashBurstMs: 666,
   goalRespawnDelayMs: 2000,
   popupGlitchMs: 19,
   popupSpaceTypeMs: 12,
@@ -367,7 +367,7 @@ const ARG_PONG = {
   paddleHitBounceDamping: 0.78,
   paddleHitBounceMaxPx: 5.2,
   floatStickAmpPx: 1.35,
-  floatBallAmpPx: 1.7,
+  floatBallAmpPx: 3.4,
   floatStickCycleMs: 3900,
   floatBallCycleMs: 3200,
   floatSecondaryRatio: 0.37,
@@ -1070,13 +1070,19 @@ let DITHER_ENABLED = false;
     shakeY: 0,
     bossCharsetRotationIndex: 0,
     bossFlashHidden: false,
+    goalEyeZoomActive: false,
     bossPresetId: null,
     bossAsciiOptions: {
       ...ARG_BOSS_ASCII_PRESET,
       color: '#ffffff',
       background: '#000000'
-    }
-  };
+  }
+};
+const ARG_GOAL_FLASH_STEPS = {
+  first: 1,
+  eyeZoom: 2,
+  third: 3
+};
   const argBossAscii = {
     root: null,
     originalCanvas: null,
@@ -1640,6 +1646,8 @@ let DITHER_ENABLED = false;
     const overlay = document.getElementById('argSceneOverlay');
     const goalFlashLayer = overlay?.querySelector('#argSceneGoalFlashLayer');
     if (goalFlashLayer) goalFlashLayer.hidden = true;
+    if (overlay) overlay.classList.remove('arg-scene-overlay--goal-eye-zoom');
+    argPongState.goalEyeZoomActive = false;
   }
 
   function resetArgOverlayState() {
@@ -1656,6 +1664,8 @@ let DITHER_ENABLED = false;
     const popupText = overlay.querySelector('#argScenePopupText');
     if (popupLayer) popupLayer.hidden = true;
     if (goalFlashLayer) goalFlashLayer.hidden = true;
+    overlay.classList.remove('arg-scene-overlay--goal-eye-zoom');
+    argPongState.goalEyeZoomActive = false;
     if (countdownLayer) countdownLayer.textContent = '';
     if (scoreLayer) scoreLayer.hidden = true;
     if (popupText) popupText.textContent = '';
@@ -2134,6 +2144,8 @@ let DITHER_ENABLED = false;
     };
     applyBossFightPalette({ text: '#ffffff', bg: '#000000', presetId: null });
     resetBossCharsetRotation();
+    overlay.classList.remove('arg-scene-overlay--goal-eye-zoom');
+    argPongState.goalEyeZoomActive = false;
     ballStickLayer.style.opacity = '1';
 
     const playGoalFlashBurst = ({ onFlashOnStep = null, onDone = null } = {}) => new Promise((resolve) => {
@@ -2148,20 +2160,28 @@ let DITHER_ENABLED = false;
       goalFlashLayer.hidden = false;
       const tick = () => {
         if (!argPongState.running) {
+          overlay.classList.remove('arg-scene-overlay--goal-eye-zoom');
+          argPongState.goalEyeZoomActive = false;
           goalFlashLayer.hidden = true;
           resolve();
           return;
         }
         const flashOn = (step % 2 === 0);
-        goalFlashLayer.style.opacity = flashOn ? '1' : '0';
+        const flashStep = Math.floor(step / 2) + 1;
+        const isEyeZoomFlashStep = flashOn && flashStep === ARG_GOAL_FLASH_STEPS.eyeZoom;
+        overlay.classList.toggle('arg-scene-overlay--goal-eye-zoom', isEyeZoomFlashStep);
+        argPongState.goalEyeZoomActive = isEyeZoomFlashStep;
+        goalFlashLayer.style.opacity = (flashOn && !isEyeZoomFlashStep) ? '1' : '0';
         if (flashOn) {
           tgGoalFlashHaptic();
           if (typeof onFlashOnStep === 'function') {
-            onFlashOnStep(Math.floor(step / 2) + 1);
+            onFlashOnStep(flashStep);
           }
         }
         step += 1;
         if (step >= 6) {
+          overlay.classList.remove('arg-scene-overlay--goal-eye-zoom');
+          argPongState.goalEyeZoomActive = false;
           goalFlashLayer.style.opacity = '0';
           goalFlashLayer.hidden = true;
           if (typeof onDone === 'function') onDone();
@@ -2347,9 +2367,9 @@ let DITHER_ENABLED = false;
         serveLocked = true;
         const flashBurstPromise = playGoalFlashBurst({
           onFlashOnStep: (flashStep) => {
-            if (flashStep === 1) {
+            if (flashStep === ARG_GOAL_FLASH_STEPS.first) {
               argPongState.bossFlashHidden = true;
-            } else if (flashStep === 3) {
+            } else if (flashStep === ARG_GOAL_FLASH_STEPS.third) {
               rotateBossCharset();
               argPongState.bossFlashHidden = false;
             }
@@ -2510,6 +2530,8 @@ let DITHER_ENABLED = false;
       const floatCycleMsBall = Math.max(900, ARG_PONG.floatBallCycleMs);
       const stickOmega = (Math.PI * 2) / floatCycleMsStick;
       const ballOmega = (Math.PI * 2) / floatCycleMsBall;
+      const ballSpeed = Math.hypot(argPongState.ballVX, argPongState.ballVY);
+      const isBallInFlight = !serveLocked && ballSpeed > 0.01;
       const secondaryRatio = ARG_PONG.floatSecondaryRatio;
       const topFloatTargetY = (
         Math.sin(now * stickOmega + argPongState.topPaddleFloatPhase)
@@ -2522,13 +2544,11 @@ let DITHER_ENABLED = false;
       const ballFloatTargetY = (
         Math.sin(now * ballOmega + argPongState.ballFloatPhase)
         + Math.sin(now * ballOmega * 1.93 + argPongState.ballFloatPhase * 0.68) * (secondaryRatio + 0.05)
-      ) * ARG_PONG.floatBallAmpPx;
+      ) * (isBallInFlight ? 0 : ARG_PONG.floatBallAmpPx);
       argPongState.topPaddleFloatY += (topFloatTargetY - argPongState.topPaddleFloatY) * ARG_PONG.floatInertia;
       argPongState.bottomPaddleFloatY += (bottomFloatTargetY - argPongState.bottomPaddleFloatY) * ARG_PONG.floatInertia;
       argPongState.ballFloatY += (ballFloatTargetY - argPongState.ballFloatY) * ARG_PONG.floatInertia;
 
-      const ballSpeed = Math.hypot(argPongState.ballVX, argPongState.ballVY);
-      const isBallInFlight = !serveLocked && ballSpeed > 0.01;
       const centerDistanceNorm = Math.abs(argPongState.ballY - 0.5) / 0.5;
       const centerProximity = clamp(1 - centerDistanceNorm, 0, 1);
       const centerScaleBlend = Math.pow(centerProximity, ARG_PONG.ballCenterScaleCurve);

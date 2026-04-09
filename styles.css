@@ -1845,6 +1845,19 @@ input[type="color"] {
   opacity:0;
 }
 
+.arg-scene-overlay--goal-eye-zoom #boss-root,
+.arg-scene-overlay--goal-eye-zoom .arg-scene-boss-layer--body{
+  opacity:0 !important;
+}
+
+.arg-scene-overlay--goal-eye-zoom .arg-scene-boss-layer--eye{
+  transform:translate(0, 0) scale(clamp(2.05, 1.86 + 0.7vw, 2.45)) !important;
+}
+
+.arg-scene-overlay--goal-eye-zoom .arg-scene-boss-layer--pupil{
+  transform:translate(0, 0) scale(clamp(2.08, 1.9 + 0.75vw, 2.5)) !important;
+}
+
 .arg-scene-popup-box{
   width:min(84vw, 880px);
   min-height:136px;
