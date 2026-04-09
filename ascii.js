@@ -2010,6 +2010,13 @@ let DITHER_ENABLED = false;
     playerScoreEl.style.bottom = `${ARG_PONG.bottomScoreYVh}vh`;
     playerScoreEl.style.top = '';
     scoreLayer.hidden = false;
+    // Во время интро стики и мяч двигаются CSS keyframes.
+    // В геймплее их transform обновляется из JS каждый кадр
+    // (наклон, отскок, плавающий оффсет), поэтому убираем интро-классы,
+    // иначе CSS-анимация перетирает inline transform.
+    ball.classList.remove('arg-scene-float-ball');
+    topStick.classList.remove('arg-scene-float-stick');
+    bottomStick.classList.remove('arg-scene-float-stick');
     resetArgBall(Math.random() > 0.5);
     ball.style.transform = 'translate(-50%, -50%)';
     startArgPongMusic();
