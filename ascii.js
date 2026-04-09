@@ -1424,6 +1424,20 @@ let DITHER_ENABLED = false;
     };
   }
 
+  function getArgBossAsciiRenderOptions(baseOptions, width, height) {
+    const options = { ...(baseOptions || ARG_BOSS_ASCII_PRESET) };
+    const safeWidth = Math.max(1, Number(width) || 1);
+    const safeHeight = Math.max(1, Number(height) || 1);
+    const dpr = Math.max(1, Math.min(2, Number(argBossAscii.dpr) || (window.devicePixelRatio || 1)));
+    const cssWidth = safeWidth / dpr;
+    const viewportAspect = safeWidth / safeHeight;
+    const landscapeStrength = clamp((viewportAspect - 1.35) / 0.6, 0, 1);
+    const wideStrength = clamp((cssWidth - 1280) / 1280, 0, 1);
+    const detailBoost = Math.max(landscapeStrength, wideStrength);
+    options.size = Math.round(clamp(ARG_BOSS_ASCII_PRESET.size + detailBoost * 50, ARG_BOSS_ASCII_PRESET.size, 150));
+    return options;
+  }
+
   function renderArgBossAsciiIdleFrame() {
     if (!argBossAscii.ready || !argBossAscii.compositeCtx || !argBossAscii.originalCtx || !argBossAscii.asciiCtx || !argBossAscii.bodyImage || !argBossAscii.eyeImage || !argBossAscii.pupilImage) return false;
     const compositeCanvas = argBossAscii.compositeCanvas;
@@ -1443,7 +1457,11 @@ let DITHER_ENABLED = false;
 
     originalCtx.clearRect(0, 0, width, height);
     originalCtx.drawImage(compositeCanvas, 0, 0);
-    const asciiResult = renderAsciiFromSource(compositeCanvas, asciiCtx, argPongState.bossAsciiOptions);
+    const asciiResult = renderAsciiFromSource(
+      compositeCanvas,
+      asciiCtx,
+      getArgBossAsciiRenderOptions(argPongState.bossAsciiOptions, width, height)
+    );
     argBossAscii.visualReady = asciiResult.ok;
     return asciiResult.ok;
   }
@@ -1523,7 +1541,11 @@ let DITHER_ENABLED = false;
 
     originalCtx.clearRect(0, 0, width, height);
     originalCtx.drawImage(compositeCanvas, 0, 0);
-    const asciiResult = renderAsciiFromSource(compositeCanvas, asciiCtx, argPongState.bossAsciiOptions);
+    const asciiResult = renderAsciiFromSource(
+      compositeCanvas,
+      asciiCtx,
+      getArgBossAsciiRenderOptions(argPongState.bossAsciiOptions, width, height)
+    );
     if (!asciiResult.ok) {
       setArgBossVisualReady(overlay, { showAscii: false });
       return;
@@ -2631,7 +2653,11 @@ let DITHER_ENABLED = false;
       const sy = height / Math.max(1, rect.height);
       compositeCtx.setTransform(1, 0, 0, 1, 0, 0);
       compositeCtx.clearRect(0, 0, width, height);
-      renderAsciiFromSource(compositeCanvas, asciiCtx, argPongState.bossAsciiOptions);
+      renderAsciiFromSource(
+        compositeCanvas,
+        asciiCtx,
+        getArgBossAsciiRenderOptions(argPongState.bossAsciiOptions, width, height)
+      );
       setArgBossVisualReady(overlay, { showAscii: true });
     };
     stopStartBlinkTickerForArg();
