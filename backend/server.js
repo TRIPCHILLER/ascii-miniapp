@@ -627,6 +627,20 @@ function validateInitData(initData) {
     return null;
   }
 }
+
+function formatHttpError(err) {
+  if (!err) return 'UNKNOWN_ERROR';
+  const message = String(err?.message || err);
+  const responseStatus = err?.response?.status;
+  const responseData = err?.response?.data;
+  const responseText = (typeof responseData === 'string')
+    ? responseData
+    : (responseData ? JSON.stringify(responseData) : '');
+  const code = err?.code ? ` code=${err.code}` : '';
+  const status = responseStatus ? ` status=${responseStatus}` : '';
+  const body = responseText ? ` response=${responseText.slice(0, 800)}` : '';
+  return `${message}${code}${status}${body}`;
+}
 // Текущий баланс (из мини-аппа можно дергать GET /api/balance?telegramId=...)
 // @section MINIAPP_HTTP_API_ROUTES
 app.get('/api/balance', (req, res) => {
@@ -741,8 +755,9 @@ if (mediatype === 'video') {
       deduct(userId, cost);
       return res.json({ ok: true, balance: getBalance(userId) });
     } catch (e) {
-      console.error('[ERR] /api/upload', e);
-      return res.status(500).json({ ok: false, error: 'UPLOAD_FAILED', detail: String(e?.message || e) });
+      const detail = formatHttpError(e);
+      console.error('[ERR] /api/upload', detail);
+      return res.status(500).json({ ok: false, error: 'UPLOAD_FAILED', detail });
     }
   }
 ];
@@ -758,7 +773,7 @@ app.post('/api/ascii-text', upload.any(), async (req, res) => {
     (req.body?.initdata || '').trim();
   const userId = validateInitData(rawInit);
   if (!userId) {
-    try { if (f.path) fs.unlinkSync(f.path); } catch {}
+    try { if (f?.path) fs.unlinkSync(f.path); } catch {}
     return res.status(401).json({ ok:false, error:'INITDATA_INVALID' });
   }
   try {
@@ -820,10 +835,11 @@ app.post('/api/ascii-text', upload.any(), async (req, res) => {
       selectedCharsetPreset: result.selectedCharsetPreset
     });
   } catch (e) {
-    console.error('[ERR] /api/ascii-text', e);
-    return res.status(500).json({ ok:false, error:'ASCII_TEXT_FAILED', message:String(e?.message || e) });
+    const detail = formatHttpError(e);
+    console.error('[ERR] /api/ascii-text', detail);
+    return res.status(500).json({ ok:false, error:'ASCII_TEXT_FAILED', message:detail });
   } finally {
-    try { if (f.path) fs.unlinkSync(f.path); } catch {}
+    try { if (f?.path) fs.unlinkSync(f.path); } catch {}
   }
 });
 // ОСТАВЛЯЕМ: старый основной save (если где-то используется)
