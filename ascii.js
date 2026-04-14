@@ -5631,13 +5631,14 @@ async function precheckCaptureImpulses() {
 
 // Универсальная отправка: в Telegram → на сервер; иначе → локальная загрузка
 async function downloadBlob(blob, filename) {
-  const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
-
   if (uploadInFlight) {
-    console.warn('Upload already in progress — skip');
+    console.warn('[UPLOAD] blocked duplicate downloadBlob');
     return;
   }
   uploadInFlight = true;
+  console.log('[UPLOAD] downloadBlob:start');
+
+  const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
 
   const isTg = !!(window.Telegram?.WebApp?.initData);
   if (isTg) {
@@ -5668,11 +5669,13 @@ async function downloadBlob(blob, filename) {
       form.append('initData', tg.initData || '');
       form.append('mediatype', isVideoMode ? 'video' : 'photo');
       form.append('fps', String(Math.max(5, Math.min(60, Math.round(state.fps || 30)))));
+      console.log('[UPLOAD] fetch:start');
       const res = await fetch(`${API_BASE}/api/upload`, {
         method: 'POST',
         body: form,
         signal: ctrl.signal,
       });
+      console.log('[UPLOAD] fetch:done');
 
       // ответ может быть и текстом, и json
       const text = await res.text();
@@ -5734,9 +5737,12 @@ async function downloadBlob(blob, filename) {
   }
 
   // Не Telegram — сразу локально
-  tryLocalDownload(file);
-  uploadInFlight = false;
-  setTimeout(() => clearShotVisualEffects(), 220);
+  try {
+    tryLocalDownload(file);
+  } finally {
+    uploadInFlight = false;
+    setTimeout(() => clearShotVisualEffects(), 220);
+  }
 
   function tryLocalDownload(file) {
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
