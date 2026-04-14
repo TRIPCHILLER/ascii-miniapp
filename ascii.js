@@ -5614,7 +5614,7 @@ function saveVideo(){
 }
   
 let uploadInFlight = false;
-const PHOTO_UPLOAD_CHUNK_SIZE = 32 * 1024;
+const PHOTO_UPLOAD_CHUNK_SIZE = 8 * 1024;
 
 function getRequiredImpulsesForCapture() {
   if (isTextMode()) return 1;
