@@ -5632,12 +5632,6 @@ async function precheckCaptureImpulses() {
 // Универсальная отправка: в Telegram → на сервер; иначе → локальная загрузка
 async function downloadBlob(blob, filename) {
   const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
-  const blobToDataUrl = (srcBlob) => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ''));
-    reader.onerror = () => reject(reader.error || new Error('FILE_READER_FAILED'));
-    reader.readAsDataURL(srcBlob);
-  });
 
   if (uploadInFlight) {
     console.warn('Upload already in progress — skip');
@@ -5667,35 +5661,18 @@ async function downloadBlob(blob, filename) {
       // общий таймаут (120s)
       to = setTimeout(() => ctrl.abort(), 120000);
 
-      let res;
-      if (isVideoMode) {
-        const form = new FormData();
-        form.append('file', file, filename);
-        form.append('filename', filename);
-        form.append('initdata', tg.initData || ''); // нижний регистр — как ждёт бэкенд
-        form.append('initData', tg.initData || '');
-        form.append('mediatype', 'video');
-        form.append('fps', String(Math.max(5, Math.min(60, Math.round(state.fps || 30)))));
-        res = await fetch(`${API_BASE}/api/upload`, {
-          method: 'POST',
-          body: form,
-          signal: ctrl.signal,
-        });
-      } else {
-        const dataUrl = await blobToDataUrl(blob);
-        const payload = {
-          filename,
-          initData: tg.initData || '',
-          mediatype: 'photo',
-          dataUrl
-        };
-        res = await fetch(`${API_BASE}/api/upload-photo-json`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          signal: ctrl.signal,
-        });
-      }
+      const form = new FormData();
+      form.append('file', file, filename);
+      form.append('filename', filename);
+      form.append('initdata', tg.initData || ''); // нижний регистр — как ждёт бэкенд
+      form.append('initData', tg.initData || '');
+      form.append('mediatype', isVideoMode ? 'video' : 'photo');
+      form.append('fps', String(Math.max(5, Math.min(60, Math.round(state.fps || 30)))));
+      const res = await fetch(`${API_BASE}/api/upload`, {
+        method: 'POST',
+        body: form,
+        signal: ctrl.signal,
+      });
 
       // ответ может быть и текстом, и json
       const text = await res.text();
