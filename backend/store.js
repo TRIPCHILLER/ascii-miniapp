@@ -165,37 +165,20 @@ async function sendFileToUser(telegramId, filePath, caption) {
   if (!BOT_TOKEN) throw new Error('BOT_TOKEN is empty');
   if (!fs.existsSync(filePath)) throw new Error(`File not found: ${filePath}`);
 
-  const url = `${TG_BASE}/sendDocument`;
-  const form = new FormData();
-  const filename = path.basename(filePath);
-  const contentType = mime.lookup(filename) || 'application/octet-stream';
-
-  form.append('chat_id', telegramId);
-  form.append('document', fs.createReadStream(filePath), { filename, contentType });
-  if (caption) form.append('caption', caption);
-
-  const { data } = await axios.post(url, form, {
-    headers: form.getHeaders(),
-    maxBodyLength: Infinity,
-    maxContentLength: Infinity,
-    timeout: 30000,
+  const stat = fs.statSync(filePath);
+  console.log('[TG] sendDocument:start', {
+    telegramId: String(telegramId),
+    filePath,
+    size: stat.size,
+    caption: caption || ''
   });
 
-  if (!data.ok) throw new Error(`Telegram API error: ${JSON.stringify(data)}`);
-  return data;
-}
-// ==== SEND FILE TO TELEGRAM ====
-// @section TELEGRAM_DOCUMENT_UPLOAD_LEGACY_DUPLICATE
-async function sendFileToUser(telegramId, filePath, caption) {
-  if (!BOT_TOKEN) throw new Error('BOT_TOKEN is empty');
-  if (!fs.existsSync(filePath)) throw new Error(`File not found: ${filePath}`);
-
   const url = `${TG_BASE}/sendDocument`;
   const form = new FormData();
   const filename = path.basename(filePath);
   const contentType = mime.lookup(filename) || 'application/octet-stream';
 
-  form.append('chat_id', telegramId);
+  form.append('chat_id', String(telegramId));
   form.append('document', fs.createReadStream(filePath), { filename, contentType });
   if (caption) form.append('caption', caption);
 
@@ -203,7 +186,13 @@ async function sendFileToUser(telegramId, filePath, caption) {
     headers: form.getHeaders(),
     maxBodyLength: Infinity,
     maxContentLength: Infinity,
-    timeout: 30000,
+    timeout: 120000,
+  });
+
+  console.log('[TG] sendDocument:done', {
+    telegramId: String(telegramId),
+    ok: !!data?.ok,
+    filePath
   });
 
   if (!data.ok) throw new Error(`Telegram API error: ${JSON.stringify(data)}`);
@@ -218,7 +207,7 @@ async function probeVideo(filePath) {
       '-v', 'error',
       '-of', 'json',
       // одна опция show_entries сразу для двух секций:
-      ' -show_entries', 'stream=width,height:format=duration',
+      '-show_entries', 'stream=width,height:format=duration',
       filePath,
     ], { maxBuffer: 1e6 });
 
