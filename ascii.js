@@ -5632,6 +5632,12 @@ async function precheckCaptureImpulses() {
 // Универсальная отправка: в Telegram → на сервер; иначе → локальная загрузка
 async function downloadBlob(blob, filename) {
   const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
+  const blobToDataUrl = (srcBlob) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error || new Error('FILE_READER_FAILED'));
+    reader.readAsDataURL(srcBlob);
+  });
 
   if (uploadInFlight) {
     console.warn('Upload already in progress — skip');
@@ -5653,14 +5659,7 @@ async function downloadBlob(blob, filename) {
       tgHaptic('impactOccurred', 'light');
       tg.MainButton?.showProgress?.();
 
-      // === важно: именно такие поля и заголовки ===
-      const form = new FormData();
-      form.append('file', file, filename);
-      form.append('filename', filename);
-      form.append('initdata', tg.initData || ''); // нижний регистр — как ждёт бэкенд
-      form.append('initData', tg.initData || '');
-      form.append('mediatype', (state.mode === 'video') ? 'video' : 'photo');
-      form.append('fps', String(Math.max(5, Math.min(60, Math.round(state.fps || 30)))));
+      const isVideoMode = state.mode === 'video';
       // показываем «длинный» overlay на всё время запроса
       busyLock = true;
       stopBusyUploadAnimation = startBusyServiceTextAnimation('ОТПРАВКА ФАЙЛА В ЧАТ', { withDots: true });
@@ -5668,11 +5667,35 @@ async function downloadBlob(blob, filename) {
       // общий таймаут (120s)
       to = setTimeout(() => ctrl.abort(), 120000);
 
-      const res = await fetch(`${API_BASE}/api/upload`, {
-        method: 'POST',
-        body: form,
-        signal: ctrl.signal,
-      });
+      let res;
+      if (isVideoMode) {
+        const form = new FormData();
+        form.append('file', file, filename);
+        form.append('filename', filename);
+        form.append('initdata', tg.initData || ''); // нижний регистр — как ждёт бэкенд
+        form.append('initData', tg.initData || '');
+        form.append('mediatype', 'video');
+        form.append('fps', String(Math.max(5, Math.min(60, Math.round(state.fps || 30)))));
+        res = await fetch(`${API_BASE}/api/upload`, {
+          method: 'POST',
+          body: form,
+          signal: ctrl.signal,
+        });
+      } else {
+        const dataUrl = await blobToDataUrl(blob);
+        const payload = {
+          filename,
+          initData: tg.initData || '',
+          mediatype: 'photo',
+          dataUrl
+        };
+        res = await fetch(`${API_BASE}/api/upload-photo-json`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          signal: ctrl.signal,
+        });
+      }
 
       // ответ может быть и текстом, и json
       const text = await res.text();
@@ -5684,7 +5707,7 @@ async function downloadBlob(blob, filename) {
         showAsciiPopup({
           type: 'error',
           title: 'НЕДОСТАТОЧНО ЭНЕРГИИ',
-          message: `ДЛЯ ПРЕОБРЗОВАНИЯ ТРЕБУЕТСЯ: ${json?.need ?? (state.mode==='video'?15:5)}`,
+          message: `ДЛЯ ПРЕОБРЗОВАНИЯ ТРЕБУЕТСЯ: ${json?.need ?? (isVideoMode?15:5)}`,
           extra: `В ЭНЕРГОХРАНИЛИЩЕ: ${json?.balance ?? '—'}`
         });
         return; // без локального сохранения

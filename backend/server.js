@@ -764,6 +764,68 @@ if (mediatype === 'video') {
 // Регистрируем один и тот же обработчик на оба пути (как у тебя было)
 app.post('/api/upload', ...uploadHandler);
 app.post('/upload', ...uploadHandler);
+app.post('/api/upload-photo-json', async (req, res) => {
+  let tmpPath = '';
+  try {
+    console.log('[UPLOAD-JSON] start');
+    const body = (req.body && typeof req.body === 'object') ? req.body : {};
+    const rawInit =
+      String(body.initData || '').trim() ||
+      String(body.initdata || '').trim();
+    const userId = validateInitData(rawInit);
+    if (!userId) {
+      return res.status(401).json({ ok: false, error: 'INITDATA_INVALID' });
+    }
+
+    ensureUser(userId);
+    const cost = 5;
+    const balance = getBalance(userId);
+    if (balance < cost) {
+      return res.status(402).json({ ok: false, error: 'INSUFFICIENT_FUNDS', need: cost, balance });
+    }
+
+    const filenameRaw = String(body.filename || 'ascii_visor.png');
+    const safeNameBase = filenameRaw.replace(/[^\w.\-]+/g, '_');
+    const safeName = (safeNameBase || 'ascii_visor.png').slice(-120);
+    const payloadRaw = String(body.dataUrl || body.base64 || '').trim();
+    if (!payloadRaw) {
+      return res.status(400).json({ ok: false, error: 'NO_DATA' });
+    }
+
+    let b64 = payloadRaw;
+    if (payloadRaw.startsWith('data:')) {
+      const m = payloadRaw.match(/^data:image\/png;base64,(.+)$/i);
+      if (!m || !m[1]) {
+        return res.status(400).json({ ok: false, error: 'BAD_DATAURL' });
+      }
+      b64 = m[1];
+    }
+
+    const buffer = Buffer.from(b64, 'base64');
+    if (!buffer.length) {
+      return res.status(400).json({ ok: false, error: 'BAD_BASE64' });
+    }
+
+    tmpPath = path.join(TMP_DIR, `${Date.now()}__${safeName.endsWith('.png') ? safeName : `${safeName}.png`}`);
+    await fs.promises.writeFile(tmpPath, buffer);
+    console.log('[UPLOAD-JSON] saved', tmpPath);
+
+    await sendFileToUser(userId, tmpPath, '#ascii_photo');
+    console.log('[UPLOAD-JSON] sent', userId);
+
+    deduct(userId, cost);
+    return res.json({ ok: true, balance: getBalance(userId) });
+  } catch (e) {
+    const detail = formatHttpError(e);
+    console.error('[ERR] /api/upload-photo-json', detail);
+    return res.status(500).json({ ok: false, error: 'UPLOAD_JSON_FAILED', detail });
+  } finally {
+    if (tmpPath) {
+      try { await fs.promises.unlink(tmpPath); } catch {}
+    }
+    console.log('[UPLOAD-JSON] cleanup');
+  }
+});
 app.post('/api/ascii-text', upload.any(), async (req, res) => {
   const files = Array.isArray(req.files) ? req.files : [];
   const f = files.find(x => x.fieldname === 'file') || files.find(x => x.fieldname === 'document') || files[0];
