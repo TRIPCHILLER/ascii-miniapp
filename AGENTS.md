@@ -41,3 +41,5 @@
 - All PR descriptions, summaries, and human-facing explanations MUST be in Russian.
 - If the user prompt is in English, still write PR text in Russian.
 - Code identifiers stay in English.
+
+deploy test: 2026-04-12
