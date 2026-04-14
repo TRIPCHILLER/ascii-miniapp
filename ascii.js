@@ -5737,7 +5737,9 @@ async function downloadBlob(blob, filename) {
 
     // объявляем заранее → доступны в finally
     const ctrl = new AbortController();
+    const photoCtrl = new AbortController();
     let to = null;
+    let photoTo = null;
     let stopBusyUploadAnimation = () => {};
 
     try {
@@ -5749,11 +5751,10 @@ async function downloadBlob(blob, filename) {
       busyLock = true;
       stopBusyUploadAnimation = startBusyServiceTextAnimation('ОТПРАВКА ФАЙЛА В ЧАТ', { withDots: true });
 
-      // общий таймаут (180s)
-      to = setTimeout(() => ctrl.abort(), 180000);
-
       let res;
       if (mediatype === 'photo') {
+        // для chunk upload фото используем отдельный длинный таймаут (10 минут)
+        photoTo = setTimeout(() => photoCtrl.abort(), 600000);
         const dataUrl = await new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(String(reader.result || ''));
@@ -5764,9 +5765,11 @@ async function downloadBlob(blob, filename) {
           dataUrl,
           filename,
           initData: tg.initData || '',
-          signal: ctrl.signal,
+          signal: photoCtrl.signal,
         });
       } else {
+        // общий таймаут (180s) для video upload
+        to = setTimeout(() => ctrl.abort(), 180000);
         // === важно: именно такие поля и заголовки ===
         const form = new FormData();
         form.append('file', blob, filename);
@@ -5880,6 +5883,7 @@ async function downloadBlob(blob, filename) {
 
     } finally {
       if (to) clearTimeout(to);
+      if (photoTo) clearTimeout(photoTo);
       stopBusyUploadAnimation();
 
       window.Telegram?.WebApp?.MainButton?.hideProgress?.();
