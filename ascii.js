@@ -5657,41 +5657,64 @@ async function downloadBlob(blob, filename) {
       busyLock = true;
       stopBusyUploadAnimation = startBusyServiceTextAnimation('ОТПРАВКА ФАЙЛА В ЧАТ', { withDots: true });
 
-      const form = new FormData();
-      form.append('file', file, filename);
-      form.append('filename', filename);
-      form.append('initdata', tg.initData || ''); // нижний регистр — как ждёт бэкенд
-      form.append('initData', tg.initData || '');
-      form.append('mediatype', isVideoMode ? 'video' : 'photo');
-      form.append('fps', String(Math.max(5, Math.min(60, Math.round(state.fps || 30)))));
-      console.log('[UPLOAD] xhr:start');
-      const res = await new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', `${API_BASE}/api/upload`);
-        xhr.timeout = 120000;
-        xhr.onload = () => resolve({
-          status: xhr.status,
-          ok: xhr.status >= 200 && xhr.status < 300,
-          text: xhr.responseText || ''
+      let res;
+      if (isVideoMode) {
+        const form = new FormData();
+        form.append('file', file, filename);
+        form.append('filename', filename);
+        form.append('initdata', tg.initData || ''); // нижний регистр — как ждёт бэкенд
+        form.append('initData', tg.initData || '');
+        form.append('mediatype', 'video');
+        form.append('fps', String(Math.max(5, Math.min(60, Math.round(state.fps || 30)))));
+        console.log('[UPLOAD] xhr:start');
+        res = await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', `${API_BASE}/api/upload`);
+          xhr.timeout = 120000;
+          xhr.onload = () => resolve({
+            status: xhr.status,
+            ok: xhr.status >= 200 && xhr.status < 300,
+            text: async () => xhr.responseText || ''
+          });
+          xhr.onerror = () => {
+            console.log('[UPLOAD] xhr:error');
+            reject(new TypeError('XHR upload failed'));
+          };
+          xhr.ontimeout = () => {
+            console.log('[UPLOAD] xhr:error');
+            reject(new TypeError('XHR upload timeout'));
+          };
+          xhr.onabort = () => {
+            console.log('[UPLOAD] xhr:error');
+            reject(new TypeError('XHR upload aborted'));
+          };
+          xhr.send(form);
         });
-        xhr.onerror = () => {
-          console.log('[UPLOAD] xhr:error');
-          reject(new TypeError('XHR upload failed'));
-        };
-        xhr.ontimeout = () => {
-          console.log('[UPLOAD] xhr:error');
-          reject(new TypeError('XHR upload timeout'));
-        };
-        xhr.onabort = () => {
-          console.log('[UPLOAD] xhr:error');
-          reject(new TypeError('XHR upload aborted'));
-        };
-        xhr.send(form);
-      });
-      console.log('[UPLOAD] xhr:done', { status: res.status, ok: res.ok });
+        console.log('[UPLOAD] xhr:done', { status: res.status, ok: res.ok });
+      } else {
+        const dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result || '');
+          reader.onerror = () => reject(new TypeError('FileReader failed'));
+          reader.readAsDataURL(blob);
+        });
+        console.log('[UPLOAD] fetch:start');
+        res = await fetch(`${API_BASE}/api/upload-photo-json`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            filename,
+            initData: tg.initData || '',
+            initdata: tg.initData || '',
+            mediatype: 'photo',
+            dataUrl
+          })
+        });
+        console.log('[UPLOAD] fetch:done', { status: res.status, ok: res.ok });
+      }
 
       // ответ может быть и текстом, и json
-      const text = res.text;
+      const text = await res.text();
       let json = {};
       try { json = JSON.parse(text || '{}'); } catch (_) {}
 
