@@ -93,7 +93,8 @@ function startBusyServiceTextAnimation(targetText, {
   charMs = 30,
   spaceMs = 16,
   withDots = false,
-  dotsMs = 500
+  dotsMs = 500,
+  withHaptic = true
 } = {}) {
   const localToken = ++busyTextAnimationToken;
   const noiseAlphabet = '0123456789АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ';
@@ -131,7 +132,7 @@ function startBusyServiceTextAnimation(targetText, {
       if (!isActive()) return;
       app.ui.busyText.textContent = `${fixedPart}${ch}|`;
       playStartPrintSound();
-      tgTextHaptic();
+      if (withHaptic) tgTextHaptic();
       await sleep(charMs);
     }
 
@@ -5741,6 +5742,7 @@ async function downloadBlob(blob, filename) {
     let to = null;
     let photoTo = null;
     let stopBusyUploadAnimation = () => {};
+    let uploadCompleted = false;
 
     try {
       tgHaptic('impactOccurred', 'light');
@@ -5749,7 +5751,10 @@ async function downloadBlob(blob, filename) {
       const mediatype = (state.mode === 'video') ? 'video' : 'photo';
       // показываем «длинный» overlay на всё время запроса
       busyLock = true;
-      stopBusyUploadAnimation = startBusyServiceTextAnimation('ОТПРАВКА ФАЙЛА В ЧАТ', { withDots: true });
+      stopBusyUploadAnimation = startBusyServiceTextAnimation('ОТПРАВКА ФАЙЛА В ЧАТ', {
+        withDots: true,
+        withHaptic: false
+      });
 
       let res;
       if (mediatype === 'photo') {
@@ -5866,6 +5871,7 @@ async function downloadBlob(blob, filename) {
         message: 'ФАЙЛ ОТПРАВЛЕН В ЧАТ.',
         extra: (json && typeof json.balance !== 'undefined') ? `ОСТАЛОСЬ ИМПУЛЬСОВ: ${json.balance}` : ''
       });
+      uploadCompleted = true;
 
       return;
 
@@ -5885,6 +5891,7 @@ async function downloadBlob(blob, filename) {
       if (to) clearTimeout(to);
       if (photoTo) clearTimeout(photoTo);
       stopBusyUploadAnimation();
+      tgHaptic('impactOccurred', uploadCompleted ? 'medium' : 'light');
 
       window.Telegram?.WebApp?.MainButton?.hideProgress?.();
       uploadInFlight = false;
