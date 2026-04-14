@@ -5631,14 +5631,13 @@ async function precheckCaptureImpulses() {
 
 // Универсальная отправка: в Telegram → на сервер; иначе → локальная загрузка
 async function downloadBlob(blob, filename) {
+  const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
+
   if (uploadInFlight) {
-    console.warn('[UPLOAD] blocked duplicate downloadBlob');
+    console.warn('Upload already in progress — skip');
     return;
   }
   uploadInFlight = true;
-  console.log('[UPLOAD] downloadBlob:start');
-
-  const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
 
   const isTg = !!(window.Telegram?.WebApp?.initData);
   if (isTg) {
@@ -5646,72 +5645,34 @@ async function downloadBlob(blob, filename) {
     const tg = window.Telegram.WebApp;
 
     // объявляем заранее → доступны в finally
+    const ctrl = new AbortController();
+    let to = null;
     let stopBusyUploadAnimation = () => {};
 
     try {
       tgHaptic('impactOccurred', 'light');
       tg.MainButton?.showProgress?.();
 
-      const isVideoMode = state.mode === 'video';
+      // === важно: именно такие поля и заголовки ===
+      const form = new FormData();
+      form.append('file', file, filename);
+      form.append('filename', filename);
+      form.append('initdata', tg.initData || ''); // нижний регистр — как ждёт бэкенд
+      form.append('initData', tg.initData || '');
+      form.append('mediatype', (state.mode === 'video') ? 'video' : 'photo');
+      form.append('fps', String(Math.max(5, Math.min(60, Math.round(state.fps || 30)))));
       // показываем «длинный» overlay на всё время запроса
       busyLock = true;
       stopBusyUploadAnimation = startBusyServiceTextAnimation('ОТПРАВКА ФАЙЛА В ЧАТ', { withDots: true });
 
-      let res;
-      if (isVideoMode) {
-        const form = new FormData();
-        form.append('file', file, filename);
-        form.append('filename', filename);
-        form.append('initdata', tg.initData || ''); // нижний регистр — как ждёт бэкенд
-        form.append('initData', tg.initData || '');
-        form.append('mediatype', 'video');
-        form.append('fps', String(Math.max(5, Math.min(60, Math.round(state.fps || 30)))));
-        console.log('[UPLOAD] xhr:start');
-        res = await new Promise((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open('POST', `${API_BASE}/api/upload`);
-          xhr.timeout = 120000;
-          xhr.onload = () => resolve({
-            status: xhr.status,
-            ok: xhr.status >= 200 && xhr.status < 300,
-            text: async () => xhr.responseText || ''
-          });
-          xhr.onerror = () => {
-            console.log('[UPLOAD] xhr:error');
-            reject(new TypeError('XHR upload failed'));
-          };
-          xhr.ontimeout = () => {
-            console.log('[UPLOAD] xhr:error');
-            reject(new TypeError('XHR upload timeout'));
-          };
-          xhr.onabort = () => {
-            console.log('[UPLOAD] xhr:error');
-            reject(new TypeError('XHR upload aborted'));
-          };
-          xhr.send(form);
-        });
-        console.log('[UPLOAD] xhr:done', { status: res.status, ok: res.ok });
-      } else {
-        const dataUrl = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result || '');
-          reader.onerror = () => reject(new TypeError('FileReader failed'));
-          reader.readAsDataURL(blob);
-        });
-        console.log('[UPLOAD] fetch:start');
-        res = await fetch(`${API_BASE}/api/upload-photo-json`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            filename,
-            initData: tg.initData || '',
-            initdata: tg.initData || '',
-            mediatype: 'photo',
-            dataUrl
-          })
-        });
-        console.log('[UPLOAD] fetch:done', { status: res.status, ok: res.ok });
-      }
+      // общий таймаут (120s)
+      to = setTimeout(() => ctrl.abort(), 120000);
+
+      const res = await fetch(`${API_BASE}/api/upload`, {
+        method: 'POST',
+        body: form,
+        signal: ctrl.signal,
+      });
 
       // ответ может быть и текстом, и json
       const text = await res.text();
@@ -5723,7 +5684,7 @@ async function downloadBlob(blob, filename) {
         showAsciiPopup({
           type: 'error',
           title: 'НЕДОСТАТОЧНО ЭНЕРГИИ',
-          message: `ДЛЯ ПРЕОБРЗОВАНИЯ ТРЕБУЕТСЯ: ${json?.need ?? (isVideoMode?15:5)}`,
+          message: `ДЛЯ ПРЕОБРЗОВАНИЯ ТРЕБУЕТСЯ: ${json?.need ?? (state.mode==='video'?15:5)}`,
           extra: `В ЭНЕРГОХРАНИЛИЩЕ: ${json?.balance ?? '—'}`
         });
         return; // без локального сохранения
@@ -5761,6 +5722,7 @@ async function downloadBlob(blob, filename) {
       return;
 
     } finally {
+      if (to) clearTimeout(to);
       stopBusyUploadAnimation();
 
       window.Telegram?.WebApp?.MainButton?.hideProgress?.();
@@ -5772,12 +5734,9 @@ async function downloadBlob(blob, filename) {
   }
 
   // Не Telegram — сразу локально
-  try {
-    tryLocalDownload(file);
-  } finally {
-    uploadInFlight = false;
-    setTimeout(() => clearShotVisualEffects(), 220);
-  }
+  tryLocalDownload(file);
+  uploadInFlight = false;
+  setTimeout(() => clearShotVisualEffects(), 220);
 
   function tryLocalDownload(file) {
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
