@@ -813,6 +813,22 @@ async function uploadPhotoJsonHandler(req, res) {
   try {
     console.log('[UPLOAD-JSON] start');
     const body = (req.body && typeof req.body === 'object') ? req.body : {};
+    const payloadRaw = String(body.dataUrl || body.base64 || '').trim();
+    const dataUrlPrefix = payloadRaw ? payloadRaw.slice(0, 64) : '';
+    const mediatypeMatch = payloadRaw.match(/^data:([^;]+);base64,/i);
+    const mediatype = String(body.mediatype || (mediatypeMatch?.[1] || '')).trim();
+    const filenameRaw = String(body.filename || 'ascii_visor.png');
+    console.log('[UPLOAD-JSON] body-info', {
+      hasBody: !!req.body,
+      keys: Object.keys(body),
+      filename: filenameRaw,
+      mediatype,
+      initDataLen: String(body.initData || '').trim().length,
+      initdataLen: String(body.initdata || '').trim().length,
+      dataUrlLen: payloadRaw.length,
+      dataUrlPrefix
+    });
+
     const rawInit =
       String(body.initData || '').trim() ||
       String(body.initdata || '').trim();
@@ -828,10 +844,8 @@ async function uploadPhotoJsonHandler(req, res) {
       return res.status(402).json({ ok: false, error: 'INSUFFICIENT_FUNDS', need: cost, balance });
     }
 
-    const filenameRaw = String(body.filename || 'ascii_visor.png');
     const safeNameBase = filenameRaw.replace(/[^\w.\-]+/g, '_');
     const safeName = (safeNameBase || 'ascii_visor.png').slice(-120);
-    const payloadRaw = String(body.dataUrl || body.base64 || '').trim();
     if (!payloadRaw) {
       return res.status(400).json({ ok: false, error: 'NO_DATA' });
     }
@@ -845,7 +859,9 @@ async function uploadPhotoJsonHandler(req, res) {
       b64 = m[1];
     }
 
+    console.log('[UPLOAD-JSON] decode:start', { dataUrlLen: payloadRaw.length });
     const buffer = Buffer.from(b64, 'base64');
+    console.log('[UPLOAD-JSON] decode:done', { bufferSize: buffer.length });
     if (!buffer.length) {
       return res.status(400).json({ ok: false, error: 'BAD_BASE64' });
     }
@@ -854,14 +870,19 @@ async function uploadPhotoJsonHandler(req, res) {
     await fs.promises.writeFile(tmpPath, buffer);
     console.log('[UPLOAD-JSON] saved', tmpPath);
 
+    console.log('[UPLOAD-JSON] send:start', { tmpPath, bufferSize: buffer.length });
     await sendFileToUser(userId, tmpPath, '#ascii_photo');
-    console.log('[UPLOAD-JSON] sent', userId);
+    console.log('[UPLOAD-JSON] send:done');
 
     deduct(userId, cost);
     return res.json({ ok: true, balance: getBalance(userId) });
   } catch (e) {
+    console.error('[ERR] /api/upload-photo-json', {
+      name: e?.name || '',
+      message: e?.message || String(e || ''),
+      stackFirstLine: String(e?.stack || '').split('\n')[0] || ''
+    });
     const detail = formatHttpError(e);
-    console.error('[ERR] /api/upload-photo-json', detail);
     return res.status(500).json({ ok: false, error: 'UPLOAD_JSON_FAILED', detail });
   } finally {
     if (tmpPath) {
