@@ -5632,6 +5632,7 @@ async function precheckCaptureImpulses() {
 // Универсальная отправка: в Telegram → на сервер; иначе → локальная загрузка
 async function downloadBlob(blob, filename) {
   const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
+  console.log('[UPLOAD] file-debug', { blobSize: blob.size, fileSize: file.size, type: file.type, mode: state.mode, filename });
 
   if (uploadInFlight) {
     console.warn('Upload already in progress — skip');
