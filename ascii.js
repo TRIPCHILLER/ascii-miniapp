@@ -5681,7 +5681,7 @@ async function downloadBlob(blob, filename) {
 
       // === важно: именно такие поля и заголовки ===
       const form = new FormData();
-      form.append('file', file, filename);
+      form.append('file', blob, filename);
       form.append('filename', filename);
       form.append('initdata', tg.initData || ''); // нижний регистр — как ждёт бэкенд
       form.append('initData', tg.initData || '');
