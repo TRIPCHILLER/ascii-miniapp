@@ -153,25 +153,6 @@ const PORT      = process.env.PORT || 8080;
 const ADMIN_ID  = String(process.env.ADMIN_TELEGRAM_ID || '');
 const TG_SECRET = String(process.env.TG_WEBHOOK_SECRET || '');
 const app = express();
-const uploadPhotoChunks = new Map();
-const PHOTO_CHUNK_TTL_MS = 15 * 60 * 1000;
-const PHOTO_CHUNK_SWEEP_MS = 60 * 1000;
-
-function cleanupExpiredPhotoChunkUploads(now = Date.now()) {
-  for (const [uploadId, entry] of uploadPhotoChunks.entries()) {
-    if (!entry || typeof entry !== 'object') {
-      uploadPhotoChunks.delete(uploadId);
-      continue;
-    }
-    const lastTouch = Number(entry.updatedAt || entry.createdAt || 0);
-    if (!lastTouch || now - lastTouch > PHOTO_CHUNK_TTL_MS) {
-      uploadPhotoChunks.delete(uploadId);
-    }
-  }
-}
-setInterval(() => {
-  cleanupExpiredPhotoChunkUploads();
-}, PHOTO_CHUNK_SWEEP_MS).unref();
 // ---- CORS (единственный блок) ----
 // @section EXPRESS_BOOTSTRAP_AND_CORS
 const allowList = [/https:\/\/t\.me$/, /https:\/\/web\.telegram\.org/];
@@ -185,9 +166,6 @@ app.use(cors({
   allowedHeaders: ['Content-Type','initdata','initData','X-Requested-With'],
   maxAge: 86400,
 }));
-app.post('/api/upload-photo-json', express.json({ limit: '100mb' }), uploadPhotoJsonHandler);
-app.post('/api/upload-photo-chunk', express.json({ limit: '128kb' }), uploadPhotoChunkHandler);
-// TODO(next): добавить аналогичный chunked upload для video, не меняя текущий /api/upload до миграции клиента.
 // парсинг json после CORS
 app.use(bodyParser.json());
 // (оставь свой логгер, если нужен)
@@ -676,50 +654,7 @@ app.get('/api/balance', (req, res) => {
 // Принимаем любой из ключей: file ИЛИ document, а также initdata ИЛИ initData, mediatype ИЛИ mediaType
 const uploadHandler = [
   // 1) принимаем любые поля multipart (без "Unexpected field")
-  (req, res, next) => {
-    const isApiUpload = req.path === '/api/upload';
-    if (isApiUpload) {
-      const bytesRead = Number(req.socket?.bytesRead || req.connection?.bytesRead || 0);
-      console.log('[UPLOAD-DIAG] start', {
-        contentType: req.headers['content-type'] || '',
-        contentLength: req.headers['content-length'] || '',
-        origin: req.headers.origin || '',
-      });
-      req.on('aborted', () => {
-        console.log('[UPLOAD-DIAG] req.aborted', {
-          bytesRead: Number(req.socket?.bytesRead || req.connection?.bytesRead || bytesRead),
-        });
-      });
-      req.on('close', () => {
-        console.log('[UPLOAD-DIAG] req.close', {
-          aborted: Boolean(req.aborted),
-          complete: Boolean(req.complete),
-          bytesRead: Number(req.socket?.bytesRead || req.connection?.bytesRead || bytesRead),
-        });
-      });
-      req.on('end', () => {
-        console.log('[UPLOAD-DIAG] req.end');
-      });
-    }
-    upload.any()(req, res, (err) => {
-      if (isApiUpload) {
-        if (err) {
-          console.error('[UPLOAD-DIAG] multer.error', {
-            name: err.name || '',
-            code: err.code || '',
-            message: err.message || '',
-            stack: String(err.stack || '').split('\n')[0] || '',
-          });
-        } else {
-          console.log('[UPLOAD-DIAG] multer.done', {
-            filesCount: Array.isArray(req.files) ? req.files.length : 0,
-            bodyKeys: req.body && typeof req.body === 'object' ? Object.keys(req.body) : [],
-          });
-        }
-      }
-      next(err);
-    });
-  },
+  upload.any(),
   // 2) основной обработчик
   async (req, res) => {
     try {
@@ -830,184 +765,7 @@ if (mediatype === 'video') {
 app.post('/api/upload', ...uploadHandler);
 app.post('/upload', ...uploadHandler);
 
-async function handlePhotoUploadFromBody(body, logPrefix) {
-  let tmpPath = '';
-  try {
-    const payloadRaw = String(body.dataUrl || body.base64 || '').trim();
-    const dataUrlPrefix = payloadRaw ? payloadRaw.slice(0, 64) : '';
-    const mediatypeMatch = payloadRaw.match(/^data:([^;]+);base64,/i);
-    const mediatype = String(body.mediatype || (mediatypeMatch?.[1] || '')).trim();
-    const filenameRaw = String(body.filename || 'ascii_visor.png');
-    console.log(`${logPrefix} body-info`, {
-      keys: Object.keys(body || {}),
-      filename: filenameRaw,
-      mediatype,
-      initDataLen: String(body.initData || '').trim().length,
-      initdataLen: String(body.initdata || '').trim().length,
-      dataUrlLen: payloadRaw.length,
-      dataUrlPrefix
-    });
 
-    const rawInit =
-      String(body.initData || '').trim() ||
-      String(body.initdata || '').trim();
-    const userId = validateInitData(rawInit);
-    if (!userId) {
-      return { status: 401, payload: { ok: false, error: 'INITDATA_INVALID' } };
-    }
-
-    ensureUser(userId);
-    const cost = 5;
-    const balance = getBalance(userId);
-    if (balance < cost) {
-      return { status: 402, payload: { ok: false, error: 'INSUFFICIENT_FUNDS', need: cost, balance } };
-    }
-
-    const safeNameBase = filenameRaw.replace(/[^\w.\-]+/g, '_');
-    const safeName = (safeNameBase || 'ascii_visor.png').slice(-120);
-    if (!payloadRaw) {
-      return { status: 400, payload: { ok: false, error: 'NO_DATA' } };
-    }
-
-    let b64 = payloadRaw;
-    if (payloadRaw.startsWith('data:')) {
-      const m = payloadRaw.match(/^data:image\/png;base64,(.+)$/i);
-      if (!m || !m[1]) {
-        return { status: 400, payload: { ok: false, error: 'BAD_DATAURL' } };
-      }
-      b64 = m[1];
-    }
-
-    console.log(`${logPrefix} decode:start`, { dataUrlLen: payloadRaw.length });
-    const buffer = Buffer.from(b64, 'base64');
-    console.log(`${logPrefix} decode:done`, { bufferSize: buffer.length });
-    if (!buffer.length) {
-      return { status: 400, payload: { ok: false, error: 'BAD_BASE64' } };
-    }
-
-    tmpPath = path.join(TMP_DIR, `${Date.now()}__${safeName.endsWith('.png') ? safeName : `${safeName}.png`}`);
-    await fs.promises.writeFile(tmpPath, buffer);
-    console.log(`${logPrefix} saved`, tmpPath);
-
-    console.log(`${logPrefix} send:start`, { tmpPath, bufferSize: buffer.length });
-    await sendFileToUser(userId, tmpPath, '#ascii_photo');
-    console.log(`${logPrefix} send:done`);
-
-    deduct(userId, cost);
-    return { status: 200, payload: { ok: true, balance: getBalance(userId) } };
-  } finally {
-    if (tmpPath) {
-      try { await fs.promises.unlink(tmpPath); } catch {}
-    }
-    console.log(`${logPrefix} cleanup`);
-  }
-}
-
-async function uploadPhotoJsonHandler(req, res) {
-  try {
-    console.log('[UPLOAD-JSON] start');
-    const body = (req.body && typeof req.body === 'object') ? req.body : {};
-    const result = await handlePhotoUploadFromBody(body, '[UPLOAD-JSON]');
-    return res.status(result.status).json(result.payload);
-  } catch (e) {
-    console.error('[ERR] /api/upload-photo-json', {
-      name: e?.name || '',
-      message: e?.message || String(e || ''),
-      stackFirstLine: String(e?.stack || '').split('\n')[0] || ''
-    });
-    const detail = formatHttpError(e);
-    return res.status(500).json({ ok: false, error: 'UPLOAD_JSON_FAILED', detail });
-  }
-}
-
-async function uploadPhotoChunkHandler(req, res) {
-  let uploadId = '';
-  try {
-    cleanupExpiredPhotoChunkUploads();
-    const body = (req.body && typeof req.body === 'object') ? req.body : {};
-    uploadId = String(body.uploadId || '').trim();
-    const index = Number(body.index);
-    const total = Number(body.total);
-    const chunk = String(body.chunk || '');
-    const filename = String(body.filename || 'ascii_visor.png');
-
-    if (!uploadId || !Number.isInteger(index) || !Number.isInteger(total) || total < 1 || index < 0 || index >= total) {
-      console.log('[UPLOAD-CHUNK] error', { reason: 'BAD_META', uploadId, index, total });
-      return res.status(400).json({ ok: false, error: 'BAD_CHUNK_META' });
-    }
-    if (!chunk) {
-      console.log('[UPLOAD-CHUNK] error', { reason: 'EMPTY_CHUNK', uploadId, index, total });
-      return res.status(400).json({ ok: false, error: 'EMPTY_CHUNK' });
-    }
-
-    const now = Date.now();
-    let entry = uploadPhotoChunks.get(uploadId);
-    if (!entry) {
-      entry = {
-        chunks: new Array(total),
-        total,
-        createdAt: now,
-        updatedAt: now,
-        filename,
-        initData: String(body.initData || ''),
-        initdata: String(body.initdata || ''),
-        mediatype: String(body.mediatype || 'photo'),
-      };
-      uploadPhotoChunks.set(uploadId, entry);
-      console.log('[UPLOAD-CHUNK] start', { uploadId, total, filename });
-    }
-
-    if (entry.total !== total) {
-      uploadPhotoChunks.delete(uploadId);
-      console.log('[UPLOAD-CHUNK] error', { reason: 'TOTAL_MISMATCH', uploadId, expected: entry.total, got: total });
-      return res.status(400).json({ ok: false, error: 'TOTAL_MISMATCH' });
-    }
-    if (now - entry.createdAt > PHOTO_CHUNK_TTL_MS) {
-      uploadPhotoChunks.delete(uploadId);
-      console.log('[UPLOAD-CHUNK] error', { reason: 'UPLOAD_EXPIRED', uploadId });
-      return res.status(408).json({ ok: false, error: 'UPLOAD_EXPIRED' });
-    }
-
-    entry.chunks[index] = chunk;
-    entry.updatedAt = now;
-    console.log('[UPLOAD-CHUNK] part', { uploadId, index, total, chunkLen: chunk.length });
-
-    if (index !== total - 1) {
-      return res.json({ ok: true, uploadId, index, total });
-    }
-
-    if (entry.chunks.some(part => typeof part !== 'string')) {
-      console.log('[UPLOAD-CHUNK] error', { reason: 'MISSING_PARTS', uploadId });
-      return res.status(400).json({ ok: false, error: 'MISSING_CHUNKS' });
-    }
-
-    const assembledDataUrl = entry.chunks.join('');
-    const finalBody = {
-      filename: entry.filename || filename,
-      initData: String(entry.initData || body.initData || ''),
-      initdata: String(entry.initdata || body.initdata || ''),
-      mediatype: 'photo',
-      dataUrl: assembledDataUrl,
-    };
-
-    const result = await handlePhotoUploadFromBody(finalBody, '[UPLOAD-CHUNK]');
-    uploadPhotoChunks.delete(uploadId);
-    if (result.status >= 200 && result.status < 300) {
-      console.log('[UPLOAD-CHUNK] done', { uploadId, total, dataUrlLen: assembledDataUrl.length });
-    } else {
-      console.log('[UPLOAD-CHUNK] error', { uploadId, status: result.status, error: result.payload?.error || 'UNKNOWN' });
-    }
-    return res.status(result.status).json(result.payload);
-  } catch (e) {
-    if (uploadId) uploadPhotoChunks.delete(uploadId);
-    console.log('[UPLOAD-CHUNK] error', {
-      name: e?.name || '',
-      message: e?.message || String(e || ''),
-    });
-    const detail = formatHttpError(e);
-    return res.status(500).json({ ok: false, error: 'UPLOAD_CHUNK_FAILED', detail });
-  }
-}
 app.post('/api/ascii-text', upload.any(), async (req, res) => {
   const files = Array.isArray(req.files) ? req.files : [];
   const f = files.find(x => x.fieldname === 'file') || files.find(x => x.fieldname === 'document') || files[0];

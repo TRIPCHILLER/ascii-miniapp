@@ -5306,17 +5306,6 @@ function snapAsciiPixels(ctx, W, H, fgHex, bgHex, transparentBg){
     }
   }
 
-  const rgbaSet = new Set();
-  for (let i = 0; i < data.length; i += 4){
-    rgbaSet.add(`${data[i]},${data[i + 1]},${data[i + 2]},${data[i + 3]}`);
-  }
-  console.log('[PNG-DIAG] snapAsciiPixels', {
-    width: W,
-    height: H,
-    transparentBg: !!transparentBg,
-    uniqueRGBA: rgbaSet.size
-  });
-
   ctx.putImageData(img, 0, 0);
 }
 
@@ -5353,14 +5342,6 @@ function renderAsciiToCanvas(text, cols, rows, scale = 2.5){
 
   cvs.width  = W;
   cvs.height = H;
-  console.log('[PNG-DIAG] renderAsciiToCanvas', {
-    exportCanvasWidth: W,
-    exportCanvasHeight: H,
-    rows,
-    linesLength: lines.length,
-    maxLinePx,
-    ctxFont: `${fsPx * scale}px ${ff}`
-  });
 
   // фон
   if (!state.transparentBg) {
@@ -5404,12 +5385,6 @@ function savePNG(){
   renderAsciiToCanvas(text, cols, rows, 2.5);
   app.ui.render.toBlob(blob=>{
     if(!blob) { showAsciiPopup({ type:'error', title:'ОШИБКА', message:'НЕ УДАЛОСЬ ПРЕОБРАЗОВАТЬ ИЗОБРАЖЕНИЕ.' }); clearShotVisualEffects(); return; }
-    console.log('[PNG-DIAG] savePNG.toBlob', {
-      blobSize: blob.size,
-      blobType: blob.type,
-      exportCanvasWidth: app.ui.render.width,
-      exportCanvasHeight: app.ui.render.height
-    });
     downloadBlob(blob, 'ascii_visor.png');
     hudSet('PNG: сохранено/отправлено');
   }, 'image/png');
@@ -5615,7 +5590,6 @@ function saveVideo(){
 }
   
 let uploadInFlight = false;
-const PHOTO_UPLOAD_CHUNK_SIZE = 8 * 1024;
 
 function getRequiredImpulsesForCapture() {
   if (isTextMode()) return 1;
@@ -5656,74 +5630,9 @@ async function precheckCaptureImpulses() {
   return true;
 }
 
-async function uploadPhotoDataUrlInChunks({ dataUrl, filename, initData, signal }) {
-  const uploadId = (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function')
-    ? globalThis.crypto.randomUUID()
-    : `photo_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-  const total = Math.max(1, Math.ceil(dataUrl.length / PHOTO_UPLOAD_CHUNK_SIZE));
-  let lastResponse = null;
-  console.log('[UPLOAD-CHUNK-FE] start', {
-    dataUrlLen: dataUrl.length,
-    chunkSize: PHOTO_UPLOAD_CHUNK_SIZE,
-    total,
-    filename,
-  });
-
-  for (let index = 0; index < total; index += 1) {
-    const chunk = dataUrl.slice(index * PHOTO_UPLOAD_CHUNK_SIZE, (index + 1) * PHOTO_UPLOAD_CHUNK_SIZE);
-    const payload = {
-      uploadId,
-      index,
-      total,
-      filename,
-      initData: initData || '',
-      initdata: initData || '',
-      mediatype: 'photo',
-      chunk,
-    };
-    const bodyText = JSON.stringify(payload);
-    if (index < 3 || index === total - 1) {
-      console.log('[UPLOAD-CHUNK-FE] send', {
-        index,
-        total,
-        chunkLen: chunk.length,
-        bodySize: bodyText.length
-      });
-    }
-    let res;
-    try {
-      res = await fetch(`${API_BASE}/api/upload-photo-chunk`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal,
-        body: bodyText,
-      });
-    } catch (err) {
-      console.log('[UPLOAD-CHUNK-FE] error', {
-        index,
-        name: err?.name,
-        message: err?.message
-      });
-      throw err;
-    }
-    const textStart = await res.clone().text().then((t) => t.slice(0, 160)).catch(() => '');
-    console.log('[UPLOAD-CHUNK-FE] response', {
-      index,
-      status: res.status,
-      ok: res.ok,
-      textStart
-    });
-    lastResponse = res;
-    if (!res.ok) return res;
-  }
-
-  return lastResponse;
-}
-
 // Универсальная отправка: в Telegram → на сервер; иначе → локальная загрузка
 async function downloadBlob(blob, filename) {
   const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
-  console.log('[UPLOAD] file-debug', { blobSize: blob.size, fileSize: file.size, type: file.type, mode: state.mode, filename });
 
   if (uploadInFlight) {
     console.warn('Upload already in progress — skip');
@@ -5738,11 +5647,8 @@ async function downloadBlob(blob, filename) {
 
     // объявляем заранее → доступны в finally
     const ctrl = new AbortController();
-    const photoCtrl = new AbortController();
     let to = null;
-    let photoTo = null;
     let stopBusyUploadAnimation = () => {};
-    let uploadCompleted = false;
 
     try {
       tgHaptic('impactOccurred', 'light');
@@ -5751,93 +5657,24 @@ async function downloadBlob(blob, filename) {
       const mediatype = (state.mode === 'video') ? 'video' : 'photo';
       // показываем «длинный» overlay на всё время запроса
       busyLock = true;
-      stopBusyUploadAnimation = startBusyServiceTextAnimation('ОТПРАВКА ФАЙЛА В ЧАТ', {
-        withDots: true,
-        withHaptic: false
+      stopBusyUploadAnimation = startBusyServiceTextAnimation('ОТПРАВКА ФАЙЛА В ЧАТ', { withDots: true });
+
+      // общий таймаут (120s)
+      to = setTimeout(() => ctrl.abort(), 120000);
+      // === важно: именно такие поля и заголовки ===
+      const form = new FormData();
+      form.append('file', file, filename);
+      form.append('filename', filename);
+      form.append('initdata', tg.initData || ''); // нижний регистр — как ждёт бэкенд
+      form.append('initData', tg.initData || '');
+      form.append('mediatype', mediatype);
+      form.append('fps', String(Math.max(5, Math.min(60, Math.round(state.fps || 30)))));
+
+      const res = await fetch(`${API_BASE}/api/upload`, {
+        method: 'POST',
+        body: form,
+        signal: ctrl.signal,
       });
-
-      let res;
-      if (mediatype === 'photo') {
-        // для chunk upload фото используем отдельный длинный таймаут (10 минут)
-        photoTo = setTimeout(() => photoCtrl.abort(), 600000);
-        const dataUrl = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result || ''));
-          reader.onerror = () => reject(new Error('FILE_READER_FAILED'));
-          reader.readAsDataURL(blob);
-        });
-        res = await uploadPhotoDataUrlInChunks({
-          dataUrl,
-          filename,
-          initData: tg.initData || '',
-          signal: photoCtrl.signal,
-        });
-      } else {
-        // общий таймаут (180s) для video upload
-        to = setTimeout(() => ctrl.abort(), 180000);
-        // === важно: именно такие поля и заголовки ===
-        const form = new FormData();
-        form.append('file', blob, filename);
-        form.append('filename', filename);
-        form.append('initdata', tg.initData || ''); // нижний регистр — как ждёт бэкенд
-        form.append('initData', tg.initData || '');
-        form.append('mediatype', 'video');
-        form.append('fps', String(Math.max(5, Math.min(60, Math.round(state.fps || 30)))));
-
-        res = await new Promise((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open('POST', `${API_BASE}/api/upload`, true);
-          xhr.timeout = 180000;
-          xhr.responseType = 'text';
-
-          const buildCompatResponse = () => {
-            const bodyText = (typeof xhr.responseText === 'string' ? xhr.responseText : '') || '';
-            return {
-              status: xhr.status,
-              ok: xhr.status >= 200 && xhr.status < 300,
-              text: async () => bodyText,
-            };
-          };
-
-          xhr.upload.onprogress = (event) => {
-            console.log('[UPLOAD-XHR-DIAG] progress', {
-              loaded: event.loaded,
-              total: event.total,
-              lengthComputable: event.lengthComputable,
-            });
-          };
-
-          xhr.onload = () => {
-            const responseTextStart = (xhr.responseText || '').slice(0, 300);
-            console.log('[UPLOAD-XHR-DIAG] load', {
-              status: xhr.status,
-              responseTextStart,
-            });
-            resolve(buildCompatResponse());
-          };
-
-          xhr.onerror = () => {
-            console.log('[UPLOAD-XHR-DIAG] error');
-            reject(new Error('XHR upload failed'));
-          };
-
-          xhr.ontimeout = () => {
-            console.log('[UPLOAD-XHR-DIAG] timeout');
-            reject(new Error('XHR upload timeout'));
-          };
-
-          xhr.onabort = () => {
-            console.log('[UPLOAD-XHR-DIAG] abort');
-            reject(new DOMException('Aborted', 'AbortError'));
-          };
-
-          ctrl.signal.addEventListener('abort', () => {
-            try { xhr.abort(); } catch (_) {}
-          }, { once: true });
-
-          xhr.send(form);
-        });
-      }
 
       // ответ может быть и текстом, и json
       const text = await res.text();
@@ -5871,7 +5708,6 @@ async function downloadBlob(blob, filename) {
         message: 'ФАЙЛ ОТПРАВЛЕН В ЧАТ.',
         extra: (json && typeof json.balance !== 'undefined') ? `ОСТАЛОСЬ ИМПУЛЬСОВ: ${json.balance}` : ''
       });
-      uploadCompleted = true;
 
       return;
 
@@ -5889,9 +5725,7 @@ async function downloadBlob(blob, filename) {
 
     } finally {
       if (to) clearTimeout(to);
-      if (photoTo) clearTimeout(photoTo);
       stopBusyUploadAnimation();
-      tgHaptic('impactOccurred', uploadCompleted ? 'medium' : 'light');
 
       window.Telegram?.WebApp?.MainButton?.hideProgress?.();
       uploadInFlight = false;
