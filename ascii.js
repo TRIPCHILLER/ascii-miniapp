@@ -5305,6 +5305,17 @@ function snapAsciiPixels(ctx, W, H, fgHex, bgHex, transparentBg){
     }
   }
 
+  const rgbaSet = new Set();
+  for (let i = 0; i < data.length; i += 4){
+    rgbaSet.add(`${data[i]},${data[i + 1]},${data[i + 2]},${data[i + 3]}`);
+  }
+  console.log('[PNG-DIAG] snapAsciiPixels', {
+    width: W,
+    height: H,
+    transparentBg: !!transparentBg,
+    uniqueRGBA: rgbaSet.size
+  });
+
   ctx.putImageData(img, 0, 0);
 }
 
@@ -5341,6 +5352,14 @@ function renderAsciiToCanvas(text, cols, rows, scale = 2.5){
 
   cvs.width  = W;
   cvs.height = H;
+  console.log('[PNG-DIAG] renderAsciiToCanvas', {
+    exportCanvasWidth: W,
+    exportCanvasHeight: H,
+    rows,
+    linesLength: lines.length,
+    maxLinePx,
+    ctxFont: `${fsPx * scale}px ${ff}`
+  });
 
   // фон
   if (!state.transparentBg) {
@@ -5384,6 +5403,12 @@ function savePNG(){
   renderAsciiToCanvas(text, cols, rows, 2.5);
   app.ui.render.toBlob(blob=>{
     if(!blob) { showAsciiPopup({ type:'error', title:'ОШИБКА', message:'НЕ УДАЛОСЬ ПРЕОБРАЗОВАТЬ ИЗОБРАЖЕНИЕ.' }); clearShotVisualEffects(); return; }
+    console.log('[PNG-DIAG] savePNG.toBlob', {
+      blobSize: blob.size,
+      blobType: blob.type,
+      exportCanvasWidth: app.ui.render.width,
+      exportCanvasHeight: app.ui.render.height
+    });
     downloadBlob(blob, 'ascii_visor.png');
     hudSet('PNG: сохранено/отправлено');
   }, 'image/png');
