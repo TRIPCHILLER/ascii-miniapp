@@ -5661,23 +5661,56 @@ async function uploadPhotoDataUrlInChunks({ dataUrl, filename, initData, signal 
     : `photo_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
   const total = Math.max(1, Math.ceil(dataUrl.length / PHOTO_UPLOAD_CHUNK_SIZE));
   let lastResponse = null;
+  console.log('[UPLOAD-CHUNK-FE] start', {
+    dataUrlLen: dataUrl.length,
+    chunkSize: PHOTO_UPLOAD_CHUNK_SIZE,
+    total,
+    filename,
+  });
 
   for (let index = 0; index < total; index += 1) {
     const chunk = dataUrl.slice(index * PHOTO_UPLOAD_CHUNK_SIZE, (index + 1) * PHOTO_UPLOAD_CHUNK_SIZE);
-    const res = await fetch(`${API_BASE}/api/upload-photo-chunk`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      signal,
-      body: JSON.stringify({
-        uploadId,
+    const payload = {
+      uploadId,
+      index,
+      total,
+      filename,
+      initData: initData || '',
+      initdata: initData || '',
+      mediatype: 'photo',
+      chunk,
+    };
+    const bodyText = JSON.stringify(payload);
+    if (index < 3 || index === total - 1) {
+      console.log('[UPLOAD-CHUNK-FE] send', {
         index,
         total,
-        filename,
-        initData: initData || '',
-        initdata: initData || '',
-        mediatype: 'photo',
-        chunk,
-      }),
+        chunkLen: chunk.length,
+        bodySize: bodyText.length
+      });
+    }
+    let res;
+    try {
+      res = await fetch(`${API_BASE}/api/upload-photo-chunk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal,
+        body: bodyText,
+      });
+    } catch (err) {
+      console.log('[UPLOAD-CHUNK-FE] error', {
+        index,
+        name: err?.name,
+        message: err?.message
+      });
+      throw err;
+    }
+    const textStart = await res.clone().text().then((t) => t.slice(0, 160)).catch(() => '');
+    console.log('[UPLOAD-CHUNK-FE] response', {
+      index,
+      status: res.status,
+      ok: res.ok,
+      textStart
     });
     lastResponse = res;
     if (!res.ok) return res;
