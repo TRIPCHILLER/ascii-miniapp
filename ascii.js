@@ -5614,6 +5614,7 @@ function saveVideo(){
 }
   
 let uploadInFlight = false;
+const PHOTO_UPLOAD_CHUNK_SIZE = 32 * 1024;
 
 function getRequiredImpulsesForCapture() {
   if (isTextMode()) return 1;
@@ -5652,6 +5653,37 @@ async function precheckCaptureImpulses() {
   }
 
   return true;
+}
+
+async function uploadPhotoDataUrlInChunks({ dataUrl, filename, initData, signal }) {
+  const uploadId = (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function')
+    ? globalThis.crypto.randomUUID()
+    : `photo_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  const total = Math.max(1, Math.ceil(dataUrl.length / PHOTO_UPLOAD_CHUNK_SIZE));
+  let lastResponse = null;
+
+  for (let index = 0; index < total; index += 1) {
+    const chunk = dataUrl.slice(index * PHOTO_UPLOAD_CHUNK_SIZE, (index + 1) * PHOTO_UPLOAD_CHUNK_SIZE);
+    const res = await fetch(`${API_BASE}/api/upload-photo-chunk`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal,
+      body: JSON.stringify({
+        uploadId,
+        index,
+        total,
+        filename,
+        initData: initData || '',
+        initdata: initData || '',
+        mediatype: 'photo',
+        chunk,
+      }),
+    });
+    lastResponse = res;
+    if (!res.ok) return res;
+  }
+
+  return lastResponse;
 }
 
 // Универсальная отправка: в Telegram → на сервер; иначе → локальная загрузка
@@ -5695,17 +5727,11 @@ async function downloadBlob(blob, filename) {
           reader.onerror = () => reject(new Error('FILE_READER_FAILED'));
           reader.readAsDataURL(blob);
         });
-        res = await fetch(`${API_BASE}/api/upload-photo-json`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+        res = await uploadPhotoDataUrlInChunks({
+          dataUrl,
+          filename,
+          initData: tg.initData || '',
           signal: ctrl.signal,
-          body: JSON.stringify({
-            filename,
-            initData: tg.initData || '',
-            initdata: tg.initData || '',
-            mediatype: 'photo',
-            dataUrl,
-          }),
         });
       } else {
         // === важно: именно такие поля и заголовки ===
