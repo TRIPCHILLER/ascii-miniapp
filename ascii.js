@@ -5646,8 +5646,6 @@ async function downloadBlob(blob, filename) {
     const tg = window.Telegram.WebApp;
 
     // объявляем заранее → доступны в finally
-    const ctrl = new AbortController();
-    let to = null;
     let stopBusyUploadAnimation = () => {};
 
     try {
@@ -5659,9 +5657,6 @@ async function downloadBlob(blob, filename) {
       busyLock = true;
       stopBusyUploadAnimation = startBusyServiceTextAnimation('ОТПРАВКА ФАЙЛА В ЧАТ', { withDots: true });
 
-      // общий таймаут (120s)
-      to = setTimeout(() => ctrl.abort(), 120000);
-
       const form = new FormData();
       form.append('file', file, filename);
       form.append('filename', filename);
@@ -5669,16 +5664,34 @@ async function downloadBlob(blob, filename) {
       form.append('initData', tg.initData || '');
       form.append('mediatype', isVideoMode ? 'video' : 'photo');
       form.append('fps', String(Math.max(5, Math.min(60, Math.round(state.fps || 30)))));
-      console.log('[UPLOAD] fetch:start');
-      const res = await fetch(`${API_BASE}/api/upload`, {
-        method: 'POST',
-        body: form,
-        signal: ctrl.signal,
+      console.log('[UPLOAD] xhr:start');
+      const res = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${API_BASE}/api/upload`);
+        xhr.timeout = 120000;
+        xhr.onload = () => resolve({
+          status: xhr.status,
+          ok: xhr.status >= 200 && xhr.status < 300,
+          text: xhr.responseText || ''
+        });
+        xhr.onerror = () => {
+          console.log('[UPLOAD] xhr:error');
+          reject(new TypeError('XHR upload failed'));
+        };
+        xhr.ontimeout = () => {
+          console.log('[UPLOAD] xhr:error');
+          reject(new TypeError('XHR upload timeout'));
+        };
+        xhr.onabort = () => {
+          console.log('[UPLOAD] xhr:error');
+          reject(new TypeError('XHR upload aborted'));
+        };
+        xhr.send(form);
       });
-      console.log('[UPLOAD] fetch:done');
+      console.log('[UPLOAD] xhr:done', { status: res.status, ok: res.ok });
 
       // ответ может быть и текстом, и json
-      const text = await res.text();
+      const text = res.text;
       let json = {};
       try { json = JSON.parse(text || '{}'); } catch (_) {}
 
@@ -5725,7 +5738,6 @@ async function downloadBlob(blob, filename) {
       return;
 
     } finally {
-      if (to) clearTimeout(to);
       stopBusyUploadAnimation();
 
       window.Telegram?.WebApp?.MainButton?.hideProgress?.();
