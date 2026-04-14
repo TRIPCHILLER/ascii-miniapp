@@ -5691,13 +5691,61 @@ async function downloadBlob(blob, filename) {
       busyLock = true;
       stopBusyUploadAnimation = startBusyServiceTextAnimation('ОТПРАВКА ФАЙЛА В ЧАТ', { withDots: true });
 
-      // общий таймаут (120s)
-      to = setTimeout(() => ctrl.abort(), 120000);
+      // общий таймаут (180s)
+      to = setTimeout(() => ctrl.abort(), 180000);
 
-      const res = await fetch(`${API_BASE}/api/upload`, {
-        method: 'POST',
-        body: form,
-        signal: ctrl.signal,
+      const res = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${API_BASE}/api/upload`, true);
+        xhr.timeout = 180000;
+        xhr.responseType = 'text';
+
+        const buildCompatResponse = () => {
+          const bodyText = (typeof xhr.responseText === 'string' ? xhr.responseText : '') || '';
+          return {
+            status: xhr.status,
+            ok: xhr.status >= 200 && xhr.status < 300,
+            text: async () => bodyText,
+          };
+        };
+
+        xhr.upload.onprogress = (event) => {
+          console.log('[UPLOAD-XHR-DIAG] progress', {
+            loaded: event.loaded,
+            total: event.total,
+            lengthComputable: event.lengthComputable,
+          });
+        };
+
+        xhr.onload = () => {
+          const responseTextStart = (xhr.responseText || '').slice(0, 300);
+          console.log('[UPLOAD-XHR-DIAG] load', {
+            status: xhr.status,
+            responseTextStart,
+          });
+          resolve(buildCompatResponse());
+        };
+
+        xhr.onerror = () => {
+          console.log('[UPLOAD-XHR-DIAG] error');
+          reject(new Error('XHR upload failed'));
+        };
+
+        xhr.ontimeout = () => {
+          console.log('[UPLOAD-XHR-DIAG] timeout');
+          reject(new Error('XHR upload timeout'));
+        };
+
+        xhr.onabort = () => {
+          console.log('[UPLOAD-XHR-DIAG] abort');
+          reject(new DOMException('Aborted', 'AbortError'));
+        };
+
+        ctrl.signal.addEventListener('abort', () => {
+          try { xhr.abort(); } catch (_) {}
+        }, { once: true });
+
+        xhr.send(form);
       });
 
       // ответ может быть и текстом, и json
