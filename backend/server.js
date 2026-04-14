@@ -654,7 +654,50 @@ app.get('/api/balance', (req, res) => {
 // Принимаем любой из ключей: file ИЛИ document, а также initdata ИЛИ initData, mediatype ИЛИ mediaType
 const uploadHandler = [
   // 1) принимаем любые поля multipart (без "Unexpected field")
-  upload.any(),
+  (req, res, next) => {
+    const isApiUpload = req.path === '/api/upload';
+    if (isApiUpload) {
+      const bytesRead = Number(req.socket?.bytesRead || req.connection?.bytesRead || 0);
+      console.log('[UPLOAD-DIAG] start', {
+        contentType: req.headers['content-type'] || '',
+        contentLength: req.headers['content-length'] || '',
+        origin: req.headers.origin || '',
+      });
+      req.on('aborted', () => {
+        console.log('[UPLOAD-DIAG] req.aborted', {
+          bytesRead: Number(req.socket?.bytesRead || req.connection?.bytesRead || bytesRead),
+        });
+      });
+      req.on('close', () => {
+        console.log('[UPLOAD-DIAG] req.close', {
+          aborted: Boolean(req.aborted),
+          complete: Boolean(req.complete),
+          bytesRead: Number(req.socket?.bytesRead || req.connection?.bytesRead || bytesRead),
+        });
+      });
+      req.on('end', () => {
+        console.log('[UPLOAD-DIAG] req.end');
+      });
+    }
+    upload.any()(req, res, (err) => {
+      if (isApiUpload) {
+        if (err) {
+          console.error('[UPLOAD-DIAG] multer.error', {
+            name: err.name || '',
+            code: err.code || '',
+            message: err.message || '',
+            stack: String(err.stack || '').split('\n')[0] || '',
+          });
+        } else {
+          console.log('[UPLOAD-DIAG] multer.done', {
+            filesCount: Array.isArray(req.files) ? req.files.length : 0,
+            bodyKeys: req.body && typeof req.body === 'object' ? Object.keys(req.body) : [],
+          });
+        }
+      }
+      next(err);
+    });
+  },
   // 2) основной обработчик
   async (req, res) => {
     try {
