@@ -5679,14 +5679,7 @@ async function downloadBlob(blob, filename) {
       tgHaptic('impactOccurred', 'light');
       tg.MainButton?.showProgress?.();
 
-      // === важно: именно такие поля и заголовки ===
-      const form = new FormData();
-      form.append('file', blob, filename);
-      form.append('filename', filename);
-      form.append('initdata', tg.initData || ''); // нижний регистр — как ждёт бэкенд
-      form.append('initData', tg.initData || '');
-      form.append('mediatype', (state.mode === 'video') ? 'video' : 'photo');
-      form.append('fps', String(Math.max(5, Math.min(60, Math.round(state.fps || 30)))));
+      const mediatype = (state.mode === 'video') ? 'video' : 'photo';
       // показываем «длинный» overlay на всё время запроса
       busyLock = true;
       stopBusyUploadAnimation = startBusyServiceTextAnimation('ОТПРАВКА ФАЙЛА В ЧАТ', { withDots: true });
@@ -5694,59 +5687,90 @@ async function downloadBlob(blob, filename) {
       // общий таймаут (180s)
       to = setTimeout(() => ctrl.abort(), 180000);
 
-      const res = await new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', `${API_BASE}/api/upload`, true);
-        xhr.timeout = 180000;
-        xhr.responseType = 'text';
+      let res;
+      if (mediatype === 'photo') {
+        const dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || ''));
+          reader.onerror = () => reject(new Error('FILE_READER_FAILED'));
+          reader.readAsDataURL(blob);
+        });
+        res = await fetch(`${API_BASE}/api/upload-photo-json`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: ctrl.signal,
+          body: JSON.stringify({
+            filename,
+            initData: tg.initData || '',
+            initdata: tg.initData || '',
+            mediatype: 'photo',
+            dataUrl,
+          }),
+        });
+      } else {
+        // === важно: именно такие поля и заголовки ===
+        const form = new FormData();
+        form.append('file', blob, filename);
+        form.append('filename', filename);
+        form.append('initdata', tg.initData || ''); // нижний регистр — как ждёт бэкенд
+        form.append('initData', tg.initData || '');
+        form.append('mediatype', 'video');
+        form.append('fps', String(Math.max(5, Math.min(60, Math.round(state.fps || 30)))));
 
-        const buildCompatResponse = () => {
-          const bodyText = (typeof xhr.responseText === 'string' ? xhr.responseText : '') || '';
-          return {
-            status: xhr.status,
-            ok: xhr.status >= 200 && xhr.status < 300,
-            text: async () => bodyText,
+        res = await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', `${API_BASE}/api/upload`, true);
+          xhr.timeout = 180000;
+          xhr.responseType = 'text';
+
+          const buildCompatResponse = () => {
+            const bodyText = (typeof xhr.responseText === 'string' ? xhr.responseText : '') || '';
+            return {
+              status: xhr.status,
+              ok: xhr.status >= 200 && xhr.status < 300,
+              text: async () => bodyText,
+            };
           };
-        };
 
-        xhr.upload.onprogress = (event) => {
-          console.log('[UPLOAD-XHR-DIAG] progress', {
-            loaded: event.loaded,
-            total: event.total,
-            lengthComputable: event.lengthComputable,
-          });
-        };
+          xhr.upload.onprogress = (event) => {
+            console.log('[UPLOAD-XHR-DIAG] progress', {
+              loaded: event.loaded,
+              total: event.total,
+              lengthComputable: event.lengthComputable,
+            });
+          };
 
-        xhr.onload = () => {
-          const responseTextStart = (xhr.responseText || '').slice(0, 300);
-          console.log('[UPLOAD-XHR-DIAG] load', {
-            status: xhr.status,
-            responseTextStart,
-          });
-          resolve(buildCompatResponse());
-        };
+          xhr.onload = () => {
+            const responseTextStart = (xhr.responseText || '').slice(0, 300);
+            console.log('[UPLOAD-XHR-DIAG] load', {
+              status: xhr.status,
+              responseTextStart,
+            });
+            resolve(buildCompatResponse());
+          };
 
-        xhr.onerror = () => {
-          console.log('[UPLOAD-XHR-DIAG] error');
-          reject(new Error('XHR upload failed'));
-        };
+          xhr.onerror = () => {
+            console.log('[UPLOAD-XHR-DIAG] error');
+            reject(new Error('XHR upload failed'));
+          };
 
-        xhr.ontimeout = () => {
-          console.log('[UPLOAD-XHR-DIAG] timeout');
-          reject(new Error('XHR upload timeout'));
-        };
+          xhr.ontimeout = () => {
+            console.log('[UPLOAD-XHR-DIAG] timeout');
+            reject(new Error('XHR upload timeout'));
+          };
 
-        xhr.onabort = () => {
-          console.log('[UPLOAD-XHR-DIAG] abort');
-          reject(new DOMException('Aborted', 'AbortError'));
-        };
+          xhr.onabort = () => {
+            console.log('[UPLOAD-XHR-DIAG] abort');
+            reject(new DOMException('Aborted', 'AbortError'));
+          };
 
-        ctrl.signal.addEventListener('abort', () => {
-          try { xhr.abort(); } catch (_) {}
-        }, { once: true });
+          ctrl.signal.addEventListener('abort', () => {
+            try { xhr.abort(); } catch (_) {}
+          }, { once: true });
 
-        xhr.send(form);
-      });
+          xhr.send(form);
+        });
+      }
 
       // ответ может быть и текстом, и json
       const text = await res.text();

@@ -166,6 +166,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type','initdata','initData','X-Requested-With'],
   maxAge: 86400,
 }));
+app.post('/api/upload-photo-json', express.json({ limit: '100mb' }), uploadPhotoJsonHandler);
 // парсинг json после CORS
 app.use(bodyParser.json());
 // (оставь свой логгер, если нужен)
@@ -807,7 +808,7 @@ if (mediatype === 'video') {
 // Регистрируем один и тот же обработчик на оба пути (как у тебя было)
 app.post('/api/upload', ...uploadHandler);
 app.post('/upload', ...uploadHandler);
-app.post('/api/upload-photo-json', async (req, res) => {
+async function uploadPhotoJsonHandler(req, res) {
   let tmpPath = '';
   try {
     console.log('[UPLOAD-JSON] start');
@@ -868,7 +869,7 @@ app.post('/api/upload-photo-json', async (req, res) => {
     }
     console.log('[UPLOAD-JSON] cleanup');
   }
-});
+}
 app.post('/api/ascii-text', upload.any(), async (req, res) => {
   const files = Array.isArray(req.files) ? req.files : [];
   const f = files.find(x => x.fieldname === 'file') || files.find(x => x.fieldname === 'document') || files[0];
