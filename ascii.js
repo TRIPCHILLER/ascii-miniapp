@@ -3555,6 +3555,7 @@ const ARG_GOAL_FLASH_STEPS = {
     state.visorMode = (mode === 'text') ? 'text' : 'image';
     state.textInitPending = isTextMode();
     localStorage.setItem('visorMode', state.visorMode);
+    document.body.classList.remove('app-booting');
     if (app.ui.modeChooser) app.ui.modeChooser.hidden = true;
     stopModeChooserFx();
     applyVisorModeUi();
