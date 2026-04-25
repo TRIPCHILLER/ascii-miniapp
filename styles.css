@@ -15,6 +15,13 @@ html, body, .wrap { overflow-x: hidden; }
 }
 
 .wrap{ display:flex; flex-direction:column; height:100%; }
+
+/* На самом первом кадре до решения стартового экрана скрываем рабочий UI целиком.
+   Это устраняет flash внутреннего интерфейса до появления gate/menu. */
+body.app-booting #app{
+  visibility:hidden;
+  pointer-events:none;
+}
 /* ===== АНТИ-ВЫДЕЛЕНИЕ UI ===== */
 /* На всём приложении — нельзя выделять, вызывать callout, перетаскивать */
 html, body, .wrap, .toolbar, .panel, .modebar,
