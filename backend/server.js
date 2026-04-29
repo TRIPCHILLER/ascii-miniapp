@@ -600,14 +600,27 @@ async function probeVideoStreams(inputPath) {
     return { hasVideo: false, hasAudio: false, width: null, height: null, durationSec: 0 };
   }
 }
-async function convertWebmToGif(inPath, outPath, opts = {}) {
+async function convertWebmToMutedMp4(inPath, outPath, opts = {}) {
   const fps = clampInt(opts.fps, 5, 60, 30);
-  const palettePath = `${outPath}.palette.png`;
-  const genArgs = ['-hide_banner','-loglevel','error','-i',inPath,'-vf',`fps=${fps},palettegen=stats_mode=full`,'-y',palettePath];
-  const useArgs = ['-hide_banner','-loglevel','error','-i',inPath,'-i',palettePath,'-lavfi',`fps=${fps}[x];[x][1:v]paletteuse=dither=none`,'-y',outPath];
-  await runFfmpeg(genArgs);
-  await runFfmpeg(useArgs);
-  try { await fs.promises.rm(palettePath, { force: true }); } catch {}
+  const crf = clampInt(opts.crf, 12, 30, 17);
+  const preset = (String(opts.preset || 'medium').toLowerCase() === 'fast') ? 'fast' : 'medium';
+  const maxrate = String(opts.maxrate || '10M');
+  const bufsize = String(opts.bufsize || '20M');
+  const args = [
+    '-hide_banner', '-loglevel', 'error',
+    '-i', inPath,
+    '-r', String(fps),
+    '-an',
+    '-c:v', 'libx264',
+    '-preset', preset,
+    '-crf', String(crf),
+    '-maxrate', maxrate,
+    '-bufsize', bufsize,
+    '-pix_fmt', 'yuv420p',
+    '-movflags', '+faststart',
+    '-y', outPath
+  ];
+  await runFfmpeg(args);
 }
 async function cleanupStaleTmpArtifacts() {
   const now = Date.now();
@@ -768,16 +781,19 @@ const uploadHandler = [
       if (mediatype === 'video') {
   if (sourceIsGif) {
     const gifTmpdir = fs.mkdtempSync(path.join(os.tmpdir(), 'trip-gif-'));
-    const outGif = path.join(gifTmpdir, `out_${Date.now()}.gif`);
+    const outMp4 = path.join(gifTmpdir, `out_${Date.now()}.mp4`);
     try {
       const inputSizeBytes = (() => { try { return fs.statSync(f.path).size; } catch { return null; } })();
       console.log('[GIF-SOURCE] detected', { sourceFilename, sourceMime, uploadedMime, uploadedPath: f.path });
-      console.log('[GIF-CONVERT] start', { inputPath: f.path, outputPath: outGif, inputSizeBytes });
-      await convertWebmToGif(f.path, outGif, { fps: clampInt(req.body.fps, 5, 60, 30) });
-      const outputSizeBytes = (() => { try { return fs.statSync(outGif).size; } catch { return null; } })();
-      console.log('[GIF-CONVERT] done', { outputPath: outGif, outputSizeBytes });
-      const sent = await sendAnimationToUser(userId, outGif, { caption: '#ascii_video' });
-      console.log('[TG] ascii animation sent', { ok: !!sent?.ok, filePath: outGif, size: outputSizeBytes });
+      console.log('[GIF-MP4-CONVERT] start', { inputPath: f.path, outputPath: outMp4, inputSizeBytes });
+      await convertWebmToMutedMp4(f.path, outMp4, { fps: clampInt(req.body.fps, 5, 60, 30), crf: 17, preset: 'medium', maxrate: '10M', bufsize: '20M' });
+      const outputSizeBytes = (() => { try { return fs.statSync(outMp4).size; } catch { return null; } })();
+      console.log('[GIF-MP4-CONVERT] done', { outputPath: outMp4, outputSizeBytes });
+      if (Number(outputSizeBytes || 0) > VIDEO_OUTPUT_SAFE_LIMIT_BYTES) {
+        return res.status(413).json({ ok:false, error:'GIF_OUTPUT_TOO_LARGE', maxSizeBytes: VIDEO_OUTPUT_SAFE_LIMIT_BYTES, outputSizeBytes });
+      }
+      const sent = await sendAnimationToUser(userId, outMp4, { caption: '#ascii_video' });
+      console.log('[TG] ascii animation sent', { ok: !!sent?.ok, filePath: outMp4, size: outputSizeBytes });
     } finally {
       try { if (f.path) await fs.promises.rm(f.path, { force: true }); } catch {}
       try { await fs.promises.rm(gifTmpdir, { recursive: true, force: true }); } catch {}
