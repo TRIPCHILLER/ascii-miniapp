@@ -1226,7 +1226,7 @@ const ARG_GOAL_FLASH_STEPS = {
       </div>
       <div class="arg-scene-layer arg-scene-goal-flash" id="argSceneGoalFlashLayer" hidden></div>
       <div class="arg-scene-layer arg-scene-popup" id="argScenePopupLayer" hidden>
-        <div class="arg-scene-popup-box">
+        <div class="arg-scene-popup-box ascii-terminal-frame">
           <div class="arg-scene-popup-text" id="argScenePopupText"></div>
         </div>
       </div>
@@ -1604,7 +1604,7 @@ const ARG_GOAL_FLASH_STEPS = {
     if (!popupLayer || !popupBox || !textEl) return;
 
     popupLayer.hidden = false;
-    popupBox.className = 'arg-scene-popup-box';
+    popupBox.className = 'arg-scene-popup-box ascii-terminal-frame';
     if (popupClass) popupBox.classList.add(popupClass);
     if (openSoundSrc) playUiSoundNoThrow(openSoundSrc);
     await animateArgPopupText(textEl, text);
@@ -1616,7 +1616,7 @@ const ARG_GOAL_FLASH_STEPS = {
         closed = true;
         popupLayer.removeEventListener('pointerup', onClose, true);
         popupLayer.removeEventListener('click', onClose, true);
-        popupBox.className = 'arg-scene-popup-box';
+        popupBox.className = 'arg-scene-popup-box ascii-terminal-frame';
         popupLayer.hidden = true;
         playUiSoundNoThrow(ARG_SCENE_SOUNDS.click);
         resolve();
