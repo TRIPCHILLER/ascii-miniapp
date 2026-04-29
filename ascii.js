@@ -1226,7 +1226,7 @@ const ARG_GOAL_FLASH_STEPS = {
       </div>
       <div class="arg-scene-layer arg-scene-goal-flash" id="argSceneGoalFlashLayer" hidden></div>
       <div class="arg-scene-layer arg-scene-popup" id="argScenePopupLayer" hidden>
-        <div class="arg-scene-popup-box ascii-terminal-frame">
+        <div class="arg-scene-popup-box">
           <div class="arg-scene-popup-text" id="argScenePopupText"></div>
         </div>
       </div>
@@ -1604,8 +1604,7 @@ const ARG_GOAL_FLASH_STEPS = {
     if (!popupLayer || !popupBox || !textEl) return;
 
     popupLayer.hidden = false;
-    popupBox.className = 'arg-scene-popup-box ascii-terminal-frame';
-    ensureAsciiTerminalFrame(popupBox);
+    popupBox.className = 'arg-scene-popup-box';
     if (popupClass) popupBox.classList.add(popupClass);
     if (openSoundSrc) playUiSoundNoThrow(openSoundSrc);
     await animateArgPopupText(textEl, text);
@@ -1617,7 +1616,7 @@ const ARG_GOAL_FLASH_STEPS = {
         closed = true;
         popupLayer.removeEventListener('pointerup', onClose, true);
         popupLayer.removeEventListener('click', onClose, true);
-        popupBox.className = 'arg-scene-popup-box ascii-terminal-frame';
+        popupBox.className = 'arg-scene-popup-box';
         popupLayer.hidden = true;
         playUiSoundNoThrow(ARG_SCENE_SOUNDS.click);
         resolve();
@@ -4230,36 +4229,9 @@ function currentSource(){
 let asciiPopupCloseHandlerBound = false;
 let asciiPopupLastFocusedEl = null;
 
-function ensureAsciiTerminalFrame(el) {
-  if (!el || el.dataset.asciiFrameReady === '1') return;
-  let content = el.querySelector(':scope > .ascii-terminal-content');
-  if (!content) {
-    content = document.createElement('div');
-    content.className = 'ascii-terminal-content';
-    while (el.firstChild) content.appendChild(el.firstChild);
-    el.appendChild(content);
-  }
-  const parts = [
-    ['tl', '+'], ['tr', '+'], ['bl', '+'], ['br', '+'],
-    ['top', ''], ['bottom', ''], ['left', ''], ['right', '']
-  ];
-  for (const [name, text] of parts) {
-    const node = document.createElement('span');
-    node.className = `ascii-terminal-part ascii-terminal-part--${name}`;
-    if (text) node.textContent = text;
-    el.appendChild(node);
-  }
-  el.dataset.asciiFrameReady = '1';
-}
-
-function getAsciiTerminalContent(el) {
-  ensureAsciiTerminalFrame(el);
-  return el?.querySelector(':scope > .ascii-terminal-content') || el;
-}
-
-function initAsciiTerminalFrames() {
-  document.querySelectorAll('.ascii-terminal-frame').forEach((node) => ensureAsciiTerminalFrame(node));
-}
+function ensureAsciiTerminalFrame(el) { return el; }
+function getAsciiTerminalContent(el) { return el; }
+function initAsciiTerminalFrames() { return; }
 
 function resetCamShutterPressedState() {
   if (!app?.ui?.camShutter || !app?.ui?.camBtnCore) return;
