@@ -5786,6 +5786,18 @@ async function uploadBlobToBot(blob, filename, options = {}) {
         });
         return;
       }
+      if (json?.error === 'GIF_OUTPUT_TOO_LARGE') {
+        showAsciiPopup({
+          type: 'error',
+          disableErrorSound: true,
+          sound: 'danger',
+          title: 'ОШИБКА ЗАГРУЗКИ',
+          message: 'Я НЕ МОГУ ПЕРЕДАТЬ ЭТУ АНИМАЦИЮ.\nОНА СЛИШКОМ ТЯЖЁЛА ДЛЯ ФОРМАТА GIF.\nСОКРАТИ ЕЁ ИЛИ УМЕНЬШИ ПАРАМЕТРЫ.',
+          useTypewriter: false,
+          closeText: '[ ЗАКРЫТЬ ]'
+        });
+        return;
+      }
 
       if (!res.ok) {
         showAsciiPopup({
