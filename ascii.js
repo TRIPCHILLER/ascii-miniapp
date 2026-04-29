@@ -1605,6 +1605,7 @@ const ARG_GOAL_FLASH_STEPS = {
 
     popupLayer.hidden = false;
     popupBox.className = 'arg-scene-popup-box ascii-terminal-frame';
+    ensureAsciiTerminalFrame(popupBox);
     if (popupClass) popupBox.classList.add(popupClass);
     if (openSoundSrc) playUiSoundNoThrow(openSoundSrc);
     await animateArgPopupText(textEl, text);
@@ -4229,6 +4230,37 @@ function currentSource(){
 let asciiPopupCloseHandlerBound = false;
 let asciiPopupLastFocusedEl = null;
 
+function ensureAsciiTerminalFrame(el) {
+  if (!el || el.dataset.asciiFrameReady === '1') return;
+  let content = el.querySelector(':scope > .ascii-terminal-content');
+  if (!content) {
+    content = document.createElement('div');
+    content.className = 'ascii-terminal-content';
+    while (el.firstChild) content.appendChild(el.firstChild);
+    el.appendChild(content);
+  }
+  const parts = [
+    ['tl', '+'], ['tr', '+'], ['bl', '+'], ['br', '+'],
+    ['top', ''], ['bottom', ''], ['left', ''], ['right', '']
+  ];
+  for (const [name, text] of parts) {
+    const node = document.createElement('span');
+    node.className = `ascii-terminal-part ascii-terminal-part--${name}`;
+    if (text) node.textContent = text;
+    el.appendChild(node);
+  }
+  el.dataset.asciiFrameReady = '1';
+}
+
+function getAsciiTerminalContent(el) {
+  ensureAsciiTerminalFrame(el);
+  return el?.querySelector(':scope > .ascii-terminal-content') || el;
+}
+
+function initAsciiTerminalFrames() {
+  document.querySelectorAll('.ascii-terminal-frame').forEach((node) => ensureAsciiTerminalFrame(node));
+}
+
 function resetCamShutterPressedState() {
   if (!app?.ui?.camShutter || !app?.ui?.camBtnCore) return;
   app.ui.camBtnCore.src = 'assets/camera_button.svg';
@@ -4281,7 +4313,7 @@ function showAsciiPopup(input = {}) {
   const popupLines = [title, '', message];
   if (extra) popupLines.push('', extra);
   const popupText = popupLines.join('\n').toLocaleUpperCase('ru-RU');
-  textEl.textContent = popupText;
+  getAsciiTerminalContent(textEl).textContent = popupText;
   asciiPopupLastFocusedEl = document.activeElement;
 
   popup.hidden = false;
@@ -5628,15 +5660,16 @@ async function showAsciiTypedPopup(input = {}, { charMs = 28, doneDelayMs = 2200
   const popup = app.ui.asciiPopup;
   const textEl = app.ui.asciiPopupText;
   if (!popup || !textEl) return;
+  const contentEl = getAsciiTerminalContent(textEl);
   showAsciiPopup(input);
   const token = ++asciiPopupTypeToken;
   const title = String(input.title || 'ИНФОРМАЦИЯ').trim().toLocaleUpperCase('ru-RU');
   const message = String(input.message || '').trim().toLocaleUpperCase('ru-RU');
   const fullText = `${title}\n\n${message}`;
-  textEl.textContent = '';
+  contentEl.textContent = '';
   for (let i = 0; i < fullText.length; i += 1) {
     if (token !== asciiPopupTypeToken || popup.hidden) return;
-    textEl.textContent += fullText[i];
+    contentEl.textContent += fullText[i];
     await sleep(fullText[i] === '\n' ? Math.max(10, Math.floor(charMs * 0.5)) : charMs);
   }
   if (token !== asciiPopupTypeToken || popup.hidden) return;
@@ -6762,6 +6795,7 @@ function layoutSettingsPanel() {
   // ============== СВЯЗКА UI ==============
   // @section UI_BINDINGS
   function bindUI() {
+    initAsciiTerminalFrames();
     bindWorkUiClickSoundOnce();
 
     if (app.ui.charsetTrigger) {
