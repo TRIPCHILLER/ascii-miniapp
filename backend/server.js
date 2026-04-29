@@ -299,9 +299,14 @@ function logReq(req){ console.log(`[REQ] ${req.method} ${req.url} Origin: ${req.
 // @section MEDIA_CONVERSION_PIPELINE
 async function convertToMp4(inPath, outPath, opts = {}) {
   const fps = Number(opts.fps || 30);
+  const mode = opts.mode === 'balanced' ? 'balanced' : 'high';
   const dryRun = opts.dryRun === true;
   const vfExpr = `fps=${fps}:round=down,setsar=1,pad=ceil(iw/2)*2:ceil(ih/2)*2,format=yuv420p`;
   // Аргументы для ffmpeg
+  const preset = mode === 'balanced' ? 'medium' : 'slow';
+  const crf = mode === 'balanced' ? '20' : '12';
+  const maxrate = mode === 'balanced' ? '10M' : '30M';
+  const bufsize = mode === 'balanced' ? '20M' : '60M';
   const args = [
     '-hide_banner', '-loglevel', 'error',
     // Анализ потока для .MOV и тяжёлых файлов
@@ -315,8 +320,8 @@ async function convertToMp4(inPath, outPath, opts = {}) {
     '-c:v', 'libx264',
     '-profile:v', 'high',
     '-level', '4.2',
-    '-preset', 'slow',
-    '-crf', '12',
+    '-preset', preset,
+    '-crf', crf,
     '-vsync', 'cfr',
     '-video_track_timescale', String(fps * 1000),
     // Чёткое ключевание без b-frames и дрожания
@@ -331,8 +336,8 @@ async function convertToMp4(inPath, outPath, opts = {}) {
       'deblock=0:0',
       'mbtree=0'
     ].join(':'),
-  '-maxrate', '30M',
-  '-bufsize', '60M',
+  '-maxrate', maxrate,
+  '-bufsize', bufsize,
   '-movflags', '+faststart',
     outPath,
   ];
@@ -344,51 +349,27 @@ async function convertAndSaveVideo(inPath, tmpdir, opts = {}) {
   const path = require('path');
   const outMp4 = path.join(tmpdir, `out_${Date.now()}.mp4`);
   const fps = clampInt(opts.fps, 5, 60, 30);
+  const mode = opts.mode === 'balanced' ? 'balanced' : 'high';
   const inputSizeBytes = (() => {
     try { return fs.statSync(inPath).size; } catch { return null; }
   })();
-  try {
-    console.log('[VIDEO-CONVERT] start', { inputPath: inPath, outputPath: outMp4, fps, inputSizeBytes });
-    // Попытка #1 — профиль выше
-    const ffmpegArgs = convertToMp4(inPath, outMp4, { fps, dryRun: true });
-    console.log('[VIDEO-CONVERT] ffmpeg args', ffmpegArgs);
-    await runFfmpeg(ffmpegArgs);
-    const outputSizeBytes = (() => {
-      try { return fs.statSync(outMp4).size; } catch { return null; }
-    })();
-    console.log('[VIDEO-CONVERT] done', { outputPath: outMp4, outputSizeBytes });
-    return { path: outMp4, mime: 'video/mp4', ext: 'mp4' };
-  } catch (e1) {
-    console.warn('[video] mp4 attempt#1 failed:', String(e1).slice(0, 500));
-    // Попытка #2 — ультра-простой (часто «лечит» нестандартные входы)
-    const args2 = [
-      '-hide_banner', '-y', '-loglevel', 'error',
-      '-i', inPath,
-      '-an',
-      '-r', String(fps),          // альтернативный способ задать fps
-      '-c:v', 'libx264',
-      '-preset', 'ultrafast',
-      '-crf', '29',
-      '-pix_fmt', 'yuv420p',
-      '-movflags', '+faststart',
-      '-threads', '0',
-      outMp4,
-    ];
-    try {
-      await runFfmpeg(args2);
-      return { path: outMp4, mime: 'video/mp4', ext: 'mp4' };
-    } catch (e2) {
-      console.error('[video] mp4 attempt#2 failed:', String(e2).slice(0, 500));
-      // финальный фоллбек — как было
-      return { path: inPath, mime: 'video/webm', ext: 'webm' };
-    }
-  }
+  console.log('[VIDEO-CONVERT] start', { inputPath: inPath, outputPath: outMp4, fps, inputSizeBytes, mode });
+  const ffmpegArgs = await convertToMp4(inPath, outMp4, { fps, mode, dryRun: true });
+  console.log('[VIDEO-CONVERT] ffmpeg args', ffmpegArgs);
+  await runFfmpeg(ffmpegArgs);
+  const outputSizeBytes = (() => {
+    try { return fs.statSync(outMp4).size; } catch { return null; }
+  })();
+  console.log('[VIDEO-CONVERT] done', { outputPath: outMp4, outputSizeBytes, mode });
+  return { path: outMp4, mime: 'video/mp4', ext: 'mp4', mode, outputSizeBytes };
 }
 function clampInt(v, min, max, def) {
   const n = parseInt(String(v), 10);
   if (!Number.isFinite(n)) return def;
   return Math.min(max, Math.max(min, n));
 }
+const VIDEO_MAX_DURATION_SEC = 60;
+const VIDEO_OUTPUT_SAFE_LIMIT_BYTES = 45 * 1024 * 1024;
 const ASCII_TEXT_LIMIT = 3800;
 const TEXT_MODE_COST = 1;
 const TEXT_COLS_MIN = 24;
@@ -691,14 +672,16 @@ const uploadHandler = [
         mediatype = 'video';
       }
       const cost = mediatype === 'video' ? 15 : 5;
-// Проверим длительность (для видео)
-if (mediatype === 'video') {
-  const { duration } = await probeVideo(f.path); // у тебя эта функция уже есть в store.js
-  if (duration && duration > 10.5) {
-    try { fs.unlinkSync(f.path); } catch {}
-    return res.status(400).json({ ok:false, error:'TOO_LONG', message:'Макс. длительность видео — 10 секунд' });
-  }
-}
+      // Проверим длительность (для видео)
+      if (mediatype === 'video') {
+        const { duration } = await probeVideo(f.path);
+        const durationSec = Number(duration || 0);
+        console.log('[VIDEO-CHECK] duration', { durationSec, maxDurationSec: VIDEO_MAX_DURATION_SEC });
+        if (durationSec > VIDEO_MAX_DURATION_SEC) {
+          try { if (f.path) fs.unlinkSync(f.path); } catch {}
+          return res.status(400).json({ ok:false, error:'VIDEO_TOO_LONG', maxDurationSec: VIDEO_MAX_DURATION_SEC, durationSec });
+        }
+      }
       // --- баланс / списание ---
       ensureUser(userId);
       const bal = getBalance(userId);
@@ -706,35 +689,37 @@ if (mediatype === 'video') {
         try { if (f.path) require('fs').unlinkSync(f.path); } catch {}
         return res.status(402).json({ ok: false, error: 'INSUFFICIENT_FUNDS', need: cost, balance: bal });
       }
-// --- отправка в ЛС бота ---
-if (mediatype === 'video') {
+      // --- отправка в ЛС бота ---
+      if (mediatype === 'video') {
   const os = require('os');
   const path = require('path');
   const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), 'trip-vid-'));
   const userFps = clampInt(req.body.fps, 5, 60, 30);
-  let result;
+  const mode = (String(req.body.videoQuality || req.body.compressMode || 'high').toLowerCase() === 'balanced') ? 'balanced' : 'high';
   try {
-    result = await convertAndSaveVideo(f.path, tmpdir, { fps: userFps });
-  } catch (e) {
-    console.warn('[video] convert failed:', e?.message || e);
-  }
-  try {
-    // ASCII video отправляем как document, чтобы сохранить качество исходного mp4
+    const result = await convertAndSaveVideo(f.path, tmpdir, { fps: userFps, mode });
     if (result?.ext === 'mp4') {
-      const sent = await sendFileToUser(userId, result.path, '#ascii_video');
-      let fileSize = null;
-      try { fileSize = (await fs.promises.stat(result.path)).size; } catch {}
-      console.log('[TG] ascii video document sent', { ok: !!sent?.ok, filePath: result.path, size: fileSize });
+      const outputSizeBytes = Number(result.outputSizeBytes || 0);
+      if (outputSizeBytes > VIDEO_OUTPUT_SAFE_LIMIT_BYTES) {
+        console.log('[VIDEO-CONVERT] too-large', { outputSizeBytes, maxSizeBytes: VIDEO_OUTPUT_SAFE_LIMIT_BYTES, mode });
+        if (mode === 'high') {
+          return res.status(413).json({ ok:false, error:'VIDEO_RETRY_COMPRESS', maxSizeBytes: VIDEO_OUTPUT_SAFE_LIMIT_BYTES, outputSizeBytes });
+        }
+        return res.status(413).json({ ok:false, error:'VIDEO_OUTPUT_TOO_LARGE', maxSizeBytes: VIDEO_OUTPUT_SAFE_LIMIT_BYTES, outputSizeBytes });
+      }
+      // успешный mp4 отправляем как video для прямого просмотра в Telegram
+      const sent = await sendVideoToUser(userId, result.path, { caption: '#ascii_video' });
+      console.log('[TG] ascii video sent', { ok: !!sent?.ok, filePath: result.path, size: outputSizeBytes, mode });
     } else {
-      // фолбэк: шлём исходник как документ (подпишем, что webm)
       await sendFileToUser(userId, f.path || f.buffer, '#ascii_video (webm)');
     }
   } finally {
-  try { await fs.promises.rm(tmpdir, { recursive: true, force: true }); } catch {}
+    try { await fs.promises.rm(tmpdir, { recursive: true, force: true }); } catch {}
+    try { if (f.path) await fs.promises.rm(f.path, { force: true }); } catch {}
   }
-} else {
-  await sendFileToUser(userId, f.path || f.buffer, '#ascii_photo');
-}
+      } else {
+        await sendFileToUser(userId, f.path || f.buffer, '#ascii_photo');
+      }
 // --- РЕФЕРАЛЬНЫЙ БОНУС ЗА ПЕРВУЮ АКТИВАЦИЮ ЯДРА ---
       try {
         const ref = getRefInfo(String(userId));
