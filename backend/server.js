@@ -760,6 +760,14 @@ const uploadHandler = [
         mediatype = 'video';
       }
       const cost = mediatype === 'video' ? 15 : 5;
+      ensureUser(userId);
+      const bal = getBalance(userId);
+      if (bal < cost) {
+        console.log('[BALANCE-GUARD] denied', { mediatype, cost, balance: bal });
+        try { if (f.path) fs.unlinkSync(f.path); } catch {}
+        return res.status(402).json({ ok: false, error: 'INSUFFICIENT_FUNDS', need: cost, balance: bal });
+      }
+      console.log('[BALANCE-GUARD] ok', { mediatype, cost, balance: bal });
       // Проверим длительность (для видео)
       if (mediatype === 'video') {
         const { duration } = await probeVideo(f.path);
@@ -769,13 +777,6 @@ const uploadHandler = [
           try { if (f.path) fs.unlinkSync(f.path); } catch {}
           return res.status(400).json({ ok:false, error:'VIDEO_TOO_LONG', maxDurationSec: VIDEO_MAX_DURATION_SEC, durationSec });
         }
-      }
-      // --- баланс / списание ---
-      ensureUser(userId);
-      const bal = getBalance(userId);
-      if (bal < cost) {
-        try { if (f.path) require('fs').unlinkSync(f.path); } catch {}
-        return res.status(402).json({ ok: false, error: 'INSUFFICIENT_FUNDS', need: cost, balance: bal });
       }
       // --- отправка в ЛС бота ---
       if (mediatype === 'video') {

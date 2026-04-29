@@ -5650,10 +5650,22 @@ function getRequiredImpulsesForCapture() {
   return (state.mode === 'video') ? 15 : 5;
 }
 
-async function precheckCaptureImpulses() {
+function showInsufficientBalancePopup(required, balance) {
+  showAsciiPopup({
+    type: 'error',
+    sound: 'danger',
+    useTypewriter: false,
+    closeText: '[ ЗАКРЫТЬ ]',
+    title: 'НЕДОСТАТОЧНО ЭНЕРГИИ',
+    message: `ДЛЯ ПРЕОБРЗОВАНИЯ ТРЕБУЕТСЯ: ${required}`,
+    extra: `В ЭНЕРГОХРАНИЛИЩЕ: ${balance}`
+  });
+}
+
+async function ensureEnoughBalanceBeforeExport(kind = 'photo', required = getRequiredImpulsesForCapture()) {
   const tgWebApp = window.Telegram?.WebApp;
   const telegramId = tgWebApp?.initDataUnsafe?.user?.id;
-  const required = getRequiredImpulsesForCapture();
+  console.log('[BALANCE-PREFLIGHT] start', { kind, cost: required });
 
   if (!telegramId) return true;
 
@@ -5669,14 +5681,11 @@ async function precheckCaptureImpulses() {
     if (!Number.isFinite(balance)) return true;
 
     if (balance < required) {
-      showAsciiPopup({
-        type: 'error',
-        title: 'НЕДОСТАТОЧНО ЭНЕРГИИ',
-        message: `ДЛЯ ПРЕОБРЗОВАНИЯ ТРЕБУЕТСЯ: ${required}`,
-        extra: `В ЭНЕРГОХРАНИЛИЩЕ: ${balance}`
-      });
+      console.log('[BALANCE-PREFLIGHT] denied', { kind, cost: required, balance });
+      showInsufficientBalancePopup(required, balance);
       return false;
     }
+    console.log('[BALANCE-PREFLIGHT] ok', { kind, cost: required, balance });
   } catch (err) {
     console.warn('[balance precheck] failed:', err);
   }
@@ -7207,7 +7216,7 @@ if (app.ui.flashBtn) {
         let shotPipelineStarted = false;
 
         try {
-          const hasEnoughImpulses = await precheckCaptureImpulses();
+          const hasEnoughImpulses = await ensureEnoughBalanceBeforeExport('camera', getRequiredImpulsesForCapture());
           if (!hasEnoughImpulses) return;
 
           pressOn();
@@ -7638,6 +7647,8 @@ async function doSave() {
   if (saveTextHandled) { dbgLine('doSave.return:text-mode'); return; }
   dbgLine(`doSave.branch:${state.mode}`);
   if (state.mode === 'photo') {
+    const hasEnoughImpulses = await ensureEnoughBalanceBeforeExport('photo', 5);
+    if (!hasEnoughImpulses) return;
     hudSet('PNG: экспорт…');
     savePNG();
   } else if (state.mode === 'video') {
@@ -7647,6 +7658,8 @@ async function doSave() {
       showAsciiPopup({ type:'info', title:'НЕТ ВИДЕО', message:'НЕТ ВЫБРАННОГО ВИДЕО.' });
       return;
     }
+    const hasEnoughImpulses = await ensureEnoughBalanceBeforeExport('video', 15);
+    if (!hasEnoughImpulses) return;
     hudSet('VIDEO: запись… (дождитесь окончания)');
     saveVideo();
   }
