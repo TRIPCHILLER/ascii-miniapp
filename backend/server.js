@@ -125,6 +125,7 @@ const {
   setUsername,
   findIdByUsername,
   sendVideoToUser,
+  sendAnimationToUser,
   probeVideo
 } = require('./store');
 const { spawn } = require('child_process');
@@ -314,6 +315,8 @@ async function convertToMp4(inPath, outPath, opts = {}) {
     '-probesize', '200M',
     '-sws_flags', 'neighbor+full_chroma_int+full_chroma_inp+accurate_rnd',
     '-i', inPath,
+    '-map', '0:v:0',
+    '-map', '0:a?',
     // Основные фильтры без downscale (сохраняем исходную детализацию ASCII)
     '-vf', vfExpr,
     // Кодек и параметры
@@ -336,6 +339,10 @@ async function convertToMp4(inPath, outPath, opts = {}) {
       'deblock=0:0',
       'mbtree=0'
     ].join(':'),
+  '-c:a', 'aac',
+  '-b:a', mode === 'balanced' ? '96k' : '128k',
+  // TODO: future ASCII audio pass / bitcrusher-style processing.
+  // Possible future direction: aresample / acrusher / low bitrate digital distortion.
   '-maxrate', maxrate,
   '-bufsize', bufsize,
   '-movflags', '+faststart',
@@ -654,6 +661,7 @@ const uploadHandler = [
       const originalName = f.originalname || '';
       const ext = path.extname(originalName).toLowerCase();
       const mimeType = String(f.mimetype || '').toLowerCase();
+      const isGifInput = ext === '.gif' || mimeType === 'image/gif';
       // --- initData (любая форма) ---
       const rawInit =
         (req.headers['x-telegram-init-data'] || '').trim() ||
@@ -668,7 +676,7 @@ const uploadHandler = [
       // --- тип медиа (любая форма ключа) ---
       let mediatype = String(req.body?.mediatype || req.body?.mediaType || 'photo').toLowerCase();
       // если пришёл GIF — всегда считаем его «видео»
-      if (ext === '.gif' || mimeType === 'image/gif') {
+      if (isGifInput) {
         mediatype = 'video';
       }
       const cost = mediatype === 'video' ? 15 : 5;
@@ -691,6 +699,15 @@ const uploadHandler = [
       }
       // --- отправка в ЛС бота ---
       if (mediatype === 'video') {
+  if (isGifInput) {
+    const inputSizeBytes = (() => {
+      try { return fs.statSync(f.path).size; } catch { return null; }
+    })();
+    console.log('[VIDEO-CHECK] GIF/input animation detected', { originalName, mimeType, inputSizeBytes });
+    const sent = await sendAnimationToUser(userId, f.path, { caption: '#ascii_video' });
+    console.log('[TG] ascii animation sent', { ok: !!sent?.ok, filePath: f.path, size: inputSizeBytes });
+    try { if (f.path) await fs.promises.rm(f.path, { force: true }); } catch {}
+  } else {
   const os = require('os');
   const path = require('path');
   const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), 'trip-vid-'));
@@ -716,6 +733,7 @@ const uploadHandler = [
   } finally {
     try { await fs.promises.rm(tmpdir, { recursive: true, force: true }); } catch {}
     try { if (f.path) await fs.promises.rm(f.path, { force: true }); } catch {}
+  }
   }
       } else {
         await sendFileToUser(userId, f.path || f.buffer, '#ascii_photo');

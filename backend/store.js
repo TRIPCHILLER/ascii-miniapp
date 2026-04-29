@@ -254,6 +254,28 @@ async function sendVideoToUser(telegramId, filePath, { caption } = {}) {
   return data;
 }
 
+async function sendAnimationToUser(telegramId, filePath, { caption } = {}) {
+  if (!BOT_TOKEN) throw new Error('BOT_TOKEN is empty');
+  if (!fs.existsSync(filePath)) throw new Error(`File not found: ${filePath}`);
+
+  const url = `${TG_BASE}/sendAnimation`;
+  const form = new FormData();
+
+  form.append('chat_id', telegramId);
+  if (caption) form.append('caption', caption);
+  form.append('animation', fs.createReadStream(filePath));
+
+  const { data } = await axios.post(url, form, {
+    headers: form.getHeaders(),
+    maxBodyLength: Infinity,
+    maxContentLength: Infinity,
+    timeout: 120000,
+  });
+
+  if (!data.ok) throw new Error(`Telegram API error: ${JSON.stringify(data)}`);
+  return data;
+}
+
 // ==== EXPORTS ====
 // @section MODULE_EXPORTS
 module.exports = {
@@ -269,5 +291,6 @@ module.exports = {
   convertAndSave,
   sendFileToUser,
   sendVideoToUser,
+  sendAnimationToUser,
   probeVideo,
 };
