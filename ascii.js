@@ -710,6 +710,10 @@ let DITHER_ENABLED = false;
     gifCanvas: null,        // offscreen-canvas для текущего кадра
     gifCtx: null,           // контекст для gifCanvas
     _gifLastTs: 0,          // последний ts из loop()
+    sourceFilename: '',
+    sourceMime: '',
+    sourceSizeBytes: 0,
+    sourceIsGif: false,
     
     isRecording: false,     // запись видео (экспорт)
     recorder: null,
@@ -5726,6 +5730,10 @@ async function uploadBlobToBot(blob, filename, options = {}) {
       form.append('mediatype', mediatype);
       form.append('fps', String(Math.max(5, Math.min(60, Math.round(state.fps || 30)))));
       if (mediatype === 'video') form.append('videoQuality', quality);
+      form.append('sourceFilename', state.sourceFilename || '');
+      form.append('sourceMime', state.sourceMime || '');
+      form.append('sourceSizeBytes', String(Number(state.sourceSizeBytes || 0)));
+      form.append('sourceIsGif', state.sourceIsGif ? '1' : '0');
 
       const res = await fetch(`${API_BASE}/api/upload`, {
         method: 'POST',
@@ -7428,7 +7436,21 @@ fileVideo.addEventListener('change', async (e) => {
     return;
   }
 
-  const isGif = (original.type === 'image/gif') || /\.gif$/i.test(original.name || '');
+  const sourceFilename = String(original.name || '');
+  const sourceMime = String(original.type || '');
+  const sourceSizeBytes = Number(original.size || 0);
+  const sourceIsGif = sourceFilename.toLowerCase().endsWith('.gif') || sourceMime === 'image/gif';
+  state.sourceFilename = sourceFilename;
+  state.sourceMime = sourceMime;
+  state.sourceSizeBytes = sourceSizeBytes;
+  state.sourceIsGif = sourceIsGif;
+  console.log('[MEDIA-SOURCE] selected', {
+    sourceFilename,
+    sourceMime,
+    sourceSizeBytes,
+    sourceIsGif
+  });
+  const isGif = sourceIsGif;
 
   // В любом случае — очищаем предыдущее GIF-состояние
   state.gifFrames   = null;
