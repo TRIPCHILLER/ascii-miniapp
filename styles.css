@@ -1868,8 +1868,8 @@ input[type="color"] {
 .arg-scene-popup-box{
   width:min(84vw, 880px);
   min-height:136px;
-  background:var(--arg-popup-bg);
-  padding:30px 34px;
+  background:transparent;
+  padding:12px 16px;
   display:flex;
   align-items:center;
   justify-content:center;
@@ -2164,68 +2164,6 @@ body.visor-text #textSizeWrap{display:flex !important;}
   font-family:'PxPlus IBM VGA','BetterVCR',monospace;
   font-size:18px;
   text-transform:uppercase;
-}
-
-.ascii-terminal-frame{
-  --ascii-frame-color:#fff;
-  --ascii-frame-stroke:2px;
-  --ascii-frame-corner:22px;
-  --ascii-frame-pad-x:28px;
-  --ascii-frame-pad-y:24px;
-  position:relative;
-  border:0;
-  box-sizing:border-box;
-  overflow:hidden;
-}
-
-.ascii-terminal-content{
-  position:relative;
-  z-index:1;
-  background:#000;
-  padding:var(--ascii-frame-pad-y) var(--ascii-frame-pad-x);
-}
-
-.ascii-terminal-part{
-  position:absolute;
-  pointer-events:none;
-  color:var(--ascii-frame-color);
-  font-family:'PxPlus IBM VGA','BetterVCR',monospace;
-  font-size:30px;
-  line-height:1;
-  z-index:2;
-}
-
-.ascii-terminal-part--tl{ top:-3px; left:4px; }
-.ascii-terminal-part--tr{ top:-3px; right:4px; }
-.ascii-terminal-part--bl{ bottom:-5px; left:4px; }
-.ascii-terminal-part--br{ bottom:-5px; right:4px; }
-.ascii-terminal-part--top,
-.ascii-terminal-part--bottom{
-  left:22px;
-  right:22px;
-  height:var(--ascii-frame-stroke);
-  background:repeating-linear-gradient(to right,var(--ascii-frame-color) 0 18px,transparent 18px 36px);
-}
-.ascii-terminal-part--top{ top:14px; }
-.ascii-terminal-part--bottom{ bottom:13px; }
-.ascii-terminal-part--left,
-.ascii-terminal-part--right{
-  top:22px;
-  bottom:22px;
-  width:var(--ascii-frame-stroke);
-  background:repeating-linear-gradient(to bottom,var(--ascii-frame-color) 0 16px,transparent 16px 34px);
-}
-.ascii-terminal-part--left{ left:12px; }
-.ascii-terminal-part--right{ right:12px; }
-
-.ascii-popup__text,
-.ascii-select-popup__dialog,
-.arg-scene-popup-box{
-  --ascii-frame-color:#fff;
-}
-
-.arg-scene-popup-box{
-  --ascii-frame-color:var(--arg-popup-fg);
 }
 
 .ascii-popup__text,
