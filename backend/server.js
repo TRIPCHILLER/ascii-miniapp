@@ -719,9 +719,12 @@ if (mediatype === 'video') {
     console.warn('[video] convert failed:', e?.message || e);
   }
   try {
-    // ВСЕГДА sendVideo — никаких sendDocument/animation
+    // ASCII video отправляем как document, чтобы сохранить качество исходного mp4
     if (result?.ext === 'mp4') {
-      await sendVideoToUser(userId, result.path, { caption: '#ascii_video' });
+      const sent = await sendFileToUser(userId, result.path, '#ascii_video');
+      let fileSize = null;
+      try { fileSize = (await fs.promises.stat(result.path)).size; } catch {}
+      console.log('[TG] ascii video document sent', { ok: !!sent?.ok, filePath: result.path, size: fileSize });
     } else {
       // фолбэк: шлём исходник как документ (подпишем, что webm)
       await sendFileToUser(userId, f.path || f.buffer, '#ascii_video (webm)');
