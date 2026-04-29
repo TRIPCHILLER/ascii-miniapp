@@ -5770,16 +5770,16 @@ async function uploadBlobToBot(blob, filename, options = {}) {
         showAsciiPopup({
           type: 'error',
           sound: 'error',
-          title: 'ОШИБКА ЗАГРУЗКИ',
-          message: 'Я НЕ МОГУ ПОЗВОЛИТЬ СДЕЛАТЬ ТЕБЕ ЭТО.\nТВОЁ ВОСПОМИНАНИЕ ДЛИТСЯ БОЛЕЕ 60 СЕКУНД.\nСОКРАТИ ВРЕМЯ ИЛИ ВЫБЕРИ ДРУГОЕ'
+          title: 'ОШИБКА ИМПОРТА...',
+          message: 'Я НЕ МОГУ ОБРАБОТАТЬ ЭТО.\nЭТО ВОСПОМИНАНИЕ ДЛИТСЯ БОЛЕЕ 60 СЕКУНД.\nСОКРАТИ ЕГО ВРЕМЯ ИЛИ ВЫБЕРИ ДРУГОЕ'
         });
         return;
       }
       if (json?.error === 'VIDEO_RETRY_COMPRESS' && retryAttempt === 0) {
         await showAsciiTypedPopup({
           type: 'info',
-          title: 'ПОВТОРНАЯ ОБРАБОТКА',
-          message: 'ФАЙЛ ПРЕВЫШАЕТ ДОПУСТИМУЮ МАССУ.\nЯ ПЕРЕЗАПИШУ ASCII VIDEO С БОЛЕЕ ЛЁГКИМ ПРЕСЕТОМ.\nКАЧЕСТВО БУДЕТ СНИЖЕНО.',
+          title: 'ПОВТОРНАЯ ОБРАБОТКА...',
+          message: 'ФАЙЛ ПРЕВЫШАЕТ ДОПУСТИМУЮ МАССУ.\nЯ ПЕРЕЗАПИШУ ASCII-ВИДЕО С БОЛЕЕ ЛЁГКИМ ПРЕСЕТОМ.\nКАЧЕСТВО БУДЕТ СНИЖЕНО.',
           allowManualClose: false
         });
         return uploadBlobToBot(blob, filename, { quality: 'balanced', retryAttempt: 1 });
@@ -5788,8 +5788,8 @@ async function uploadBlobToBot(blob, filename, options = {}) {
         showAsciiPopup({
           type: 'error',
           sound: 'error',
-          title: 'ОШИБКА ЗАГРУЗКИ',
-          message: 'Я НЕ МОГУ ПОЗВОЛИТЬ СДЕЛАТЬ ТЕБЕ ЭТО.\nТВОЁ ВОСПОМИНАНИЕ СЛИШКОМ ТЯЖЁЛОЕ ДЛЯ ОТПРАВКИ.\nСОКРАТИ ВЕС ИЛИ ВЫБЕРИ ДРУГОЕ'
+          title: 'ОШИБКА ЗАГРУЗКИ...',
+          message: 'Я НЕ МОГУ ОБРАБОТАТЬ ЭТО.\nТВОЁ ВОСПОМИНАНИЕ СЛИШКОМ ТЯЖЁЛОЕ ДЛЯ ОТПРАВКИ.\nУМЕНЬШИ ЕГО ВЕС ИЛИ ВЫБЕРИ ДРУГОЕ'
         });
         return;
       }
@@ -5797,10 +5797,10 @@ async function uploadBlobToBot(blob, filename, options = {}) {
         showAsciiPopup({
           type: 'error',
           sound: 'error',
-          title: 'ОШИБКА ЗАГРУЗКИ',
-          message: 'Я НЕ МОГУ ПЕРЕДАТЬ ЭТУ АНИМАЦИЮ.\nОНА СЛИШКОМ ТЯЖЁЛА ДЛЯ ФОРМАТА GIF.\nСОКРАТИ ЕЁ ИЛИ УМЕНЬШИ ПАРАМЕТРЫ.',
+          title: 'ОШИБКА ЗАГРУЗКИ...',
+          message: 'Я НЕ МОГУ ПЕРЕДАТЬ ЭТУ АНИМАЦИЮ.\nОНА СЛИШКОМ ТЯЖЁЛА ДЛЯ ФОРМАТА .GIF.\nСОКРАТИ ЕЁ ИЛИ УМЕНЬШИ ПАРАМЕТРЫ.',
           useTypewriter: false,
-          closeText: '[ ЗАКРЫТЬ ]'
+          closeText: '[ЗАКРЫТЬ]'
         });
         return;
       }
@@ -5808,7 +5808,7 @@ async function uploadBlobToBot(blob, filename, options = {}) {
       if (!res.ok) {
         showAsciiPopup({
           type: 'error',
-          title: 'ОШИБКА ЗАГРУЗКИ',
+          title: 'ОШИБКА ЗАГРУЗКИ...',
           message: `СТАТУС: ${res.status}\n${(text || '').slice(0,1000)}`
         });
         return;
