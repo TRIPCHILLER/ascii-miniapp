@@ -5657,7 +5657,7 @@ function showInsufficientBalancePopup(required, balance) {
     useTypewriter: false,
     closeText: '[ ЗАКРЫТЬ ]',
     title: 'НЕДОСТАТОЧНО ЭНЕРГИИ',
-    message: `ДЛЯ ПРЕОБРЗОВАНИЯ ТРЕБУЕТСЯ: ${required}`,
+    message: `ДЛЯ ПРЕОБРАЗОВАНИЯ ТРЕБУЕТСЯ: ${required}`,
     extra: `В ЭНЕРГОХРАНИЛИЩЕ: ${balance}`
   });
 }
