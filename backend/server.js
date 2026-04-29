@@ -2,6 +2,7 @@ require('dotenv').config();
 const express    = require('express');
 const bodyParser = require('body-parser');
 const fs         = require('fs');
+const os         = require('os');
 const path       = require('path');
 const axios      = require('axios');
 const crypto     = require('crypto');
@@ -782,8 +783,6 @@ const uploadHandler = [
       try { await fs.promises.rm(gifTmpdir, { recursive: true, force: true }); } catch {}
     }
   } else {
-  const os = require('os');
-  const path = require('path');
   const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), 'trip-vid-'));
   const userFps = clampInt(req.body.fps, 5, 60, 30);
   const mode = (String(req.body.videoQuality || req.body.compressMode || 'high').toLowerCase() === 'balanced') ? 'balanced' : 'high';
