@@ -26,6 +26,7 @@
   const $ = s => document.querySelector(s);
   const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
   const API_BASE = 'https://api.tripchiller.com';
+  const MAX_VIDEO_DURATION_SEC = 60;
   const SAFE_TG_MAX_COLS = 40;
   const TEXT_TELEGRAM_CELL_ASPECT = 0.50;
   const TEXT_PREVIEW_LINE_HEIGHT = 1.10;
@@ -4266,7 +4267,10 @@ function showAsciiPopup(input = {}) {
     upperTitle.includes('НЕДОСТАТОЧНО ЭНЕРГИИ') ||
     upperTitle.includes('СЕТЕВАЯ ОШИБКА')
   );
-  if (input.type === 'error' || input.playErrorSound || machineErrorPopup) {
+  if (input.sound === 'danger') {
+    playUiSoundNoThrow(ARG_SCENE_SOUNDS.danger);
+  }
+  if (!input.disableErrorSound && (input.type === 'error' || input.playErrorSound || machineErrorPopup)) {
     playErrorSound();
   }
 
@@ -4280,10 +4284,16 @@ function showAsciiPopup(input = {}) {
   document.body.classList.add('ascii-popup-open');
 
   if (!asciiPopupCloseHandlerBound) {
-    closeBtn.addEventListener('click', hideAsciiPopup);
+    closeBtn.addEventListener('click', () => {
+      if (closeBtn.disabled) return;
+      hideAsciiPopup();
+    });
     asciiPopupCloseHandlerBound = true;
   }
-  closeBtn.focus({ preventScroll: true });
+  const canClose = input.allowManualClose !== false;
+  closeBtn.disabled = !canClose;
+  closeBtn.hidden = !canClose;
+  if (canClose) closeBtn.focus({ preventScroll: true });
 }
 
 function showErrorPopup(titleOrPayload, message = '', extra = '') {
@@ -5590,7 +5600,46 @@ function saveVideo(){
   }
 }
   
+async function getVideoDurationSec(file) {
+  if (!file) return 0;
+  const tempVideo = document.createElement('video');
+  tempVideo.preload = 'metadata';
+  const objectUrl = URL.createObjectURL(file);
+  return await new Promise((resolve) => {
+    const done = (value) => {
+      try { URL.revokeObjectURL(objectUrl); } catch (_) {}
+      tempVideo.removeAttribute('src');
+      resolve(Number.isFinite(value) ? value : 0);
+    };
+    tempVideo.onloadedmetadata = () => done(Number(tempVideo.duration || 0));
+    tempVideo.onerror = () => done(0);
+    tempVideo.src = objectUrl;
+  });
+}
+
 let uploadInFlight = false;
+let asciiPopupTypeToken = 0;
+
+async function showAsciiTypedPopup(input = {}, { charMs = 28, doneDelayMs = 2200 } = {}) {
+  const popup = app.ui.asciiPopup;
+  const textEl = app.ui.asciiPopupText;
+  if (!popup || !textEl) return;
+  showAsciiPopup(input);
+  const token = ++asciiPopupTypeToken;
+  const title = String(input.title || 'ИНФОРМАЦИЯ').trim().toLocaleUpperCase('ru-RU');
+  const message = String(input.message || '').trim().toLocaleUpperCase('ru-RU');
+  const fullText = `${title}\n\n${message}`;
+  textEl.textContent = '';
+  for (let i = 0; i < fullText.length; i += 1) {
+    if (token !== asciiPopupTypeToken || popup.hidden) return;
+    textEl.textContent += fullText[i];
+    await sleep(fullText[i] === '\n' ? Math.max(10, Math.floor(charMs * 0.5)) : charMs);
+  }
+  if (token !== asciiPopupTypeToken || popup.hidden) return;
+  await sleep(doneDelayMs);
+  if (token !== asciiPopupTypeToken || popup.hidden) return;
+  hideAsciiPopup();
+}
 
 function getRequiredImpulsesForCapture() {
   if (isTextMode()) return 1;
@@ -5633,7 +5682,13 @@ async function precheckCaptureImpulses() {
 
 // Универсальная отправка: в Telegram → на сервер; иначе → локальная загрузка
 async function downloadBlob(blob, filename) {
+  return uploadBlobToBot(blob, filename, { quality: 'high', retryAttempt: 0 });
+}
+
+async function uploadBlobToBot(blob, filename, options = {}) {
   const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
+  const quality = options.quality === 'balanced' ? 'balanced' : 'high';
+  const retryAttempt = Number(options.retryAttempt || 0);
 
   if (uploadInFlight) {
     console.warn('Upload already in progress — skip');
@@ -5670,6 +5725,7 @@ async function downloadBlob(blob, filename) {
       form.append('initData', tg.initData || '');
       form.append('mediatype', mediatype);
       form.append('fps', String(Math.max(5, Math.min(60, Math.round(state.fps || 30)))));
+      if (mediatype === 'video') form.append('videoQuality', quality);
 
       const res = await fetch(`${API_BASE}/api/upload`, {
         method: 'POST',
@@ -5691,6 +5747,36 @@ async function downloadBlob(blob, filename) {
           extra: `В ЭНЕРГОХРАНИЛИЩЕ: ${json?.balance ?? '—'}`
         });
         return; // без локального сохранения
+      }
+
+      if (json?.error === 'VIDEO_TOO_LONG') {
+        showAsciiPopup({
+          type: 'error',
+          disableErrorSound: true,
+          sound: 'danger',
+          title: 'ОШИБКА ЗАГРУЗКИ',
+          message: 'Я НЕ МОГУ ПОЗВОЛИТЬ СДЕЛАТЬ ТЕБЕ ЭТО.\nТВОЁ ВОСПОМИНАНИЕ ДЛИТСЯ БОЛЕЕ 60 СЕКУНД.\nСОКРАТИ ВРЕМЯ ИЛИ ВЫБЕРИ ДРУГОЕ'
+        });
+        return;
+      }
+      if (json?.error === 'VIDEO_RETRY_COMPRESS' && retryAttempt === 0) {
+        await showAsciiTypedPopup({
+          type: 'info',
+          title: 'ПОВТОРНАЯ ОБРАБОТКА',
+          message: 'ФАЙЛ ПРЕВЫШАЕТ ДОПУСТИМУЮ МАССУ.\nЯ ПЕРЕЗАПИШУ ASCII VIDEO С БОЛЕЕ ЛЁГКИМ ПРЕСЕТОМ.\nКАЧЕСТВО БУДЕТ СНИЖЕНО.',
+          allowManualClose: false
+        });
+        return uploadBlobToBot(blob, filename, { quality: 'balanced', retryAttempt: 1 });
+      }
+      if (json?.error === 'VIDEO_OUTPUT_TOO_LARGE') {
+        showAsciiPopup({
+          type: 'error',
+          disableErrorSound: true,
+          sound: 'danger',
+          title: 'ОШИБКА ЗАГРУЗКИ',
+          message: 'Я НЕ МОГУ ПОЗВОЛИТЬ СДЕЛАТЬ ТЕБЕ ЭТО.\nТВОЁ ВОСПОМИНАНИЕ СЛИШКОМ ТЯЖЁЛОЕ ДЛЯ ОТПРАВКИ.\nСОКРАТИ ВЕС ИЛИ ВЫБЕРИ ДРУГОЕ'
+        });
+        return;
       }
 
       if (!res.ok) {
@@ -7329,6 +7415,18 @@ fileVideo.addEventListener('change', async (e) => {
 
   // Ничего не выбрали → не трогаем текущий режим (live/photo/video)
   if (!original) return;
+  const durationSec = await getVideoDurationSec(original);
+  if (durationSec > MAX_VIDEO_DURATION_SEC) {
+    showAsciiPopup({
+      type: 'error',
+      disableErrorSound: true,
+      sound: 'danger',
+      title: 'ОШИБКА ЗАГРУЗКИ',
+      message: 'Я НЕ МОГУ ПОЗВОЛИТЬ СДЕЛАТЬ ТЕБЕ ЭТО.\nТВОЁ ВОСПОМИНАНИЕ ДЛИТСЯ БОЛЕЕ 60 СЕКУНД.\nСОКРАТИ ВРЕМЯ ИЛИ ВЫБЕРИ ДРУГОЕ'
+    });
+    e.target.value = '';
+    return;
+  }
 
   const isGif = (original.type === 'image/gif') || /\.gif$/i.test(original.name || '');
 
