@@ -5657,8 +5657,8 @@ function showInsufficientBalancePopup(required, balance) {
     useTypewriter: false,
     closeText: '[ ЗАКРЫТЬ ]',
     title: 'НЕДОСТАТОЧНО ЭНЕРГИИ',
-    message: `ДЛЯ ПРЕОБРАЗОВАНИЯ ТРЕБУЕТСЯ: ${required}`,
-    extra: `В ЭНЕРГОХРАНИЛИЩЕ: ${balance}`
+    message: `Для преобразования требуется: ${required}`,
+    extra: `В энергохранилище: ${balance}`
   });
 }
 
@@ -5760,8 +5760,8 @@ async function uploadBlobToBot(blob, filename, options = {}) {
         showAsciiPopup({
           type: 'error',
           title: 'НЕДОСТАТОЧНО ЭНЕРГИИ',
-          message: `ДЛЯ ПРЕОБРЗОВАНИЯ ТРЕБУЕТСЯ: ${json?.need ?? (state.mode==='video'?15:5)}`,
-          extra: `В ЭНЕРГОХРАНИЛИЩЕ: ${json?.balance ?? '—'}`
+          message: `Для преобразования требуется: ${json?.need ?? (state.mode==='video'?15:5)}`,
+          extra: `В энергохранилище: ${json?.balance ?? '—'}`
         });
         return; // без локального сохранения
       }
@@ -5771,7 +5771,7 @@ async function uploadBlobToBot(blob, filename, options = {}) {
           type: 'error',
           sound: 'error',
           title: 'ОШИБКА ИМПОРТА...',
-          message: 'Я НЕ МОГУ ОБРАБОТАТЬ ЭТО.\nЭТО ВОСПОМИНАНИЕ ДЛИТСЯ БОЛЕЕ 60 СЕКУНД.\nСОКРАТИ ЕГО ВРЕМЯ ИЛИ ВЫБЕРИ ДРУГОЕ'
+          message: 'Я не могу обработать это.\nТвоё воспоминание длится более 60 секунд.\nСократи его время или выбери другое.'
         });
         return;
       }
@@ -5779,7 +5779,7 @@ async function uploadBlobToBot(blob, filename, options = {}) {
         await showAsciiTypedPopup({
           type: 'info',
           title: 'ПОВТОРНАЯ ОБРАБОТКА...',
-          message: 'ФАЙЛ ПРЕВЫШАЕТ ДОПУСТИМУЮ МАССУ.\nЯ ПЕРЕЗАПИШУ ASCII-ВИДЕО С БОЛЕЕ ЛЁГКИМ ПРЕСЕТОМ.\nКАЧЕСТВО БУДЕТ СНИЖЕНО.',
+          message: 'Файл превышает допустимую массу.\nЯ перезапишу это ASCII-видео с более лёгким пресетом.\nКАЧЕСТВО БУДЕТ СНИЖЕНО.',
           allowManualClose: false
         });
         return uploadBlobToBot(blob, filename, { quality: 'balanced', retryAttempt: 1 });
@@ -5789,7 +5789,7 @@ async function uploadBlobToBot(blob, filename, options = {}) {
           type: 'error',
           sound: 'error',
           title: 'ОШИБКА ЗАГРУЗКИ...',
-          message: 'Я НЕ МОГУ ОБРАБОТАТЬ ЭТО.\nТВОЁ ВОСПОМИНАНИЕ СЛИШКОМ ТЯЖЁЛОЕ ДЛЯ ОТПРАВКИ.\nУМЕНЬШИ ЕГО ВЕС ИЛИ ВЫБЕРИ ДРУГОЕ'
+          message: 'Я не могу обработать это.\nТвоё воспоминание слишком тяжёлое для отправки.\nУменьши его вес или выбери другое.',
         });
         return;
       }
@@ -5798,7 +5798,7 @@ async function uploadBlobToBot(blob, filename, options = {}) {
           type: 'error',
           sound: 'error',
           title: 'ОШИБКА ЗАГРУЗКИ...',
-          message: 'Я НЕ МОГУ ПЕРЕДАТЬ ЭТУ АНИМАЦИЮ.\nОНА СЛИШКОМ ТЯЖЁЛА ДЛЯ ФОРМАТА .GIF.\nСОКРАТИ ЕЁ ИЛИ УМЕНЬШИ ПАРАМЕТРЫ.',
+          message: 'Я не могу обработать эту анимацию.\nОна слишком тяжела для формата .GIF.\nСократи или уменьши её параметры.',
           useTypewriter: false,
           closeText: '[ЗАКРЫТЬ]'
         });
