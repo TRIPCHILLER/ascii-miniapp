@@ -5653,7 +5653,7 @@ function getRequiredImpulsesForCapture() {
 function showInsufficientBalancePopup(required, balance) {
   showAsciiPopup({
     type: 'error',
-    sound: 'danger',
+    sound: 'error',
     useTypewriter: false,
     closeText: '[ ЗАКРЫТЬ ]',
     title: 'НЕДОСТАТОЧНО ЭНЕРГИИ',
@@ -5769,8 +5769,7 @@ async function uploadBlobToBot(blob, filename, options = {}) {
       if (json?.error === 'VIDEO_TOO_LONG') {
         showAsciiPopup({
           type: 'error',
-          disableErrorSound: true,
-          sound: 'danger',
+          sound: 'error',
           title: 'ОШИБКА ЗАГРУЗКИ',
           message: 'Я НЕ МОГУ ПОЗВОЛИТЬ СДЕЛАТЬ ТЕБЕ ЭТО.\nТВОЁ ВОСПОМИНАНИЕ ДЛИТСЯ БОЛЕЕ 60 СЕКУНД.\nСОКРАТИ ВРЕМЯ ИЛИ ВЫБЕРИ ДРУГОЕ'
         });
@@ -5788,8 +5787,7 @@ async function uploadBlobToBot(blob, filename, options = {}) {
       if (json?.error === 'VIDEO_OUTPUT_TOO_LARGE') {
         showAsciiPopup({
           type: 'error',
-          disableErrorSound: true,
-          sound: 'danger',
+          sound: 'error',
           title: 'ОШИБКА ЗАГРУЗКИ',
           message: 'Я НЕ МОГУ ПОЗВОЛИТЬ СДЕЛАТЬ ТЕБЕ ЭТО.\nТВОЁ ВОСПОМИНАНИЕ СЛИШКОМ ТЯЖЁЛОЕ ДЛЯ ОТПРАВКИ.\nСОКРАТИ ВЕС ИЛИ ВЫБЕРИ ДРУГОЕ'
         });
@@ -5798,8 +5796,7 @@ async function uploadBlobToBot(blob, filename, options = {}) {
       if (json?.error === 'GIF_OUTPUT_TOO_LARGE') {
         showAsciiPopup({
           type: 'error',
-          disableErrorSound: true,
-          sound: 'danger',
+          sound: 'error',
           title: 'ОШИБКА ЗАГРУЗКИ',
           message: 'Я НЕ МОГУ ПЕРЕДАТЬ ЭТУ АНИМАЦИЮ.\nОНА СЛИШКОМ ТЯЖЁЛА ДЛЯ ФОРМАТА GIF.\nСОКРАТИ ЕЁ ИЛИ УМЕНЬШИ ПАРАМЕТРЫ.',
           useTypewriter: false,
@@ -7448,8 +7445,7 @@ fileVideo.addEventListener('change', async (e) => {
   if (durationSec > MAX_VIDEO_DURATION_SEC) {
     showAsciiPopup({
       type: 'error',
-      disableErrorSound: true,
-      sound: 'danger',
+      sound: 'error',
       title: 'ОШИБКА ЗАГРУЗКИ',
       message: 'Я НЕ МОГУ ПОЗВОЛИТЬ СДЕЛАТЬ ТЕБЕ ЭТО.\nТВОЁ ВОСПОМИНАНИЕ ДЛИТСЯ БОЛЕЕ 60 СЕКУНД.\nСОКРАТИ ВРЕМЯ ИЛИ ВЫБЕРИ ДРУГОЕ'
     });
