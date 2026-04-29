@@ -573,6 +573,70 @@ async function renderAsciiTextFromImage(inputPath, options = {}) {
 // Папка для временных загрузок (поддержим из .env TMP_DIR)
 const TMP_DIR = process.env.TMP_DIR || '/tmp/ascii';
 fs.mkdirSync(TMP_DIR, { recursive: true });
+
+async function probeVideoStreams(inputPath) {
+  try {
+    const ffArgs = [
+      '-v', 'error',
+      '-print_format', 'json',
+      '-show_streams',
+      '-show_format',
+      inputPath
+    ];
+    const { stdout } = await exec('ffprobe', ffArgs, { encoding: 'utf8' });
+    const data = JSON.parse(String(stdout || '{}'));
+    const streams = Array.isArray(data?.streams) ? data.streams : [];
+    const video = streams.find((st) => st.codec_type === 'video') || null;
+    const audio = streams.find((st) => st.codec_type === 'audio') || null;
+    return {
+      hasVideo: !!video,
+      hasAudio: !!audio,
+      width: Number(video?.width || 0) || null,
+      height: Number(video?.height || 0) || null,
+      durationSec: Number(data?.format?.duration || video?.duration || 0) || 0
+    };
+  } catch (_) {
+    return { hasVideo: false, hasAudio: false, width: null, height: null, durationSec: 0 };
+  }
+}
+async function convertWebmToGif(inPath, outPath, opts = {}) {
+  const fps = clampInt(opts.fps, 5, 60, 30);
+  const palettePath = `${outPath}.palette.png`;
+  const genArgs = ['-hide_banner','-loglevel','error','-i',inPath,'-vf',`fps=${fps},palettegen=stats_mode=full`,'-y',palettePath];
+  const useArgs = ['-hide_banner','-loglevel','error','-i',inPath,'-i',palettePath,'-lavfi',`fps=${fps}[x];[x][1:v]paletteuse=dither=none`,'-y',outPath];
+  await runFfmpeg(genArgs);
+  await runFfmpeg(useArgs);
+  try { await fs.promises.rm(palettePath, { force: true }); } catch {}
+}
+async function cleanupStaleTmpArtifacts() {
+  const now = Date.now();
+  const thresholdMs = 24 * 60 * 60 * 1000;
+  let files = 0; let dirs = 0; let bytesApprox = 0;
+  try {
+    const entries = await fs.promises.readdir(TMP_DIR, { withFileTypes: true });
+    for (const e of entries) {
+      const full = path.join(TMP_DIR, e.name);
+      const st = await fs.promises.stat(full).catch(() => null);
+      if (!st || (now - st.mtimeMs) < thresholdMs) continue;
+      bytesApprox += Number(st.size || 0);
+      await fs.promises.rm(full, { recursive: true, force: true });
+      e.isDirectory() ? dirs++ : files++;
+    }
+  } catch {}
+  try {
+    const tmpEntries = await fs.promises.readdir('/tmp', { withFileTypes: true });
+    for (const e of tmpEntries) {
+      if (!e.isDirectory() || (!e.name.startsWith('trip-vid-') && !e.name.startsWith('trip-gif-'))) continue;
+      const full = path.join('/tmp', e.name);
+      const st = await fs.promises.stat(full).catch(() => null);
+      if (!st || (now - st.mtimeMs) < thresholdMs) continue;
+      await fs.promises.rm(full, { recursive: true, force: true });
+      dirs++;
+    }
+  } catch {}
+  if (files || dirs) console.log('[TMP-CLEANUP] removed stale files/dirs', { files, dirs, bytesApprox });
+}
+
 // Multer: сохраняем во временный каталог
 const upload = multer({
   storage: multer.diskStorage({
@@ -659,9 +723,11 @@ const uploadHandler = [
       }
       // достаём имя, расширение и mime загруженного файла
       const originalName = f.originalname || '';
-      const ext = path.extname(originalName).toLowerCase();
-      const mimeType = String(f.mimetype || '').toLowerCase();
-      const isGifInput = ext === '.gif' || mimeType === 'image/gif';
+      const uploadedMime = String(f.mimetype || '').toLowerCase();
+      const sourceFilename = String(req.body?.sourceFilename || '');
+      const sourceMime = String(req.body?.sourceMime || '').toLowerCase();
+      const sourceIsGifFlag = String(req.body?.sourceIsGif || '') === '1';
+      const sourceIsGif = sourceIsGifFlag || sourceMime === 'image/gif' || /\.gif$/i.test(sourceFilename);
       // --- initData (любая форма) ---
       const rawInit =
         (req.headers['x-telegram-init-data'] || '').trim() ||
@@ -675,8 +741,8 @@ const uploadHandler = [
       }
       // --- тип медиа (любая форма ключа) ---
       let mediatype = String(req.body?.mediatype || req.body?.mediaType || 'photo').toLowerCase();
-      // если пришёл GIF — всегда считаем его «видео»
-      if (isGifInput) {
+      // если источник GIF — обрабатываем как видео-пайплайн с gif output
+      if (sourceIsGif) {
         mediatype = 'video';
       }
       const cost = mediatype === 'video' ? 15 : 5;
@@ -699,14 +765,22 @@ const uploadHandler = [
       }
       // --- отправка в ЛС бота ---
       if (mediatype === 'video') {
-  if (isGifInput) {
-    const inputSizeBytes = (() => {
-      try { return fs.statSync(f.path).size; } catch { return null; }
-    })();
-    console.log('[VIDEO-CHECK] GIF/input animation detected', { originalName, mimeType, inputSizeBytes });
-    const sent = await sendAnimationToUser(userId, f.path, { caption: '#ascii_video' });
-    console.log('[TG] ascii animation sent', { ok: !!sent?.ok, filePath: f.path, size: inputSizeBytes });
-    try { if (f.path) await fs.promises.rm(f.path, { force: true }); } catch {}
+  if (sourceIsGif) {
+    const gifTmpdir = fs.mkdtempSync(path.join(os.tmpdir(), 'trip-gif-'));
+    const outGif = path.join(gifTmpdir, `out_${Date.now()}.gif`);
+    try {
+      const inputSizeBytes = (() => { try { return fs.statSync(f.path).size; } catch { return null; } })();
+      console.log('[GIF-SOURCE] detected', { sourceFilename, sourceMime, uploadedMime, uploadedPath: f.path });
+      console.log('[GIF-CONVERT] start', { inputPath: f.path, outputPath: outGif, inputSizeBytes });
+      await convertWebmToGif(f.path, outGif, { fps: clampInt(req.body.fps, 5, 60, 30) });
+      const outputSizeBytes = (() => { try { return fs.statSync(outGif).size; } catch { return null; } })();
+      console.log('[GIF-CONVERT] done', { outputPath: outGif, outputSizeBytes });
+      const sent = await sendAnimationToUser(userId, outGif, { caption: '#ascii_video' });
+      console.log('[TG] ascii animation sent', { ok: !!sent?.ok, filePath: outGif, size: outputSizeBytes });
+    } finally {
+      try { if (f.path) await fs.promises.rm(f.path, { force: true }); } catch {}
+      try { await fs.promises.rm(gifTmpdir, { recursive: true, force: true }); } catch {}
+    }
   } else {
   const os = require('os');
   const path = require('path');
@@ -714,6 +788,8 @@ const uploadHandler = [
   const userFps = clampInt(req.body.fps, 5, 60, 30);
   const mode = (String(req.body.videoQuality || req.body.compressMode || 'high').toLowerCase() === 'balanced') ? 'balanced' : 'high';
   try {
+    const probe = await probeVideoStreams(f.path);
+    console.log('[VIDEO-PROBE] streams', probe);
     const result = await convertAndSaveVideo(f.path, tmpdir, { fps: userFps, mode });
     if (result?.ext === 'mp4') {
       const outputSizeBytes = Number(result.outputSizeBytes || 0);
@@ -737,6 +813,7 @@ const uploadHandler = [
   }
       } else {
         await sendFileToUser(userId, f.path || f.buffer, '#ascii_photo');
+        try { if (f.path) await fs.promises.rm(f.path, { force: true }); } catch {}
       }
 // --- РЕФЕРАЛЬНЫЙ БОНУС ЗА ПЕРВУЮ АКТИВАЦИЮ ЯДРА ---
       try {
@@ -763,6 +840,7 @@ const uploadHandler = [
       deduct(userId, cost);
       return res.json({ ok: true, balance: getBalance(userId) });
     } catch (e) {
+      try { const files = Array.isArray(req.files) ? req.files : []; await Promise.all(files.map((x) => x?.path ? fs.promises.rm(x.path, { force: true }).catch(() => {}) : Promise.resolve())); } catch {}
       const detail = formatHttpError(e);
       console.error('[ERR] /api/upload', detail);
       return res.status(500).json({ ok: false, error: 'UPLOAD_FAILED', detail });
@@ -1546,4 +1624,6 @@ app.use((req, res) => {
   res.type('text').status(404).send('fallback 404 ' + req.method + ' ' + req.url);
 });
 // Run
+cleanupStaleTmpArtifacts().catch(() => {});
+setInterval(() => { cleanupStaleTmpArtifacts().catch(() => {}); }, 6 * 60 * 60 * 1000);
 app.listen(PORT, () => console.log(`[BOOT] API listening on ${PORT}`));
