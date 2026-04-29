@@ -295,21 +295,12 @@ function HELP_HTML() {
 // ---------- Мелкие утилиты ----------
 const string = (v) => (v == null ? '' : String(v));
 function logReq(req){ console.log(`[REQ] ${req.method} ${req.url} Origin: ${req.headers.origin||'-'}`); }
-const TARGET_W = 1080;
-const TARGET_H = 1920;
 // Конвертация видео в MP4 с оптимизацией под ASCII
 // @section MEDIA_CONVERSION_PIPELINE
 async function convertToMp4(inPath, outPath, opts = {}) {
   const fps = Number(opts.fps || 30);
-  // Баланс качества / производительности
-  const crfValue = fps > 30 ? 20 : 18;        // <30fps — почти без потерь, >30fps — чуть компрессии
-  const presetValue = fps > 30 ? 'veryfast' : 'fast'; // Быстрее кодирование для высоких fps
-  // Масштабирование с сохранением пропорций
-const scaleExpr =
-  `scale='min(${TARGET_W},iw)':'min(${TARGET_H},ih)':` +
-  `force_original_aspect_ratio=decrease:flags=neighbor+bitexact,` +
-  `fps=${fps}:round=down,setsar=1,format=yuv420p,` +
-  `pad=ceil(iw/2)*2:ceil(ih/2)*2`;
+  const dryRun = opts.dryRun === true;
+  const vfExpr = `fps=${fps}:round=down,setsar=1,pad=ceil(iw/2)*2:ceil(ih/2)*2,format=yuv420p`;
   // Аргументы для ffmpeg
   const args = [
     '-hide_banner', '-loglevel', 'error',
@@ -318,14 +309,14 @@ const scaleExpr =
     '-probesize', '200M',
     '-sws_flags', 'neighbor+full_chroma_int+full_chroma_inp+accurate_rnd',
     '-i', inPath,
-    // Основные фильтры и масштабирование
-    '-vf', scaleExpr,
+    // Основные фильтры без downscale (сохраняем исходную детализацию ASCII)
+    '-vf', vfExpr,
     // Кодек и параметры
     '-c:v', 'libx264',
     '-profile:v', 'high',
     '-level', '4.2',
-    '-preset', presetValue,
-    '-crf', String(crfValue),
+    '-preset', 'slow',
+    '-crf', '12',
     '-vsync', 'cfr',
     '-video_track_timescale', String(fps * 1000),
     // Чёткое ключевание без b-frames и дрожания
@@ -340,11 +331,12 @@ const scaleExpr =
       'deblock=0:0',
       'mbtree=0'
     ].join(':'),
-  '-maxrate', '12M',
-  '-bufsize', '24M',
+  '-maxrate', '30M',
+  '-bufsize', '60M',
   '-movflags', '+faststart',
     outPath,
   ];
+  if (dryRun) return args;
   await runFfmpeg(args);
   return outPath;
 }
@@ -352,9 +344,19 @@ async function convertAndSaveVideo(inPath, tmpdir, opts = {}) {
   const path = require('path');
   const outMp4 = path.join(tmpdir, `out_${Date.now()}.mp4`);
   const fps = clampInt(opts.fps, 5, 60, 30);
+  const inputSizeBytes = (() => {
+    try { return fs.statSync(inPath).size; } catch { return null; }
+  })();
   try {
+    console.log('[VIDEO-CONVERT] start', { inputPath: inPath, outputPath: outMp4, fps, inputSizeBytes });
     // Попытка #1 — профиль выше
-    await convertToMp4(inPath, outMp4, { fps });
+    const ffmpegArgs = convertToMp4(inPath, outMp4, { fps, dryRun: true });
+    console.log('[VIDEO-CONVERT] ffmpeg args', ffmpegArgs);
+    await runFfmpeg(ffmpegArgs);
+    const outputSizeBytes = (() => {
+      try { return fs.statSync(outMp4).size; } catch { return null; }
+    })();
+    console.log('[VIDEO-CONVERT] done', { outputPath: outMp4, outputSizeBytes });
     return { path: outMp4, mime: 'video/mp4', ext: 'mp4' };
   } catch (e1) {
     console.warn('[video] mp4 attempt#1 failed:', String(e1).slice(0, 500));
