@@ -1083,9 +1083,43 @@ app.post('/admin/set', (req, res) => {
 // ============================================================
 // ===============         Telegram webhook       =============
 // ============================================================
+const TG_MESSAGE_SOFT_LIMIT = 3600;
+
+function buildMessagePreview(text, maxLen = 120) {
+  return String(text || '')
+    .replace(/\s+/g, ' ')
+    .replace(/[<>]/g, '')
+    .slice(0, maxLen);
+}
+
+function truncateMessageText(text, maxLen = TG_MESSAGE_SOFT_LIMIT) {
+  const src = String(text || '');
+  if (src.length <= maxLen) return src;
+  const marker = '\n[сообщение сокращено]';
+  return src.slice(0, Math.max(0, maxLen - marker.length)) + marker;
+}
+
+function logTelegramSendError(err, { method, chatId, text }) {
+  console.error('[TG sendMessage error]', {
+    method,
+    status: err?.response?.status,
+    description: err?.response?.data?.description,
+    chatId: String(chatId),
+    textLength: String(text || '').length,
+    textPreview: buildMessagePreview(text)
+  });
+}
+
 async function sendMessage(chatId, text, extra = {}) {
-  const url = `https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`;
-  await axios.post(url, { chat_id: String(chatId), text, ...extra });
+  const method = 'sendMessage';
+  const url = `https://api.telegram.org/bot${process.env.BOT_TOKEN}/${method}`;
+  const safeText = truncateMessageText(text);
+  try {
+    await axios.post(url, { chat_id: String(chatId), text: safeText, ...extra });
+  } catch (err) {
+    logTelegramSendError(err, { method, chatId, text: safeText });
+    throw err;
+  }
 }
 async function getChatSafe(chatId) {
   try {
@@ -1521,9 +1555,14 @@ if (/^\/who(?:@[\w_]+)?\s+(.+)$/i.test(text)) {
     idToUsername[String(uid)] = String(uname);
   }
   const referrals = getReferralsOf(targetId);
+  const refsPreviewLimit = 30;
+  const refsPreview = referrals.slice(0, refsPreviewLimit);
   const refsLines = referrals.length
-    ? referrals.map((rid) => idToUsername[rid] ? `@${idToUsername[rid]} (${rid})` : rid)
-    : ['рефералов нет'];
+    ? refsPreview.map((rid) => idToUsername[rid] ? `@${idToUsername[rid]} (${rid})` : rid)
+    : ['none'];
+  const refsTail = referrals.length > refsPreviewLimit
+    ? `...и ещё ${referrals.length - refsPreviewLimit} рефералов`
+    : null;
   const whoMsg = [
     '[b]WHO[/b]',
     `username: ${username ? '@' + username : '-'}`,
@@ -1535,14 +1574,68 @@ if (/^\/who(?:@[\w_]+)?\s+(.+)$/i.test(text)) {
     `last_seen_at: ${reg?.last_seen_at || '-'}`,
     `has_balance: ${Object.prototype.hasOwnProperty.call(readJsonObjectSafe(BAL_FILE), targetId) ? 'yes' : 'no'}`,
     `has_referral: ${getRefInfo(targetId) ? 'yes' : 'no'}`,
-    'referrals:',
-    '[q]',
+    `referrals_count: ${referrals.length}`,
+    'referrals_preview:',
     ...refsLines,
-    '[/q]'
+    ...(refsTail ? [refsTail] : [])
   ].join('\n');
   await sendMessage(fromId, applyMiniFormatting(whoMsg), { parse_mode: 'HTML', disable_web_page_preview: true });
   return res.json({ ok:true });
 }
+
+// --------- /who_refs (только для админа) ---------
+if (/^\/who_refs(?:@[\w_]+)?\s+(.+)$/i.test(text)) {
+  if (String(fromId) !== String(ADMIN_ID)) {
+    await sendMessage(fromId, applyMiniFormatting('[q]Отказано.[/q]'), { parse_mode: 'HTML', disable_web_page_preview: true });
+    return res.json({ ok:true });
+  }
+  const rawArgs = String(text.match(/^\/who_refs(?:@[\w_]+)?\s+(.+)$/i)[1] || '').trim();
+  const args = rawArgs.split(/\s+/).filter(Boolean);
+  const targetToken = args[0] || '';
+  const pageRaw = Number(args[1] || 1);
+  const pageSize = 50;
+  const page = Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : 1;
+  if (!targetToken) {
+    await sendMessage(fromId, applyMiniFormatting('[q]Формат: /who_refs @username|<user_id> [page][/q]'), { parse_mode: 'HTML', disable_web_page_preview: true });
+    return res.json({ ok:true });
+  }
+  const { targetId, resolved } = resolveTargetIdOrNull(targetToken);
+  if (resolved?.ambiguous) {
+    const lines = resolved.candidates.map((c) => `${c.id} (last_seen_at: ${c.last_seen_at || '-'})`);
+    await sendMessage(fromId, applyMiniFormatting(['[b]WHO_REFS[/b]', '[q]', 'Найдено несколько кандидатов:', ...lines, '[/q]'].join('\n')), { parse_mode: 'HTML', disable_web_page_preview: true });
+    return res.json({ ok:true });
+  }
+  if (!targetId) {
+    await sendMessage(fromId, applyMiniFormatting('[q]Пользователь не найден.[/q]'), { parse_mode: 'HTML', disable_web_page_preview: true });
+    return res.json({ ok:true });
+  }
+  const usernamesObj = readJsonObjectSafe(UNAME_FILE);
+  const idToUsername = {};
+  for (const [uname, uid] of Object.entries(usernamesObj)) idToUsername[String(uid)] = String(uname);
+  const referrals = getReferralsOf(targetId);
+  if (!referrals.length) {
+    await sendMessage(fromId, applyMiniFormatting('[b]WHO_REFS[/b]\nrefs: none'), { parse_mode: 'HTML', disable_web_page_preview: true });
+    return res.json({ ok:true });
+  }
+  const totalPages = Math.max(1, Math.ceil(referrals.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const start = (safePage - 1) * pageSize;
+  const pageItems = referrals.slice(start, start + pageSize);
+  const lines = pageItems.map((rid, idx) => {
+    const label = idToUsername[rid] ? `@${idToUsername[rid]} (${rid})` : rid;
+    return `${start + idx + 1}. ${label}`;
+  });
+  const msg = [
+    '[b]WHO_REFS[/b]',
+    `user_id: ${targetId}`,
+    `referrals_count: ${referrals.length}`,
+    `page: ${safePage}/${totalPages}`,
+    ...lines
+  ].join('\n');
+  await sendMessage(fromId, applyMiniFormatting(msg), { parse_mode: 'HTML', disable_web_page_preview: true });
+  return res.json({ ok:true });
+}
+
 // --------- /all (только для админа) ---------
 if (/^\/all(?:@[\w_]+)?\s+([\s\S]+)$/i.test(text)) {
   if (String(fromId) !== String(ADMIN_ID)) {
