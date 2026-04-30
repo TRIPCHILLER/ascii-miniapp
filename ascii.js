@@ -295,6 +295,7 @@ const START_EASTER_EGG_SOUNDS = Array.from(
   (_, i) => `assets/sounds/sound${i + 1}.mp3?v=${SOUND_ASSET_VERSION}`
 );
 const ERROR_SOUND_SRC = `assets/sounds/errorsound.mp3?v=${SOUND_ASSET_VERSION}`;
+const SUCCESS_SOUND_SRC = `assets/sounds/successsound.mp3?v=${SOUND_ASSET_VERSION}`;
 const START_UI_SOUNDS = {
   launch: `assets/sounds/startsound.mp3?v=${SOUND_ASSET_VERSION}`,
   modeClick: `assets/sounds/clicksound.mp3?v=${SOUND_ASSET_VERSION}`,
@@ -4349,6 +4350,9 @@ function showAsciiPopup(input = {}) {
   if (input.sound === 'danger') {
     playUiSoundNoThrow(ARG_SCENE_SOUNDS.danger);
   }
+  if (input.sound === 'success') {
+    playUiSoundNoThrow(SUCCESS_SOUND_SRC);
+  }
   if (!input.disableErrorSound && (input.type === 'error' || input.playErrorSound || machineErrorPopup)) {
     playErrorSound();
   }
@@ -5906,6 +5910,7 @@ async function uploadBlobToBot(blob, filename, options = {}) {
       // успех: файл улетел, бот сам пришлёт его в ЛС
       showAsciiPopup({
         type: 'success',
+        sound: 'success',
         title: 'ПРЕОБРАЗОВАНИЕ ЗАВЕРШЕНО',
         message: 'Файл отправлен в чат.',
         extra: (json && typeof json.balance !== 'undefined') ? `Осталось импульсов: ${json.balance}` : ''
@@ -7872,12 +7877,13 @@ async function frameBlobForTextMode() {
 
 async function sendAsciiTextToBot() {
   const tgWebApp = window.Telegram?.WebApp;
-  const tgPopup = (title, message, withErrorSound = false, extra = '') => {
+  const tgPopup = (title, message, withErrorSound = false, extra = '', sound = '') => {
     showAsciiPopup({
       title: String(title || '').slice(0, 64),
       message: String(message || '').slice(0, 1600),
       extra: String(extra || '').slice(0, 600),
-      type: withErrorSound ? 'error' : 'info'
+      type: withErrorSound ? 'error' : 'info',
+      sound: sound || undefined
     });
   };
 
@@ -8010,7 +8016,8 @@ async function sendAsciiTextToBot() {
       'ПРЕОБРАЗОВАНИЕ ЗАВЕРШЕНО',
       'Файл отправлен в чат.',
       false,
-      (json && typeof json.balance !== 'undefined') ? `Осталось импульсов: ${json.balance}` : ''
+      (json && typeof json.balance !== 'undefined') ? `Осталось импульсов: ${json.balance}` : '',
+      'success'
     );
   } catch (e) {
     dbgState('sendAsciiTextToBot.exception', { url: textEndpointUrl, error: String(e?.message || e || '').slice(0, 200) });
