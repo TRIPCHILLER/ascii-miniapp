@@ -143,15 +143,6 @@ function backupDataFiles() {
 }
 const backupResult = backupDataFiles();
 const refUsersCount = Object.keys(loadRefDb()?.users || {}).length;
-const storageStats = getStorageStats();
-console.log('[startup] data-stats', {
-  balances_users: storageStats.balances,
-  legacy_usernames: storageStats.legacyUsernames,
-  user_registry: storageStats.userRegistry,
-  username_index: storageStats.usernameIndex,
-  referrals_users: refUsersCount,
-  backup: backupResult
-});
 // ==== ПРОСТАЯ АНТИ-СПАМ ЗАЩИТА ====
 // @section RATE_LIMITER_GUARDS
 const RATE_LIMIT = { photo: { limit: 60, windowMs: 60*60*1000 }, video: { limit: 20, windowMs: 60*60*1000 } };
@@ -186,6 +177,15 @@ const {
   sendAnimationToUser,
   probeVideo
 } = require('./store');
+const storageStats = getStorageStats();
+console.log('[startup] data-stats', {
+  balances_users: storageStats.balances,
+  legacy_usernames: storageStats.legacyUsernames,
+  user_registry: storageStats.userRegistry,
+  username_index: storageStats.usernameIndex,
+  referrals_users: refUsersCount,
+  backup: backupResult
+});
 const { spawn } = require('child_process');
 // ==== STORE / FFMPEG INTEGRATION ====
 // @section STORE_INTEGRATION_AND_FFMPEG_RUNNER
