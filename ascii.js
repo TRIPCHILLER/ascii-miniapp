@@ -6845,6 +6845,20 @@ function layoutSettingsPanel() {
     bindWorkUiClickSoundOnce();
     const closeSaveStyleModal = () => { if (app.ui.saveStyleModal) app.ui.saveStyleModal.hidden = true; };
     const sanitizePresetName = (value) => String(value || '').toUpperCase().trim().replace(/[^A-ZА-ЯЁ0-9 _-]/g, '').slice(0, 16);
+    const applyPresetNameLeetFilter = (value) => String(value || '').replace(/[OAEIОАЕЁЯ]/g, (ch) => {
+      const map = {
+        O: '0',
+        A: '4',
+        E: '3',
+        I: '1',
+        О: '0',
+        А: '4',
+        Е: '3',
+        Ё: '3',
+        Я: '9'
+      };
+      return map[ch] || ch;
+    });
     const loadUserStylePresets = async () => {
       try {
         const res = await fetch(`${API_BASE}/api/user-style-presets`, { headers: applyTelegramInitDataHeader({}) });
@@ -6861,9 +6875,10 @@ function layoutSettingsPanel() {
     const saveUserStylePreset = async () => {
       const input = app.ui.saveStyleInput;
       const cleanName = sanitizePresetName(input?.value || '');
-      if (!cleanName) return showAsciiPopup({ type:'info', title:'ОШИБКА', message:'Название пресета пустое.' });
+      const finalName = applyPresetNameLeetFilter(cleanName);
+      if (!finalName) return showAsciiPopup({ type:'info', title:'ОШИБКА', message:'Название пресета пустое.' });
       try {
-        const res = await fetch(`${API_BASE}/api/user-style-presets`, { method:'POST', headers: applyTelegramInitDataHeader({ 'Content-Type':'application/json' }), body: JSON.stringify({ name: cleanName, textColor: normalizeHexColor(state.color), bgColor: normalizeHexColor(state.background) }) });
+        const res = await fetch(`${API_BASE}/api/user-style-presets`, { method:'POST', headers: applyTelegramInitDataHeader({ 'Content-Type':'application/json' }), body: JSON.stringify({ name: finalName, textColor: normalizeHexColor(state.color), bgColor: normalizeHexColor(state.background) }) });
         const json = await res.json();
         if (!res.ok || !json?.ok) {
           const em = json?.error === 'duplicate_name' ? 'Такой стиль уже существует.' : json?.error === 'duplicate_colors' ? 'Эта цветовая пара уже сохранена.' : json?.error === 'limit_reached' ? 'Достигнут лимит сохранённых стилей.' : 'Не удалось сохранить стиль. Открой Mini App через Telegram.';

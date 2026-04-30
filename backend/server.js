@@ -874,6 +874,23 @@ function parseInitDataUserIdOrThrow(req) {
   upsertUserFromTelegramUser(user, 'webapp_initdata');
   return String(user.id);
 }
+function normalizeUserPresetName(name) {
+  const clean = String(name || '').trim().toUpperCase().replace(/[^A-ZА-ЯЁ0-9 _-]/g, '').slice(0, 16);
+  return clean.replace(/[OAEIОАЕЁЯ]/g, (ch) => {
+    const map = {
+      O: '0',
+      A: '4',
+      E: '3',
+      I: '1',
+      О: '0',
+      А: '4',
+      Е: '3',
+      Ё: '3',
+      Я: '9'
+    };
+    return map[ch] || ch;
+  });
+}
 // Текущий баланс (из мини-аппа можно дергать GET /api/balance?telegramId=...)
 // @section MINIAPP_HTTP_API_ROUTES
 app.get('/api/balance', (req, res) => {
@@ -900,7 +917,7 @@ app.post('/api/user-style-presets', (req, res) => {
   } catch {
     return res.status(401).json({ ok: false, error: 'invalid_init_data' });
   }
-  const name = String(req.body?.name || '').trim().toUpperCase();
+  const name = normalizeUserPresetName(req.body?.name);
   const textColor = normalizeHexColor(req.body?.textColor);
   const bgColor = normalizeHexColor(req.body?.bgColor);
   if (!name || !/^[A-ZА-ЯЁ0-9 _-]{1,16}$/.test(name)) return res.status(400).json({ ok: false, error: 'invalid_name' });
