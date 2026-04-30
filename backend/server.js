@@ -92,6 +92,38 @@ function getReferralsOf(inviterId) {
     .filter(([, info]) => String(info?.invitedBy || '') === iid)
     .map(([uid]) => String(uid));
 }
+function formatMskDateTime(isoValue) {
+  if (!isoValue) return 'неизвестно';
+  const dt = new Date(isoValue);
+  if (Number.isNaN(dt.getTime())) return 'неизвестно';
+  try {
+    const parts = new Intl.DateTimeFormat('ru-RU', {
+      timeZone: 'Europe/Moscow',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    }).formatToParts(dt);
+    const get = (type) => parts.find((p) => p.type === type)?.value || '00';
+    return `${get('day')}.${get('month')}.${get('year')}, ${get('hour')}:${get('minute')}:${get('second')} МСК`;
+  } catch {
+    return 'неизвестно';
+  }
+}
+function mapResolvedByLabel(foundBy) {
+  const key = String(foundBy || '').trim();
+  if (!key) return '-';
+  if (key === 'registry') return 'реестр пользователей';
+  if (key === 'username_index') return 'индекс никнеймов';
+  if (key === 'legacy username' || key === 'legacy_usernames' || key === 'legacy_username_index') return 'старый индекс никнеймов';
+  if (key === 'id' || key === 'user_id') return 'user_id';
+  if (key === 'balance' || key === 'balances') return 'баланс';
+  if (key === 'unknown' || key === 'fallback') return key;
+  return `другой источник: ${key}`;
+}
 function readJsonObjectSafe(filePath) {
   try {
     const raw = fs.readFileSync(filePath, 'utf8');
@@ -1563,20 +1595,20 @@ if (/^\/who(?:@[\w_]+)?\s+(.+)$/i.test(text)) {
     : null;
   const refsPreviewBlock = referrals.length
     ? ['[q]', ...refsLines, ...(refsTail ? [refsTail] : []), '[/q]']
-    : ['none'];
+    : ['нет'];
   const whoMsg = [
     '[b]WHO[/b]',
     `username: ${username ? '@' + username : '-'}`,
     `user_id: ${targetId}`,
     `chat_id: ${targetId}`,
-    `known: ${known ? 'yes' : 'no'}`,
-    `resolved_by: ${resolved?.foundBy || '-'}`,
-    `username_history: ${(reg?.username_history || []).join(', ') || '-'}`,
-    `last_seen_at: ${reg?.last_seen_at || '-'}`,
-    `has_balance: ${Object.prototype.hasOwnProperty.call(readJsonObjectSafe(BAL_FILE), targetId) ? 'yes' : 'no'}`,
-    `has_referral: ${getRefInfo(targetId) ? 'yes' : 'no'}`,
-    `referrals_count: ${referrals.length}`,
-    'referrals_preview:',
+    `Известен: ${known ? 'да' : 'нет'}`,
+    `Найден через: ${mapResolvedByLabel(resolved?.foundBy)}`,
+    `Известен также как: ${(reg?.username_history || []).join(', ') || '-'}`,
+    `Последнее посещение: ${formatMskDateTime(reg?.last_seen_at)}`,
+    `Баланс найден: ${Object.prototype.hasOwnProperty.call(readJsonObjectSafe(BAL_FILE), targetId) ? 'да' : 'нет'}`,
+    `Приглашён другим: ${getRefInfo(targetId) ? 'да' : 'нет'}`,
+    `Количество рефералов: ${referrals.length}`,
+    'Приведённые пользователи:',
     ...refsPreviewBlock
   ].join('\n');
   await sendMessage(fromId, applyMiniFormatting(whoMsg), { parse_mode: 'HTML', disable_web_page_preview: true });
@@ -1614,7 +1646,7 @@ if (/^\/who_refs(?:@[\w_]+)?\s+(.+)$/i.test(text)) {
   for (const [uname, uid] of Object.entries(usernamesObj)) idToUsername[String(uid)] = String(uname);
   const referrals = getReferralsOf(targetId);
   if (!referrals.length) {
-    await sendMessage(fromId, applyMiniFormatting('[b]WHO_REFS[/b]\nrefs: none'), { parse_mode: 'HTML', disable_web_page_preview: true });
+    await sendMessage(fromId, applyMiniFormatting('[b]WHO_REFS[/b]\nСтраница 1/1\nКоличество: 0\n[q]нет[/q]'), { parse_mode: 'HTML', disable_web_page_preview: true });
     return res.json({ ok:true });
   }
   const totalPages = Math.max(1, Math.ceil(referrals.length / pageSize));
@@ -1628,9 +1660,11 @@ if (/^\/who_refs(?:@[\w_]+)?\s+(.+)$/i.test(text)) {
   const msg = [
     '[b]WHO_REFS[/b]',
     `user_id: ${targetId}`,
-    `referrals_count: ${referrals.length}`,
-    `page: ${safePage}/${totalPages}`,
-    ...lines
+    `Страница ${safePage}/${totalPages}`,
+    `Количество: ${referrals.length}`,
+    '[q]',
+    ...lines,
+    '[/q]'
   ].join('\n');
   await sendMessage(fromId, applyMiniFormatting(msg), { parse_mode: 'HTML', disable_web_page_preview: true });
   return res.json({ ok:true });
