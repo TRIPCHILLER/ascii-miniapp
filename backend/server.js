@@ -243,7 +243,32 @@ const impulseWord = (n) => pluralRu(n, ...IMPULSE_FORMS);
 const PORT      = process.env.PORT || 8080;
 const ADMIN_ID  = String(process.env.ADMIN_TELEGRAM_ID || '');
 const TG_SECRET = String(process.env.TG_WEBHOOK_SECRET || '');
+const ADMIN_ONLY_REPLY = 'Хуя ты хитрый! Только Создатель может использовать эту команду.';
+const PUBLIC_COMMANDS = new Set(['/start', '/balance', '/help', '/buy_energy', '/referal', '/referral']);
+const SUPPORTED_COMMANDS = new Set([
+  '/start', '/balance', '/help', '/buy_energy', '/referal', '/referral',
+  '/who', '/who_refs', '/stats', '/all', '/say', '/penalise', '/punish', '/send'
+]);
 const app = express();
+function isAdminUser(userId) {
+  return String(userId) === String(ADMIN_ID);
+}
+function parseTelegramCommand(rawText = '') {
+  const text = String(rawText || '');
+  const firstLine = text.split('\n')[0] || '';
+  const trimmed = firstLine.trim();
+  if (!trimmed.startsWith('/')) {
+    return { command: '', args: '', isValid: false };
+  }
+  const firstSpace = trimmed.search(/\s/);
+  const token = firstSpace === -1 ? trimmed : trimmed.slice(0, firstSpace);
+  const args = firstSpace === -1 ? '' : trimmed.slice(firstSpace + 1).trim();
+  const isLowercase = token === token.toLowerCase();
+  const hasMention = token.includes('@');
+  const isSupported = SUPPORTED_COMMANDS.has(token);
+  const isValid = isLowercase && !hasMention && isSupported;
+  return { command: token, args, isValid };
+}
 // ---- CORS (единственный блок) ----
 // @section EXPRESS_BOOTSTRAP_AND_CORS
 const allowList = [/https:\/\/t\.me$/, /https:\/\/web\.telegram\.org/];
@@ -1315,10 +1340,23 @@ if (msg.successful_payment) {
     const fromId = string(msg.from.id || '');
     const text   = string((msg.text || '').trim());
     const textTrim = (text || '').trim();
+    const { command, args, isValid } = parseTelegramCommand(textTrim);
+    const isAdmin = isAdminUser(fromId);
+    if (isValid && !isAdmin) {
+      if (PUBLIC_COMMANDS.has(command)) {
+        if (command === '/balance' && args) {
+          await sendMessage(fromId, ADMIN_ONLY_REPLY);
+          return res.json({ ok: true });
+        }
+      } else {
+        await sendMessage(fromId, ADMIN_ONLY_REPLY);
+        return res.json({ ok: true });
+      }
+    }
     // /say — отправить произвольный текст пользователю (только для админа)
     if (/^\/say(?:@[\w_]+)?(\s|$)/i.test(textTrim)) {
-      if (String(fromId) !== String(ADMIN_ID)) {
-        await sendMessage(fromId, 'Хуя ты хитрый! Только Создатель может использовать эту команду.');
+      if (!isAdmin) {
+        await sendMessage(fromId, ADMIN_ONLY_REPLY);
         return res.json({ ok: true });
       }
       const m = textTrim.match(/^\/say(?:@[\w_]+)?\s+([\s\S]+)$/i);
@@ -1367,8 +1405,8 @@ if (msg.successful_payment) {
 // --------- /penalise (alias /punish) ---------
 if (/^\/(penalise|punish)(?:@[\w_]+)?(\s|$)/i.test(text)) {
   // только админ
-  if (String(fromId) !== String(ADMIN_ID)) {
-    await sendMessage(fromId, 'Хуя ты хитрый! Только Создатель может использовать эту команду.');
+  if (!isAdmin) {
+    await sendMessage(fromId, ADMIN_ONLY_REPLY);
     return res.json({ ok:true });
   }
   // Форматы:
@@ -1489,8 +1527,8 @@ if (text === '/referal' || text === '/referral') {
 }
 // --------- /balance @username (только для админа) ---------
 if (/^\/balance(?:@[\w_]+)?\s+@?([A-Za-z0-9_]+)\b/i.test(text)) {
-  if (String(fromId) !== String(ADMIN_ID)) {
-    await sendMessage(fromId, 'Ты хочешь знать больше, чем нужно.');
+  if (!isAdmin) {
+    await sendMessage(fromId, ADMIN_ONLY_REPLY);
     return res.json({ ok:true });
   }
   const uname = text.match(/^\/balance(?:@[\w_]+)?\s+@?([A-Za-z0-9_]+)\b/i)[1];
@@ -1506,8 +1544,8 @@ if (/^\/balance(?:@[\w_]+)?\s+@?([A-Za-z0-9_]+)\b/i.test(text)) {
 }
 // --------- /stats (только для админа) ---------
 if (/^\/stats(?:@[\w_]+)?$/i.test(text)) {
-  if (String(fromId) !== String(ADMIN_ID)) {
-    await sendMessage(fromId, applyMiniFormatting('[q]Отказано.[/q]'), { parse_mode: 'HTML', disable_web_page_preview: true });
+  if (!isAdmin) {
+    await sendMessage(fromId, ADMIN_ONLY_REPLY);
     return res.json({ ok:true });
   }
   const balancesObj = readJsonObjectSafe(BAL_FILE);
@@ -1555,8 +1593,8 @@ if (/^\/stats(?:@[\w_]+)?$/i.test(text)) {
 }
 // --------- /who (только для админа) ---------
 if (/^\/who(?:@[\w_]+)?\s+(.+)$/i.test(text)) {
-  if (String(fromId) !== String(ADMIN_ID)) {
-    await sendMessage(fromId, applyMiniFormatting('[q]Отказано.[/q]'), { parse_mode: 'HTML', disable_web_page_preview: true });
+  if (!isAdmin) {
+    await sendMessage(fromId, ADMIN_ONLY_REPLY);
     return res.json({ ok:true });
   }
   const targetToken = String(text.match(/^\/who(?:@[\w_]+)?\s+(.+)$/i)[1] || '').trim();
@@ -1630,8 +1668,8 @@ if (/^\/who(?:@[\w_]+)?\s+(.+)$/i.test(text)) {
 
 // --------- /who_refs (только для админа) ---------
 if (/^\/who_refs(?:@[\w_]+)?\s+(.+)$/i.test(text)) {
-  if (String(fromId) !== String(ADMIN_ID)) {
-    await sendMessage(fromId, applyMiniFormatting('[q]Отказано.[/q]'), { parse_mode: 'HTML', disable_web_page_preview: true });
+  if (!isAdmin) {
+    await sendMessage(fromId, ADMIN_ONLY_REPLY);
     return res.json({ ok:true });
   }
   const rawArgs = String(text.match(/^\/who_refs(?:@[\w_]+)?\s+(.+)$/i)[1] || '').trim();
@@ -1686,8 +1724,8 @@ if (/^\/who_refs(?:@[\w_]+)?\s+(.+)$/i.test(text)) {
 
 // --------- /all (только для админа) ---------
 if (/^\/all(?:@[\w_]+)?\s+([\s\S]+)$/i.test(text)) {
-  if (String(fromId) !== String(ADMIN_ID)) {
-    await sendMessage(fromId, applyMiniFormatting('[q]Отказано.[/q]'), { parse_mode: 'HTML', disable_web_page_preview: true });
+  if (!isAdmin) {
+    await sendMessage(fromId, ADMIN_ONLY_REPLY);
     return res.json({ ok:true });
   }
   const broadcastText = String(text.match(/^\/all(?:@[\w_]+)?\s+([\s\S]+)$/i)[1] || '');
@@ -1740,8 +1778,8 @@ if (/^\/all(?:@[\w_]+)?\s+([\s\S]+)$/i.test(text)) {
 // /send — награда от Создателя (аналог /penalise, но с плюсом)
 if (/^\/send(\s|$)/i.test(text)) {
   // только админ
-  if (String(fromId) !== String(ADMIN_ID)) {
-    await sendMessage(fromId, 'Хуя ты хитрый! Выдавать баланс может только Создатель.');
+  if (!isAdmin) {
+    await sendMessage(fromId, ADMIN_ONLY_REPLY);
     return res.json({ ok: true });
   }
   let targetId = null;
