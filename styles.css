@@ -336,14 +336,31 @@ button:focus, .btn:focus{
 #styleTrigger:active,
 #resetModeBtn:active,
 #settings.panel .check:active,
-#saveStyleBtn:active,
-#saveStyleDone:active,
-#saveStyleCancel:active{
+#saveStyleBtn:active{
   background:#262626;
   color:#bfbfbf;
   border:0;
   background-image:none;
   box-shadow:none;
+}
+
+#saveStyleDone,
+#saveStyleCancel,
+#saveStyleDone:hover,
+#saveStyleCancel:hover,
+#saveStyleDone:focus,
+#saveStyleCancel:focus{
+  background:transparent;
+  background-image:none;
+  box-shadow:none;
+}
+
+#saveStyleDone:active,
+#saveStyleCancel:active{
+  background:transparent;
+  background-image:none;
+  box-shadow:none;
+  color:#808080;
 }
 
 /* ===== СЦЕНА/ВЫВОД ===== */
