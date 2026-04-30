@@ -34,6 +34,9 @@ const BAL_FILE = path.join(__dirname, '..', 'data', 'balances.json');
 const UNAME_FILE = path.join(__dirname, '..', 'data', 'usernames.json');
 const REGISTRY_FILE = path.join(__dirname, '..', 'data', 'user_registry.json');
 const USERNAME_INDEX_FILE = path.join(__dirname, '..', 'data', 'username_index.json');
+const USER_STYLE_PRESETS_FILE = path.join(__dirname, '..', 'data', 'user_style_presets.json');
+const USER_STYLE_PRESETS_LIMIT = 20;
+const USER_PRESET_ID_PREFIX = 'usp_';
 function loadRefDb() {
   try {
     const raw = fs.readFileSync(REF_DB_PATH, 'utf8');
@@ -142,7 +145,7 @@ function backupDataFiles() {
   const marker = path.join(backupDir, `.last-backup-${today}`);
   if (fs.existsSync(marker)) return { skipped: true, reason: 'already-backed-up-today' };
   const ts = new Date().toISOString().replace(/[:.]/g, '-');
-  const files = [BAL_FILE, UNAME_FILE, REF_DB_PATH, REGISTRY_FILE, USERNAME_INDEX_FILE];
+  const files = [BAL_FILE, UNAME_FILE, REF_DB_PATH, REGISTRY_FILE, USERNAME_INDEX_FILE, USER_STYLE_PRESETS_FILE];
   for (const file of files) {
     try {
       if (!fs.existsSync(file)) continue;
@@ -844,6 +847,33 @@ function formatHttpError(err) {
   const body = responseText ? ` response=${responseText.slice(0, 800)}` : '';
   return `${message}${code}${status}${body}`;
 }
+function normalizeHexColor(color) {
+  const raw = String(color || '').trim().toLowerCase();
+  const hex = raw.startsWith('#') ? raw.slice(1) : raw;
+  if (/^[0-9a-f]{3}$/.test(hex)) return `#${hex.split('').map((ch) => ch + ch).join('')}`;
+  if (/^[0-9a-f]{6}$/.test(hex)) return `#${hex}`;
+  return '';
+}
+function readUserStylePresetsDb() {
+  return readJsonObjectSafe(USER_STYLE_PRESETS_FILE);
+}
+function writeUserStylePresetsDb(db) {
+  const dir = path.dirname(USER_STYLE_PRESETS_FILE);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const tmp = `${USER_STYLE_PRESETS_FILE}.tmp-${process.pid}-${Date.now()}`;
+  fs.writeFileSync(tmp, JSON.stringify(db, null, 2), 'utf-8');
+  fs.renameSync(tmp, USER_STYLE_PRESETS_FILE);
+}
+function parseInitDataUserIdOrThrow(req) {
+  const initData = String(req.get('X-Telegram-Init-Data') || '').trim();
+  if (!initData) throw new Error('invalid_init_data');
+  const checked = validateTelegramInitData(initData, process.env.BOT_TOKEN);
+  if (!checked.ok) throw new Error('invalid_init_data');
+  const user = JSON.parse(String(checked.params.get('user') || '{}'));
+  if (!user?.id) throw new Error('invalid_init_data');
+  upsertUserFromTelegramUser(user, 'webapp_initdata');
+  return String(user.id);
+}
 // Текущий баланс (из мини-аппа можно дергать GET /api/balance?telegramId=...)
 // @section MINIAPP_HTTP_API_ROUTES
 app.get('/api/balance', (req, res) => {
@@ -853,6 +883,41 @@ app.get('/api/balance', (req, res) => {
   if (!telegramId) return res.status(400).json({ ok:false, message:'telegramId required' });
   ensureUser(telegramId);
   return res.json({ ok:true, balance: getBalance(telegramId) });
+});
+app.get('/api/user-style-presets', (req, res) => {
+  try {
+    const userId = parseInitDataUserIdOrThrow(req);
+    const db = readUserStylePresetsDb();
+    return res.json({ ok: true, presets: Array.isArray(db[userId]) ? db[userId] : [] });
+  } catch {
+    return res.status(401).json({ ok: false, error: 'invalid_init_data' });
+  }
+});
+app.post('/api/user-style-presets', (req, res) => {
+  let userId = '';
+  try {
+    userId = parseInitDataUserIdOrThrow(req);
+  } catch {
+    return res.status(401).json({ ok: false, error: 'invalid_init_data' });
+  }
+  const name = String(req.body?.name || '').trim().toUpperCase();
+  const textColor = normalizeHexColor(req.body?.textColor);
+  const bgColor = normalizeHexColor(req.body?.bgColor);
+  if (!name || !/^[A-ZА-ЯЁ0-9 _-]{1,16}$/.test(name)) return res.status(400).json({ ok: false, error: 'invalid_name' });
+  if (!textColor || !bgColor) return res.status(400).json({ ok: false, error: 'invalid_name' });
+  const db = readUserStylePresetsDb();
+  const list = Array.isArray(db[userId]) ? db[userId] : [];
+  if (list.length >= USER_STYLE_PRESETS_LIMIT) return res.status(400).json({ ok: false, error: 'limit_reached' });
+  if (list.some((p) => String(p?.name || '').toUpperCase() === name)) return res.status(400).json({ ok: false, error: 'duplicate_name' });
+  const builtInPresets = [
+    ['#ffffff','#000000'],['#e5ffff','#333319'],['#8bc8fe','#051b2c'],['#fdca55','#3f291e'],['#ebe1cd','#000b40'],['#ebe5ce','#2e3037'],['#88d7de','#40318e'],['#01eb5f','#25342f'],['#00ff40','#000000'],['#83b07e','#000000'],['#fec28c','#920244'],['#fff8dc','#6495ed'],['#f44e38','#1d0f44'],['#d7bcad','#452f47'],['#edf4ff','#c62b69'],['#ebb5b5','#100101'],['#ff0055','#200955'],['#ffff02','#000000'],['#cde9cd','#321632'],['#b8c2b9','#382b26']
+  ];
+  const hasDupBuiltIn = builtInPresets.some(([t,b]) => normalizeHexColor(t) === textColor && normalizeHexColor(b) === bgColor);
+  if (hasDupBuiltIn || list.some((p) => normalizeHexColor(p?.textColor) === textColor && normalizeHexColor(p?.bgColor) === bgColor)) return res.status(400).json({ ok: false, error: 'duplicate_colors' });
+  const preset = { id: `${USER_PRESET_ID_PREFIX}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`, name, textColor, bgColor, createdAt: new Date().toISOString() };
+  db[userId] = [...list, preset];
+  writeUserStylePresetsDb(db);
+  return res.json({ ok: true, preset });
 });
 // === ОБНОВЛЁННЫЙ ХЕНДЛЕР ДЛЯ /api/upload и /upload ===
 // Принимаем любой из ключей: file ИЛИ document, а также initdata ИЛИ initData, mediatype ИЛИ mediaType

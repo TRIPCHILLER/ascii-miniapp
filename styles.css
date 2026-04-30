@@ -237,6 +237,29 @@ button:focus, .btn:focus{
   padding-top:1px;
   padding-bottom:1px;
 }
+#saveStyleBtn{
+  padding:calc(4px + var(--button-text-drop)) 10px calc(4px - var(--button-text-drop));
+}
+#saveStyleModal{
+  position:fixed; inset:0; z-index:1200;
+}
+.save-style-modal__backdrop{
+  position:absolute; inset:0; background:rgba(0,0,0,.45);
+}
+.save-style-modal__card{
+  position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+  background:#000; border:2px solid #fff; padding:18px 16px; min-width:320px;
+  display:flex; flex-direction:column; gap:14px; align-items:center;
+}
+.save-style-modal__title{ text-align:center; font-size:38px; line-height:1; }
+#saveStyleInput{
+  width:100%; background:#000; border:2px solid #fff; color:#fff; outline:none;
+  font:inherit; text-transform:uppercase; padding:8px 10px;
+}
+#saveStyleInput::placeholder{ color:#808080; }
+#saveStyleInput.blink-cursor::placeholder{ animation: save-style-blink 1s steps(1,end) infinite; }
+@keyframes save-style-blink { 0%,49%{opacity:1;} 50%,100%{opacity:.1;} }
+.save-style-modal__actions{ width:100%; display:flex; justify-content:space-between; gap:14px; }
 
 #settings.panel #resetModeBtn{
   padding:calc(4px + var(--button-text-drop)) 12px calc(4px - var(--button-text-drop));

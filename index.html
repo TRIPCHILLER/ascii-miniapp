@@ -128,6 +128,7 @@
           <span>Ф0Н</span>
           <input id="bg" type="color" />
         </label>
+        <button type="button" id="saveStyleBtn" class="btn ghost" hidden>СОХРАНИТЬ СТИЛЬ</button>
       </div>
 
       <!-- 7) ИНВЕРСИЯ -->
@@ -208,6 +209,17 @@
   <img id="frozenFrameImage" alt="">
 </div>
 <div id="shutterFlashOverlay" hidden aria-hidden="true"></div>
+<div id="saveStyleModal" hidden>
+  <div class="save-style-modal__backdrop"></div>
+  <div class="save-style-modal__card">
+    <div class="save-style-modal__title">ДАЙ ИМЯ<br>НОВОМУ СТИЛЮ:</div>
+    <input id="saveStyleInput" type="text" maxlength="16" autocomplete="off" />
+    <div class="save-style-modal__actions">
+      <button type="button" id="saveStyleDone" class="btn ghost">[ГОТОВО]</button>
+      <button type="button" id="saveStyleCancel" class="btn ghost">[ОТМЕНА]</button>
+    </div>
+  </div>
+</div>
 
     <!-- НИЖНИЙ ряд переключения режимов -->
     <div class="modebar">
