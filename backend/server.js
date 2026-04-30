@@ -1571,7 +1571,7 @@ if (/^\/who(?:@[\w_]+)?\s+(.+)$/i.test(text)) {
   let known = Boolean(targetId);
   if (resolved?.ambiguous) {
     const lines = resolved.candidates.map((c) => `${c.id} (last_seen_at: ${c.last_seen_at || '-'})`);
-    await sendMessage(fromId, applyMiniFormatting(['[b]WHO[/b]', '[q]', 'Найдено несколько кандидатов:', ...lines, '[/q]'].join('\n')), { parse_mode: 'HTML', disable_web_page_preview: true });
+    await sendMessage(fromId, applyMiniFormatting(['[b]КТО?[/b]', '[q]', 'Найдено несколько кандидатов:', ...lines, '[/q]'].join('\n')), { parse_mode: 'HTML', disable_web_page_preview: true });
     return res.json({ ok:true });
   }
   if (!targetId) {
@@ -1589,26 +1589,39 @@ if (/^\/who(?:@[\w_]+)?\s+(.+)$/i.test(text)) {
   const referrals = getReferralsOf(targetId);
   const refsPreviewLimit = 15;
   const refsPreview = referrals.slice(0, refsPreviewLimit);
-  const refsLines = refsPreview.map((rid) => idToUsername[rid] ? `@${idToUsername[rid]} (${rid})` : rid);
+  const refsLines = refsPreview.map((rid) => {
+    const label = idToUsername[rid] ? `@${idToUsername[rid]} (${rid})` : String(rid);
+    return escapeHtml(label);
+  });
   const refsTail = referrals.length > refsPreviewLimit
-    ? `...и ещё ${referrals.length - refsPreviewLimit} рефералов`
+    ? escapeHtml(`...и ещё ${referrals.length - refsPreviewLimit} рефералов`)
     : null;
   const refsPreviewBlock = referrals.length
     ? ['[q]', ...refsLines, ...(refsTail ? [refsTail] : []), '[/q]']
     : ['нет'];
+  const balancesObj = readJsonObjectSafe(BAL_FILE);
+  const hasBalance = Object.prototype.hasOwnProperty.call(balancesObj, targetId);
+  const balanceValue = hasBalance ? Number(balancesObj[targetId] || 0) : null;
+  const usernameValue = username ? `@${username}` : '-';
+  const usernameHistory = (reg?.username_history || []).join(', ') || '-';
+  const lastSeenAt = formatMskDateTime(reg?.last_seen_at);
+  const resolvedBy = mapResolvedByLabel(resolved?.foundBy);
   const whoMsg = [
-    '[b]WHO[/b]',
-    `username: ${username ? '@' + username : '-'}`,
-    `user_id: ${targetId}`,
-    `chat_id: ${targetId}`,
-    `Известен: ${known ? 'да' : 'нет'}`,
-    `Найден через: ${mapResolvedByLabel(resolved?.foundBy)}`,
-    `Известен также как: ${(reg?.username_history || []).join(', ') || '-'}`,
-    `Последнее посещение: ${formatMskDateTime(reg?.last_seen_at)}`,
-    `Баланс найден: ${Object.prototype.hasOwnProperty.call(readJsonObjectSafe(BAL_FILE), targetId) ? 'да' : 'нет'}`,
-    `Приглашён другим: ${getRefInfo(targetId) ? 'да' : 'нет'}`,
-    `Количество рефералов: ${referrals.length}`,
-    'Приведённые пользователи:',
+    '[b]КТО?[/b]',
+    `<b>username:</b> ${escapeHtml(usernameValue)}`,
+    `<b>user_id:</b> <code>${escapeHtml(targetId)}</code>`,
+    `<b>chat_id:</b> <code>${escapeHtml(targetId)}</code>`,
+    `<b>Известен:</b> ${known ? 'да' : 'нет'}`,
+    `<b>Найден через:</b> ${escapeHtml(resolvedBy)}`,
+    `<b>Известен также как:</b> ${escapeHtml(usernameHistory)}`,
+    `<b>Последнее посещение:</b> <code>${escapeHtml(lastSeenAt)}</code>`,
+    hasBalance
+      ? `<b>Баланс:</b> <code>${escapeHtml(`[${balanceValue}]`)}</code> импульсов`
+      : '<b>Баланс:</b> нет',
+    `<b>Приглашён другим:</b> ${getRefInfo(targetId) ? 'да' : 'нет'}`,
+    `<b>Количество рефералов:</b> <code>${escapeHtml(String(referrals.length))}</code>`,
+    '',
+    '<b>Приведённые пользователи:</b>',
     ...refsPreviewBlock
   ].join('\n');
   await sendMessage(fromId, applyMiniFormatting(whoMsg), { parse_mode: 'HTML', disable_web_page_preview: true });
@@ -1634,7 +1647,7 @@ if (/^\/who_refs(?:@[\w_]+)?\s+(.+)$/i.test(text)) {
   const { targetId, resolved } = resolveTargetIdOrNull(targetToken);
   if (resolved?.ambiguous) {
     const lines = resolved.candidates.map((c) => `${c.id} (last_seen_at: ${c.last_seen_at || '-'})`);
-    await sendMessage(fromId, applyMiniFormatting(['[b]WHO_REFS[/b]', '[q]', 'Найдено несколько кандидатов:', ...lines, '[/q]'].join('\n')), { parse_mode: 'HTML', disable_web_page_preview: true });
+    await sendMessage(fromId, applyMiniFormatting(['[b]ПРИВЕДЁННЫЕ АДЕПТЫ[/b]', '[q]', 'Найдено несколько кандидатов:', ...lines, '[/q]'].join('\n')), { parse_mode: 'HTML', disable_web_page_preview: true });
     return res.json({ ok:true });
   }
   if (!targetId) {
@@ -1646,7 +1659,7 @@ if (/^\/who_refs(?:@[\w_]+)?\s+(.+)$/i.test(text)) {
   for (const [uname, uid] of Object.entries(usernamesObj)) idToUsername[String(uid)] = String(uname);
   const referrals = getReferralsOf(targetId);
   if (!referrals.length) {
-    await sendMessage(fromId, applyMiniFormatting('[b]WHO_REFS[/b]\nСтраница 1/1\nКоличество: 0\n[q]нет[/q]'), { parse_mode: 'HTML', disable_web_page_preview: true });
+    await sendMessage(fromId, applyMiniFormatting('[b]ПРИВЕДЁННЫЕ АДЕПТЫ[/b]\n<b>user_id:</b> <code>' + escapeHtml(targetId) + '</code>\n<b>Страница:</b> <code>1/1</code>\n<b>Количество:</b> <code>0</code>\n\n[q]нет[/q]'), { parse_mode: 'HTML', disable_web_page_preview: true });
     return res.json({ ok:true });
   }
   const totalPages = Math.max(1, Math.ceil(referrals.length / pageSize));
@@ -1654,16 +1667,17 @@ if (/^\/who_refs(?:@[\w_]+)?\s+(.+)$/i.test(text)) {
   const start = (safePage - 1) * pageSize;
   const pageItems = referrals.slice(start, start + pageSize);
   const lines = pageItems.map((rid, idx) => {
-    const label = idToUsername[rid] ? `@${idToUsername[rid]} (${rid})` : rid;
+    const label = idToUsername[rid] ? `@${idToUsername[rid]} (${rid})` : String(rid);
     return `${start + idx + 1}. ${label}`;
   });
   const msg = [
-    '[b]WHO_REFS[/b]',
-    `user_id: ${targetId}`,
-    `Страница ${safePage}/${totalPages}`,
-    `Количество: ${referrals.length}`,
+    '[b]ПРИВЕДЁННЫЕ АДЕПТЫ[/b]',
+    `<b>user_id:</b> <code>${escapeHtml(targetId)}</code>`,
+    `<b>Страница:</b> <code>${escapeHtml(`${safePage}/${totalPages}`)}</code>`,
+    `<b>Количество:</b> <code>${escapeHtml(String(referrals.length))}</code>`,
+    '',
     '[q]',
-    ...lines,
+    ...lines.map((line) => escapeHtml(line)),
     '[/q]'
   ].join('\n');
   await sendMessage(fromId, applyMiniFormatting(msg), { parse_mode: 'HTML', disable_web_page_preview: true });
