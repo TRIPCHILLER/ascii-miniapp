@@ -237,9 +237,6 @@ button:focus, .btn:focus{
   padding-top:1px;
   padding-bottom:1px;
 }
-#saveStyleBtn{
-  padding:calc(4px + var(--button-text-drop)) 10px calc(4px - var(--button-text-drop));
-}
 #saveStyleModal{
   position:fixed; inset:0; z-index:1200;
 }
@@ -296,7 +293,8 @@ button:focus, .btn:focus{
 #charsetTrigger,
 #styleTrigger,
 #resetModeBtn,
-#settings.panel .check{
+#settings.panel .check,
+#saveStyleBtn{
   display:inline-flex;
   align-items:center;
   justify-content:center;
@@ -312,7 +310,8 @@ button:focus, .btn:focus{
 #charsetTrigger:active,
 #styleTrigger:active,
 #resetModeBtn:active,
-#settings.panel .check:active{
+#settings.panel .check:active,
+#saveStyleBtn:active{
   background:#262626;
   color:#bfbfbf;
   border:0;

@@ -3807,6 +3807,12 @@ function isFullscreenLike() {
     if (user) return { type:'user', id: user.id, name: user.name };
     return null;
   }
+  function updateSaveStyleButtonVisibility() {
+    if (!app.ui.saveStyleBtn) return;
+    const pair = getPresetByPair(state.color, state.background);
+    const canShow = !isTextMode() && !state.transparentBg && (pair === null) && (app.ui.style?.value === 'custom');
+    app.ui.saveStyleBtn.hidden = !canShow;
+  }
   function fillStyleSelect(){
     if(!app.ui.style) return;
     app.ui.style.innerHTML='';
@@ -4540,6 +4546,7 @@ if (state.transparentBg) {
     const matched = detectPreset(state.color, state.background);
     if (app.ui.style) app.ui.style.value = matched === 'custom' ? 'custom' : matched;
     syncAsciiSelectTriggers();
+    updateSaveStyleButtonVisibility();
     syncFpsVisibility(); // обновим видимость FPS на старте
   }
 
@@ -6837,12 +6844,6 @@ function layoutSettingsPanel() {
     initAsciiTerminalFrames();
     bindWorkUiClickSoundOnce();
     const closeSaveStyleModal = () => { if (app.ui.saveStyleModal) app.ui.saveStyleModal.hidden = true; };
-    const refreshSaveStyleButton = () => {
-      if (!app.ui.saveStyleBtn) return;
-      const pair = getPresetByPair(state.color, state.background);
-      const canShow = !isTextMode() && !state.transparentBg && (pair === null) && (app.ui.style?.value === 'custom');
-      app.ui.saveStyleBtn.hidden = !canShow;
-    };
     const sanitizePresetName = (value) => String(value || '').toUpperCase().trim().replace(/[^A-ZА-ЯЁ0-9 _-]/g, '').slice(0, 16);
     const loadUserStylePresets = async () => {
       try {
@@ -6854,7 +6855,7 @@ function layoutSettingsPanel() {
         const matched = getPresetByPair(state.color, state.background);
         app.ui.style.value = matched ? matched.id : 'custom';
         syncAsciiSelectTriggers();
-        refreshSaveStyleButton();
+        updateSaveStyleButtonVisibility();
       } catch {}
     };
     const saveUserStylePreset = async () => {
@@ -6873,7 +6874,7 @@ function layoutSettingsPanel() {
         app.ui.style.value = json.preset.id;
         applyPreset(json.preset.id);
         closeSaveStyleModal();
-        refreshSaveStyleButton();
+        updateSaveStyleButtonVisibility();
       } catch {
         showAsciiPopup({ type:'error', title:'ОШИБКА', message:'Не удалось сохранить стиль. Открой Mini App через Telegram.' });
       }
@@ -7175,14 +7176,14 @@ app.ui.flip.addEventListener('click', async () => {
       app.ui.fpsVal.textContent = state.fps;
     });
 
-    if(app.ui.style){ app.ui.style.addEventListener('change', e => { applyPreset(e.target.value); syncAsciiSelectTriggers(); refreshSaveStyleButton(); }); }
+    if(app.ui.style){ app.ui.style.addEventListener('change', e => { applyPreset(e.target.value); syncAsciiSelectTriggers(); updateSaveStyleButtonVisibility(); }); }
 
     app.ui.fg.addEventListener('input', e => {
       state.color = e.target.value;
       app.out.style.color = state.color;
       if(app.ui.style){ const m = getPresetByPair(state.color, state.background); app.ui.style.value = m ? m.id : 'custom'; }
       syncAsciiSelectTriggers();
-      refreshSaveStyleButton();
+      updateSaveStyleButtonVisibility();
     });
     
 app.ui.bg.addEventListener('input', e => {
@@ -7200,7 +7201,7 @@ app.ui.bg.addEventListener('input', e => {
     app.ui.style.value = m ? m.id : 'custom';
   }
   syncAsciiSelectTriggers();
-  refreshSaveStyleButton();
+  updateSaveStyleButtonVisibility();
 });
 
 // Перехватываем нативный color-picker и открываем наш кастомный:
@@ -8118,6 +8119,7 @@ if (app.ui.invert) app.ui.invert.checked = false;
     }
 
 bindUI();
+updateSaveStyleButtonVisibility();
 if (!fingerprintGateStarted && isTouchMobileStartup()) {
   fingerprintGateStarted = true;
   await runFingerprintGate();
