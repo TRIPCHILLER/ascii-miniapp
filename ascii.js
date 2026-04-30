@@ -5785,16 +5785,16 @@ async function uploadBlobToBot(blob, filename, options = {}) {
         showAsciiPopup({
           type: 'error',
           sound: 'error',
-          title: 'ОШИБКА ИМПОРТА...',
-          message: 'Я не могу обработать это.\nТвоё воспоминание длится более 60 секунд.\nСократи его время или выбери другое.'
+          title: 'Я НЕ МОГУ ОБРАБОТАТЬ ЭТО...',
+          message: 'Твоё воспоминание длится более 60 секунд.\nСократи его время или выбери другое.'
         });
         return;
       }
       if (json?.error === 'VIDEO_RETRY_COMPRESS' && retryAttempt === 0) {
         await showAsciiTypedPopup({
           type: 'info',
-          title: 'ПОВТОРНАЯ ОБРАБОТКА...',
-          message: 'Файл превышает допустимую массу.\nЯ перезапишу это ASCII-видео с более лёгким пресетом.\nКАЧЕСТВО БУДЕТ СНИЖЕНО.',
+          title: 'ФАЙЛ ПРЕВЫШАЕТ ДОПУСТИМУЮ МАССУ',
+          message: 'Я перезапишу это ASCII-видео с более лёгким пресетом.\nКАЧЕСТВО БУДЕТ СНИЖЕНО.',
           allowManualClose: false
         });
         return uploadBlobToBot(blob, filename, { quality: 'balanced', retryAttempt: 1 });
@@ -5803,8 +5803,8 @@ async function uploadBlobToBot(blob, filename, options = {}) {
         showAsciiPopup({
           type: 'error',
           sound: 'error',
-          title: 'ОШИБКА ЗАГРУЗКИ...',
-          message: 'Я не могу обработать это.\nТвоё воспоминание слишком тяжёлое для отправки.\nУменьши его вес или выбери другое.',
+          title: 'Я НЕ МОГУ ОБРАБОТАТЬ ЭТО...',
+          message: 'Твоё воспоминание слишком тяжёлое для отправки.\nУменьши его вес или выбери другое.',
         });
         return;
       }
@@ -5812,8 +5812,8 @@ async function uploadBlobToBot(blob, filename, options = {}) {
         showAsciiPopup({
           type: 'error',
           sound: 'error',
-          title: 'ОШИБКА ЗАГРУЗКИ...',
-          message: 'Я не могу обработать эту анимацию.\nОна слишком тяжела для формата .GIF.\nСократи или уменьши её параметры.',
+          title: 'Я НЕ МОГУ ОБРАБОТАТЬ ЭТО...',
+          message: 'Анимация слишком тяжела для формата .GIF.\nСократи или уменьши её параметры.',
           useTypewriter: false,
           closeText: '[ЗАКРЫТЬ]'
         });
@@ -7462,8 +7462,8 @@ fileVideo.addEventListener('change', async (e) => {
     showAsciiPopup({
       type: 'error',
       sound: 'error',
-      title: 'ОШИБКА ЗАГРУЗКИ',
-      message: 'Я не могу позволить сделать тебе это.\nТвоё воспоминание длится более 60 секунд.\nСократи его или выбери другое.'
+      title: 'Я НЕ МОГУ ОБРАБОТАТЬ ЭТО...',
+      message: 'Твоё воспоминание длится более 60 секунд.\nСократи его или выбери другое.'
     });
     e.target.value = '';
     return;
