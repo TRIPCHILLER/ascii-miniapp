@@ -192,6 +192,11 @@ function startBusyServiceTextAnimation(targetText, {
       startInitText: $('#startInitText'),
       startBlinkLine: $('#startBlinkLine'),
       colorRow: $('#colorRow'),
+      saveStyleBtn: $('#saveStyleBtn'),
+      saveStyleModal: $('#saveStyleModal'),
+      saveStyleInput: $('#saveStyleInput'),
+      saveStyleDone: $('#saveStyleDone'),
+      saveStyleCancel: $('#saveStyleCancel'),
       resetModeBtn: $('#resetModeBtn'),
       visorModeStatus: $('#visorModeStatus'),
     modePhoto:   $('#modePhoto'),
@@ -3727,8 +3732,18 @@ function isFullscreenLike() {
 { id:'paperback',  name:'P4P3RB4CK',            colors:['#382b26', '#b8c2b9'] },
   ];
   const CUSTOM_LABEL = 'П0ЛЬЗ0В4Т3ЛЬСКИЙ';
+  const USER_PRESET_LIMIT = 20;
+  const USER_PRESET_ID_PREFIX = 'usp_';
+  let userStylePresets = [];
   const norm = (hex)=> (hex||'').toLowerCase().replace('#','');
   const toHex = v => v && v[0]==='#' ? v : ('#'+v);
+  function normalizeHexColor(color){
+    const raw = String(color || '').trim().toLowerCase();
+    const hex = raw.startsWith('#') ? raw.slice(1) : raw;
+    if (/^[0-9a-f]{3}$/.test(hex)) return `#${hex.split('').map((ch) => ch + ch).join('')}`;
+    if (/^[0-9a-f]{6}$/.test(hex)) return `#${hex}`;
+    return '';
+  }
   const lum = (hex)=>{ // относительная яркость 0..1
     const h = norm(hex);
     if (h.length<6) return 0;
@@ -3773,25 +3788,41 @@ function isFullscreenLike() {
     return { bg: toHex(bg), text: toHex(text) };
   }
   function detectPreset(textHex, bgHex){
-    const t=norm(textHex), b=norm(bgHex);
+    const t=norm(normalizeHexColor(textHex)), b=norm(normalizeHexColor(bgHex));
     for(const p of PRESETS){
       const {bg,text}=splitToBgText(p.colors);
       if(norm(text)===t && norm(bg)===b) return p.id;
     }
     return 'custom';
   }
+  function getPresetByPair(textHex, bgHex){
+    const text = normalizeHexColor(textHex);
+    const bg = normalizeHexColor(bgHex);
+    const builtIn = PRESETS.find((p) => {
+      const x = splitToBgText(p.colors);
+      return normalizeHexColor(x.text) === text && normalizeHexColor(x.bg) === bg;
+    });
+    if (builtIn) return { type:'builtin', id: builtIn.id, name: builtIn.name };
+    const user = userStylePresets.find((p) => normalizeHexColor(p.textColor) === text && normalizeHexColor(p.bgColor) === bg);
+    if (user) return { type:'user', id: user.id, name: user.name };
+    return null;
+  }
   function fillStyleSelect(){
     if(!app.ui.style) return;
     app.ui.style.innerHTML='';
     const opt = new Option(CUSTOM_LABEL,'custom'); app.ui.style.append(opt);
     PRESETS.forEach(p=> app.ui.style.append(new Option(p.name,p.id)));
+    userStylePresets.forEach((p) => app.ui.style.append(new Option(p.name, p.id)));
     syncAsciiSelectTriggers();
   }
   function applyPreset(id){
     if(!app.ui.style) return;
     if(id==='custom'){ app.ui.style.value='custom'; syncAsciiSelectTriggers(); return; }
-    const p = PRESETS.find(x=>x.id===id); if(!p){ app.ui.style.value='custom'; syncAsciiSelectTriggers(); return; }
-    const {bg,text}=splitToBgText(p.colors);
+    const p = PRESETS.find(x=>x.id===id);
+    const up = userStylePresets.find((x) => x.id === id);
+    if(!p && !up){ app.ui.style.value='custom'; syncAsciiSelectTriggers(); return; }
+    const bg = p ? splitToBgText(p.colors).bg : up.bgColor;
+    const text = p ? splitToBgText(p.colors).text : up.textColor;
     // обновим state и UI как при ручном выборе цвета
     state.color = toHex(text); state.background = toHex(bg);
     app.ui.fg.value = state.color; app.ui.bg.value = state.background;
@@ -3932,6 +3963,20 @@ function isFullscreenLike() {
           label: preset.name,
           isSelected: selectedValue === preset.id,
           palette: { text: toHex(colors.text), bg: toHex(colors.bg) },
+          onClick: () => {
+            app.ui.style.value = preset.id;
+            app.ui.style.dispatchEvent(new Event('change', { bubbles: true }));
+            syncAsciiSelectTriggers();
+            closeAsciiSelectPopup();
+          }
+        });
+        list.appendChild(row);
+      });
+      userStylePresets.forEach((preset) => {
+        const row = buildAsciiSelectRow({
+          label: preset.name,
+          isSelected: selectedValue === preset.id,
+          palette: { text: normalizeHexColor(preset.textColor), bg: normalizeHexColor(preset.bgColor) },
           onClick: () => {
             app.ui.style.value = preset.id;
             app.ui.style.dispatchEvent(new Event('change', { bubbles: true }));
@@ -6791,6 +6836,48 @@ function layoutSettingsPanel() {
   function bindUI() {
     initAsciiTerminalFrames();
     bindWorkUiClickSoundOnce();
+    const closeSaveStyleModal = () => { if (app.ui.saveStyleModal) app.ui.saveStyleModal.hidden = true; };
+    const refreshSaveStyleButton = () => {
+      if (!app.ui.saveStyleBtn) return;
+      const pair = getPresetByPair(state.color, state.background);
+      const canShow = !isTextMode() && !state.transparentBg && (pair === null) && (app.ui.style?.value === 'custom');
+      app.ui.saveStyleBtn.hidden = !canShow;
+    };
+    const sanitizePresetName = (value) => String(value || '').toUpperCase().trim().replace(/[^A-ZА-ЯЁ0-9 _-]/g, '').slice(0, 16);
+    const loadUserStylePresets = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/user-style-presets`, { headers: applyTelegramInitDataHeader({}) });
+        const json = await res.json();
+        if (!res.ok || !json?.ok || !Array.isArray(json.presets)) return;
+        userStylePresets = json.presets.map((p) => ({ ...p, textColor: normalizeHexColor(p.textColor), bgColor: normalizeHexColor(p.bgColor) }));
+        fillStyleSelect();
+        const matched = getPresetByPair(state.color, state.background);
+        app.ui.style.value = matched ? matched.id : 'custom';
+        syncAsciiSelectTriggers();
+        refreshSaveStyleButton();
+      } catch {}
+    };
+    const saveUserStylePreset = async () => {
+      const input = app.ui.saveStyleInput;
+      const cleanName = sanitizePresetName(input?.value || '');
+      if (!cleanName) return showAsciiPopup({ type:'info', title:'ОШИБКА', message:'Название пресета пустое.' });
+      try {
+        const res = await fetch(`${API_BASE}/api/user-style-presets`, { method:'POST', headers: applyTelegramInitDataHeader({ 'Content-Type':'application/json' }), body: JSON.stringify({ name: cleanName, textColor: normalizeHexColor(state.color), bgColor: normalizeHexColor(state.background) }) });
+        const json = await res.json();
+        if (!res.ok || !json?.ok) {
+          const em = json?.error === 'duplicate_name' ? 'Такой стиль уже существует.' : json?.error === 'duplicate_colors' ? 'Эта цветовая пара уже сохранена.' : json?.error === 'limit_reached' ? 'Достигнут лимит сохранённых стилей.' : 'Не удалось сохранить стиль. Открой Mini App через Telegram.';
+          return showAsciiPopup({ type:'error', title:'ОШИБКА', message:em });
+        }
+        userStylePresets.push(json.preset);
+        fillStyleSelect();
+        app.ui.style.value = json.preset.id;
+        applyPreset(json.preset.id);
+        closeSaveStyleModal();
+        refreshSaveStyleButton();
+      } catch {
+        showAsciiPopup({ type:'error', title:'ОШИБКА', message:'Не удалось сохранить стиль. Открой Mini App через Telegram.' });
+      }
+    };
 
     if (app.ui.charsetTrigger) {
       app.ui.charsetTrigger.addEventListener('click', (e) => {
@@ -7088,13 +7175,14 @@ app.ui.flip.addEventListener('click', async () => {
       app.ui.fpsVal.textContent = state.fps;
     });
 
-    if(app.ui.style){ app.ui.style.addEventListener('change', e => { applyPreset(e.target.value); syncAsciiSelectTriggers(); }); }
+    if(app.ui.style){ app.ui.style.addEventListener('change', e => { applyPreset(e.target.value); syncAsciiSelectTriggers(); refreshSaveStyleButton(); }); }
 
     app.ui.fg.addEventListener('input', e => {
       state.color = e.target.value;
       app.out.style.color = state.color;
-      if(app.ui.style){ const m = detectPreset(state.color, state.background); app.ui.style.value = (m==='custom'?'custom':m); }
+      if(app.ui.style){ const m = getPresetByPair(state.color, state.background); app.ui.style.value = m ? m.id : 'custom'; }
       syncAsciiSelectTriggers();
+      refreshSaveStyleButton();
     });
     
 app.ui.bg.addEventListener('input', e => {
@@ -7108,10 +7196,11 @@ app.ui.bg.addEventListener('input', e => {
 
   // синхронизация пресета
   if (app.ui.style){
-    const m = detectPreset(state.color, state.background);
-    app.ui.style.value = (m==='custom'?'custom':m);
+    const m = getPresetByPair(state.color, state.background);
+    app.ui.style.value = m ? m.id : 'custom';
   }
   syncAsciiSelectTriggers();
+  refreshSaveStyleButton();
 });
 
 // Перехватываем нативный color-picker и открываем наш кастомный:
@@ -7824,6 +7913,19 @@ async function sendAsciiTextToBot() {
       body: form,
       headers: applyTelegramInitDataHeader({})
     });
+    app.ui.saveStyleBtn?.addEventListener('click', () => {
+      if (!app.ui.saveStyleModal || !app.ui.saveStyleInput) return;
+      app.ui.saveStyleInput.value = '';
+      app.ui.saveStyleInput.placeholder = 'I Введите название пресета';
+      app.ui.saveStyleInput.classList.add('blink-cursor');
+      app.ui.saveStyleModal.hidden = false;
+    });
+    app.ui.saveStyleInput?.addEventListener('focus', () => { app.ui.saveStyleInput.classList.remove('blink-cursor'); app.ui.saveStyleInput.placeholder = ''; });
+    app.ui.saveStyleInput?.addEventListener('input', () => { app.ui.saveStyleInput.value = sanitizePresetName(app.ui.saveStyleInput.value); });
+    app.ui.saveStyleDone?.addEventListener('click', saveUserStylePreset);
+    app.ui.saveStyleCancel?.addEventListener('click', closeSaveStyleModal);
+    app.ui.saveStyleModal?.querySelector('.save-style-modal__backdrop')?.addEventListener('click', closeSaveStyleModal);
+    loadUserStylePresets();
     const raw = await res.text();
     let json = null;
     try { json = JSON.parse(raw || '{}'); } catch (_) { json = null; }
@@ -8053,6 +8155,3 @@ await setMode(isTextMode() ? (hasCam ? 'live' : 'photo') : (hasCam ? 'live' : 'p
     init();
   }
 })();
-
-
-
