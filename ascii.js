@@ -6879,6 +6879,24 @@ function layoutSettingsPanel() {
         showAsciiPopup({ type:'error', title:'ОШИБКА', message:'Не удалось сохранить стиль. Открой Mini App через Telegram.' });
       }
     };
+    app.ui.saveStyleBtn?.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (!app.ui.saveStyleModal || !app.ui.saveStyleInput) {
+        console.warn('[save-style] click ignored: modal-or-input-missing');
+        return;
+      }
+      app.ui.saveStyleInput.value = '';
+      app.ui.saveStyleInput.placeholder = 'I Введите название пресета';
+      app.ui.saveStyleInput.classList.add('blink-cursor');
+      app.ui.saveStyleModal.hidden = false;
+    });
+    app.ui.saveStyleInput?.addEventListener('focus', () => { app.ui.saveStyleInput.classList.remove('blink-cursor'); app.ui.saveStyleInput.placeholder = ''; });
+    app.ui.saveStyleInput?.addEventListener('input', () => { app.ui.saveStyleInput.value = sanitizePresetName(app.ui.saveStyleInput.value); });
+    app.ui.saveStyleDone?.addEventListener('click', saveUserStylePreset);
+    app.ui.saveStyleCancel?.addEventListener('click', closeSaveStyleModal);
+    app.ui.saveStyleModal?.querySelector('.save-style-modal__backdrop')?.addEventListener('click', closeSaveStyleModal);
+    loadUserStylePresets();
 
     if (app.ui.charsetTrigger) {
       app.ui.charsetTrigger.addEventListener('click', (e) => {
@@ -7914,19 +7932,6 @@ async function sendAsciiTextToBot() {
       body: form,
       headers: applyTelegramInitDataHeader({})
     });
-    app.ui.saveStyleBtn?.addEventListener('click', () => {
-      if (!app.ui.saveStyleModal || !app.ui.saveStyleInput) return;
-      app.ui.saveStyleInput.value = '';
-      app.ui.saveStyleInput.placeholder = 'I Введите название пресета';
-      app.ui.saveStyleInput.classList.add('blink-cursor');
-      app.ui.saveStyleModal.hidden = false;
-    });
-    app.ui.saveStyleInput?.addEventListener('focus', () => { app.ui.saveStyleInput.classList.remove('blink-cursor'); app.ui.saveStyleInput.placeholder = ''; });
-    app.ui.saveStyleInput?.addEventListener('input', () => { app.ui.saveStyleInput.value = sanitizePresetName(app.ui.saveStyleInput.value); });
-    app.ui.saveStyleDone?.addEventListener('click', saveUserStylePreset);
-    app.ui.saveStyleCancel?.addEventListener('click', closeSaveStyleModal);
-    app.ui.saveStyleModal?.querySelector('.save-style-modal__backdrop')?.addEventListener('click', closeSaveStyleModal);
-    loadUserStylePresets();
     const raw = await res.text();
     let json = null;
     try { json = JSON.parse(raw || '{}'); } catch (_) { json = null; }
