@@ -1555,14 +1555,15 @@ if (/^\/who(?:@[\w_]+)?\s+(.+)$/i.test(text)) {
     idToUsername[String(uid)] = String(uname);
   }
   const referrals = getReferralsOf(targetId);
-  const refsPreviewLimit = 30;
+  const refsPreviewLimit = 15;
   const refsPreview = referrals.slice(0, refsPreviewLimit);
-  const refsLines = referrals.length
-    ? refsPreview.map((rid) => idToUsername[rid] ? `@${idToUsername[rid]} (${rid})` : rid)
-    : ['none'];
+  const refsLines = refsPreview.map((rid) => idToUsername[rid] ? `@${idToUsername[rid]} (${rid})` : rid);
   const refsTail = referrals.length > refsPreviewLimit
     ? `...и ещё ${referrals.length - refsPreviewLimit} рефералов`
     : null;
+  const refsPreviewBlock = referrals.length
+    ? ['[q]', ...refsLines, ...(refsTail ? [refsTail] : []), '[/q]']
+    : ['none'];
   const whoMsg = [
     '[b]WHO[/b]',
     `username: ${username ? '@' + username : '-'}`,
@@ -1576,8 +1577,7 @@ if (/^\/who(?:@[\w_]+)?\s+(.+)$/i.test(text)) {
     `has_referral: ${getRefInfo(targetId) ? 'yes' : 'no'}`,
     `referrals_count: ${referrals.length}`,
     'referrals_preview:',
-    ...refsLines,
-    ...(refsTail ? [refsTail] : [])
+    ...refsPreviewBlock
   ].join('\n');
   await sendMessage(fromId, applyMiniFormatting(whoMsg), { parse_mode: 'HTML', disable_web_page_preview: true });
   return res.json({ ok:true });
