@@ -259,24 +259,9 @@ button:focus, .btn:focus{
   align-items:center;
   background:#000;
   border:2px solid #fff;
-  padding:8px 10px;
-}
-.save-style-modal__cursor{
-  color:#fff;
-  animation: save-style-blink 1s steps(1,end) infinite;
-}
-.save-style-modal__hint{
-  color:#808080;
-  margin-left:1px;
-  pointer-events:none;
-}
-.save-style-modal__input-wrap.is-typing .save-style-modal__cursor,
-.save-style-modal__input-wrap.is-typing .save-style-modal__hint{
-  display:none;
+  padding:0;
 }
 #saveStyleInput{
-  position:absolute;
-  inset:0;
   width:100%;
   background:transparent;
   border:0;
@@ -286,7 +271,10 @@ button:focus, .btn:focus{
   text-transform:uppercase;
   padding:8px 10px;
 }
-@keyframes save-style-blink { 0%,49%{opacity:1;} 50%,100%{opacity:.1;} }
+#saveStyleInput::placeholder{
+  color:#808080;
+  text-transform:none;
+}
 .save-style-modal__actions{
   width:320px;
   display:flex;
@@ -348,7 +336,9 @@ button:focus, .btn:focus{
 #styleTrigger:active,
 #resetModeBtn:active,
 #settings.panel .check:active,
-#saveStyleBtn:active{
+#saveStyleBtn:active,
+#saveStyleDone:active,
+#saveStyleCancel:active{
   background:#262626;
   color:#bfbfbf;
   border:0;

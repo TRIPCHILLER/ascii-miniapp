@@ -6844,11 +6844,6 @@ function layoutSettingsPanel() {
     initAsciiTerminalFrames();
     bindWorkUiClickSoundOnce();
     const closeSaveStyleModal = () => { if (app.ui.saveStyleModal) app.ui.saveStyleModal.hidden = true; };
-    const syncSaveStyleInputState = () => {
-      const wrap = app.ui.saveStyleInput?.closest('.save-style-modal__input-wrap');
-      if (!wrap || !app.ui.saveStyleInput) return;
-      wrap.classList.toggle('is-typing', Boolean(app.ui.saveStyleInput.value));
-    };
     const sanitizePresetName = (value) => String(value || '').toUpperCase().trim().replace(/[^A-ZА-ЯЁ0-9 _-]/g, '').slice(0, 16);
     const loadUserStylePresets = async () => {
       try {
@@ -6892,14 +6887,11 @@ function layoutSettingsPanel() {
         return;
       }
       app.ui.saveStyleInput.value = '';
-      syncSaveStyleInputState();
       app.ui.saveStyleModal.hidden = false;
       requestAnimationFrame(() => app.ui.saveStyleInput?.focus());
     });
-    app.ui.saveStyleInput?.addEventListener('focus', syncSaveStyleInputState);
     app.ui.saveStyleInput?.addEventListener('input', () => {
       app.ui.saveStyleInput.value = sanitizePresetName(app.ui.saveStyleInput.value);
-      syncSaveStyleInputState();
     });
     app.ui.saveStyleDone?.addEventListener('click', saveUserStylePreset);
     app.ui.saveStyleCancel?.addEventListener('click', closeSaveStyleModal);
