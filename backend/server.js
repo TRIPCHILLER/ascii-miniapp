@@ -936,6 +936,29 @@ app.post('/api/user-style-presets', (req, res) => {
   writeUserStylePresetsDb(db);
   return res.json({ ok: true, preset });
 });
+app.delete('/api/user-style-presets/:presetId', (req, res) => {
+  let userId = '';
+  try {
+    userId = parseInitDataUserIdOrThrow(req);
+  } catch {
+    return res.status(401).json({ ok: false, error: 'invalid_init_data' });
+  }
+  const presetId = String(req.params?.presetId || '').trim();
+  if (!presetId || !presetId.startsWith(USER_PRESET_ID_PREFIX)) {
+    return res.status(400).json({ ok: false, error: 'invalid_preset_id' });
+  }
+  const db = readUserStylePresetsDb();
+  const list = Array.isArray(db[userId]) ? db[userId] : [];
+  const idx = list.findIndex((p) => String(p?.id || '') === presetId);
+  if (idx < 0) return res.status(404).json({ ok: false, error: 'not_found' });
+  try {
+    db[userId] = [...list.slice(0, idx), ...list.slice(idx + 1)];
+    writeUserStylePresetsDb(db);
+    return res.json({ ok: true, deletedId: presetId });
+  } catch {
+    return res.status(500).json({ ok: false, error: 'delete_failed' });
+  }
+});
 // === ОБНОВЛЁННЫЙ ХЕНДЛЕР ДЛЯ /api/upload и /upload ===
 // Принимаем любой из ключей: file ИЛИ document, а также initdata ИЛИ initData, mediatype ИЛИ mediaType
 const uploadHandler = [

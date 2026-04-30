@@ -197,6 +197,9 @@ function startBusyServiceTextAnimation(targetText, {
       saveStyleInput: $('#saveStyleInput'),
       saveStyleDone: $('#saveStyleDone'),
       saveStyleCancel: $('#saveStyleCancel'),
+      deleteStyleModal: $('#deleteStyleModal'),
+      deleteStyleDone: $('#deleteStyleDone'),
+      deleteStyleCancel: $('#deleteStyleCancel'),
       resetModeBtn: $('#resetModeBtn'),
       visorModeStatus: $('#visorModeStatus'),
     modePhoto:   $('#modePhoto'),
@@ -3807,11 +3810,18 @@ function isFullscreenLike() {
     if (user) return { type:'user', id: user.id, name: user.name };
     return null;
   }
+  function getCurrentStyleActionMode() {
+    const pair = getPresetByPair(state.color, state.background);
+    if (isTextMode() || state.transparentBg) return 'hidden';
+    if (pair?.type === 'user' && app.ui.style?.value === pair.id) return 'delete';
+    if (pair === null && app.ui.style?.value === 'custom') return 'save';
+    return 'hidden';
+  }
   function updateSaveStyleButtonVisibility() {
     if (!app.ui.saveStyleBtn) return;
-    const pair = getPresetByPair(state.color, state.background);
-    const canShow = !isTextMode() && !state.transparentBg && (pair === null) && (app.ui.style?.value === 'custom');
-    app.ui.saveStyleBtn.hidden = !canShow;
+    const mode = getCurrentStyleActionMode();
+    app.ui.saveStyleBtn.hidden = (mode === 'hidden');
+    app.ui.saveStyleBtn.textContent = mode === 'delete' ? 'УДАЛИТЬ СТИЛЬ' : 'СОХРАНИТЬ СТИЛЬ';
   }
   function fillStyleSelect(){
     if(!app.ui.style) return;
@@ -6844,6 +6854,7 @@ function layoutSettingsPanel() {
     initAsciiTerminalFrames();
     bindWorkUiClickSoundOnce();
     const closeSaveStyleModal = () => { if (app.ui.saveStyleModal) app.ui.saveStyleModal.hidden = true; };
+    const closeDeleteStyleModal = () => { if (app.ui.deleteStyleModal) app.ui.deleteStyleModal.hidden = true; };
     const sanitizePresetName = (value) => String(value || '').toUpperCase().trim().replace(/[^A-ZА-ЯЁ0-9 _-]/g, '').slice(0, 16);
     const applyPresetNameLeetFilter = (value) => String(value || '').replace(/[OAEIОАЕЁЯ]/g, (ch) => {
       const map = {
@@ -6894,9 +6905,38 @@ function layoutSettingsPanel() {
         showAsciiPopup({ type:'error', title:'ОШИБКА', message:'Не удалось сохранить стиль. Открой Mini App через Telegram.' });
       }
     };
+    const deleteUserStylePreset = async () => {
+      const pair = getPresetByPair(state.color, state.background);
+      if (!pair || pair.type !== 'user') return;
+      try {
+        const res = await fetch(`${API_BASE}/api/user-style-presets/${encodeURIComponent(pair.id)}`, { method:'DELETE', headers: applyTelegramInitDataHeader({}) });
+        const json = await res.json();
+        if (!res.ok || !json?.ok) {
+          const em = json?.error === 'not_found' ? 'Стиль не найден.' : json?.error === 'invalid_init_data' ? 'Авторизация Telegram устарела. Открой Mini App заново.' : 'Не удалось удалить стиль.';
+          return showAsciiPopup({ type:'error', title:'ОШИБКА', message: em });
+        }
+        userStylePresets = userStylePresets.filter((p) => p.id !== json.deletedId);
+        fillStyleSelect();
+        const matched = getPresetByPair(state.color, state.background);
+        app.ui.style.value = matched ? matched.id : 'custom';
+        syncAsciiSelectTriggers();
+        closeDeleteStyleModal();
+        updateSaveStyleButtonVisibility();
+      } catch {
+        showAsciiPopup({ type:'error', title:'ОШИБКА', message:'Не удалось удалить стиль.' });
+      }
+    };
     app.ui.saveStyleBtn?.addEventListener('click', (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
+      const actionMode = getCurrentStyleActionMode();
+      if (actionMode === 'hidden') return;
+      if (actionMode === 'delete') {
+        const pair = getPresetByPair(state.color, state.background);
+        if (!pair || pair.type !== 'user' || !app.ui.deleteStyleModal) return;
+        app.ui.deleteStyleModal.hidden = false;
+        return;
+      }
       if (!app.ui.saveStyleModal || !app.ui.saveStyleInput) {
         console.warn('[save-style] click ignored: modal-or-input-missing');
         return;
@@ -6911,6 +6951,9 @@ function layoutSettingsPanel() {
     app.ui.saveStyleDone?.addEventListener('click', saveUserStylePreset);
     app.ui.saveStyleCancel?.addEventListener('click', closeSaveStyleModal);
     app.ui.saveStyleModal?.querySelector('.save-style-modal__backdrop')?.addEventListener('click', closeSaveStyleModal);
+    app.ui.deleteStyleDone?.addEventListener('click', deleteUserStylePreset);
+    app.ui.deleteStyleCancel?.addEventListener('click', closeDeleteStyleModal);
+    app.ui.deleteStyleModal?.querySelector('.save-style-modal__backdrop')?.addEventListener('click', closeDeleteStyleModal);
     loadUserStylePresets();
 
     if (app.ui.charsetTrigger) {

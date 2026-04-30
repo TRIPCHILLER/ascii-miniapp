@@ -237,7 +237,8 @@ button:focus, .btn:focus{
   padding-top:1px;
   padding-bottom:1px;
 }
-#saveStyleModal{
+#saveStyleModal,
+#deleteStyleModal{
   position:fixed; inset:0; z-index:1200;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
   gap:14px;
@@ -346,17 +347,25 @@ button:focus, .btn:focus{
 
 #saveStyleDone,
 #saveStyleCancel,
+#deleteStyleDone,
+#deleteStyleCancel,
 #saveStyleDone:hover,
 #saveStyleCancel:hover,
+#deleteStyleDone:hover,
+#deleteStyleCancel:hover,
 #saveStyleDone:focus,
-#saveStyleCancel:focus{
+#saveStyleCancel:focus,
+#deleteStyleDone:focus,
+#deleteStyleCancel:focus{
   background:transparent;
   background-image:none;
   box-shadow:none;
 }
 
 #saveStyleDone:active,
-#saveStyleCancel:active{
+#saveStyleCancel:active,
+#deleteStyleDone:active,
+#deleteStyleCancel:active{
   background:transparent;
   background-image:none;
   box-shadow:none;
