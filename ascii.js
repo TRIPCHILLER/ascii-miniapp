@@ -5386,7 +5386,7 @@ function renderAsciiToCanvas(text, cols, rows, scale = 2.5){
 // PNG (режим ФОТО)
 function savePNG(){
   const full = app.out.textContent || '';
-  if (!full.trim()) { showAsciiPopup({ type:'info', title:'ЗДЕСЬ ПУСТО...', message:'МНЕ НЕЧЕГО СОХРАНЯТЬ.' }); clearShotVisualEffects(); return; }
+  if (!full.trim()) { showAsciiPopup({ type:'info', title:'ЗДЕСЬ ПУСТО...', message:'Мне нечего сохранять.' }); clearShotVisualEffects(); return; }
 
   let text = full;
   let cols = Math.max(1, state.lastGrid?.w || 1);
@@ -5484,7 +5484,7 @@ function saveVideo(){
 
   const fullNow = app.out.textContent || '';
   if (!fullNow.trim()) {
-    showAsciiPopup({ type:'info', title:'ЗДЕСЬ ПУСТО...', message:'МНЕ НЕЧЕГО СОХРАНЯТЬ.' });
+    showAsciiPopup({ type:'info', title:'ЗДЕСЬ ПУСТО...', message:'Мне нечего сохранять.' });
     return;
   }
 
@@ -5494,7 +5494,7 @@ function saveVideo(){
 
   const mime = pickMime();
   if (!mime) {
-    showAsciiPopup({ type:'error', title:'ОШИБКА', message:'ЗАПИСЬ ВИДЕО НЕ ПОДДЕРЖИВАЕТСЯ НА ЭТОМ УСТРОЙСТВЕ.' });
+    showAsciiPopup({ type:'error', title:'ОШИБКА ЗАПИСИ', message:'Запись видео не поддерживается на этом устройстве.' });
     return;
   }
 
@@ -5660,7 +5660,7 @@ function showInsufficientBalancePopup(required, balance) {
     type: 'error',
     sound: 'error',
     useTypewriter: false,
-    closeText: '[ ЗАКРЫТЬ ]',
+    closeText: '[ЗАКРЫТЬ]',
     title: 'НЕДОСТАТОЧНО ЭНЕРГИИ',
     message: `Для преобразования требуется: ${required}`,
     extra: `В энергохранилище: ${balance}`
@@ -5823,8 +5823,8 @@ async function uploadBlobToBot(blob, filename, options = {}) {
       showAsciiPopup({
         type: 'success',
         title: 'ПРЕОБРАЗОВАНИЕ ЗАВЕРШЕНО',
-        message: 'ФАЙЛ ОТПРАВЛЕН В ЧАТ.',
-        extra: (json && typeof json.balance !== 'undefined') ? `ОСТАЛОСЬ ИМПУЛЬСОВ: ${json.balance}` : ''
+        message: 'Файл отправлен в чат.',
+        extra: (json && typeof json.balance !== 'undefined') ? `Осталось импульсов: ${json.balance}` : ''
       });
 
       return;
@@ -5835,9 +5835,9 @@ async function uploadBlobToBot(blob, filename, options = {}) {
         type: 'error',
         title: 'СЕТЕВАЯ ОШИБКА',
         message: (e?.name === 'AbortError')
-          ? 'СЕРВЕР ОТВЕЧАЛ СЛИШКОМ ДОЛГО.'
+          ? 'Сервер не отвечает...'
           : (e?.message || 'СЕТЕВАЯ ОШИБКА.'),
-        extra: 'ПРОВЕРЬ ЧАТ — ФАЙЛ МОГ УЖЕ ПРИЙТИ.'
+        extra: 'Проверь чат — файл мог уже прийти.'
       });
       return;
 
