@@ -7210,7 +7210,7 @@ if (app.ui.flashBtn) {
         const hasAsciiFrame = !!(app.out?.textContent || '').trim();
         if (!hasSource || !hasAsciiFrame) {
           pressOff();
-          showAsciiPopup({ type:'info', title:'ЗДЕСЬ ПУСТО...', message:'МНЕ НЕЧЕГО СОХРАНЯТЬ.' });
+          showAsciiPopup({ type:'info', title:'ЗДЕСЬ ПУСТО...', message:'Мне нечего сохранять.' });
           clearShotVisualEffects();
           return;
         }
@@ -7453,7 +7453,7 @@ fileVideo.addEventListener('change', async (e) => {
       type: 'error',
       sound: 'error',
       title: 'ОШИБКА ЗАГРУЗКИ',
-      message: 'Я НЕ МОГУ ПОЗВОЛИТЬ СДЕЛАТЬ ТЕБЕ ЭТО.\nТВОЁ ВОСПОМИНАНИЕ ДЛИТСЯ БОЛЕЕ 60 СЕКУНД.\nСОКРАТИ ВРЕМЯ ИЛИ ВЫБЕРИ ДРУГОЕ'
+      message: 'Я НЕ МОГУ ПОЗВОЛИТЬ СДЕЛАТЬ ТЕБЕ ЭТО.\nТвоё воспоминание длится более 60 секунд.\nСократи его или выбери другое.'
     });
     e.target.value = '';
     return;
@@ -7816,9 +7816,9 @@ async function sendAsciiTextToBot() {
     }
     tgPopup(
       'ПРЕОБРАЗОВАНИЕ ЗАВЕРШЕНО',
-      'ФАЙЛ ОТПРАВЛЕН В ЧАТ.',
+      'Файл отправлен в чат.',
       false,
-      (json && typeof json.balance !== 'undefined') ? `ОСТАЛОСЬ ИМПУЛЬСОВ: ${json.balance}` : ''
+      (json && typeof json.balance !== 'undefined') ? `Осталось импульсов: ${json.balance}` : ''
     );
   } catch (e) {
     dbgState('sendAsciiTextToBot.exception', { url: textEndpointUrl, error: String(e?.message || e || '').slice(0, 200) });
