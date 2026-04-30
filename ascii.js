@@ -4282,9 +4282,19 @@ function showAsciiPopup(input = {}) {
     playErrorSound();
   }
 
-  const popupLines = [title, '', message];
-  if (extra) popupLines.push('', extra);
-  const popupText = popupLines.join('\n').toLocaleUpperCase('ru-RU');
+  const normalizePopupBodyLine = (line) => {
+    const raw = String(line || '');
+    const trimmed = raw.trim();
+    if (!trimmed) return raw;
+    if (/^\[[^\]]+\]$/u.test(trimmed)) return trimmed.toLocaleUpperCase('ru-RU');
+    const lower = trimmed.toLocaleLowerCase('ru-RU');
+    const firstLetterIndex = lower.search(/[a-zа-яё]/iu);
+    if (firstLetterIndex < 0) return lower;
+    return `${lower.slice(0, firstLetterIndex)}${lower[firstLetterIndex].toLocaleUpperCase('ru-RU')}${lower.slice(firstLetterIndex + 1)}`;
+  };
+  const popupLines = [title.toLocaleUpperCase('ru-RU'), '', normalizePopupBodyLine(message)];
+  if (extra) popupLines.push('', normalizePopupBodyLine(extra));
+  const popupText = popupLines.join('\n');
   getAsciiTerminalContent(textEl).textContent = popupText;
   asciiPopupLastFocusedEl = document.activeElement;
 
