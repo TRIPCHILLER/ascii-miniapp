@@ -1877,14 +1877,6 @@ input[type="color"] {
   color:var(--arg-popup-fg);
 }
 
-.arg-scene-countdown:not(:empty){
-  border:4px double var(--arg-popup-fg);
-  background:#000;
-  padding:10px 20px;
-  min-width:min(220px, 56vw);
-  text-align:center;
-}
-
 .arg-scene-countdown.arg-scene-countdown--dim{
   background:transparent;
 }
