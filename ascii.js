@@ -7815,13 +7815,13 @@ async function sendAsciiTextToBot() {
       const needText = `${json?.need ?? 1} импульсов`;
       const balanceValue = json?.balance ?? '—';
       const balanceText = balanceValue === '—' ? balanceValue : `${balanceValue} импульсов`;
-      tgPopup('НЕДОСТАТОЧНО ИМПУЛЬСОВ', `ТРЕБУЕТСЯ: ${needText}`, true, `БАЛАНС: ${balanceText}`);
+      tgPopup('НЕДОСТАТОЧНО ИМПУЛЬСОВ', `Требуется: ${needText}`, true, `Баланс: ${balanceText}`);
       return;
     }
     if (!res.ok) {
       const rawHead = String(raw || '').slice(0, 200);
       dbgState('sendAsciiTextToBot.http_error', { status: res.status, url: textEndpointUrl, body: rawHead });
-      tgPopup('ОШИБКА', `СТАТУС ${res.status}\n${textEndpointUrl}\n${rawHead}`, true);
+      tgPopup('ОШИБКА', `Статус ${res.status}\n${textEndpointUrl}\n${rawHead}`, true);
       return;
     }
     tgPopup(
