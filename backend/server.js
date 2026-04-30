@@ -222,7 +222,7 @@ app.use(cors({
     cb(null, ok);
   },
   methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type','initdata','initData','X-Requested-With'],
+  allowedHeaders: ['Content-Type','initdata','initData','X-Requested-With','X-Telegram-Init-Data'],
   maxAge: 86400,
 }));
 // парсинг json после CORS
@@ -732,28 +732,44 @@ app.get('/__debug', (_req, res) => res.type('text').send(`root=${PORT}`));
 // ============================================================
 // ВАЛИДАЦИЯ Telegram WebApp initData (RFC 2104 / sha256)
 // @section TELEGRAM_INITDATA_VALIDATION
-function validateInitData(initData) {
+function validateTelegramInitData(initData, botToken) {
   try {
-    if (!initData || !process.env.BOT_TOKEN) return null;
-    // initData — строка query-like: "query_id=...&user=...&auth_date=...&hash=..."
+    if (!initData || !botToken) return { ok: false, reason: 'missing_input' };
     const params = new URLSearchParams(initData);
-    const hash   = params.get('hash') || '';
+    const hash = params.get('hash') || '';
+    if (!hash) return { ok: false, reason: 'missing_hash' };
     params.delete('hash');
-    // Делаем data-check-string
     const pairs = [];
     for (const [k, v] of params.entries()) pairs.push(`${k}=${v}`);
     pairs.sort();
     const dataCheckStr = pairs.join('\n');
-    const secret   = crypto.createHmac('sha256', 'WebAppData').update(process.env.BOT_TOKEN).digest();
+    const secret = crypto.createHmac('sha256', 'WebAppData').update(botToken).digest();
     const calcHash = crypto.createHmac('sha256', secret).update(dataCheckStr).digest('hex');
-    if (calcHash !== hash) return null;
-    // user (json)
+    if (calcHash !== hash) return { ok: false, reason: 'hash_mismatch' };
+    return { ok: true, params };
+  } catch {
+    return { ok: false, reason: 'malformed' };
+  }
+}
+
+function maybeUpsertUserFromInitData(req) {
+  const initData = String(req.get('X-Telegram-Init-Data') || '').trim();
+  if (!initData) return null;
+  const checked = validateTelegramInitData(initData, process.env.BOT_TOKEN);
+  if (!checked.ok) {
+    console.warn('[initData] invalid', checked.reason);
+    return null;
+  }
+  try {
+    const params = checked.params;
     const userStr = params.get('user');
-    const user = userStr ? JSON.parse(userStr) : null;
-    const userId = user?.id ? String(user.id) : '';
-    return userId || null;
-  } catch (e) {
-    console.error('[initData] validate error:', e);
+    if (!userStr) return null;
+    const user = JSON.parse(userStr);
+    if (!user?.id) return null;
+    upsertUserFromTelegramUser(user, 'webapp_initdata');
+    return String(user.id);
+  } catch {
+    console.warn('[initData] invalid', 'bad_user_json');
     return null;
   }
 }
@@ -775,6 +791,7 @@ function formatHttpError(err) {
 // @section MINIAPP_HTTP_API_ROUTES
 app.get('/api/balance', (req, res) => {
   logReq(req);
+  maybeUpsertUserFromInitData(req);
   const telegramId = string(req.query.telegramId || '');
   if (!telegramId) return res.status(400).json({ ok:false, message:'telegramId required' });
   ensureUser(telegramId);
@@ -805,16 +822,9 @@ const uploadHandler = [
       const sourceIsGifFlag = String(req.body?.sourceIsGif || '') === '1';
       const sourceIsGif = sourceIsGifFlag || sourceMime === 'image/gif' || /\.gif$/i.test(sourceFilename);
       // --- initData (любая форма) ---
-      const rawInit =
-        (req.headers['x-telegram-init-data'] || '').trim() ||
-        (req.body?.initData || '').trim() ||
-        (req.body?.initdata || '').trim();
-      const userId = validateInitData(rawInit);
-      if (!userId) {
-        // подчистим файл на диске, если был сохранён
-        try { if (f.path) require('fs').unlinkSync(f.path); } catch {}
-        return res.status(401).json({ ok: false, error: 'INITDATA_INVALID' });
-      }
+      const initDataUserId = maybeUpsertUserFromInitData(req);
+      const userId = String(initDataUserId || req.body?.telegramId || req.body?.userId || '');
+      if (!userId) return res.status(400).json({ ok: false, error: 'USER_ID_REQUIRED' });
       // --- тип медиа (любая форма ключа) ---
       let mediatype = String(req.body?.mediatype || req.body?.mediaType || 'photo').toLowerCase();
       // если источник GIF — обрабатываем как видео-пайплайн с gif output
@@ -933,14 +943,11 @@ app.post('/upload', ...uploadHandler);
 app.post('/api/ascii-text', upload.any(), async (req, res) => {
   const files = Array.isArray(req.files) ? req.files : [];
   const f = files.find(x => x.fieldname === 'file') || files.find(x => x.fieldname === 'document') || files[0];
-  const rawInit =
-    (req.headers['x-telegram-init-data'] || '').trim() ||
-    (req.body?.initData || '').trim() ||
-    (req.body?.initdata || '').trim();
-  const userId = validateInitData(rawInit);
+  const initDataUserId = maybeUpsertUserFromInitData(req);
+  const userId = String(initDataUserId || req.body?.telegramId || req.body?.userId || '');
   if (!userId) {
     try { if (f?.path) fs.unlinkSync(f.path); } catch {}
-    return res.status(401).json({ ok:false, error:'INITDATA_INVALID' });
+    return res.status(400).json({ ok:false, error:'USER_ID_REQUIRED' });
   }
   try {
     ensureUser(userId);

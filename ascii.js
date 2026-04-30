@@ -247,6 +247,16 @@ function tgHaptic(method, ...args) {
   } catch (_) {}
 }
 
+function getTelegramInitData() {
+  return window.Telegram?.WebApp?.initData || '';
+}
+
+function applyTelegramInitDataHeader(headers) {
+  const initData = getTelegramInitData();
+  if (initData) headers['X-Telegram-Init-Data'] = initData;
+  return headers;
+}
+
 function createThrottle(fn, waitMs) {
   let lastAt = 0;
   return (...args) => {
@@ -5687,7 +5697,8 @@ async function ensureEnoughBalanceBeforeExport(kind = 'photo', required = getReq
   try {
     const res = await fetch(`${API_BASE}/api/balance?telegramId=${encodeURIComponent(String(telegramId))}`, {
       method: 'GET',
-      cache: 'no-store'
+      cache: 'no-store',
+      headers: applyTelegramInitDataHeader({})
     });
     if (!res.ok) return true;
 
@@ -5763,6 +5774,7 @@ async function uploadBlobToBot(blob, filename, options = {}) {
         method: 'POST',
         body: form,
         signal: ctrl.signal,
+        headers: applyTelegramInitDataHeader({})
       });
 
       // ответ может быть и текстом, и json
@@ -7807,7 +7819,11 @@ async function sendAsciiTextToBot() {
   busyLock = true;
   busyShow('0ТПР4ВК4 ТЕКСТ-АРТА…');
   try {
-    const res = await fetch(textEndpointUrl, { method:'POST', body: form });
+    const res = await fetch(textEndpointUrl, {
+      method:'POST',
+      body: form,
+      headers: applyTelegramInitDataHeader({})
+    });
     const raw = await res.text();
     let json = null;
     try { json = JSON.parse(raw || '{}'); } catch (_) { json = null; }
