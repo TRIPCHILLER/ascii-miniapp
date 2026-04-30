@@ -2073,6 +2073,12 @@ body.visor-text #textSizeWrap{display:flex !important;}
   height:26px;
 }
 
+.ascii-select-popup__row.is-selected .ascii-select-popup__katakana,
+.ascii-select-popup__row:hover:not(.is-selected) .ascii-select-popup__katakana,
+.ascii-select-popup__row:active:not(.is-selected) .ascii-select-popup__katakana{
+  filter:invert(1);
+}
+
 .ascii-select-popup__palette{
   display:flex;
   align-items:center;
