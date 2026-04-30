@@ -4287,10 +4287,10 @@ function showAsciiPopup(input = {}) {
     const trimmed = raw.trim();
     if (!trimmed) return raw;
     if (/^\[[^\]]+\]$/u.test(trimmed)) return trimmed.toLocaleUpperCase('ru-RU');
-    const lower = trimmed.toLocaleLowerCase('ru-RU');
-    const firstLetterIndex = lower.search(/[a-zа-яё]/iu);
-    if (firstLetterIndex < 0) return lower;
-    return `${lower.slice(0, firstLetterIndex)}${lower[firstLetterIndex].toLocaleUpperCase('ru-RU')}${lower.slice(firstLetterIndex + 1)}`;
+    if (input.preserveBodyCase !== false) return trimmed;
+    const firstLetterIndex = trimmed.search(/[a-zа-яё]/iu);
+    if (firstLetterIndex < 0) return trimmed;
+    return `${trimmed.slice(0, firstLetterIndex)}${trimmed[firstLetterIndex].toLocaleUpperCase('ru-RU')}${trimmed.slice(firstLetterIndex + 1)}`;
   };
   const popupLines = [title.toLocaleUpperCase('ru-RU'), '', normalizePopupBodyLine(message)];
   if (extra) popupLines.push('', normalizePopupBodyLine(extra));
@@ -5413,7 +5413,7 @@ function savePNG(){
 
   renderAsciiToCanvas(text, cols, rows, 2.5);
   app.ui.render.toBlob(blob=>{
-    if(!blob) { showAsciiPopup({ type:'error', title:'ОШИБКА', message:'НЕ УДАЛОСЬ ПРЕОБРАЗОВАТЬ ИЗОБРАЖЕНИЕ.' }); clearShotVisualEffects(); return; }
+    if(!blob) { showAsciiPopup({ type:'error', title:'ОШИБКА', message:'Не удалось преобразовать изображение.' }); clearShotVisualEffects(); return; }
     downloadBlob(blob, 'ascii_visor.png');
     hudSet('PNG: сохранено/отправлено');
   }, 'image/png');
@@ -5488,7 +5488,7 @@ c.fillRect(0, 0, d.W, d.H);
 }
 function saveVideo(){
   if (state.mode !== 'video') {
-    showAsciiPopup({ type:'info', title:'НЕДОСТУПНО', message:'ВИДЕО-ЭКСПОРТ ДОСТУПЕН ТОЛЬКО В РЕЖИМЕ ВИДЕО.' });
+    showAsciiPopup({ type:'info', title:'НЕДОСТУПНО', message:'Видео-экспорт доступен только в режиме видео.' });
     return;
   }
 
@@ -5536,7 +5536,7 @@ function saveVideo(){
     });
   } catch (e) {
     console.warn('MediaRecorder error:', e);
-    showAsciiPopup({ type:'error', title:'ОШИБКА ЗАПИСИ', message:'БРАУЗЕР НЕ ДАЛ ЗАПИСАТЬ ВИДЕО.', extra:'ПОПРОБУЙ ДРУГОЙ БРАУЗЕР ИЛИ УСТРОЙСТВО.' });
+    showAsciiPopup({ type:'error', title:'ОШИБКА ЗАПИСИ', message:'Браузер не дал записать видео.', extra:'Попробуй другой браузер или устройство.' });
     return;
   }
 
@@ -5824,7 +5824,7 @@ async function uploadBlobToBot(blob, filename, options = {}) {
         showAsciiPopup({
           type: 'error',
           title: 'ОШИБКА ЗАГРУЗКИ...',
-          message: `СТАТУС: ${res.status}\n${(text || '').slice(0,1000)}`
+          message: `Статус: ${res.status}\n${(text || '').slice(0,1000)}`
         });
         return;
       }
@@ -5846,7 +5846,7 @@ async function uploadBlobToBot(blob, filename, options = {}) {
         title: 'СЕТЕВАЯ ОШИБКА',
         message: (e?.name === 'AbortError')
           ? 'Сервер не отвечает...'
-          : (e?.message || 'СЕТЕВАЯ ОШИБКА.'),
+          : (e?.message || 'Сетевая ошибка.'),
         extra: 'Проверь чат — файл мог уже прийти.'
       });
       return;
@@ -7463,7 +7463,7 @@ fileVideo.addEventListener('change', async (e) => {
       type: 'error',
       sound: 'error',
       title: 'ОШИБКА ЗАГРУЗКИ',
-      message: 'Я НЕ МОГУ ПОЗВОЛИТЬ СДЕЛАТЬ ТЕБЕ ЭТО.\nТвоё воспоминание длится более 60 секунд.\nСократи его или выбери другое.'
+      message: 'Я не могу позволить сделать тебе это.\nТвоё воспоминание длится более 60 секунд.\nСократи его или выбери другое.'
     });
     e.target.value = '';
     return;
@@ -7667,7 +7667,7 @@ async function doSave() {
     const hasGif = !!(state.gifFrames && state.gifFrames.length);
     const hasVideo = !!(app.vid && (app.vid.src || app.vid.srcObject));
     if (!hasGif && !hasVideo) {
-      showAsciiPopup({ type:'info', title:'НЕТ ВИДЕО', message:'НЕТ ВЫБРАННОГО ВИДЕО.' });
+      showAsciiPopup({ type:'info', title:'НЕТ ВИДЕО', message:'Нет выбранного видео.' });
       return;
     }
     const hasEnoughImpulses = await ensureEnoughBalanceBeforeExport('video', 15);
