@@ -2013,6 +2013,7 @@ body.visor-text #textSizeWrap{display:flex !important;}
   max-height:min(80vh, 760px);
   overflow:auto;
   background:#000;
+  border:1px solid #fff;
   padding:14px 12px;
   color:#fff;
   font-family:'PxPlus IBM VGA','BetterVCR',monospace;
