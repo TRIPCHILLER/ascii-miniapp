@@ -32,6 +32,8 @@ const exec = promisify(execFile);
 const REF_DB_PATH = path.join(__dirname, '..', 'referrals.json');
 const BAL_FILE = path.join(__dirname, '..', 'data', 'balances.json');
 const UNAME_FILE = path.join(__dirname, '..', 'data', 'usernames.json');
+const REGISTRY_FILE = path.join(__dirname, '..', 'data', 'user_registry.json');
+const USERNAME_INDEX_FILE = path.join(__dirname, '..', 'data', 'username_index.json');
 function loadRefDb() {
   try {
     const raw = fs.readFileSync(REF_DB_PATH, 'utf8');
@@ -99,6 +101,57 @@ function readJsonObjectSafe(filePath) {
     return {};
   }
 }
+function backupDataFiles() {
+  const dataDir = path.join(__dirname, '..', 'data');
+  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+  const backupDir = path.join(dataDir, 'backups');
+  if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+  const today = new Date().toISOString().slice(0, 10);
+  const marker = path.join(backupDir, `.last-backup-${today}`);
+  if (fs.existsSync(marker)) return { skipped: true, reason: 'already-backed-up-today' };
+  const ts = new Date().toISOString().replace(/[:.]/g, '-');
+  const files = [BAL_FILE, UNAME_FILE, REF_DB_PATH, REGISTRY_FILE, USERNAME_INDEX_FILE];
+  for (const file of files) {
+    try {
+      if (!fs.existsSync(file)) continue;
+      const base = path.basename(file);
+      fs.copyFileSync(file, path.join(backupDir, `${ts}-${base}`));
+    } catch (e) {
+      console.error('[backup] copy failed:', file, e?.message || e);
+    }
+  }
+  try { fs.writeFileSync(marker, ts, 'utf-8'); } catch {}
+  try {
+    const markers = fs.readdirSync(backupDir).filter((f) => f.startsWith('.last-backup-')).sort();
+    if (markers.length > 30) {
+      markers.slice(0, markers.length - 30).forEach((f) => { try { fs.unlinkSync(path.join(backupDir, f)); } catch {} });
+    }
+  } catch {}
+  try {
+    const cutoff = Date.now() - (30 * 24 * 60 * 60 * 1000);
+    const backupFiles = fs.readdirSync(backupDir)
+      .filter((f) => !f.startsWith('.last-backup-') && f.endsWith('.json'))
+      .map((f) => ({ name: f, full: path.join(backupDir, f) }));
+    backupFiles.forEach((f) => {
+      try {
+        const st = fs.statSync(f.full);
+        if (st.mtimeMs < cutoff) fs.unlinkSync(f.full);
+      } catch {}
+    });
+  } catch {}
+  return { skipped: false, date: today };
+}
+const backupResult = backupDataFiles();
+const refUsersCount = Object.keys(loadRefDb()?.users || {}).length;
+const storageStats = getStorageStats();
+console.log('[startup] data-stats', {
+  balances_users: storageStats.balances,
+  legacy_usernames: storageStats.legacyUsernames,
+  user_registry: storageStats.userRegistry,
+  username_index: storageStats.usernameIndex,
+  referrals_users: refUsersCount,
+  backup: backupResult
+});
 // ==== ПРОСТАЯ АНТИ-СПАМ ЗАЩИТА ====
 // @section RATE_LIMITER_GUARDS
 const RATE_LIMIT = { photo: { limit: 60, windowMs: 60*60*1000 }, video: { limit: 20, windowMs: 60*60*1000 } };
@@ -125,6 +178,10 @@ const {
   sendFileToUser,
   setUsername,
   findIdByUsername,
+  upsertUserFromTelegramUser,
+  resolveUserRef,
+  normalizeUsername,
+  getStorageStats,
   sendVideoToUser,
   sendAnimationToUser,
   probeVideo
@@ -297,6 +354,11 @@ function HELP_HTML() {
 // ---------- Мелкие утилиты ----------
 const string = (v) => (v == null ? '' : String(v));
 function logReq(req){ console.log(`[REQ] ${req.method} ${req.url} Origin: ${req.headers.origin||'-'}`); }
+function resolveTargetIdOrNull(token) {
+  const resolved = resolveUserRef(token);
+  if (resolved?.ok) return { targetId: String(resolved.id), resolved };
+  return { targetId: null, resolved };
+}
 // Конвертация видео в MP4 с оптимизацией под ASCII
 // @section MEDIA_CONVERSION_PIPELINE
 async function convertToMp4(inPath, outPath, opts = {}) {
@@ -991,7 +1053,7 @@ app.post('/admin/grant', (req, res) => {
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ ok:false, message:'forbidden' });
   const amt = Number(amount);
   if (!Number.isFinite(amt)) return res.status(400).json({ ok:false, message:'amount must be number' });
-  const targetId = telegramId ? String(telegramId) : findIdByUsername(username);
+  const targetId = telegramId ? String(telegramId) : resolveTargetIdOrNull(username).targetId;
   if (!targetId) return res.status(400).json({ ok:false, message:'telegramId or known username required' });
   ensureUser(targetId);
   add(targetId, amt);
@@ -1003,7 +1065,7 @@ app.post('/admin/set', (req, res) => {
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ ok:false, message:'forbidden' });
   const val = Number(balance);
   if (!Number.isFinite(val)) return res.status(400).json({ ok:false, message:'balance must be number' });
-  const targetId = telegramId ? String(telegramId) : findIdByUsername(username);
+  const targetId = telegramId ? String(telegramId) : resolveTargetIdOrNull(username).targetId;
   if (!targetId) return res.status(400).json({ ok:false, message:'telegramId or known username required' });
   ensureUser(targetId);
   const curr = getBalance(targetId);
@@ -1208,7 +1270,7 @@ if (msg.successful_payment) {
         resolvedChatId = targetToken;
       } else {
         const uname = targetToken.replace(/^@/, '');
-        const id = findIdByUsername(uname);
+        const id = resolveTargetIdOrNull(uname).targetId;
         if (!id) {
           await sendMessage(fromId, `Пользователь @${uname} не существует или ещё ни разу не запускал бота.`);
           return res.json({ ok: true });
@@ -1225,8 +1287,10 @@ if (msg.successful_payment) {
       }
       return res.json({ ok: true });
     }
-    // кешируем username для /send @username
-    if (msg.from) setUsername(fromId, msg.from.username || '');
+    if (msg.from) {
+      upsertUserFromTelegramUser(msg.from, 'bot_message');
+      setUsername(fromId, msg.from.username || '');
+    }
 // --------- /penalise (alias /punish) ---------
 if (/^\/(penalise|punish)(?:@[\w_]+)?(\s|$)/i.test(text)) {
   // только админ
@@ -1245,7 +1309,7 @@ if (/^\/(penalise|punish)(?:@[\w_]+)?(\s|$)/i.test(text)) {
     const uname = userMentionMatch[2];
     amount = Number(userMentionMatch[3]);
     reason = userMentionMatch[4] || '';
-    targetId = findIdByUsername(uname); // из store.js
+    targetId = resolveTargetIdOrNull(uname).targetId;
     if (!targetId) {
       await sendMessage(fromId, `Пользователь @${uname} ещё не запускал бота.`);
       return res.json({ ok:true });
@@ -1357,7 +1421,7 @@ if (/^\/balance(?:@[\w_]+)?\s+@?([A-Za-z0-9_]+)\b/i.test(text)) {
     return res.json({ ok:true });
   }
   const uname = text.match(/^\/balance(?:@[\w_]+)?\s+@?([A-Za-z0-9_]+)\b/i)[1];
-  const targetId = findIdByUsername(uname);
+  const { targetId } = resolveTargetIdOrNull(uname);
   if (!targetId) {
     await sendMessage(fromId, `Пользователь @${uname} ещё не запускал бота или не найден.`);
     return res.json({ ok:true });
@@ -1428,31 +1492,21 @@ if (/^\/who(?:@[\w_]+)?\s+(.+)$/i.test(text)) {
     return res.json({ ok:true });
   }
   const usernamesObj = readJsonObjectSafe(UNAME_FILE);
-  let targetId = null;
+  const registryObj = readJsonObjectSafe(REGISTRY_FILE);
+  const { targetId, resolved } = resolveTargetIdOrNull(targetToken);
   let username = '';
-  let known = false;
-  if (/^-?\d+$/.test(targetToken)) {
-    targetId = String(targetToken);
-    for (const [uname, uid] of Object.entries(usernamesObj)) {
-      if (String(uid) === targetId) {
-        username = String(uname);
-        known = true;
-        break;
-      }
-    }
-  } else {
-    const uname = targetToken.replace(/^@/, '').toLowerCase();
-    const id = findIdByUsername(uname);
-    if (id) {
-      targetId = String(id);
-      username = uname;
-      known = true;
-    }
+  let known = Boolean(targetId);
+  if (resolved?.ambiguous) {
+    const lines = resolved.candidates.map((c) => `${c.id} (last_seen_at: ${c.last_seen_at || '-'})`);
+    await sendMessage(fromId, applyMiniFormatting(['[b]WHO[/b]', '[q]', 'Найдено несколько кандидатов:', ...lines, '[/q]'].join('\n')), { parse_mode: 'HTML', disable_web_page_preview: true });
+    return res.json({ ok:true });
   }
   if (!targetId) {
     await sendMessage(fromId, applyMiniFormatting('[q]Пользователь не найден.[/q]'), { parse_mode: 'HTML', disable_web_page_preview: true });
     return res.json({ ok:true });
   }
+  const reg = registryObj[targetId] || null;
+  if (reg?.username) username = String(reg.username);
   const actualUsername = await getActualUsername(targetId);
   if (actualUsername) username = actualUsername;
   const idToUsername = {};
@@ -1469,6 +1523,11 @@ if (/^\/who(?:@[\w_]+)?\s+(.+)$/i.test(text)) {
     `user_id: ${targetId}`,
     `chat_id: ${targetId}`,
     `known: ${known ? 'yes' : 'no'}`,
+    `resolved_by: ${resolved?.foundBy || '-'}`,
+    `username_history: ${(reg?.username_history || []).join(', ') || '-'}`,
+    `last_seen_at: ${reg?.last_seen_at || '-'}`,
+    `has_balance: ${Object.prototype.hasOwnProperty.call(readJsonObjectSafe(BAL_FILE), targetId) ? 'yes' : 'no'}`,
+    `has_referral: ${getRefInfo(targetId) ? 'yes' : 'no'}`,
     'referrals:',
     '[q]',
     ...refsLines,
@@ -1546,7 +1605,7 @@ if (/^\/send(\s|$)/i.test(text)) {
     const uname = byUsername[1];
     amount = Number(byUsername[2]);
     reason = byUsername[3] || '';
-    const id = findIdByUsername(uname);
+    const id = resolveTargetIdOrNull(uname).targetId;
     if (!id) {
       await sendMessage(fromId, `Пользователь @${uname} ещё ни разу не запускал бота.`);
       return res.json({ ok: true });

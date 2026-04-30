@@ -41,11 +41,15 @@ const TG_BASE = `https://api.telegram.org/bot${BOT_TOKEN}`;
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const BAL_FILE = path.join(DATA_DIR, 'balances.json');
 const UNAME_FILE = path.join(DATA_DIR, 'usernames.json');
+const REGISTRY_FILE = path.join(DATA_DIR, 'user_registry.json');
+const USERNAME_INDEX_FILE = path.join(DATA_DIR, 'username_index.json');
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
 let balances = new Map();
 let unameIndex = {};
+let userRegistry = {};
+let usernameIndex = {};
 
 function loadBalances() {
   try {
@@ -65,9 +69,194 @@ function loadUsernames() {
 function saveUsernames() {
   fs.writeFileSync(UNAME_FILE, JSON.stringify(unameIndex, null, 2), 'utf-8');
 }
+function loadRegistry() {
+  try { userRegistry = JSON.parse(fs.readFileSync(REGISTRY_FILE, 'utf-8')); } catch { userRegistry = {}; }
+}
+function saveRegistry() {
+  writeJsonAtomic(REGISTRY_FILE, userRegistry);
+}
+function loadUsernameIndex() {
+  try { usernameIndex = JSON.parse(fs.readFileSync(USERNAME_INDEX_FILE, 'utf-8')); } catch { usernameIndex = {}; }
+}
+function saveUsernameIndex() {
+  writeJsonAtomic(USERNAME_INDEX_FILE, usernameIndex);
+}
+function writeJsonAtomic(filePath, data) {
+  const dir = path.dirname(filePath);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const tmp = `${filePath}.tmp-${process.pid}-${Date.now()}`;
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf-8');
+  fs.renameSync(tmp, filePath);
+}
 
 loadBalances();
 loadUsernames();
+loadRegistry();
+loadUsernameIndex();
+
+function migrateLegacyIntoRegistry() {
+  let changedRegistry = false;
+  let changedIndex = false;
+  const legacyPairs = [];
+  for (const [rawKey, rawVal] of Object.entries(unameIndex)) {
+    const key = String(rawKey || '');
+    if (rawVal == null) continue;
+    if (typeof rawVal === 'string' || typeof rawVal === 'number') {
+      const val = String(rawVal);
+      if (/^-?\d+$/.test(key)) legacyPairs.push({ uid: key, uname: val });
+      else if (/^-?\d+$/.test(val)) legacyPairs.push({ uid: val, uname: key });
+      else console.warn('[migration] skip usernames legacy pair (unknown scalar format)', { key, val });
+      continue;
+    }
+    if (typeof rawVal === 'object') {
+      const valUid = String(rawVal.id || rawVal.user_id || rawVal.userId || '');
+      const valUname = String(rawVal.username || rawVal.uname || '');
+      if (/^-?\d+$/.test(key) && valUname) legacyPairs.push({ uid: key, uname: valUname });
+      else if (valUid && !/^-?\d+$/.test(key)) legacyPairs.push({ uid: valUid, uname: key });
+      else if (valUid && valUname) legacyPairs.push({ uid: valUid, uname: valUname });
+      else console.warn('[migration] skip usernames legacy object (unknown structure)', { key });
+      continue;
+    }
+    console.warn('[migration] skip usernames legacy value (unsupported type)', { key, type: typeof rawVal });
+  }
+  for (const uid of balances.keys()) {
+    if (!userRegistry[uid]) {
+      const nowIso = new Date().toISOString();
+      userRegistry[uid] = {
+        id: Number(uid),
+        username: '',
+        username_history: [],
+        first_name: '',
+        last_name: '',
+        first_seen_at: nowIso,
+        last_seen_at: nowIso,
+        last_chat_id: Number(uid),
+        source: ['migration']
+      };
+      changedRegistry = true;
+    }
+  }
+  for (const item of legacyPairs) {
+    const unameNorm = normalizeUsername(item.uname);
+    const uid = String(item.uid);
+    if (!uid || !unameNorm) continue;
+    if (!userRegistry[uid]) {
+      const nowIso = new Date().toISOString();
+      userRegistry[uid] = {
+        id: Number(uid),
+        username: unameNorm,
+        username_history: [unameNorm],
+        first_name: '',
+        last_name: '',
+        first_seen_at: nowIso,
+        last_seen_at: nowIso,
+        last_chat_id: Number(uid),
+        source: ['migration']
+      };
+      changedRegistry = true;
+    } else {
+      const rec = userRegistry[uid];
+      if (!Array.isArray(rec.username_history)) rec.username_history = [];
+      if (!rec.username_history.includes(unameNorm)) {
+        rec.username_history.push(unameNorm);
+        changedRegistry = true;
+      }
+      if (!rec.username) {
+        rec.username = unameNorm;
+        changedRegistry = true;
+      }
+      if (!Array.isArray(rec.source)) rec.source = [];
+      if (!rec.source.includes('migration')) {
+        rec.source.push('migration');
+        changedRegistry = true;
+      }
+    }
+    if (usernameIndex[unameNorm] !== uid) {
+      usernameIndex[unameNorm] = uid;
+      changedIndex = true;
+    }
+  }
+  if (changedRegistry) saveRegistry();
+  if (changedIndex) saveUsernameIndex();
+  return { changedRegistry, changedIndex };
+}
+migrateLegacyIntoRegistry();
+
+function normalizeUsername(username) {
+  return String(username || '').trim().replace(/^@/, '').toLowerCase();
+}
+
+function upsertUserFromTelegramUser(user, source = 'bot_message') {
+  if (!user || !user.id) return null;
+  const uid = String(user.id);
+  const nowIso = new Date().toISOString();
+  const unameNorm = normalizeUsername(user.username);
+  const record = userRegistry[uid] || {
+    id: Number(user.id),
+    username: '',
+    username_history: [],
+    first_name: '',
+    last_name: '',
+    first_seen_at: nowIso,
+    last_seen_at: nowIso,
+    last_chat_id: Number(user.id),
+    source: []
+  };
+  if (!record.first_seen_at) record.first_seen_at = nowIso;
+  record.last_seen_at = nowIso;
+  record.last_chat_id = Number(user.id);
+  if (user.first_name) record.first_name = String(user.first_name);
+  if (user.last_name) record.last_name = String(user.last_name);
+  if (!Array.isArray(record.username_history)) record.username_history = [];
+  if (record.username && !record.username_history.includes(record.username)) record.username_history.push(record.username);
+  if (unameNorm) {
+    record.username = unameNorm;
+    if (!record.username_history.includes(unameNorm)) record.username_history.push(unameNorm);
+    usernameIndex[unameNorm] = uid;
+  }
+  if (!Array.isArray(record.source)) record.source = [];
+  if (source && !record.source.includes(source)) record.source.push(source);
+  userRegistry[uid] = record;
+  saveRegistry();
+  saveUsernameIndex();
+  return record;
+}
+
+function resolveUserRef(input) {
+  const raw = String(input || '').trim();
+  const token = raw.replace(/^https?:\/\/t\.me\//i, '').trim();
+  const unameNorm = normalizeUsername(token);
+  const candidates = [];
+  const seen = new Set();
+  const push = (id, foundBy) => {
+    const sid = String(id || '');
+    if (!sid || seen.has(sid)) return;
+    seen.add(sid);
+    candidates.push({ id: sid, foundBy, last_seen_at: userRegistry[sid]?.last_seen_at || null });
+  };
+  if (/^-?\d+$/.test(token)) {
+    if (userRegistry[token]) push(token, 'registry');
+    if (balances.has(token)) push(token, 'balances');
+  } else if (unameNorm) {
+    if (usernameIndex[unameNorm]) push(usernameIndex[unameNorm], 'username_index');
+    if (unameIndex[unameNorm]) push(unameIndex[unameNorm], 'legacy_usernames');
+    Object.entries(userRegistry).forEach(([uid, rec]) => {
+      if ((rec?.username_history || []).includes(unameNorm)) push(uid, 'registry_history');
+    });
+  }
+  if (candidates.length === 1) return { ok: true, ...candidates[0], candidates };
+  if (candidates.length > 1) return { ok: false, ambiguous: true, candidates };
+  return { ok: false, notFound: true, candidates: [] };
+}
+
+function getStorageStats() {
+  return {
+    balances: balances.size,
+    legacyUsernames: Object.keys(unameIndex).length,
+    userRegistry: Object.keys(userRegistry).length,
+    usernameIndex: Object.keys(usernameIndex).length
+  };
+}
 
 // ==== BALANCE API ====
 // @section BALANCE_STATE_API
@@ -110,16 +299,20 @@ function deduct(userId, amount) {
 // ==== USERNAME CACHE ====
 // @section USERNAME_INDEX_API
 function setUsername(userId, username) {
-  const u = (username || '').trim();
+  const u = normalizeUsername(username);
   if (!u) return;
   if (unameIndex[u] !== String(userId)) {
     unameIndex[u] = String(userId);
     saveUsernames();
   }
+  if (usernameIndex[u] !== String(userId)) {
+    usernameIndex[u] = String(userId);
+    saveUsernameIndex();
+  }
 }
 function findIdByUsername(username) {
-  const u = (username || '').replace(/^@/, '');
-  return unameIndex[u] || null;
+  const u = normalizeUsername(username);
+  return usernameIndex[u] || unameIndex[u] || null;
 }
 
 // ==== HELPERS ====
@@ -287,6 +480,12 @@ module.exports = {
   deduct,
   setUsername,
   findIdByUsername,
+  upsertUserFromTelegramUser,
+  resolveUserRef,
+  normalizeUsername,
+  getStorageStats,
+  REGISTRY_FILE,
+  USERNAME_INDEX_FILE,
   buildArgs,
   convertAndSave,
   sendFileToUser,
