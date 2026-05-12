@@ -1008,6 +1008,7 @@ let DITHER_ENABLED = false;
   let startMenuCurrentText = '#ffffff';
   let startEasterEggRouletteTimer = 0;
   let startEasterEggRouletteStartAt = 0;
+  let isEasterEggRollRunning = false;
   let startWordGlitchTimer = 0;
   let startWordGlitchBrokenChars = 0;
   let startWordGlitchFullChaos = false;
@@ -3283,6 +3284,7 @@ const ARG_GOAL_FLASH_STEPS = {
       eyeOverlay.style.setProperty('--start-easter-eye-opacity', opacity.toFixed(2));
     };
     const stopEasterRoulette = () => {
+      isEasterEggRollRunning = false;
       if (startEasterEggRouletteTimer) {
         clearTimeout(startEasterEggRouletteTimer);
         startEasterEggRouletteTimer = 0;
@@ -3394,11 +3396,44 @@ const ARG_GOAL_FLASH_STEPS = {
       }
       startWordGlitchFx();
     };
-    const startEasterRoulette = (soundIndex) => {
+    const resolveRemainingAudioDurationMs = (audio, fallbackMs = 4200, onResolve = null) => {
+      const done = (value) => {
+        if (typeof onResolve === 'function') onResolve(value);
+      };
+      const getRemainingMs = () => {
+        const totalSec = Number(audio?.duration);
+        const currentSec = Number(audio?.currentTime || 0);
+        if (!Number.isFinite(totalSec) || totalSec <= 0) return null;
+        const remainingSec = Math.max(0.2, totalSec - Math.max(0, currentSec));
+        return Math.max(200, Math.round(remainingSec * 1000));
+      };
+      const immediate = getRemainingMs();
+      if (immediate != null) {
+        done(immediate);
+        return;
+      }
+      let finished = false;
+      const finalize = (value) => {
+        if (finished) return;
+        finished = true;
+        audio?.removeEventListener?.('loadedmetadata', onReady);
+        audio?.removeEventListener?.('error', onFail);
+        clearTimeout(fallbackTimer);
+        done(value);
+      };
+      const onReady = () => finalize(getRemainingMs() ?? fallbackMs);
+      const onFail = () => finalize(fallbackMs);
+      const fallbackTimer = setTimeout(() => finalize(fallbackMs), 180);
+      audio?.addEventListener?.('loadedmetadata', onReady, { once: true });
+      audio?.addEventListener?.('error', onFail, { once: true });
+    };
+    const startEasterRoulette = (soundIndex, { durationMs = 4200, onComplete = null } = {}) => {
+      if (isEasterEggRollRunning) return;
       stopEasterRoulette();
+      isEasterEggRollRunning = true;
       startEasterEggRouletteStartAt = performance.now();
       const tick = () => {
-        if (!startEasterEggPlaying || startEasterEggNextSound !== soundIndex) {
+        if (!isEasterEggRollRunning) {
           stopEasterRoulette();
           return;
         }
@@ -3416,10 +3451,15 @@ const ARG_GOAL_FLASH_STEPS = {
         }
 
         const elapsed = performance.now() - startEasterEggRouletteStartAt;
-        const phase = Math.min(1, elapsed / 1600);
-        const minDelay = 24;
-        const maxDelay = 170;
-        const nextDelay = minDelay + (maxDelay - minDelay) * phase;
+        if (elapsed >= durationMs) {
+          stopEasterRoulette();
+          if (typeof onComplete === 'function') onComplete();
+          return;
+        }
+        const phase = Math.min(1, elapsed / durationMs);
+        const minDelay = 22;
+        const maxDelay = 220;
+        const nextDelay = minDelay + (maxDelay - minDelay) * (phase * phase);
         startEasterEggRouletteTimer = setTimeout(tick, nextDelay);
       };
       tick();
@@ -3471,21 +3511,12 @@ const ARG_GOAL_FLASH_STEPS = {
       startEasterEggNextSound += 1;
       if (startEasterEggNextSound > START_EASTER_EGG_MAX_SOUND) {
         startEasterEggDone = true;
-        if (!startArgScenePending && !startArgSceneRunning && !startArgSceneStarted) {
-          stopStartBlinkTickerForArg();
-          startArgScenePending = true;
-          runStartArgScene().catch(() => {
-            startArgScenePending = false;
-            startArgSceneRunning = false;
-          });
-        }
       }
       const unlock = () => {
         if (startEasterEggAudio === audio) {
           startEasterEggAudio = null;
           startEasterEggPlaying = false;
         }
-        stopEasterRoulette();
         if (startEasterEggDone || soundIndex >= START_EASTER_EGG_MAX_SOUND) {
           stopWordGlitchFx();
         }
@@ -3495,7 +3526,20 @@ const ARG_GOAL_FLASH_STEPS = {
       updateWordGlitchStage(soundIndex);
       if (soundIndex === START_EASTER_EGG_MAX_SOUND) {
         startWordGlitchFullChaos = true;
-        startEasterRoulette(soundIndex);
+        resolveRemainingAudioDurationMs(audio, 4200, (durationMs) => {
+          startEasterRoulette(soundIndex, {
+            durationMs,
+            onComplete: () => {
+              if (startArgScenePending || startArgSceneRunning || startArgSceneStarted) return;
+              stopStartBlinkTickerForArg();
+              startArgScenePending = true;
+              runStartArgScene().catch(() => {
+                startArgScenePending = false;
+                startArgSceneRunning = false;
+              });
+            }
+          });
+        });
       }
 
       audio.addEventListener('ended', () => {
