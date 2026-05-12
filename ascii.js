@@ -3670,9 +3670,10 @@ const ARG_GOAL_FLASH_STEPS = {
           return;
         }
         const phase = Math.min(1, elapsed / durationMs);
-        const minDelay = 22;
-        const maxDelay = 220;
-        const nextDelay = minDelay + (maxDelay - minDelay) * (phase * phase);
+        const minDelay = 24;
+        const maxDelay = 520;
+        const easedPhase = 1 - Math.pow(1 - phase, 4);
+        const nextDelay = minDelay + (maxDelay - minDelay) * easedPhase;
         startEasterEggRouletteTimer = setTimeout(tick, nextDelay);
       };
       tick();
