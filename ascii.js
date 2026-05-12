@@ -772,7 +772,7 @@ let DITHER_ENABLED = false;
   const BRAILLE_BLANK = '\u2800';
   const ARG_BOSS_CHARSET_ROTATION = Object.freeze([
     ARG_BOSS_ASCII_PRESET.charset,
-    `${BRAILLE_BLANK}01²346⁷𝟴⁸9+.,`,
+    `${BRAILLE_BLANK}01²346⁷𝟴⁸9+. `,
     '█▓▒░'
   ]);
 
