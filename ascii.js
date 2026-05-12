@@ -1008,6 +1008,9 @@ let DITHER_ENABLED = false;
   let startMenuCurrentText = '#ffffff';
   let startEasterEggRouletteTimer = 0;
   let startEasterEggRouletteStartAt = 0;
+  let startEasterBigEyeShakeRafId = 0;
+  let startEasterBigEyeShakeTimer = 0;
+  let startEasterBigEyeShakeToken = 0;
   let isEasterEggRollRunning = false;
   let startWordGlitchTimer = 0;
   let startWordGlitchBrokenChars = 0;
@@ -3156,11 +3159,23 @@ const ARG_GOAL_FLASH_STEPS = {
   }
 
   function resetStartEasterEyeOverlay() {
+    startEasterBigEyeShakeToken += 1;
+    if (startEasterBigEyeShakeTimer) {
+      clearTimeout(startEasterBigEyeShakeTimer);
+      startEasterBigEyeShakeTimer = 0;
+    }
+    if (startEasterBigEyeShakeRafId) {
+      cancelAnimationFrame(startEasterBigEyeShakeRafId);
+      startEasterBigEyeShakeRafId = 0;
+    }
     const eyeOverlay = app.ui.modeChooser?.querySelector('.start-easter-eye-layer');
     if (!eyeOverlay) return;
     eyeOverlay.hidden = true;
     eyeOverlay.style.removeProperty('--start-easter-eye-color');
     eyeOverlay.style.removeProperty('--start-easter-eye-opacity');
+    eyeOverlay.style.removeProperty('--start-easter-eye-shake-x');
+    eyeOverlay.style.removeProperty('--start-easter-eye-shake-y');
+    eyeOverlay.classList.remove('start-easter-eye-layer--countdown-shake');
   }
 
   function startModeChooserFx(){
@@ -3427,6 +3442,56 @@ const ARG_GOAL_FLASH_STEPS = {
       audio?.addEventListener?.('loadedmetadata', onReady, { once: true });
       audio?.addEventListener?.('error', onFail, { once: true });
     };
+    const stopStartMenuBigEyeShake = () => {
+      startEasterBigEyeShakeToken += 1;
+      if (startEasterBigEyeShakeTimer) {
+        clearTimeout(startEasterBigEyeShakeTimer);
+        startEasterBigEyeShakeTimer = 0;
+      }
+      if (startEasterBigEyeShakeRafId) {
+        cancelAnimationFrame(startEasterBigEyeShakeRafId);
+        startEasterBigEyeShakeRafId = 0;
+      }
+      eyeOverlay.style.removeProperty('--start-easter-eye-shake-x');
+      eyeOverlay.style.removeProperty('--start-easter-eye-shake-y');
+      eyeOverlay.classList.remove('start-easter-eye-layer--countdown-shake');
+    };
+    const startStartMenuBigEyeShakeForAudio = (audio, soundIndex) => {
+      if (soundIndex < 5 || soundIndex > START_EASTER_EGG_MAX_SOUND) return;
+      stopStartMenuBigEyeShake();
+      const shakeToken = startEasterBigEyeShakeToken;
+      const maxShiftY = ARG_PONG.visorEyeMaxShiftYPx * ARG_PONG.visorFollowRadiusBoost;
+      const clutchSpringShakeAmpPx = maxShiftY * ARG_PONG.visorClutchSpringShakeAmpRatio;
+      const roundShakeSpeedY = ARG_PONG.visorClutchSpringShakeSpeedY * ARG_PONG.visorRoundShakeSpeedFactor;
+      const phaseX = Math.random() * Math.PI * 2;
+      const phaseY = Math.random() * Math.PI * 2;
+      const startAt = performance.now();
+      eyeOverlay.classList.add('start-easter-eye-layer--countdown-shake');
+      const loop = (ts) => {
+        if (shakeToken !== startEasterBigEyeShakeToken) return;
+        const now = ts || performance.now();
+        const roundSpringShakeY = (
+          Math.sin(now * roundShakeSpeedY + phaseY * 1.37)
+          + Math.sin(now * roundShakeSpeedY * 1.91 + phaseX * 0.92) * 0.45
+        ) * clutchSpringShakeAmpPx;
+        eyeOverlay.style.setProperty('--start-easter-eye-shake-x', '0px');
+        eyeOverlay.style.setProperty('--start-easter-eye-shake-y', `${roundSpringShakeY.toFixed(3)}px`);
+        startEasterBigEyeShakeRafId = requestAnimationFrame(loop);
+      };
+      startEasterBigEyeShakeRafId = requestAnimationFrame(loop);
+      const finalize = () => {
+        if (shakeToken !== startEasterBigEyeShakeToken) return;
+        stopStartMenuBigEyeShake();
+      };
+      resolveRemainingAudioDurationMs(audio, 4200, (durationMs) => {
+        if (shakeToken !== startEasterBigEyeShakeToken) return;
+        const elapsed = Math.max(0, performance.now() - startAt);
+        const remainingMs = Math.max(0, durationMs - elapsed);
+        startEasterBigEyeShakeTimer = setTimeout(finalize, remainingMs);
+      });
+      audio?.addEventListener?.('ended', finalize, { once: true });
+      audio?.addEventListener?.('error', finalize, { once: true });
+    };
     const startEasterRoulette = (soundIndex, { durationMs = 4200, onComplete = null } = {}) => {
       if (isEasterEggRollRunning) return;
       stopEasterRoulette();
@@ -3524,6 +3589,7 @@ const ARG_GOAL_FLASH_STEPS = {
 
       updateEyeOverlayBySound(soundIndex, { bgHex: startMenuCurrentBg, textHex: startMenuCurrentText });
       updateWordGlitchStage(soundIndex);
+      startStartMenuBigEyeShakeForAudio(audio, soundIndex);
       if (soundIndex === START_EASTER_EGG_MAX_SOUND) {
         startWordGlitchFullChaos = true;
         resolveRemainingAudioDurationMs(audio, 4200, (durationMs) => {

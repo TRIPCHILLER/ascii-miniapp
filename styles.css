@@ -1528,6 +1528,10 @@ input[type="color"] {
   display:none !important;
 }
 
+.start-easter-eye-layer--countdown-shake{
+  transform:translate(var(--start-easter-eye-shake-x, 0px), var(--start-easter-eye-shake-y, 0px));
+}
+
 .start-easter-roulette-shake{
   animation:start-easter-roulette-shake 80ms linear 1;
 }
