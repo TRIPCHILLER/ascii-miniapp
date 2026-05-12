@@ -3191,7 +3191,6 @@ const ARG_GOAL_FLASH_STEPS = {
     if (!eyeOverlay) return;
     startEasterBigEyeMotionIntensity = 0;
     eyeOverlay.hidden = true;
-    eyeOverlay.style.removeProperty('--start-easter-eye-color');
     eyeOverlay.style.removeProperty('--start-easter-eye-opacity');
     eyeOverlay.style.removeProperty('--start-easter-eye-shake-x');
     eyeOverlay.style.removeProperty('--start-easter-eye-shake-y');
@@ -3273,37 +3272,22 @@ const ARG_GOAL_FLASH_STEPS = {
     const footerSelector = '.start-footer-box, .start-footer-title, .start-footer-sub';
     const eyeOverlay = document.createElement('div');
     eyeOverlay.className = 'start-easter-eye-layer';
+    const eyeImg = document.createElement('img');
+    eyeImg.className = 'start-easter-eye-img start-easter-eye-img--eye';
+    eyeImg.src = ARG_SCENE_ASSETS.visorEye;
+    eyeImg.alt = '';
+    eyeImg.decoding = 'async';
+    const pupilImg = document.createElement('img');
+    pupilImg.className = 'start-easter-eye-img start-easter-eye-img--pupil';
+    pupilImg.src = ARG_SCENE_ASSETS.visorPupil;
+    pupilImg.alt = '';
+    pupilImg.decoding = 'async';
+    eyeOverlay.append(eyeImg, pupilImg);
     eyeOverlay.hidden = true;
     app.ui.modeChooser.appendChild(eyeOverlay);
     const startShell = app.ui.modeChooser.querySelector('.start-shell');
     if (startShell) startShell.classList.remove('start-easter-roulette-shake');
 
-    const clampColor = (value) => Math.max(0, Math.min(255, value));
-    const hexToRgb = (hex) => {
-      const safe = toHex(hex || '#000000').replace('#', '');
-      const normalized = safe.length === 3
-        ? safe.split('').map((ch) => ch + ch).join('')
-        : safe;
-      const num = parseInt(normalized, 16);
-      return {
-        r: (num >> 16) & 255,
-        g: (num >> 8) & 255,
-        b: num & 255
-      };
-    };
-    const rgbToHexLocal = ({ r, g, b }) => `#${[r, g, b]
-      .map((val) => clampColor(Math.round(val)).toString(16).padStart(2, '0'))
-      .join('')}`;
-    const adjustColorBrightness = (hex, ratio) => {
-      const rgb = hexToRgb(hex);
-      const isBlack = rgb.r === 0 && rgb.g === 0 && rgb.b === 0;
-      if (isBlack) {
-        const towardWhite = (c) => c + (255 - c) * ratio;
-        return rgbToHexLocal({ r: towardWhite(rgb.r), g: towardWhite(rgb.g), b: towardWhite(rgb.b) });
-      }
-      const towardDark = (c) => c * (1 - ratio);
-      return rgbToHexLocal({ r: towardDark(rgb.r), g: towardDark(rgb.g), b: towardDark(rgb.b) });
-    };
     const getEyeShadeRatioBySound = (soundIndex) => {
       const stage = Math.max(0, soundIndex - 4);
       return Math.min(0.3, stage * 0.05);
@@ -3342,23 +3326,19 @@ const ARG_GOAL_FLASH_STEPS = {
       };
       startEasterBigEyeMotionRafId = requestAnimationFrame(loop);
     };
-    const updateEyeOverlayBySound = (soundIndex, { textHex } = {}) => {
+    const updateEyeOverlayBySound = (soundIndex) => {
       const opacity = getEyeShadeRatioBySound(soundIndex);
       const progress = getStartEasterEyeStageProgress(soundIndex);
       const growthScale = progress;
       startEasterBigEyeMotionIntensity = progress;
       if (opacity <= 0) {
         eyeOverlay.hidden = true;
-        eyeOverlay.style.removeProperty('--start-easter-eye-color');
         eyeOverlay.style.removeProperty('--start-easter-eye-opacity');
         eyeOverlay.style.removeProperty('--start-easter-eye-growth-scale');
         return;
       }
-      const safeText = toHex(textHex || '#ffffff');
-      const eyeColor = adjustColorBrightness(safeText, opacity);
       eyeOverlay.hidden = false;
       if (!startEasterBigEyeMotionRafId) startStartMenuBigEyeMotion();
-      eyeOverlay.style.setProperty('--start-easter-eye-color', eyeColor);
       eyeOverlay.style.setProperty('--start-easter-eye-opacity', opacity.toFixed(2));
       eyeOverlay.style.setProperty('--start-easter-eye-growth-scale', growthScale.toFixed(4));
     };

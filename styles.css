@@ -1512,7 +1512,6 @@ input[type="color"] {
 }
 
 .start-easter-eye-layer{
-  --start-easter-eye-color:#000000;
   --start-easter-eye-opacity:1;
   --start-easter-eye-base-x:0px;
   --start-easter-eye-base-y:0px;
@@ -1524,15 +1523,31 @@ input[type="color"] {
   inset:0;
   z-index:1;
   pointer-events:none;
-  background-color:var(--start-easter-eye-color);
   opacity:var(--start-easter-eye-opacity);
   transform:translate(
     calc(var(--start-easter-eye-base-x) + var(--start-easter-eye-shake-x)),
     calc(var(--start-easter-eye-base-y) + var(--start-easter-eye-shake-y))
   ) scale(calc(var(--start-easter-eye-growth-scale) * var(--start-easter-eye-motion-scale)));
   transform-origin:50% 50%;
-  -webkit-mask: url('assets/visoreyebig.png') center / min(86vmin, 76vw) auto no-repeat;
-  mask: url('assets/visoreyebig.png') center / min(86vmin, 76vw) auto no-repeat;
+}
+
+.start-easter-eye-img{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  object-position:center;
+  user-select:none;
+  -webkit-user-drag:none;
+}
+
+.start-easter-eye-img--eye{
+  transform:scale(1);
+}
+
+.start-easter-eye-img--pupil{
+  transform:scale(1);
 }
 
 .start-easter-eye-layer[hidden]{
