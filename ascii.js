@@ -1762,7 +1762,6 @@ const ARG_GOAL_FLASH_STEPS = {
     const layer = overlay.querySelector('#argSceneCountdownLayer');
     if (!layer) return;
     layer.classList.add('arg-scene-countdown--dim');
-    argPongState.argBossCountdownZoomActive = true;
     try {
       for (const value of ['3', '2', '1']) {
         layer.textContent = value;
@@ -2812,6 +2811,9 @@ const ARG_GOAL_FLASH_STEPS = {
       openSoundSrc: ARG_SCENE_SOUNDS.danger2,
       popupClass: 'arg-scene-popup-box--score'
     });
+    // Включаем countdown-зум заранее (сразу после закрытия 3/3),
+    // чтобы не было скачка масштаба перед появлением первой цифры.
+    argPongState.argBossCountdownZoomActive = true;
 
     const visorBody = document.createElement('img');
     visorBody.className = 'arg-scene-boss-layer arg-scene-boss-layer--body';
@@ -2862,7 +2864,6 @@ const ARG_GOAL_FLASH_STEPS = {
     argPongState.visorEngineShakePulseLeftMs = 0;
     argPongState.introCountdownShakeUntilMs = 0;
     argPongState.introCountdownFastShakeUntilMs = 0;
-    argPongState.argBossCountdownZoomActive = false;
     startArgBossIntroLoop({ overlay, visorBody, visorEye, visorPupil });
 
     if (bossInitOk) {
