@@ -3734,7 +3734,9 @@ const ARG_GOAL_FLASH_STEPS = {
 
       updateEyeOverlayBySound(soundIndex, { bgHex: startMenuCurrentBg, textHex: startMenuCurrentText });
       updateWordGlitchStage(soundIndex);
-      startStartMenuBigEyeShakeForAudio(audio, soundIndex);
+      // Убрали shake только у start-menu глаза на sound5..10.
+      // Остальная логика ARG/boss/countdown и мини-игры не меняется.
+      // startStartMenuBigEyeShakeForAudio(audio, soundIndex);
       if (soundIndex === START_EASTER_EGG_MAX_SOUND) {
         startWordGlitchFullChaos = true;
         resolveRemainingAudioDurationMs(audio, 4200, (durationMs) => {
