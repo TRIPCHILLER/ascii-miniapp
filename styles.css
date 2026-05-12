@@ -1547,7 +1547,31 @@ input[type="color"] {
 }
 
 .start-easter-eye-img--pupil{
-  transform:scale(1);
+  transform:scale(0.82);
+  transform-origin:50% 50%;
+}
+
+.start-easter-eye-ascii{
+  position:absolute;
+  inset:0;
+  margin:0;
+  color:var(--start-menu-fg);
+  font-family:'PxPlus IBM VGA', monospace;
+  font-size:clamp(10px, 1.5vw, 17px);
+  line-height:1;
+  letter-spacing:0;
+  white-space:pre;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  pointer-events:none;
+  user-select:none;
+  text-shadow:0 0 0.35em color-mix(in srgb, var(--start-menu-fg) 62%, transparent);
+}
+
+.start-easter-eye-layer--ascii-ready .start-easter-eye-img{
+  opacity:0;
 }
 
 .start-easter-eye-layer[hidden]{
