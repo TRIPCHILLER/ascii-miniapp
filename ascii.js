@@ -3294,10 +3294,13 @@ const ARG_GOAL_FLASH_STEPS = {
     eyeOverlay.append(eyeImg, pupilImg, eyeAscii);
     const eyeAsciiCanvas = document.createElement('canvas');
     const eyeAsciiCtx = eyeAsciiCanvas.getContext('2d', { willReadFrequently: true });
-    const eyeAsciiGridW = 52;
-    const eyeAsciiGridH = 28;
-    const eyeAsciiCellW = 4;
-    const eyeAsciiCellH = 4;
+    const eyeAsciiGridW = 64;
+    const eyeAsciiGridH = 34;
+    const eyeAsciiCellW = 3;
+    const eyeAsciiCellH = 3;
+    const START_EASTER_EYE_ALPHA_CUTOFF = 0.035;
+    const START_EASTER_EYE_CONTRAST = 1.18;
+    const START_EASTER_EYE_GAMMA = 1.22;
     const START_EASTER_EYE_PUPIL_SCALE = 0.82;
     let eyeAsciiReady = false;
     let eyeAsciiRenderPending = false;
@@ -3321,6 +3324,10 @@ const ARG_GOAL_FLASH_STEPS = {
       const eyeDrawX = (eyeAsciiCanvas.width - eyeDrawW) * 0.5 + shiftX;
       const eyeDrawY = (eyeAsciiCanvas.height - eyeDrawH) * 0.5 + shiftY;
       eyeAsciiCtx.clearRect(0, 0, eyeAsciiCanvas.width, eyeAsciiCanvas.height);
+      eyeAsciiCtx.imageSmoothingEnabled = false;
+      if (typeof eyeAsciiCtx.webkitImageSmoothingEnabled === 'boolean') eyeAsciiCtx.webkitImageSmoothingEnabled = false;
+      if (typeof eyeAsciiCtx.mozImageSmoothingEnabled === 'boolean') eyeAsciiCtx.mozImageSmoothingEnabled = false;
+      if (typeof eyeAsciiCtx.msImageSmoothingEnabled === 'boolean') eyeAsciiCtx.msImageSmoothingEnabled = false;
       eyeAsciiCtx.drawImage(eyeImg, eyeDrawX, eyeDrawY, eyeDrawW, eyeDrawH);
       const pupilDrawW = eyeDrawW * START_EASTER_EYE_PUPIL_SCALE;
       const pupilDrawH = eyeDrawH * START_EASTER_EYE_PUPIL_SCALE;
@@ -3345,12 +3352,14 @@ const ARG_GOAL_FLASH_STEPS = {
               accAlpha += a;
             }
           }
-          if (accAlpha <= 0.06) {
+          if (accAlpha <= START_EASTER_EYE_ALPHA_CUTOFF) {
             out += ' ';
             continue;
           }
           const l = clamp(accLuma / accAlpha, 0, 1);
-          const mapped = 1 - l;
+          const inv = 1 - l;
+          const contrasted = clamp(((inv - 0.5) * START_EASTER_EYE_CONTRAST) + 0.5, 0, 1);
+          const mapped = Math.pow(contrasted, 1 / START_EASTER_EYE_GAMMA);
           const cIdx = Math.max(0, Math.min(charset.length - 1, Math.floor(mapped * (charset.length - 1))));
           out += charset[cIdx] || ' ';
         }
