@@ -1095,6 +1095,7 @@ let DITHER_ENABLED = false;
     visorEngineShakePulseLeftMs: 0,
     introCountdownShakeUntilMs: 0,
     introCountdownFastShakeUntilMs: 0,
+    argBossCountdownZoomActive: false,
     shakeX: 0,
     shakeY: 0,
     bossCharsetRotationIndex: 0,
@@ -1758,6 +1759,7 @@ const ARG_GOAL_FLASH_STEPS = {
     const layer = overlay.querySelector('#argSceneCountdownLayer');
     if (!layer) return;
     layer.classList.add('arg-scene-countdown--dim');
+    argPongState.argBossCountdownZoomActive = true;
     try {
       for (const value of ['3', '2', '1']) {
         layer.textContent = value;
@@ -1774,6 +1776,7 @@ const ARG_GOAL_FLASH_STEPS = {
       layer.classList.remove('arg-scene-countdown--dim');
       argPongState.introCountdownShakeUntilMs = 0;
       argPongState.introCountdownFastShakeUntilMs = 0;
+      argPongState.argBossCountdownZoomActive = false;
     }
   }
 
@@ -1885,8 +1888,11 @@ const ARG_GOAL_FLASH_STEPS = {
         + ARG_PONG.visorPupilBreathPhaseOffset
       );
       const pupilScale = 1.1 + pupilBreathWave * ARG_PONG.visorPupilBreathScaleAmp;
-      visorEye.style.transform = `translate(${visorEyeX}px, ${visorEyeY}px) scale(${eyeScale})`;
-      visorPupil.style.transform = `translate(${visorPupilX}px, ${visorPupilY}px) scale(${pupilScale})`;
+      const countdownZoomMul = argPongState.argBossCountdownZoomActive ? 2 : 1;
+      const eyeFinalScale = eyeScale * countdownZoomMul;
+      const pupilFinalScale = pupilScale * countdownZoomMul;
+      visorEye.style.transform = `translate(${visorEyeX}px, ${visorEyeY}px) scale(${eyeFinalScale})`;
+      visorPupil.style.transform = `translate(${visorPupilX}px, ${visorPupilY}px) scale(${pupilFinalScale})`;
       const rect = overlay.getBoundingClientRect();
       renderArgBossAsciiFrame(overlay, {
         rect,
@@ -1899,8 +1905,8 @@ const ARG_GOAL_FLASH_STEPS = {
         bodyBandSway,
         visorEyeX,
         visorEyeY,
-        eyeScale,
-        pupilScale,
+        eyeScale: eyeFinalScale,
+        pupilScale: pupilFinalScale,
         visorPupilX,
         visorPupilY
       });
@@ -2628,8 +2634,11 @@ const ARG_GOAL_FLASH_STEPS = {
         + ARG_PONG.visorPupilBreathPhaseOffset
       );
       const pupilScale = 1.1 + pupilBreathWave * ARG_PONG.visorPupilBreathScaleAmp;
-      visorEye.style.transform = `translate(${visorEyeX}px, ${visorEyeY}px) scale(${eyeScale})`;
-      visorPupil.style.transform = `translate(${visorPupilX}px, ${visorPupilY}px) scale(${pupilScale})`;
+      const countdownZoomMul = argPongState.argBossCountdownZoomActive ? 2 : 1;
+      const eyeFinalScale = eyeScale * countdownZoomMul;
+      const pupilFinalScale = pupilScale * countdownZoomMul;
+      visorEye.style.transform = `translate(${visorEyeX}px, ${visorEyeY}px) scale(${eyeFinalScale})`;
+      visorPupil.style.transform = `translate(${visorPupilX}px, ${visorPupilY}px) scale(${pupilFinalScale})`;
 
       renderArgBossAsciiFrame(overlay, {
         rect,
@@ -2642,8 +2651,8 @@ const ARG_GOAL_FLASH_STEPS = {
         bodyBandSway,
         visorEyeX,
         visorEyeY,
-        eyeScale,
-        pupilScale,
+        eyeScale: eyeFinalScale,
+        pupilScale: pupilFinalScale,
         visorPupilX,
         visorPupilY
       });
@@ -2850,6 +2859,7 @@ const ARG_GOAL_FLASH_STEPS = {
     argPongState.visorEngineShakePulseLeftMs = 0;
     argPongState.introCountdownShakeUntilMs = 0;
     argPongState.introCountdownFastShakeUntilMs = 0;
+    argPongState.argBossCountdownZoomActive = false;
     startArgBossIntroLoop({ overlay, visorBody, visorEye, visorPupil });
 
     if (bossInitOk) {
