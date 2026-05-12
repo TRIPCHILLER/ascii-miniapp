@@ -1013,6 +1013,7 @@ let DITHER_ENABLED = false;
   let startEasterBigEyeShakeToken = 0;
   let startEasterBigEyeMotionRafId = 0;
   let startEasterBigEyeMotionToken = 0;
+  let startEasterBigEyeMotionIntensity = 0;
   let isEasterEggRollRunning = false;
   let startWordGlitchTimer = 0;
   let startWordGlitchBrokenChars = 0;
@@ -3187,6 +3188,7 @@ const ARG_GOAL_FLASH_STEPS = {
     }
     const eyeOverlay = app.ui.modeChooser?.querySelector('.start-easter-eye-layer');
     if (!eyeOverlay) return;
+    startEasterBigEyeMotionIntensity = 0;
     eyeOverlay.hidden = true;
     eyeOverlay.style.removeProperty('--start-easter-eye-color');
     eyeOverlay.style.removeProperty('--start-easter-eye-opacity');
@@ -3305,20 +3307,17 @@ const ARG_GOAL_FLASH_STEPS = {
       const stage = Math.max(0, soundIndex - 4);
       return Math.min(0.3, stage * 0.05);
     };
-    const getStartEyeGrowthScaleBySound = (soundIndex) => {
-      const firstAppearanceTap = 5;
-      if (soundIndex < firstAppearanceTap) return 0;
-      const progress = clamp((soundIndex - firstAppearanceTap) / (START_EASTER_EGG_MAX_SOUND - firstAppearanceTap), 0, 1);
-      return 0.1 + progress * 0.9;
+    const getStartEasterEyeStageProgress = (soundIndex) => {
+      if (soundIndex < 2) return 0;
+      return clamp(soundIndex / START_EASTER_EGG_MAX_SOUND, 0, 1);
     };
     const startStartMenuBigEyeMotion = () => {
       if (startEasterBigEyeMotionRafId) return;
       startEasterBigEyeMotionToken += 1;
       const motionToken = startEasterBigEyeMotionToken;
-      const phaseX = Math.random() * Math.PI * 2;
-      const phaseY = Math.random() * Math.PI * 2;
+      const phaseJitterX = Math.random() * Math.PI * 2;
+      const phaseJitterY = Math.random() * Math.PI * 2;
       const phaseBreath = Math.random() * Math.PI * 2;
-      const phaseSway = Math.random() * Math.PI * 2;
       const loop = (ts) => {
         if (motionToken !== startEasterBigEyeMotionToken) return;
         if (eyeOverlay.hidden) {
@@ -3326,18 +3325,17 @@ const ARG_GOAL_FLASH_STEPS = {
           return;
         }
         const now = ts || performance.now();
-        const offsetX =
-          Math.sin(now * ARG_PONG.visorBodyDriftSpeedX + phaseX) * ARG_PONG.visorBodyDriftAmpXPx
-          + Math.cos(now * ARG_PONG.visorBodyMicroJitterSpeedX + phaseY * 0.67) * ARG_PONG.visorBodyMicroJitterAmpXPx
-          + Math.sin(now * ARG_PONG.visorBodyPulseSpeedX + phaseBreath) * ARG_PONG.visorBodyPulseAmpXPx;
-        const offsetY =
-          Math.cos(now * ARG_PONG.visorBodyDriftSpeedY + phaseY) * ARG_PONG.visorBodyDriftAmpYPx
-          + Math.sin(now * ARG_PONG.visorBodyMicroJitterSpeedY + phaseX * 0.83) * ARG_PONG.visorBodyMicroJitterAmpYPx
-          + Math.cos(now * ARG_PONG.visorBodyPulseSpeedY + phaseBreath * 1.19) * ARG_PONG.visorBodyPulseAmpYPx;
-        const breath = Math.sin(now * ARG_PONG.visorEyeBreathScaleSpeed + phaseSway);
-        const motionScale = 1.1 + breath * ARG_PONG.visorEyeBreathScaleAmp;
-        eyeOverlay.style.setProperty('--start-easter-eye-base-x', `${offsetX.toFixed(3)}px`);
-        eyeOverlay.style.setProperty('--start-easter-eye-base-y', `${offsetY.toFixed(3)}px`);
+        const intensity = clamp(startEasterBigEyeMotionIntensity, 0, 1);
+        const jitterX = Math.cos(now * ARG_PONG.visorBodyMicroJitterSpeedX + phaseJitterY * 0.67)
+          * ARG_PONG.visorBodyMicroJitterAmpXPx
+          * intensity;
+        const jitterY = Math.sin(now * ARG_PONG.visorBodyMicroJitterSpeedY + phaseJitterX * 0.83)
+          * ARG_PONG.visorBodyMicroJitterAmpYPx
+          * intensity;
+        const breath = Math.sin(now * ARG_PONG.visorEyeBreathScaleSpeed + phaseBreath);
+        const motionScale = 1 + (breath * ARG_PONG.visorEyeBreathScaleAmp * intensity);
+        eyeOverlay.style.setProperty('--start-easter-eye-base-x', `${jitterX.toFixed(3)}px`);
+        eyeOverlay.style.setProperty('--start-easter-eye-base-y', `${jitterY.toFixed(3)}px`);
         eyeOverlay.style.setProperty('--start-easter-eye-motion-scale', motionScale.toFixed(4));
         startEasterBigEyeMotionRafId = requestAnimationFrame(loop);
       };
@@ -3345,7 +3343,9 @@ const ARG_GOAL_FLASH_STEPS = {
     };
     const updateEyeOverlayBySound = (soundIndex, { textHex } = {}) => {
       const opacity = getEyeShadeRatioBySound(soundIndex);
-      const growthScale = getStartEyeGrowthScaleBySound(soundIndex);
+      const progress = getStartEasterEyeStageProgress(soundIndex);
+      const growthScale = progress;
+      startEasterBigEyeMotionIntensity = progress;
       if (opacity <= 0) {
         eyeOverlay.hidden = true;
         eyeOverlay.style.removeProperty('--start-easter-eye-color');
@@ -3523,8 +3523,9 @@ const ARG_GOAL_FLASH_STEPS = {
       if (soundIndex < 5 || soundIndex > START_EASTER_EGG_MAX_SOUND) return;
       stopStartMenuBigEyeShake();
       const shakeToken = startEasterBigEyeShakeToken;
+      const intensity = clamp(startEasterBigEyeMotionIntensity, 0, 1);
       const maxShiftY = ARG_PONG.visorEyeMaxShiftYPx * ARG_PONG.visorFollowRadiusBoost;
-      const clutchSpringShakeAmpPx = maxShiftY * ARG_PONG.visorClutchSpringShakeAmpRatio;
+      const clutchSpringShakeAmpPx = maxShiftY * ARG_PONG.visorClutchSpringShakeAmpRatio * intensity;
       const roundShakeSpeedY = ARG_PONG.visorClutchSpringShakeSpeedY * ARG_PONG.visorRoundShakeSpeedFactor;
       const phaseX = Math.random() * Math.PI * 2;
       const phaseY = Math.random() * Math.PI * 2;
