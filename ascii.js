@@ -3199,6 +3199,7 @@ const ARG_GOAL_FLASH_STEPS = {
     eyeOverlay.style.removeProperty('--start-easter-eye-motion-scale');
     eyeOverlay.style.removeProperty('--start-easter-eye-growth-scale');
     eyeOverlay.classList.remove('start-easter-eye-layer--countdown-shake');
+    eyeOverlay.classList.remove('start-easter-eye-layer--ascii-ready');
   }
 
   function startModeChooserFx(){
@@ -3282,7 +3283,84 @@ const ARG_GOAL_FLASH_STEPS = {
     pupilImg.src = ARG_SCENE_ASSETS.visorPupil;
     pupilImg.alt = '';
     pupilImg.decoding = 'async';
-    eyeOverlay.append(eyeImg, pupilImg);
+    const eyeAscii = document.createElement('pre');
+    eyeAscii.className = 'start-easter-eye-ascii';
+    eyeAscii.setAttribute('aria-hidden', 'true');
+    eyeAscii.textContent = '';
+    eyeOverlay.append(eyeImg, pupilImg, eyeAscii);
+    const eyeAsciiCanvas = document.createElement('canvas');
+    const eyeAsciiCtx = eyeAsciiCanvas.getContext('2d', { willReadFrequently: true });
+    const eyeAsciiGridW = 52;
+    const eyeAsciiGridH = 28;
+    const eyeAsciiCellW = 4;
+    const eyeAsciiCellH = 4;
+    const START_EASTER_EYE_PUPIL_SCALE = 0.82;
+    let eyeAsciiReady = false;
+    let eyeAsciiRenderPending = false;
+    const getClassicCharsetForStartEye = () => {
+      const options = Array.from(app.ui.charset?.options || []);
+      const classicOption = options.find((opt) => /CL4SS1C/i.test(String(opt.textContent || '')));
+      return String(classicOption?.value || options[0]?.value || '@%#*+=-:. ');
+    };
+    const renderStartEyeAscii = () => {
+      if (!eyeAsciiCtx) return;
+      eyeAsciiRenderPending = false;
+      const charset = Array.from(getClassicCharsetForStartEye());
+      if (!charset.length) return;
+      eyeAsciiCanvas.width = eyeAsciiGridW * eyeAsciiCellW;
+      eyeAsciiCanvas.height = eyeAsciiGridH * eyeAsciiCellH;
+      eyeAsciiCtx.clearRect(0, 0, eyeAsciiCanvas.width, eyeAsciiCanvas.height);
+      eyeAsciiCtx.drawImage(eyeImg, 0, 0, eyeAsciiCanvas.width, eyeAsciiCanvas.height);
+      const pupilDrawW = eyeAsciiCanvas.width * START_EASTER_EYE_PUPIL_SCALE;
+      const pupilDrawH = eyeAsciiCanvas.height * START_EASTER_EYE_PUPIL_SCALE;
+      const pupilDrawX = (eyeAsciiCanvas.width - pupilDrawW) * 0.5;
+      const pupilDrawY = (eyeAsciiCanvas.height - pupilDrawH) * 0.5;
+      eyeAsciiCtx.drawImage(pupilImg, pupilDrawX, pupilDrawY, pupilDrawW, pupilDrawH);
+      const src = eyeAsciiCtx.getImageData(0, 0, eyeAsciiCanvas.width, eyeAsciiCanvas.height).data;
+      let out = '';
+      for (let gy = 0; gy < eyeAsciiGridH; gy += 1) {
+        const py = gy * eyeAsciiCellH;
+        for (let gx = 0; gx < eyeAsciiGridW; gx += 1) {
+          const px = gx * eyeAsciiCellW;
+          let accLuma = 0;
+          let accAlpha = 0;
+          for (let sy = 0; sy < eyeAsciiCellH; sy += 1) {
+            for (let sx = 0; sx < eyeAsciiCellW; sx += 1) {
+              const idx = ((py + sy) * eyeAsciiCanvas.width + (px + sx)) * 4;
+              const a = src[idx + 3] / 255;
+              if (a <= 0.01) continue;
+              const luma = (src[idx] * 0.299 + src[idx + 1] * 0.587 + src[idx + 2] * 0.114) / 255;
+              accLuma += luma * a;
+              accAlpha += a;
+            }
+          }
+          if (accAlpha <= 0.06) {
+            out += ' ';
+            continue;
+          }
+          const l = clamp(accLuma / accAlpha, 0, 1);
+          const mapped = 1 - l;
+          const cIdx = Math.max(0, Math.min(charset.length - 1, Math.floor(mapped * (charset.length - 1))));
+          out += charset[cIdx] || ' ';
+        }
+        if (gy < eyeAsciiGridH - 1) out += '\n';
+      }
+      eyeAscii.textContent = out;
+      eyeAsciiReady = true;
+      eyeOverlay.classList.add('start-easter-eye-layer--ascii-ready');
+    };
+    const queueStartEyeAsciiRender = () => {
+      if (eyeAsciiRenderPending) return;
+      eyeAsciiRenderPending = true;
+      requestAnimationFrame(renderStartEyeAscii);
+    };
+    const onStartEyeAssetLoad = () => {
+      if (!eyeImg.complete || !pupilImg.complete) return;
+      queueStartEyeAsciiRender();
+    };
+    eyeImg.addEventListener('load', onStartEyeAssetLoad);
+    pupilImg.addEventListener('load', onStartEyeAssetLoad);
+    if (eyeImg.complete && pupilImg.complete) queueStartEyeAsciiRender();
     eyeOverlay.hidden = true;
     app.ui.modeChooser.appendChild(eyeOverlay);
     const startShell = app.ui.modeChooser.querySelector('.start-shell');
@@ -3338,6 +3416,7 @@ const ARG_GOAL_FLASH_STEPS = {
         return;
       }
       eyeOverlay.hidden = false;
+      if (!eyeAsciiReady) queueStartEyeAsciiRender();
       if (!startEasterBigEyeMotionRafId) startStartMenuBigEyeMotion();
       eyeOverlay.style.setProperty('--start-easter-eye-opacity', opacity.toFixed(2));
       eyeOverlay.style.setProperty('--start-easter-eye-growth-scale', growthScale.toFixed(4));
@@ -3585,6 +3664,7 @@ const ARG_GOAL_FLASH_STEPS = {
       startMenuCurrentBg = safeBg;
       startMenuCurrentText = safeText;
       startMenuPresetId = presetId;
+      if (eyeOverlay && !eyeOverlay.hidden) queueStartEyeAsciiRender();
     };
     const applyRandomStartMenuPreset = () => {
       if (!PRESETS.length) return;
