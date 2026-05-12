@@ -1881,7 +1881,10 @@ const ARG_GOAL_FLASH_STEPS = {
       );
       const visorBodyX = visorBodyOffsetX;
       const visorBodyY = visorBodyOffsetY;
-      visorBody.style.transform = `translate(${visorBodyX}px, ${visorBodyY}px) rotate(${bodyRotate}deg) scale(${bodyScale + bodySqueeze}, ${bodyScale - bodySqueeze * 0.75})`;
+      const countdownZoomMul = argPongState.argBossCountdownZoomActive ? 2 : 1;
+      const bodyCountdownScaleX = (bodyScale + bodySqueeze) * countdownZoomMul;
+      const bodyCountdownScaleY = (bodyScale - bodySqueeze * 0.75) * countdownZoomMul;
+      visorBody.style.transform = `translate(${visorBodyX}px, ${visorBodyY}px) rotate(${bodyRotate}deg) scale(${bodyCountdownScaleX}, ${bodyCountdownScaleY})`;
       const eyeBreathWave = Math.sin(now * ARG_PONG.visorEyeBreathScaleSpeed + argPongState.visorEyePhaseX);
       const eyeScale = 1.1 + eyeBreathWave * ARG_PONG.visorEyeBreathScaleAmp;
       const pupilBreathWave = Math.sin(
@@ -1890,7 +1893,6 @@ const ARG_GOAL_FLASH_STEPS = {
         + ARG_PONG.visorPupilBreathPhaseOffset
       );
       const pupilScale = 1.1 + pupilBreathWave * ARG_PONG.visorPupilBreathScaleAmp;
-      const countdownZoomMul = argPongState.argBossCountdownZoomActive ? 2 : 1;
       const eyeFinalScale = eyeScale * countdownZoomMul;
       const pupilFinalScale = pupilScale * countdownZoomMul;
       visorEye.style.transform = `translate(${visorEyeX}px, ${visorEyeY}px) scale(${eyeFinalScale})`;
@@ -1901,8 +1903,8 @@ const ARG_GOAL_FLASH_STEPS = {
         visorBodyX,
         visorBodyY,
         bodyRotate,
-        bodyScaleX: bodyScale + bodySqueeze,
-        bodyScaleY: bodyScale - bodySqueeze * 0.75,
+        bodyScaleX: bodyCountdownScaleX,
+        bodyScaleY: bodyCountdownScaleY,
         bodyBandPulse,
         bodyBandSway,
         visorEyeX,
@@ -2627,7 +2629,10 @@ const ARG_GOAL_FLASH_STEPS = {
       const bodyBandSway = Math.cos(
         now * ARG_PONG.visorBodySwaySpeed * 1.21 + argPongState.visorBodyPhaseSway * 1.24
       );
-      visorBody.style.transform = `translate(${visorBodyX}px, ${visorBodyY}px) rotate(${bodyRotate}deg) scale(${bodyScale + bodySqueeze}, ${bodyScale - bodySqueeze * 0.75})`;
+      const countdownZoomMul = argPongState.argBossCountdownZoomActive ? 2 : 1;
+      const bodyCountdownScaleX = (bodyScale + bodySqueeze) * countdownZoomMul;
+      const bodyCountdownScaleY = (bodyScale - bodySqueeze * 0.75) * countdownZoomMul;
+      visorBody.style.transform = `translate(${visorBodyX}px, ${visorBodyY}px) rotate(${bodyRotate}deg) scale(${bodyCountdownScaleX}, ${bodyCountdownScaleY})`;
       const eyeBreathWave = Math.sin(now * ARG_PONG.visorEyeBreathScaleSpeed + argPongState.visorEyePhaseX);
       const eyeScale = 1.1 + eyeBreathWave * ARG_PONG.visorEyeBreathScaleAmp;
       const pupilBreathWave = Math.sin(
@@ -2636,7 +2641,6 @@ const ARG_GOAL_FLASH_STEPS = {
         + ARG_PONG.visorPupilBreathPhaseOffset
       );
       const pupilScale = 1.1 + pupilBreathWave * ARG_PONG.visorPupilBreathScaleAmp;
-      const countdownZoomMul = argPongState.argBossCountdownZoomActive ? 2 : 1;
       const eyeFinalScale = eyeScale * countdownZoomMul;
       const pupilFinalScale = pupilScale * countdownZoomMul;
       visorEye.style.transform = `translate(${visorEyeX}px, ${visorEyeY}px) scale(${eyeFinalScale})`;
@@ -2647,8 +2651,8 @@ const ARG_GOAL_FLASH_STEPS = {
         visorBodyX,
         visorBodyY,
         bodyRotate,
-        bodyScaleX: bodyScale + bodySqueeze,
-        bodyScaleY: bodyScale - bodySqueeze * 0.75,
+        bodyScaleX: bodyCountdownScaleX,
+        bodyScaleY: bodyCountdownScaleY,
         bodyBandPulse,
         bodyBandSway,
         visorEyeX,
