@@ -3302,19 +3302,26 @@ const ARG_GOAL_FLASH_STEPS = {
       const classicOption = options.find((opt) => /CL4SS1C/i.test(String(opt.textContent || '')));
       return String(classicOption?.value || options[0]?.value || '@%#*+=-:. ');
     };
-    const renderStartEyeAscii = () => {
+    const renderStartEyeAscii = (motion = {}) => {
       if (!eyeAsciiCtx) return;
       eyeAsciiRenderPending = false;
       const charset = Array.from(getClassicCharsetForStartEye());
       if (!charset.length) return;
       eyeAsciiCanvas.width = eyeAsciiGridW * eyeAsciiCellW;
       eyeAsciiCanvas.height = eyeAsciiGridH * eyeAsciiCellH;
+      const shiftX = Number.isFinite(motion.shiftX) ? motion.shiftX : 0;
+      const shiftY = Number.isFinite(motion.shiftY) ? motion.shiftY : 0;
+      const eyeScale = Number.isFinite(motion.eyeScale) ? motion.eyeScale : 1;
+      const eyeDrawW = eyeAsciiCanvas.width * eyeScale;
+      const eyeDrawH = eyeAsciiCanvas.height * eyeScale;
+      const eyeDrawX = (eyeAsciiCanvas.width - eyeDrawW) * 0.5 + shiftX;
+      const eyeDrawY = (eyeAsciiCanvas.height - eyeDrawH) * 0.5 + shiftY;
       eyeAsciiCtx.clearRect(0, 0, eyeAsciiCanvas.width, eyeAsciiCanvas.height);
-      eyeAsciiCtx.drawImage(eyeImg, 0, 0, eyeAsciiCanvas.width, eyeAsciiCanvas.height);
-      const pupilDrawW = eyeAsciiCanvas.width * START_EASTER_EYE_PUPIL_SCALE;
-      const pupilDrawH = eyeAsciiCanvas.height * START_EASTER_EYE_PUPIL_SCALE;
-      const pupilDrawX = (eyeAsciiCanvas.width - pupilDrawW) * 0.5;
-      const pupilDrawY = (eyeAsciiCanvas.height - pupilDrawH) * 0.5;
+      eyeAsciiCtx.drawImage(eyeImg, eyeDrawX, eyeDrawY, eyeDrawW, eyeDrawH);
+      const pupilDrawW = eyeDrawW * START_EASTER_EYE_PUPIL_SCALE;
+      const pupilDrawH = eyeDrawH * START_EASTER_EYE_PUPIL_SCALE;
+      const pupilDrawX = eyeDrawX + (eyeDrawW - pupilDrawW) * 0.5;
+      const pupilDrawY = eyeDrawY + (eyeDrawH - pupilDrawH) * 0.5;
       eyeAsciiCtx.drawImage(pupilImg, pupilDrawX, pupilDrawY, pupilDrawW, pupilDrawH);
       const src = eyeAsciiCtx.getImageData(0, 0, eyeAsciiCanvas.width, eyeAsciiCanvas.height).data;
       let out = '';
@@ -3372,7 +3379,18 @@ const ARG_GOAL_FLASH_STEPS = {
     };
     const getStartEasterEyeStageProgress = (soundIndex) => {
       if (soundIndex < 2) return 0;
-      return clamp(soundIndex / START_EASTER_EGG_MAX_SOUND, 0, 1);
+      const growthByTap = {
+        2: 0.30,
+        3: 0.45,
+        4: 0.60,
+        5: 0.75,
+        6: 0.90,
+        7: 1.05,
+        8: 1.20,
+        9: 1.35,
+        10: 1.50
+      };
+      return growthByTap[soundIndex] ?? 1.50;
     };
     const startStartMenuBigEyeMotion = () => {
       if (startEasterBigEyeMotionRafId) return;
@@ -3397,6 +3415,7 @@ const ARG_GOAL_FLASH_STEPS = {
           * intensity;
         const breath = Math.sin(now * ARG_PONG.visorEyeBreathScaleSpeed + phaseBreath);
         const motionScale = 1 + (breath * ARG_PONG.visorEyeBreathScaleAmp * intensity);
+        renderStartEyeAscii({ shiftX: jitterX, shiftY: jitterY, eyeScale: motionScale });
         eyeOverlay.style.setProperty('--start-easter-eye-base-x', `${jitterX.toFixed(3)}px`);
         eyeOverlay.style.setProperty('--start-easter-eye-base-y', `${jitterY.toFixed(3)}px`);
         eyeOverlay.style.setProperty('--start-easter-eye-motion-scale', motionScale.toFixed(4));
@@ -3408,7 +3427,8 @@ const ARG_GOAL_FLASH_STEPS = {
       const opacity = getEyeShadeRatioBySound(soundIndex);
       const progress = getStartEasterEyeStageProgress(soundIndex);
       const growthScale = progress;
-      startEasterBigEyeMotionIntensity = progress;
+      const motionIntensity = clamp(soundIndex / START_EASTER_EGG_MAX_SOUND, 0, 1);
+      startEasterBigEyeMotionIntensity = motionIntensity;
       if (opacity <= 0) {
         eyeOverlay.hidden = true;
         eyeOverlay.style.removeProperty('--start-easter-eye-opacity');
