@@ -3301,8 +3301,9 @@ const ARG_GOAL_FLASH_STEPS = {
     const START_EASTER_EYE_ALPHA_CUTOFF = 0.035;
     const START_EASTER_EYE_CONTRAST = 1.18;
     const START_EASTER_EYE_GAMMA = 1.22;
-    const START_EASTER_EYE_PUPIL_SCALE = 0.82;
-    const START_EASTER_EYE_DEBUG_HIDE_PUPIL = true;
+    const START_EASTER_EYE_PUPIL_RELATIVE_SCALE = 0.8;
+    const START_EASTER_EYE_PUPIL_MOTION_RATIO = 0.8;
+    const START_EASTER_EYE_DEBUG_HIDE_PUPIL = false;
     let eyeAsciiReady = false;
     let eyeAsciiRenderPending = false;
     const getClassicCharsetForStartEye = () => {
@@ -3324,6 +3325,8 @@ const ARG_GOAL_FLASH_STEPS = {
       const eyeDrawH = eyeAsciiCanvas.height * eyeScale;
       const eyeDrawX = (eyeAsciiCanvas.width - eyeDrawW) * 0.5 + shiftX;
       const eyeDrawY = (eyeAsciiCanvas.height - eyeDrawH) * 0.5 + shiftY;
+      const pupilShiftX = shiftX * START_EASTER_EYE_PUPIL_MOTION_RATIO;
+      const pupilShiftY = shiftY * START_EASTER_EYE_PUPIL_MOTION_RATIO;
       eyeAsciiCtx.clearRect(0, 0, eyeAsciiCanvas.width, eyeAsciiCanvas.height);
       eyeAsciiCtx.imageSmoothingEnabled = false;
       if (typeof eyeAsciiCtx.webkitImageSmoothingEnabled === 'boolean') eyeAsciiCtx.webkitImageSmoothingEnabled = false;
@@ -3331,10 +3334,15 @@ const ARG_GOAL_FLASH_STEPS = {
       if (typeof eyeAsciiCtx.msImageSmoothingEnabled === 'boolean') eyeAsciiCtx.msImageSmoothingEnabled = false;
       eyeAsciiCtx.drawImage(eyeImg, eyeDrawX, eyeDrawY, eyeDrawW, eyeDrawH);
       if (!START_EASTER_EYE_DEBUG_HIDE_PUPIL) {
-        const pupilDrawW = eyeDrawW * START_EASTER_EYE_PUPIL_SCALE;
-        const pupilDrawH = eyeDrawH * START_EASTER_EYE_PUPIL_SCALE;
-        const pupilDrawX = eyeDrawX + (eyeDrawW - pupilDrawW) * 0.5;
-        const pupilDrawY = eyeDrawY + (eyeDrawH - pupilDrawH) * 0.5;
+        const pupilTargetW = eyeDrawW * START_EASTER_EYE_PUPIL_RELATIVE_SCALE;
+        const pupilTargetH = eyeDrawH * START_EASTER_EYE_PUPIL_RELATIVE_SCALE;
+        const pupilAssetW = Math.max(1, pupilImg.naturalWidth || 1);
+        const pupilAssetH = Math.max(1, pupilImg.naturalHeight || 1);
+        const pupilUniformScale = Math.min(pupilTargetW / pupilAssetW, pupilTargetH / pupilAssetH);
+        const pupilDrawW = pupilAssetW * pupilUniformScale;
+        const pupilDrawH = pupilAssetH * pupilUniformScale;
+        const pupilDrawX = eyeDrawX + (eyeDrawW - pupilDrawW) * 0.5 + (pupilShiftX - shiftX);
+        const pupilDrawY = eyeDrawY + (eyeDrawH - pupilDrawH) * 0.5 + (pupilShiftY - shiftY);
         eyeAsciiCtx.drawImage(pupilImg, pupilDrawX, pupilDrawY, pupilDrawW, pupilDrawH);
       }
       const src = eyeAsciiCtx.getImageData(0, 0, eyeAsciiCanvas.width, eyeAsciiCanvas.height).data;
