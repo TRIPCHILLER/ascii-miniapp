@@ -2074,7 +2074,6 @@ input[type="color"] {
 }
 
 .arg-scene-leaderboard-title,
-.arg-scene-leaderboard-you,
 .arg-scene-leaderboard-empty,
 .arg-scene-leaderboard-divider,
 .arg-scene-leaderboard-row{
@@ -2083,13 +2082,10 @@ input[type="color"] {
   margin:0 auto;
 }
 
-.arg-scene-leaderboard-title,
-.arg-scene-leaderboard-you{
+.arg-scene-leaderboard-title{
   font-size:clamp(28px, 5.2vw, 38px);
   text-align:center;
 }
-
-.arg-scene-leaderboard-you{ margin-top:14px; }
 
 .arg-scene-leaderboard-divider{
   font-size:clamp(18px, 3.5vw, 26px);
@@ -2134,7 +2130,14 @@ input[type="color"] {
 }
 .arg-scene-leaderboard-name{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .arg-scene-leaderboard-score{ text-align:right; }
-.arg-scene-leaderboard-row.is-current-user{ color:#fff; }
+.arg-scene-leaderboard-row.is-current-user{
+  background:#fff;
+  color:#000;
+}
+
+.arg-scene-leaderboard-row.is-current-user *{
+  color:#000;
+}
 
 .arg-scene-leaderboard-empty{
   text-align:center;
