@@ -1925,66 +1925,65 @@ const ARG_RESULT_REPLIES = {
     if (scoreLayer) scoreLayer.hidden = true;
     if (countdownLayer) countdownLayer.textContent = '';
 
-    let leaderboard = [];
-    try {
-      leaderboard = await fetchArgLeaderboard();
-    } catch (_) {}
+    const renderLeaderboard = async ({ resetScroll = false } = {}) => {
+      let leaderboard = [];
+      try {
+        leaderboard = await fetchArgLeaderboard();
+      } catch (_) {}
 
-    const userId = String(tg?.initDataUnsafe?.user?.id || '');
-    const currentRank = leaderboard.findIndex((p) => String(p?.userId || '') === userId);
-    const divider = '————————————————————————————————';
-    const frag = document.createDocumentFragment();
-    const title = document.createElement('div');
-    title.className = 'arg-scene-leaderboard-title';
-    title.textContent = 'СТАТИСТИКА:';
-    frag.append(title);
-    const titleDivider = document.createElement('div');
-    titleDivider.className = 'arg-scene-leaderboard-divider';
-    titleDivider.textContent = divider;
-    frag.append(titleDivider);
+      const userId = String(tg?.initDataUnsafe?.user?.id || '');
+      const currentRank = leaderboard.findIndex((p) => String(p?.userId || '') === userId);
+      const divider = '————————————————————————————————';
+      const frag = document.createDocumentFragment();
+      const title = document.createElement('div');
+      title.className = 'arg-scene-leaderboard-title';
+      title.textContent = 'СТАТИСТИКА:';
+      frag.append(title);
+      const titleDivider = document.createElement('div');
+      titleDivider.className = 'arg-scene-leaderboard-divider';
+      titleDivider.textContent = divider;
+      frag.append(titleDivider);
 
-    leaderboard.forEach((player, index) => {
-      if (index === currentRank) {
-        const youLabel = document.createElement('div');
-        youLabel.className = 'arg-scene-leaderboard-you';
-        youLabel.textContent = 'ТЫ:';
-        const youDivider = document.createElement('div');
-        youDivider.className = 'arg-scene-leaderboard-divider';
-        youDivider.textContent = divider;
-        frag.append(youLabel, renderArgLeaderboardRow(player, index + 1, { isCurrentUser: true }), youDivider);
-      } else {
-        frag.append(renderArgLeaderboardRow(player, index + 1));
+      leaderboard.forEach((player, index) => {
+        if (index === currentRank) {
+          const youLabel = document.createElement('div');
+          youLabel.className = 'arg-scene-leaderboard-you';
+          youLabel.textContent = 'ТЫ:';
+          const youDivider = document.createElement('div');
+          youDivider.className = 'arg-scene-leaderboard-divider';
+          youDivider.textContent = divider;
+          frag.append(youLabel, renderArgLeaderboardRow(player, index + 1, { isCurrentUser: true }), youDivider);
+        } else {
+          frag.append(renderArgLeaderboardRow(player, index + 1));
+        }
+      });
+
+      if (!leaderboard.length) {
+        const empty = document.createElement('div');
+        empty.className = 'arg-scene-leaderboard-empty';
+        empty.textContent = 'ПОКА ПУСТО';
+        frag.append(empty);
       }
-    });
 
-    if (!leaderboard.length) {
-      const empty = document.createElement('div');
-      empty.className = 'arg-scene-leaderboard-empty';
-      empty.textContent = 'ПОКА ПУСТО';
-      frag.append(empty);
-    }
+      leaderboardScroll.innerHTML = '';
+      leaderboardScroll.appendChild(frag);
+      if (resetScroll) leaderboardScroll.scrollTop = 0;
+      leaderboardLayer.hidden = false;
+    };
 
-    leaderboardScroll.innerHTML = '';
-    leaderboardScroll.appendChild(frag);
-    leaderboardScroll.scrollTop = 0;
-    leaderboardLayer.hidden = false;
+    await renderLeaderboard({ resetScroll: true });
 
     await new Promise((resolve) => {
       let closed = false;
-      const close = ({ openRename = false } = {}) => {
+      const close = () => {
         if (closed) return;
         closed = true;
         backBtn.removeEventListener('click', onBack);
         renameBtn.removeEventListener('click', onRename);
         leaderboardActions.removeEventListener('click', stopFooterClick);
-        if (!openRename) leaderboardLayer.hidden = true;
+        leaderboardLayer.hidden = true;
         if (eyeLayer) eyeLayer.hidden = false;
         playUiSoundNoThrow(ARG_SCENE_SOUNDS.click);
-        if (openRename) {
-          openArgRenameFlow().then((saved) => {
-            if (saved) openArgLeaderboardFullscreen();
-          });
-        }
         resolve();
       };
       const stopFooterClick = (ev) => { ev.stopPropagation(); };
@@ -1993,10 +1992,11 @@ const ARG_RESULT_REPLIES = {
         ev.stopPropagation();
         close();
       };
-      const onRename = (ev) => {
+      const onRename = async (ev) => {
         ev.preventDefault();
         ev.stopPropagation();
-        close({ openRename: true });
+        const saved = await openArgRenameFlow();
+        if (saved) await renderLeaderboard();
       };
       leaderboardActions.addEventListener('click', stopFooterClick);
       backBtn.addEventListener('click', onBack);
