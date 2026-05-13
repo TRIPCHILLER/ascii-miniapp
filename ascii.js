@@ -1965,17 +1965,8 @@ const ARG_RESULT_REPLIES = {
       frag.append(titleDivider);
 
       leaderboard.forEach((player, index) => {
-        if (index === currentRank) {
-          const youLabel = document.createElement('div');
-          youLabel.className = 'arg-scene-leaderboard-you';
-          youLabel.textContent = 'ТЫ:';
-          const youDivider = document.createElement('div');
-          youDivider.className = 'arg-scene-leaderboard-divider';
-          youDivider.textContent = divider;
-          frag.append(youLabel, renderArgLeaderboardRow(player, index + 1, { isCurrentUser: true }), youDivider);
-        } else {
-          frag.append(renderArgLeaderboardRow(player, index + 1));
-        }
+        const isCurrentUser = index === currentRank;
+        frag.append(renderArgLeaderboardRow(player, index + 1, { isCurrentUser }));
       });
 
       if (!leaderboard.length) {
