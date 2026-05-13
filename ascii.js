@@ -3302,6 +3302,7 @@ const ARG_GOAL_FLASH_STEPS = {
     const START_EASTER_EYE_CONTRAST = 1.18;
     const START_EASTER_EYE_GAMMA = 1.22;
     const START_EASTER_EYE_PUPIL_SCALE = 0.82;
+    const START_EASTER_EYE_DEBUG_HIDE_PUPIL = true;
     let eyeAsciiReady = false;
     let eyeAsciiRenderPending = false;
     const getClassicCharsetForStartEye = () => {
@@ -3329,11 +3330,13 @@ const ARG_GOAL_FLASH_STEPS = {
       if (typeof eyeAsciiCtx.mozImageSmoothingEnabled === 'boolean') eyeAsciiCtx.mozImageSmoothingEnabled = false;
       if (typeof eyeAsciiCtx.msImageSmoothingEnabled === 'boolean') eyeAsciiCtx.msImageSmoothingEnabled = false;
       eyeAsciiCtx.drawImage(eyeImg, eyeDrawX, eyeDrawY, eyeDrawW, eyeDrawH);
-      const pupilDrawW = eyeDrawW * START_EASTER_EYE_PUPIL_SCALE;
-      const pupilDrawH = eyeDrawH * START_EASTER_EYE_PUPIL_SCALE;
-      const pupilDrawX = eyeDrawX + (eyeDrawW - pupilDrawW) * 0.5;
-      const pupilDrawY = eyeDrawY + (eyeDrawH - pupilDrawH) * 0.5;
-      eyeAsciiCtx.drawImage(pupilImg, pupilDrawX, pupilDrawY, pupilDrawW, pupilDrawH);
+      if (!START_EASTER_EYE_DEBUG_HIDE_PUPIL) {
+        const pupilDrawW = eyeDrawW * START_EASTER_EYE_PUPIL_SCALE;
+        const pupilDrawH = eyeDrawH * START_EASTER_EYE_PUPIL_SCALE;
+        const pupilDrawX = eyeDrawX + (eyeDrawW - pupilDrawW) * 0.5;
+        const pupilDrawY = eyeDrawY + (eyeDrawH - pupilDrawH) * 0.5;
+        eyeAsciiCtx.drawImage(pupilImg, pupilDrawX, pupilDrawY, pupilDrawW, pupilDrawH);
+      }
       const src = eyeAsciiCtx.getImageData(0, 0, eyeAsciiCanvas.width, eyeAsciiCanvas.height).data;
       let out = '';
       for (let gy = 0; gy < eyeAsciiGridH; gy += 1) {
@@ -3375,12 +3378,13 @@ const ARG_GOAL_FLASH_STEPS = {
       requestAnimationFrame(renderStartEyeAscii);
     };
     const onStartEyeAssetLoad = () => {
-      if (!eyeImg.complete || !pupilImg.complete) return;
+      if (!eyeImg.complete) return;
+      if (!START_EASTER_EYE_DEBUG_HIDE_PUPIL && !pupilImg.complete) return;
       queueStartEyeAsciiRender();
     };
     eyeImg.addEventListener('load', onStartEyeAssetLoad);
     pupilImg.addEventListener('load', onStartEyeAssetLoad);
-    if (eyeImg.complete && pupilImg.complete) queueStartEyeAsciiRender();
+    if (eyeImg.complete && (START_EASTER_EYE_DEBUG_HIDE_PUPIL || pupilImg.complete)) queueStartEyeAsciiRender();
     eyeOverlay.hidden = true;
     app.ui.modeChooser.appendChild(eyeOverlay);
     const startShell = app.ui.modeChooser.querySelector('.start-shell');
