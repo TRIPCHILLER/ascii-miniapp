@@ -3302,7 +3302,7 @@ const ARG_GOAL_FLASH_STEPS = {
     const START_EASTER_EYE_CONTRAST = 1.18;
     const START_EASTER_EYE_GAMMA = 1.22;
     const START_EASTER_EYE_PUPIL_RELATIVE_SCALE = 0.8;
-    const START_EASTER_EYE_PUPIL_WIDTH_BOOST = 1.1;
+    const START_EASTER_EYE_PUPIL_WIDTH_BOOST = 1.21;
     const START_EASTER_EYE_PUPIL_MOTION_RATIO = 0.8;
     const START_EASTER_EYE_DEBUG_HIDE_PUPIL = false;
     let eyeAsciiReady = false;
@@ -3623,15 +3623,18 @@ const ARG_GOAL_FLASH_STEPS = {
       }
       eyeOverlay.style.removeProperty('--start-easter-eye-shake-x');
       eyeOverlay.style.removeProperty('--start-easter-eye-shake-y');
+      eyeOverlay.style.removeProperty('--start-easter-eye-eye-shake-y');
+      eyeOverlay.style.removeProperty('--start-easter-eye-pupil-shake-y');
       eyeOverlay.classList.remove('start-easter-eye-layer--countdown-shake');
     };
     const startStartMenuBigEyeShakeForAudio = (audio, soundIndex) => {
-      if (soundIndex < 5 || soundIndex > START_EASTER_EGG_MAX_SOUND) return;
+      if (soundIndex !== START_EASTER_EGG_MAX_SOUND) return;
       stopStartMenuBigEyeShake();
       const shakeToken = startEasterBigEyeShakeToken;
       const intensity = clamp(startEasterBigEyeMotionIntensity, 0, 1);
+      const shakeAmpMul = soundIndex === START_EASTER_EGG_MAX_SOUND ? 2 : 1;
       const maxShiftY = ARG_PONG.visorEyeMaxShiftYPx * ARG_PONG.visorFollowRadiusBoost;
-      const clutchSpringShakeAmpPx = maxShiftY * ARG_PONG.visorClutchSpringShakeAmpRatio * intensity;
+      const clutchSpringShakeAmpPx = maxShiftY * ARG_PONG.visorClutchSpringShakeAmpRatio * intensity * shakeAmpMul;
       const roundShakeSpeedY = ARG_PONG.visorClutchSpringShakeSpeedY * ARG_PONG.visorRoundShakeSpeedFactor;
       const phaseX = Math.random() * Math.PI * 2;
       const phaseY = Math.random() * Math.PI * 2;
@@ -3644,8 +3647,12 @@ const ARG_GOAL_FLASH_STEPS = {
           Math.sin(now * roundShakeSpeedY + phaseY * 1.37)
           + Math.sin(now * roundShakeSpeedY * 1.91 + phaseX * 0.92) * 0.45
         ) * clutchSpringShakeAmpPx;
+        const eyeLayerShakeY = roundSpringShakeY;
+        const pupilLayerShakeY = roundSpringShakeY * 0.82;
         eyeOverlay.style.setProperty('--start-easter-eye-shake-x', '0px');
         eyeOverlay.style.setProperty('--start-easter-eye-shake-y', `${roundSpringShakeY.toFixed(3)}px`);
+        eyeOverlay.style.setProperty('--start-easter-eye-eye-shake-y', `${eyeLayerShakeY.toFixed(3)}px`);
+        eyeOverlay.style.setProperty('--start-easter-eye-pupil-shake-y', `${pupilLayerShakeY.toFixed(3)}px`);
         startEasterBigEyeShakeRafId = requestAnimationFrame(loop);
       };
       startEasterBigEyeShakeRafId = requestAnimationFrame(loop);
@@ -3761,9 +3768,7 @@ const ARG_GOAL_FLASH_STEPS = {
 
       updateEyeOverlayBySound(soundIndex, { bgHex: startMenuCurrentBg, textHex: startMenuCurrentText });
       updateWordGlitchStage(soundIndex);
-      // Убрали shake только у start-menu глаза на sound5..10.
-      // Остальная логика ARG/boss/countdown и мини-игры не меняется.
-      // startStartMenuBigEyeShakeForAudio(audio, soundIndex);
+      if (soundIndex === START_EASTER_EGG_MAX_SOUND) startStartMenuBigEyeShakeForAudio(audio, soundIndex);
       if (soundIndex === START_EASTER_EGG_MAX_SOUND) {
         startWordGlitchFullChaos = true;
         resolveRemainingAudioDurationMs(audio, 4200, (durationMs) => {
