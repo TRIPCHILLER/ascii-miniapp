@@ -1733,22 +1733,45 @@ const ARG_GOAL_FLASH_STEPS = {
     return argPongState.playerScore >= (ARG_PONG.scoreToWin - 1);
   }
 
-  async function finishArgMatch(result = 'lose') {
+  function clearArgMatchSceneObjects() {
+    const overlay = ensureArgOverlay();
+    const ballStickLayer = overlay.querySelector('#argSceneBallStickLayer');
+    const scoreLayer = overlay.querySelector('#argSceneScoreLayer');
+    if (scoreLayer) scoreLayer.hidden = true;
+    if (ballStickLayer) {
+      ballStickLayer.innerHTML = '';
+      ballStickLayer.style.transform = 'translate(0px, 0px)';
+    }
+    argPongState.syncActive = false;
+    argPongState.syncProgressMs = 0;
+    argPongState.goalEyeZoomActive = false;
+    argPongState.bossFlashHidden = false;
+    argPongState.ballVX = 0;
+    argPongState.ballVY = 0;
+    if (argPongServeTimer) {
+      clearTimeout(argPongServeTimer);
+      argPongServeTimer = 0;
+    }
+    if (argPongFlashTimers.length) {
+      argPongFlashTimers.forEach((id) => clearTimeout(id));
+      argPongFlashTimers = [];
+    }
+  }
+
+  async function finishArgMatch() {
     if (argPongState.ended) return;
     argPongState.ended = true;
+    stopArgPongMusic();
     stopArgPongLoop();
-    if (result === 'win') {
-      await showArgPopup('ТЫ ОДОЛЕЛ СИСТЕМУ');
-      resetArgOverlayState();
-      returnToStartMenu();
-      startArgSessionLocked = true;
-      startArgScenePending = false;
-      startArgSceneRunning = false;
-      startArgSceneStarted = false;
-      return;
-    }
+    clearArgMatchSceneObjects();
+    const runScore = Math.max(0, Number(argPongState.playerScore) || 0);
+    await showArgPopup(`ЗАБЕГ ЗАВЕРШЁН
 
-    await showArgPopup('ТЫ ТАК И НЕ УВИДЕЛ СУТЬ...');
+ТВОЙ SCORE: [${runScore}]
+ИЗВЛЕЧЕНО ИМПУЛЬСОВ: [+${runScore}]`, {
+      openSoundSrc: ARG_SCENE_SOUNDS.danger2,
+      popupClass: 'arg-scene-popup-box--score'
+    });
     resetArgOverlayState();
     returnToStartMenu();
     startArgSessionLocked = true;
@@ -2399,10 +2422,6 @@ const ARG_GOAL_FLASH_STEPS = {
         playUiSoundNoThrow(ARG_SCENE_SOUNDS.bitClick2);
         argPongState.playerScore += 1;
         playerScoreEl.textContent = String(argPongState.playerScore);
-        if (argPongState.playerScore >= ARG_PONG.scoreToWin) {
-          finishArgMatch('win');
-          return;
-        }
         serveLocked = true;
         const flashBurstPromise = playGoalFlashBurst({
           onFlashOnStep: (flashStep) => {
@@ -2437,7 +2456,7 @@ const ARG_GOAL_FLASH_STEPS = {
         argPongState.aiScore += 1;
         aiScoreEl.textContent = String(argPongState.aiScore);
         if (argPongState.aiScore >= ARG_PONG.scoreToWin) {
-          finishArgMatch('lose');
+          finishArgMatch();
           return;
         }
         serveLocked = true;
