@@ -1532,6 +1532,8 @@ input[type="color"] {
 }
 
 .start-easter-eye-img{
+  --start-easter-eye-layer-shake-x:0px;
+  --start-easter-eye-layer-shake-y:0px;
   position:absolute;
   inset:0;
   width:100%;
@@ -1543,11 +1545,17 @@ input[type="color"] {
 }
 
 .start-easter-eye-img--eye{
-  transform:scale(1);
+  transform:translate(
+    var(--start-easter-eye-layer-shake-x),
+    var(--start-easter-eye-eye-shake-y, var(--start-easter-eye-layer-shake-y))
+  ) scale(1);
 }
 
 .start-easter-eye-img--pupil{
-  transform:scaleX(0.902) scaleY(0.82);
+  transform:translate(
+    var(--start-easter-eye-layer-shake-x),
+    var(--start-easter-eye-pupil-shake-y, var(--start-easter-eye-layer-shake-y))
+  ) scaleX(0.902) scaleY(0.82);
   transform-origin:50% 50%;
 }
 
