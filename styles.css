@@ -2179,7 +2179,7 @@ input[type="color"] {
 
 .arg-scene-rename-input{
   width:100%;
-  border:2px solid #fff;
+  border:none;
   background:#000;
   color:#fff;
   font-family:'PixPlus', monospace;
@@ -2188,12 +2188,26 @@ input[type="color"] {
   padding:8px 10px;
   box-sizing:border-box;
 }
+.arg-scene-rename-input.is-placeholder-name{
+  color:#7f7f7f;
+}
 .arg-scene-rename--customize{
   display:flex;
   flex-direction:column;
-  gap:12px;
+  gap:16px;
+  width:min(100%, 420px);
 }
 .arg-scene-rename-name-block{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.arg-scene-rename-title{
+  font-size:clamp(36px, 5vw, 58px);
+  line-height:1;
+  text-align:left;
+}
+.arg-scene-rename-input-frame{
   border:2px solid #fff;
   padding:10px;
 }
@@ -2201,11 +2215,11 @@ input[type="color"] {
   display:flex;
   flex-direction:column;
   align-items:center;
-  gap:9px;
+  gap:12px;
 }
 .arg-scene-avatar-preview{
-  width:74px;
-  height:74px;
+  width:126px;
+  height:126px;
   border:2px solid #fff;
   background:var(--arg-avatar-bg, #111);
   display:flex;
@@ -2221,17 +2235,37 @@ input[type="color"] {
 }
 .arg-scene-avatar-swatches{
   display:flex;
+  width:126px;
+  justify-content:space-between;
   gap:10px;
 }
 .arg-scene-avatar-swatch{
-  width:34px;
-  height:34px;
+  width:58px;
+  height:58px;
   border:2px solid #666;
   background:#000;
 }
 .arg-scene-avatar-swatch.is-active{ border-color:#fff; }
-.arg-scene-picker-wrap #cp-body{
+.arg-scene-picker-wrap{
+  text-align:center;
+}
+.arg-scene-picker-grid{
+  width:min(100%, 340px);
   margin:0 auto;
+  display:grid;
+  grid-template-columns:repeat(8, minmax(0, 1fr));
+  gap:6px;
+}
+.arg-scene-picker-cell{
+  width:100%;
+  aspect-ratio:1/1;
+  border:2px solid #5a5a5a;
+  padding:0;
+  background:#000;
+}
+.arg-scene-picker-cell:hover,
+.arg-scene-picker-cell:focus-visible{
+  border-color:#fff;
 }
 
 .arg-scene-rename-error{
@@ -2242,10 +2276,14 @@ input[type="color"] {
 }
 
 .arg-scene-rename-actions{
-  margin-top:14px;
   display:flex;
   justify-content:center;
-  gap:18px;
+  gap:16px;
+}
+
+.arg-scene-popup.arg-scene-popup--profile-customize-open .arg-scene-popup-box--leaderboard{
+  border-color:#fff;
+  background:#000;
 }
 
 body.visor-text #modeVideo{display:none !important;}
