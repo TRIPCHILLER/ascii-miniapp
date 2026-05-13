@@ -2169,6 +2169,11 @@ input[type="color"] {
   pointer-events:auto;
 }
 
+.arg-scene-leaderboard-btn:active,
+.arg-scene-leaderboard-btn.is-pressed{
+  color:#404040;
+}
+
 .arg-scene-rename-title{
   font-family:'PixPlus', monospace;
   text-transform:uppercase;
@@ -2205,7 +2210,8 @@ input[type="color"] {
 .arg-scene-rename-title{
   font-size:clamp(36px, 5vw, 58px);
   line-height:1;
-  text-align:left;
+  text-align:center;
+  width:100%;
 }
 .arg-scene-rename-input-frame{
   border:2px solid #fff;
