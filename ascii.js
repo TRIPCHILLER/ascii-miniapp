@@ -1701,6 +1701,23 @@ const ARG_RESULT_REPLIES = {
     return Array.isArray(json.leaderboard) ? json.leaderboard : [];
   }
 
+  async function updateArgDisplayName(displayName) {
+    const res = await fetch(`${API_BASE}/api/pong/profile/name`, {
+      method: 'POST',
+      headers: applyTelegramInitDataHeader({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ displayName })
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json?.ok) throw new Error(json?.error || 'pong_profile_name_failed');
+    return json.player || null;
+  }
+
+  function sanitizeArgDisplayName(input) {
+    const normalized = String(input || '').replace(/[\u0000-\u001F\u007F]/g, '').trim();
+    if (normalized.length < 2 || normalized.length > 20) return '';
+    return normalized;
+  }
+
   function renderArgLeaderboardRow(player, rank, { isCurrentUser = false } = {}) {
     const row = document.createElement('div');
     row.className = `arg-scene-leaderboard-row${isCurrentUser ? ' is-current-user' : ''}`;
@@ -1709,7 +1726,11 @@ const ARG_RESULT_REPLIES = {
     rankEl.textContent = `#${rank}`;
     const avatarEl = document.createElement('div');
     avatarEl.className = 'arg-scene-leaderboard-avatar';
-    avatarEl.textContent = String(player?.avatar || '🌺');
+    avatarEl.style.setProperty('--arg-avatar-bg', String(player?.avatarBg || '#181818'));
+    avatarEl.style.setProperty('--arg-avatar-fg', String(player?.avatarFg || '#ffffff'));
+    const avatarIcon = document.createElement('div');
+    avatarIcon.className = 'arg-scene-leaderboard-avatar-icon';
+    avatarEl.appendChild(avatarIcon);
     const nameEl = document.createElement('div');
     nameEl.className = 'arg-scene-leaderboard-name';
     nameEl.textContent = String(player?.displayName || 'БЕЗЫМЯННЫЙ').trim().toUpperCase();
@@ -1720,8 +1741,79 @@ const ARG_RESULT_REPLIES = {
     return row;
   }
 
-  async function openArgRenameFlowPlaceholder() {
-    showAsciiPopup({ type: 'info', title: 'СКОРО', message: 'СМЕНА ИМЕНИ БУДЕТ ДОБАВЛЕНА В СЛЕДУЮЩЕМ ШАГЕ.' });
+  async function openArgRenameFlow() {
+    const overlay = ensureArgOverlay();
+    const popupLayer = overlay.querySelector('#argScenePopupLayer');
+    const popupBox = overlay.querySelector('.arg-scene-popup-box');
+    if (!popupLayer || !popupBox) return false;
+
+    const tpl = document.createElement('div');
+    tpl.className = 'arg-scene-rename';
+    tpl.innerHTML = `
+      <div class="arg-scene-rename-title">ИЗМЕНИТЬ ИМЯ</div>
+      <input type="text" class="arg-scene-rename-input" id="argSceneRenameInput" maxlength="20" autocomplete="off" spellcheck="false" />
+      <div class="arg-scene-rename-error" id="argSceneRenameError" hidden>ИМЯ: 2–20 СИМВОЛОВ</div>
+      <div class="arg-scene-rename-actions">
+        <button type="button" class="arg-scene-leaderboard-btn" id="argSceneRenameSaveBtn">[СОХРАНИТЬ]</button>
+        <button type="button" class="arg-scene-leaderboard-btn" id="argSceneRenameCancelBtn">[ОТМЕНА]</button>
+      </div>
+    `;
+    popupBox.className = 'arg-scene-popup-box arg-scene-popup-box--leaderboard';
+    popupBox.innerHTML = '';
+    popupBox.appendChild(tpl);
+    popupLayer.hidden = false;
+
+    const input = popupBox.querySelector('#argSceneRenameInput');
+    const errorEl = popupBox.querySelector('#argSceneRenameError');
+    const saveBtn = popupBox.querySelector('#argSceneRenameSaveBtn');
+    const cancelBtn = popupBox.querySelector('#argSceneRenameCancelBtn');
+    if (!input || !errorEl || !saveBtn || !cancelBtn) return false;
+
+    input.focus();
+
+    return await new Promise((resolve) => {
+      let closed = false;
+      const close = (saved) => {
+        if (closed) return;
+        closed = true;
+        saveBtn.removeEventListener('click', onSave);
+        cancelBtn.removeEventListener('click', onCancel);
+        input.removeEventListener('keydown', onKeyDown);
+        popupLayer.hidden = true;
+        popupBox.className = 'arg-scene-popup-box';
+        resolve(saved);
+      };
+      const onCancel = (ev) => {
+        ev.preventDefault();
+        close(false);
+      };
+      const onSave = async (ev) => {
+        ev.preventDefault();
+        const nextName = sanitizeArgDisplayName(input.value);
+        if (!nextName) {
+          errorEl.hidden = false;
+          return;
+        }
+        saveBtn.disabled = true;
+        cancelBtn.disabled = true;
+        try {
+          await updateArgDisplayName(nextName);
+          close(true);
+        } catch (_) {
+          saveBtn.disabled = false;
+          cancelBtn.disabled = false;
+          errorEl.textContent = 'НЕ УДАЛОСЬ СОХРАНИТЬ';
+          errorEl.hidden = false;
+        }
+      };
+      const onKeyDown = (ev) => {
+        if (ev.key === 'Enter') onSave(ev);
+        if (ev.key === 'Escape') onCancel(ev);
+      };
+      saveBtn.addEventListener('click', onSave);
+      cancelBtn.addEventListener('click', onCancel);
+      input.addEventListener('keydown', onKeyDown);
+    });
   }
 
   async function openArgLeaderboardFullscreen() {
@@ -1795,7 +1887,11 @@ const ARG_RESULT_REPLIES = {
         leaderboardLayer.hidden = true;
         if (eyeLayer) eyeLayer.hidden = false;
         playUiSoundNoThrow(ARG_SCENE_SOUNDS.click);
-        if (openRename) openArgRenameFlowPlaceholder();
+        if (openRename) {
+          openArgRenameFlow().then((saved) => {
+            if (saved) openArgLeaderboardFullscreen();
+          });
+        }
         resolve();
       };
       const onBack = (ev) => { ev.preventDefault(); close(); };
