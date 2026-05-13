@@ -1980,6 +1980,12 @@ input[type="color"] {
   cursor:pointer;
 }
 
+.arg-scene-popup.arg-scene-popup--profile-customize-open{
+  z-index:70;
+  background:rgba(0, 0, 0, 0.45);
+  backdrop-filter:blur(2px);
+}
+
 .arg-scene-goal-flash{
   pointer-events:none;
   background:#fff;
