@@ -3635,7 +3635,9 @@ const ARG_GOAL_FLASH_STEPS = {
       const shakeAmpMul = soundIndex === START_EASTER_EGG_MAX_SOUND ? 2 : 1;
       const maxShiftY = ARG_PONG.visorEyeMaxShiftYPx * ARG_PONG.visorFollowRadiusBoost;
       const clutchSpringShakeAmpPx = maxShiftY * ARG_PONG.visorClutchSpringShakeAmpRatio * intensity * shakeAmpMul;
+      const clutchSpringShakeAmpXPx = clutchSpringShakeAmpPx * 0.42;
       const roundShakeSpeedY = ARG_PONG.visorClutchSpringShakeSpeedY * ARG_PONG.visorRoundShakeSpeedFactor;
+      const roundShakeSpeedX = roundShakeSpeedY * 1.18;
       const phaseX = Math.random() * Math.PI * 2;
       const phaseY = Math.random() * Math.PI * 2;
       const startAt = performance.now();
@@ -3647,9 +3649,13 @@ const ARG_GOAL_FLASH_STEPS = {
           Math.sin(now * roundShakeSpeedY + phaseY * 1.37)
           + Math.sin(now * roundShakeSpeedY * 1.91 + phaseX * 0.92) * 0.45
         ) * clutchSpringShakeAmpPx;
+        const roundSpringShakeX = (
+          Math.sin(now * roundShakeSpeedX + phaseX * 1.21)
+          + Math.sin(now * roundShakeSpeedX * 1.67 + phaseY * 0.78) * 0.35
+        ) * clutchSpringShakeAmpXPx;
         const eyeLayerShakeY = roundSpringShakeY;
         const pupilLayerShakeY = roundSpringShakeY * 0.82;
-        eyeOverlay.style.setProperty('--start-easter-eye-shake-x', '0px');
+        eyeOverlay.style.setProperty('--start-easter-eye-shake-x', `${roundSpringShakeX.toFixed(3)}px`);
         eyeOverlay.style.setProperty('--start-easter-eye-shake-y', `${roundSpringShakeY.toFixed(3)}px`);
         eyeOverlay.style.setProperty('--start-easter-eye-eye-shake-y', `${eyeLayerShakeY.toFixed(3)}px`);
         eyeOverlay.style.setProperty('--start-easter-eye-pupil-shake-y', `${pupilLayerShakeY.toFixed(3)}px`);
