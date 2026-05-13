@@ -1104,6 +1104,7 @@ let DITHER_ENABLED = false;
     bossCharsetRotationIndex: 0,
     bossFlashHidden: false,
     goalEyeZoomActive: false,
+    runId: '',
     bossPresetId: null,
     bossAsciiOptions: {
       ...ARG_BOSS_ASCII_PRESET,
@@ -1115,6 +1116,13 @@ const ARG_GOAL_FLASH_STEPS = {
   first: 1,
   eyeZoom: 2,
   third: 3
+};
+const ARG_RESULT_REPLIES = {
+  low: 'СТАТУС: LOW SCORE',
+  normal: 'СТАТУС: NORMAL SCORE',
+  personalBest: 'СТАТУС: NEW PERSONAL BEST',
+  enteredTop: 'СТАТУС: ENTERED TOP',
+  globalBest: 'СТАТУС: GLOBAL BEST'
 };
   const argBossAscii = {
     root: null,
@@ -1658,6 +1666,53 @@ const ARG_GOAL_FLASH_STEPS = {
     });
   }
 
+  function getArgResultReplyKey(resultMeta) {
+    if (resultMeta.isGlobalBest) return 'globalBest';
+    if (resultMeta.enteredTop) return 'enteredTop';
+    if (resultMeta.isNewPersonalBest) return 'personalBest';
+    if (resultMeta.score <= 0) return 'low';
+    return 'normal';
+  }
+
+  async function finishArgRunOnBackend({ runId, playerScore, botScore }) {
+    const res = await fetch(`${API_BASE}/api/pong/finish`, {
+      method: 'POST',
+      headers: applyTelegramInitDataHeader({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ runId, playerScore, botScore })
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json?.ok) throw new Error(json?.error || 'pong_finish_failed');
+    return json;
+  }
+
+  async function fetchArgLeaderboard() {
+    const res = await fetch(`${API_BASE}/api/pong/leaderboard`, { headers: applyTelegramInitDataHeader({}) });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json?.ok) throw new Error(json?.error || 'pong_leaderboard_failed');
+    return Array.isArray(json.leaderboard) ? json.leaderboard : [];
+  }
+
+  function formatArgLeaderboardText(leaderboard) {
+    const rows = leaderboard.slice(0, 10).map((player, index) => {
+      const rank = String(index + 1).padStart(2, '0');
+      const name = String(player?.displayName || 'UNKNOWN').trim().toUpperCase().slice(0, 10).padEnd(10, ' ');
+      const score = Number(player?.bestScore || 0);
+      return `${rank} ${name} ${score}`;
+    });
+    return ['LEADERBOARD', '', ...(rows.length ? rows : ['ПОКА ПУСТО'])].join('\n');
+  }
+
+  async function openArgLeaderboardFullscreen() {
+    const overlay = ensureArgOverlay();
+    const ballStickLayer = overlay.querySelector('#argSceneBallStickLayer');
+    if (ballStickLayer) ballStickLayer.innerHTML = '';
+    let popupText = 'LEADERBOARD\n\nПОКА ПУСТО';
+    try {
+      popupText = formatArgLeaderboardText(await fetchArgLeaderboard());
+    } catch (_) {}
+    await showArgPopup(popupText, { popupClass: 'arg-scene-popup-box--leaderboard' });
+  }
+
   function stopArgPongLoop() {
     argPongState.running = false;
     argBossAscii.ready = false;
@@ -1765,13 +1820,41 @@ const ARG_GOAL_FLASH_STEPS = {
     stopArgPongLoop();
     clearArgMatchSceneObjects();
     const runScore = Math.max(0, Number(argPongState.playerScore) || 0);
-    await showArgPopup(`ЗАБЕГ ЗАВЕРШЁН
+    const botScore = Math.max(0, Number(argPongState.aiScore) || 0);
+    let resultMeta = { score: runScore, impulsesAwarded: runScore, bestScore: runScore, isNewPersonalBest: false, enteredTop: false, isGlobalBest: false };
+    try {
+      const finishData = await finishArgRunOnBackend({ runId: argPongState.runId, playerScore: runScore, botScore });
+      const leaderboard = await fetchArgLeaderboard();
+      const userId = String(tg?.initDataUnsafe?.user?.id || '');
+      const currentRank = leaderboard.findIndex((p) => String(p?.userId || '') === userId);
+      const topPlayer = leaderboard[0] || null;
+      resultMeta = {
+        score: runScore,
+        impulsesAwarded: Math.max(0, Number(finishData?.run?.impulsesAwarded || 0)),
+        bestScore: Math.max(0, Number(finishData?.player?.bestScore || 0)),
+        isNewPersonalBest: Number(finishData?.player?.bestScore || 0) === runScore,
+        enteredTop: currentRank >= 0 && currentRank < 10,
+        isGlobalBest: !!topPlayer && String(topPlayer?.userId || '') === userId && Number(topPlayer?.bestScore || 0) === Number(finishData?.player?.bestScore || 0)
+      };
+    } catch (_) {
+      showAsciiPopup({ type: 'error', title: 'ОШИБКА', message: 'Не удалось подтвердить результат ARG/PONG.' });
+      resetArgOverlayState();
+      returnToStartMenu();
+      startArgSessionLocked = true;
+      startArgScenePending = false;
+      startArgSceneRunning = false;
+      startArgSceneStarted = false;
+      return;
+    }
 
-ТВОЙ SCORE: [${runScore}]
-ИЗВЛЕЧЕНО ИМПУЛЬСОВ: [+${runScore}]`, {
+    const replyLine = ARG_RESULT_REPLIES[getArgResultReplyKey(resultMeta)] || ARG_RESULT_REPLIES.normal;
+    await showArgPopup(`${replyLine}
+ИЗВЛЕЧЕНО ИМПУЛЬСОВ: [+${resultMeta.impulsesAwarded}]
+ЛИЧНЫЙ РЕКОРД: [${resultMeta.bestScore}]`, {
       openSoundSrc: ARG_SCENE_SOUNDS.danger2,
       popupClass: 'arg-scene-popup-box--score'
     });
+    await openArgLeaderboardFullscreen();
     resetArgOverlayState();
     returnToStartMenu();
     startArgSessionLocked = true;
@@ -2707,6 +2790,18 @@ const ARG_GOAL_FLASH_STEPS = {
 
     overlay.hidden = false;
     argSceneActive = true;
+    argPongState.runId = '';
+    try {
+      const runStartRes = await fetch(`${API_BASE}/api/pong/start`, {
+        method: 'POST',
+        headers: applyTelegramInitDataHeader({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({})
+      });
+      const runStartJson = await runStartRes.json().catch(() => ({}));
+      if (runStartRes.ok && runStartJson?.ok && runStartJson?.runId) {
+        argPongState.runId = String(runStartJson.runId);
+      }
+    } catch (_) {}
     argPongState.bossPresetId = null;
     argPongState.bossCharsetRotationIndex = 0;
     argPongState.bossFlashHidden = false;

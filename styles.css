@@ -2023,6 +2023,12 @@ input[type="color"] {
   padding:10px 16px;
 }
 
+.arg-scene-popup-box--leaderboard{
+  width:min(94vw, 1040px);
+  min-height:min(88vh, 860px);
+  padding:20px 18px;
+}
+
 .arg-scene-popup-text{
   color:var(--arg-popup-fg);
   font-family:'PixPlus', monospace;
