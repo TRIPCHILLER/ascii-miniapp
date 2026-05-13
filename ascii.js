@@ -1265,6 +1265,15 @@ const ARG_RESULT_REPLIES = {
           <div class="arg-scene-popup-text" id="argScenePopupText"></div>
         </div>
       </div>
+      <div class="arg-scene-layer arg-scene-leaderboard" id="argSceneLeaderboardLayer" hidden>
+        <div class="arg-scene-leaderboard-screen">
+          <div class="arg-scene-leaderboard-scroll" id="argSceneLeaderboardScroll"></div>
+          <div class="arg-scene-leaderboard-actions">
+            <button type="button" class="arg-scene-leaderboard-btn" id="argSceneLeaderboardBackBtn">[ВЕРНУТЬСЯ]</button>
+            <button type="button" class="arg-scene-leaderboard-btn" id="argSceneLeaderboardRenameBtn">[ИЗМЕНИТЬ СЕБЯ]</button>
+          </div>
+        </div>
+      </div>
     `;
     document.body.appendChild(overlay);
     return overlay;
@@ -1692,25 +1701,108 @@ const ARG_RESULT_REPLIES = {
     return Array.isArray(json.leaderboard) ? json.leaderboard : [];
   }
 
-  function formatArgLeaderboardText(leaderboard) {
-    const rows = leaderboard.slice(0, 10).map((player, index) => {
-      const rank = String(index + 1).padStart(2, '0');
-      const name = String(player?.displayName || 'UNKNOWN').trim().toUpperCase().slice(0, 10).padEnd(10, ' ');
-      const score = Number(player?.bestScore || 0);
-      return `${rank} ${name} ${score}`;
-    });
-    return ['LEADERBOARD', '', ...(rows.length ? rows : ['ПОКА ПУСТО'])].join('\n');
+  function renderArgLeaderboardRow(player, rank, { isCurrentUser = false } = {}) {
+    const row = document.createElement('div');
+    row.className = `arg-scene-leaderboard-row${isCurrentUser ? ' is-current-user' : ''}`;
+    const rankEl = document.createElement('div');
+    rankEl.className = 'arg-scene-leaderboard-rank';
+    rankEl.textContent = `#${rank}`;
+    const avatarEl = document.createElement('div');
+    avatarEl.className = 'arg-scene-leaderboard-avatar';
+    avatarEl.textContent = String(player?.avatar || '🌺');
+    const nameEl = document.createElement('div');
+    nameEl.className = 'arg-scene-leaderboard-name';
+    nameEl.textContent = String(player?.displayName || 'БЕЗЫМЯННЫЙ').trim().toUpperCase();
+    const scoreEl = document.createElement('div');
+    scoreEl.className = 'arg-scene-leaderboard-score';
+    scoreEl.textContent = String(Math.max(0, Number(player?.bestScore) || 0));
+    row.append(rankEl, avatarEl, nameEl, scoreEl);
+    return row;
+  }
+
+  async function openArgRenameFlowPlaceholder() {
+    showAsciiPopup({ type: 'info', title: 'СКОРО', message: 'СМЕНА ИМЕНИ БУДЕТ ДОБАВЛЕНА В СЛЕДУЮЩЕМ ШАГЕ.' });
   }
 
   async function openArgLeaderboardFullscreen() {
     const overlay = ensureArgOverlay();
+    const leaderboardLayer = overlay.querySelector('#argSceneLeaderboardLayer');
+    const leaderboardScroll = overlay.querySelector('#argSceneLeaderboardScroll');
+    const backBtn = overlay.querySelector('#argSceneLeaderboardBackBtn');
+    const renameBtn = overlay.querySelector('#argSceneLeaderboardRenameBtn');
+    if (!leaderboardLayer || !leaderboardScroll || !backBtn || !renameBtn) return;
+
     const ballStickLayer = overlay.querySelector('#argSceneBallStickLayer');
+    const eyeLayer = overlay.querySelector('#argSceneEyeLayer');
+    const scoreLayer = overlay.querySelector('#argSceneScoreLayer');
+    const countdownLayer = overlay.querySelector('#argSceneCountdownLayer');
     if (ballStickLayer) ballStickLayer.innerHTML = '';
-    let popupText = 'LEADERBOARD\n\nПОКА ПУСТО';
+    if (eyeLayer) eyeLayer.hidden = true;
+    if (scoreLayer) scoreLayer.hidden = true;
+    if (countdownLayer) countdownLayer.textContent = '';
+
+    let leaderboard = [];
     try {
-      popupText = formatArgLeaderboardText(await fetchArgLeaderboard());
+      leaderboard = await fetchArgLeaderboard();
     } catch (_) {}
-    await showArgPopup(popupText, { popupClass: 'arg-scene-popup-box--leaderboard' });
+
+    const userId = String(tg?.initDataUnsafe?.user?.id || '');
+    const currentRank = leaderboard.findIndex((p) => String(p?.userId || '') === userId);
+    const divider = '————————————————————————————————';
+    const frag = document.createDocumentFragment();
+    const title = document.createElement('div');
+    title.className = 'arg-scene-leaderboard-title';
+    title.textContent = 'СТАТИСТИКА:';
+    frag.append(title);
+    const titleDivider = document.createElement('div');
+    titleDivider.className = 'arg-scene-leaderboard-divider';
+    titleDivider.textContent = divider;
+    frag.append(titleDivider);
+
+    leaderboard.forEach((player, index) => {
+      if (index === currentRank) {
+        const youLabel = document.createElement('div');
+        youLabel.className = 'arg-scene-leaderboard-you';
+        youLabel.textContent = 'ТЫ:';
+        const youDivider = document.createElement('div');
+        youDivider.className = 'arg-scene-leaderboard-divider';
+        youDivider.textContent = divider;
+        frag.append(youLabel, renderArgLeaderboardRow(player, index + 1, { isCurrentUser: true }), youDivider);
+      } else {
+        frag.append(renderArgLeaderboardRow(player, index + 1));
+      }
+    });
+
+    if (!leaderboard.length) {
+      const empty = document.createElement('div');
+      empty.className = 'arg-scene-leaderboard-empty';
+      empty.textContent = 'ПОКА ПУСТО';
+      frag.append(empty);
+    }
+
+    leaderboardScroll.innerHTML = '';
+    leaderboardScroll.appendChild(frag);
+    leaderboardScroll.scrollTop = 0;
+    leaderboardLayer.hidden = false;
+
+    await new Promise((resolve) => {
+      let closed = false;
+      const close = ({ openRename = false } = {}) => {
+        if (closed) return;
+        closed = true;
+        backBtn.removeEventListener('click', onBack);
+        renameBtn.removeEventListener('click', onRename);
+        leaderboardLayer.hidden = true;
+        if (eyeLayer) eyeLayer.hidden = false;
+        playUiSoundNoThrow(ARG_SCENE_SOUNDS.click);
+        if (openRename) openArgRenameFlowPlaceholder();
+        resolve();
+      };
+      const onBack = (ev) => { ev.preventDefault(); close(); };
+      const onRename = (ev) => { ev.preventDefault(); close({ openRename: true }); };
+      backBtn.addEventListener('click', onBack);
+      renameBtn.addEventListener('click', onRename);
+    });
   }
 
   function stopArgPongLoop() {
