@@ -2107,7 +2107,24 @@ input[type="color"] {
 .arg-scene-leaderboard-name,
 .arg-scene-leaderboard-score{ min-width:0; }
 
-.arg-scene-leaderboard-avatar{ text-align:center; }
+.arg-scene-leaderboard-avatar{
+  width:56px;
+  height:56px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:2px solid #fff;
+  background:var(--arg-avatar-bg, #101010);
+}
+
+.arg-scene-leaderboard-avatar-icon{
+  width:82%;
+  height:82%;
+  display:block;
+  background:var(--arg-avatar-fg, #fff);
+  -webkit-mask:url('./assets/player_avatar.svg') center/contain no-repeat;
+  mask:url('./assets/player_avatar.svg') center/contain no-repeat;
+}
 .arg-scene-leaderboard-name{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .arg-scene-leaderboard-score{ text-align:right; }
 .arg-scene-leaderboard-row.is-current-user{ color:#fff; }
@@ -2137,6 +2154,40 @@ input[type="color"] {
   text-transform:uppercase;
   cursor:pointer;
   padding:0;
+}
+
+.arg-scene-rename-title{
+  font-family:'PixPlus', monospace;
+  text-transform:uppercase;
+  text-align:center;
+  font-size:clamp(30px, 5vw, 40px);
+  margin-bottom:12px;
+}
+
+.arg-scene-rename-input{
+  width:100%;
+  border:2px solid #fff;
+  background:#000;
+  color:#fff;
+  font-family:'PixPlus', monospace;
+  font-size:clamp(24px, 4vw, 34px);
+  text-transform:uppercase;
+  padding:8px 10px;
+  box-sizing:border-box;
+}
+
+.arg-scene-rename-error{
+  margin-top:10px;
+  text-align:center;
+  color:#ff6b6b;
+  font-size:clamp(20px, 3.4vw, 28px);
+}
+
+.arg-scene-rename-actions{
+  margin-top:14px;
+  display:flex;
+  justify-content:center;
+  gap:18px;
 }
 
 body.visor-text #modeVideo{display:none !important;}

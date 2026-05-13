@@ -1077,8 +1077,12 @@ app.post('/api/pong/profile/name', (req, res) => {
     return res.status(401).json({ ok: false, error: 'invalid_init_data' });
   }
 
-  const nextName = String(req.body?.displayName || '').trim();
-  if (!nextName || nextName.length > 32) return res.status(400).json({ ok: false, error: 'invalid_display_name' });
+  const nextName = String(req.body?.displayName || '')
+    .replace(/[\u0000-\u001F\u007F]/g, '')
+    .trim();
+  if (nextName.length < 2 || nextName.length > 20) {
+    return res.status(400).json({ ok: false, error: 'invalid_display_name' });
+  }
 
   const { player, players } = getOrCreatePlayer(userId);
   player.displayName = nextName;
