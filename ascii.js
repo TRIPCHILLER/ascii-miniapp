@@ -1757,6 +1757,7 @@ const ARG_RESULT_REPLIES = {
     const popupLayer = overlay.querySelector('#argScenePopupLayer');
     const popupBox = overlay.querySelector('.arg-scene-popup-box');
     if (!popupLayer || !popupBox) return false;
+    popupLayer.classList.add('arg-scene-popup--profile-customize-open');
 
     const tpl = document.createElement('div');
     const fallbackPlayer = (await fetchArgLeaderboard().catch(() => []))
@@ -1801,7 +1802,20 @@ const ARG_RESULT_REPLIES = {
     const fgSwatch = popupBox.querySelector('#argSceneAvatarFgSwatch');
     const bgSwatch = popupBox.querySelector('#argSceneAvatarBgSwatch');
     const pickerMount = popupBox.querySelector('#argScenePickerMount');
-    if (!input || !errorEl || !saveBtn || !cancelBtn || !preview || !fgSwatch || !bgSwatch || !pickerMount) return false;
+    const missing = [];
+    if (!input) missing.push('input');
+    if (!errorEl) missing.push('errorEl');
+    if (!saveBtn) missing.push('saveBtn');
+    if (!cancelBtn) missing.push('cancelBtn');
+    if (!preview) missing.push('preview');
+    if (!fgSwatch) missing.push('fgSwatch');
+    if (!bgSwatch) missing.push('bgSwatch');
+    if (!pickerMount) missing.push('pickerMount');
+    if (missing.length) {
+      console.warn('[ARG leaderboard customize] missing elements:', missing.join(', '));
+      popupLayer.classList.remove('arg-scene-popup--profile-customize-open');
+      return false;
+    }
     tpl.addEventListener('click', (ev) => ev.stopPropagation());
     pickerMount.addEventListener('click', (ev) => ev.stopPropagation());
     input.value = draftName;
@@ -1810,7 +1824,11 @@ const ARG_RESULT_REPLIES = {
     const cpModal = document.getElementById('cp-modal');
     const cpCancel = document.getElementById('cp-cancel');
     const cpOk = document.getElementById('cp-ok');
-    if (!cpBody || !cpActions || !cpModal || !cpCancel || !cpOk) return false;
+    const cpOkMissing = !cpBody || !cpActions || !cpModal || !cpCancel || !cpOk;
+    const cpUnavailable = cpOkMissing || !CP || typeof CP.open !== 'function';
+    if (cpUnavailable) {
+      pickerMount.textContent = 'ПАЛИТРА НЕДОСТУПНА';
+    }
     const updateAvatarPreview = () => {
       preview.style.setProperty('--arg-avatar-bg', draftBg);
       preview.style.setProperty('--arg-avatar-fg', draftFg);
@@ -1830,6 +1848,7 @@ const ARG_RESULT_REPLIES = {
       updateAvatarPreview();
     };
     const openPickerInline = (hex) => {
+      if (cpUnavailable) return;
       const fakeInput = document.createElement('input');
       fakeInput.id = activeColorTarget === 'fg' ? 'fg' : 'bg';
       fakeInput.value = hex;
@@ -1854,11 +1873,13 @@ const ARG_RESULT_REPLIES = {
       updateAvatarPreview();
       openPickerInline(draftBg);
     });
-    cpOk.addEventListener('click', onPickConfirm);
-    cpCancel.addEventListener('click', (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
-    });
+    if (!cpUnavailable) {
+      cpOk.addEventListener('click', onPickConfirm);
+      cpCancel.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+      });
+    }
 
     input.focus();
 
@@ -1872,6 +1893,7 @@ const ARG_RESULT_REPLIES = {
         input.removeEventListener('keydown', onKeyDown);
         popupLayer.hidden = true;
         popupBox.className = 'arg-scene-popup-box';
+        popupLayer.classList.remove('arg-scene-popup--profile-customize-open');
         resolve(saved);
       };
       const onCancel = (ev) => {
