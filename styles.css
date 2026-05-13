@@ -2088,21 +2088,36 @@ input[type="color"] {
 }
 
 .arg-scene-leaderboard-divider{
-  font-size:clamp(18px, 3.5vw, 26px);
-  line-height:1;
-  text-align:center;
+  position:relative;
+  height:16px;
   margin:7px auto 9px;
+}
+
+.arg-scene-leaderboard-divider::before{
+  content:'';
+  position:absolute;
+  left:0;
+  right:0;
+  top:50%;
+  height:3px;
+  transform:translateY(-50%);
+  background:repeating-linear-gradient(
+    to right,
+    currentColor 0 14px,
+    transparent 14px 24px
+  );
 }
 
 .arg-scene-leaderboard-row{
   display:grid;
-  grid-template-columns:78px 64px minmax(0, 1fr) 88px;
+  grid-template-columns:66px 60px minmax(0, 1fr) 78px;
   align-items:center;
-  column-gap:10px;
+  column-gap:6px;
   font-size:clamp(22px, 4.1vw, 31px);
   line-height:1.12;
   text-align:left;
   margin-bottom:5px;
+  padding-inline:8px;
 }
 
 .arg-scene-leaderboard-rank,
@@ -2129,7 +2144,8 @@ input[type="color"] {
   mask:url('./assets/player_avatar.svg') center/contain no-repeat;
 }
 .arg-scene-leaderboard-name{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.arg-scene-leaderboard-score{ text-align:right; }
+.arg-scene-leaderboard-rank{ padding-left:2px; }
+.arg-scene-leaderboard-score{ text-align:right; padding-right:2px; }
 .arg-scene-leaderboard-row.is-current-user{
   background:#fff;
   color:#000;

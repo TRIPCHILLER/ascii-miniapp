@@ -1951,7 +1951,6 @@ const ARG_RESULT_REPLIES = {
 
       const userId = String(tg?.initDataUnsafe?.user?.id || '');
       const currentRank = leaderboard.findIndex((p) => String(p?.userId || '') === userId);
-      const divider = '————————————————————————————————';
       const frag = document.createDocumentFragment();
       const title = document.createElement('div');
       title.className = 'arg-scene-leaderboard-title';
@@ -1959,7 +1958,7 @@ const ARG_RESULT_REPLIES = {
       frag.append(title);
       const titleDivider = document.createElement('div');
       titleDivider.className = 'arg-scene-leaderboard-divider';
-      titleDivider.textContent = divider;
+      titleDivider.setAttribute('aria-hidden', 'true');
       frag.append(titleDivider);
 
       leaderboard.forEach((player, index) => {
