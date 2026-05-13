@@ -3408,15 +3408,15 @@ const ARG_GOAL_FLASH_STEPS = {
       const growthByTap = {
         2: 0.30,
         3: 0.45,
-        4: 0.60,
-        5: 0.75,
-        6: 0.90,
-        7: 1.05,
-        8: 1.20,
-        9: 1.35,
-        10: 1.50
+        4: 0.70,
+        5: 0.875,
+        6: 1.05,
+        7: 1.225,
+        8: 1.40,
+        9: 1.575,
+        10: 1.75
       };
-      return growthByTap[soundIndex] ?? 1.50;
+      return growthByTap[soundIndex] ?? 1.75;
     };
     const startStartMenuBigEyeMotion = () => {
       if (startEasterBigEyeMotionRafId) return;
