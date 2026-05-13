@@ -3510,13 +3510,18 @@ const ARG_GOAL_FLASH_STEPS = {
       state.indices.push(...additions);
       return state;
     };
-    const glitchTextNodeValue = (value, indices) => {
+    const nextGlitchDelayMs = () => 22 + Math.floor(Math.random() * 95);
+    const glitchTextNodeValue = (value, indices, state, nowMs) => {
       if (!value || !/\S/.test(value)) return value;
       const chars = value.split('');
       if (!indices?.length) return value;
+      if (!state.nextSwapAt || typeof state.nextSwapAt !== 'object') state.nextSwapAt = {};
       indices.forEach((idx) => {
         if (idx < 0 || idx >= chars.length || chars[idx] === ' ') return;
+        const nextSwapAt = state.nextSwapAt[idx] || 0;
+        if (nowMs < nextSwapAt) return;
         chars[idx] = getRandomGlitchChar();
+        state.nextSwapAt[idx] = nowMs + nextGlitchDelayMs();
       });
       return chars.join('');
     };
@@ -3541,6 +3546,7 @@ const ARG_GOAL_FLASH_STEPS = {
     const applyWordGlitchTick = () => {
       const targets = collectGlitchTargets();
       if (!startWordGlitchStateMap) startWordGlitchStateMap = new WeakMap();
+      const nowMs = Date.now();
       for (const node of targets) {
         const raw = node.nodeValue || '';
         if (!raw.trim()) continue;
@@ -3548,18 +3554,19 @@ const ARG_GOAL_FLASH_STEPS = {
           startWordGlitchStateMap.set(node, {
             source: raw,
             indices: [],
-            available: null
+            available: null,
+            nextSwapAt: {}
           });
         }
         const state = startWordGlitchStateMap.get(node);
         ensureGlitchState(state, startWordGlitchBrokenChars, startWordGlitchFullChaos);
-        node.nodeValue = glitchTextNodeValue(state.source, state.indices);
+        node.nodeValue = glitchTextNodeValue(state.source, state.indices, state, nowMs);
       }
     };
     const startWordGlitchFx = () => {
       if (startWordGlitchTimer) return;
       applyWordGlitchTick();
-      startWordGlitchTimer = setInterval(applyWordGlitchTick, 500);
+      startWordGlitchTimer = setInterval(applyWordGlitchTick, 33);
     };
     const stopWordGlitchFx = () => {
       if (startWordGlitchTimer) {
