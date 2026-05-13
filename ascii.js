@@ -1770,7 +1770,9 @@ const ARG_RESULT_REPLIES = {
     tpl.innerHTML = `
       <div class="arg-scene-rename-name-block">
         <div class="arg-scene-rename-title">НАЗОВИСЬ:</div>
-        <input type="text" class="arg-scene-rename-input" id="argSceneRenameInput" maxlength="20" autocomplete="off" spellcheck="false" />
+        <div class="arg-scene-rename-input-frame">
+          <input type="text" class="arg-scene-rename-input" id="argSceneRenameInput" maxlength="20" autocomplete="off" spellcheck="false" />
+        </div>
       </div>
       <div class="arg-scene-avatar-editor">
         <div class="arg-scene-avatar-preview" id="argSceneAvatarPreview">
@@ -1784,8 +1786,8 @@ const ARG_RESULT_REPLIES = {
       <div class="arg-scene-picker-wrap" id="argScenePickerMount"></div>
       <div class="arg-scene-rename-error" id="argSceneRenameError" hidden>ИМЯ: 2–20 СИМВОЛОВ</div>
       <div class="arg-scene-rename-actions">
-        <button type="button" class="arg-scene-leaderboard-btn" id="argSceneRenameSaveBtn">[ГОТОВО]</button>
         <button type="button" class="arg-scene-leaderboard-btn" id="argSceneRenameCancelBtn">[ОТМЕНА]</button>
+        <button type="button" class="arg-scene-leaderboard-btn" id="argSceneRenameSaveBtn">[УСТАНОВИТЬ]</button>
       </div>
     `;
     popupBox.className = 'arg-scene-popup-box arg-scene-popup-box--leaderboard';
@@ -1819,16 +1821,35 @@ const ARG_RESULT_REPLIES = {
     tpl.addEventListener('click', (ev) => ev.stopPropagation());
     pickerMount.addEventListener('click', (ev) => ev.stopPropagation());
     input.value = draftName;
-    const cpBody = document.getElementById('cp-body');
-    const cpActions = document.getElementById('cp-actions');
-    const cpModal = document.getElementById('cp-modal');
-    const cpCancel = document.getElementById('cp-cancel');
-    const cpOk = document.getElementById('cp-ok');
-    const cpOkMissing = !cpBody || !cpActions || !cpModal || !cpCancel || !cpOk;
-    const cpUnavailable = cpOkMissing || !CP || typeof CP.open !== 'function';
-    if (cpUnavailable) {
-      pickerMount.textContent = 'ПАЛИТРА НЕДОСТУПНА';
-    }
+    const looksSystemName = (name) => {
+      const normalized = String(name || '').trim().toUpperCase();
+      return /^ЦИФРОВОЙ[_\s-]*СУБЪ(?:Е|3)КТ[_\s-]*\d+$/i.test(normalized)
+        || /^БЕЗЫМ(?:Я|9)НН/i.test(normalized);
+    };
+    const syncNameTone = () => {
+      input.classList.toggle('is-placeholder-name', looksSystemName(input.value));
+    };
+    syncNameTone();
+    input.addEventListener('input', syncNameTone);
+    const pickerColors = [
+      '#000000','#202020','#404040','#606060','#808080','#b0b0b0','#d8d8d8','#ffffff',
+      '#6b0000','#8c1c13','#b23a00','#d25f00','#ea8a00','#f2bc1b','#ffe066','#fff4b3',
+      '#1f4d00','#2d6a1f','#3d8c40','#52b788','#2a9d8f','#00a7a7','#4cc9f0','#90e0ef',
+      '#001f54','#003f88','#00509d','#4361ee','#3a0ca3','#560bad','#7209b7','#b5179e',
+      '#d0006f','#ef476f','#ff6b6b','#ff8fab','#a47148','#c08552','#dda15e','#e9c46a'
+    ];
+    const pickerGrid = document.createElement('div');
+    pickerGrid.className = 'arg-scene-picker-grid';
+    pickerColors.forEach((hex) => {
+      const cell = document.createElement('button');
+      cell.type = 'button';
+      cell.className = 'arg-scene-picker-cell';
+      cell.style.backgroundColor = hex;
+      cell.dataset.color = hex;
+      cell.setAttribute('aria-label', `color ${hex}`);
+      pickerGrid.appendChild(cell);
+    });
+    pickerMount.appendChild(pickerGrid);
     const updateAvatarPreview = () => {
       preview.style.setProperty('--arg-avatar-bg', draftBg);
       preview.style.setProperty('--arg-avatar-fg', draftFg);
@@ -1837,49 +1858,26 @@ const ARG_RESULT_REPLIES = {
       fgSwatch.classList.toggle('is-active', activeColorTarget === 'fg');
       bgSwatch.classList.toggle('is-active', activeColorTarget === 'bg');
     };
-    const applyPickerColor = () => {
-      const swatch = document.getElementById('cp-preview-swatch');
-      const raw = swatch ? getComputedStyle(swatch).backgroundColor : '';
-      const m = String(raw).match(/\d+/g) || [];
-      if (m.length < 3) return;
-      const hex = `#${m.slice(0, 3).map((n) => Number(n).toString(16).padStart(2, '0')).join('')}`;
+    const applyPickerColor = (hex) => {
+      if (!hex) return;
       if (activeColorTarget === 'fg') draftFg = hex;
       else draftBg = hex;
       updateAvatarPreview();
     };
-    const openPickerInline = (hex) => {
-      if (cpUnavailable) return;
-      const fakeInput = document.createElement('input');
-      fakeInput.id = activeColorTarget === 'fg' ? 'fg' : 'bg';
-      fakeInput.value = hex;
-      CP.open(fakeInput);
-      cpActions.hidden = true;
-      pickerMount.appendChild(cpBody);
-      cpModal.hidden = true;
-    };
-    const onPickConfirm = (ev) => {
-      ev.preventDefault();
-      applyPickerColor();
-    };
     updateAvatarPreview();
-    openPickerInline(draftFg);
     fgSwatch.addEventListener('click', () => {
       activeColorTarget = 'fg';
       updateAvatarPreview();
-      openPickerInline(draftFg);
     });
     bgSwatch.addEventListener('click', () => {
       activeColorTarget = 'bg';
       updateAvatarPreview();
-      openPickerInline(draftBg);
     });
-    if (!cpUnavailable) {
-      cpOk.addEventListener('click', onPickConfirm);
-      cpCancel.addEventListener('click', (ev) => {
-        ev.preventDefault();
-        ev.stopPropagation();
-      });
-    }
+    pickerGrid.addEventListener('click', (ev) => {
+      const btn = ev.target.closest('.arg-scene-picker-cell');
+      if (!btn) return;
+      applyPickerColor(String(btn.dataset.color || ''));
+    });
 
     input.focus();
 
