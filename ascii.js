@@ -1879,8 +1879,6 @@ const ARG_RESULT_REPLIES = {
       applyPickerColor(String(btn.dataset.color || ''));
     });
 
-    input.focus();
-
     return await new Promise((resolve) => {
       let closed = false;
       const close = (saved) => {
