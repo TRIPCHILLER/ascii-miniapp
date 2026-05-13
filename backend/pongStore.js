@@ -55,8 +55,9 @@ function generateAvatarColors(seedInput) {
 }
 
 function formatDefaultName(playerNumber) {
-  const suffix = playerNumber >= 1 && playerNumber <= 9 ? `0${playerNumber}` : String(playerNumber);
-  return `ЦИФРОВОЙ_СУБЪ3КТ_${suffix}`;
+  const normalizedNumber = Number(playerNumber);
+  const safeNumber = Number.isFinite(normalizedNumber) && normalizedNumber > 0 ? normalizedNumber : 0;
+  return `СУБЪ3КТ_${String(safeNumber).padStart(2, '0')}`;
 }
 
 function getOrCreatePlayer(userId) {

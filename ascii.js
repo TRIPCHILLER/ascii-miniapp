@@ -1782,7 +1782,7 @@ const ARG_RESULT_REPLIES = {
     const tpl = document.createElement('div');
     const fallbackPlayer = (await fetchArgLeaderboard().catch(() => []))
       .find((p) => String(p?.userId || '') === String(tg?.initDataUnsafe?.user?.id || '')) || null;
-    let draftName = String(fallbackPlayer?.displayName || '').trim();
+    let draftName = resolveArgLeaderboardName(fallbackPlayer || {});
     let draftFg = String(fallbackPlayer?.avatarFg || '#ffffff');
     let draftBg = String(fallbackPlayer?.avatarBg || '#181818');
     let activeColorTarget = 'fg';
