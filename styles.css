@@ -2143,6 +2143,8 @@ input[type="color"] {
   justify-content:center;
   align-items:center;
   padding-top:12px;
+  width:100%;
+  pointer-events:auto;
 }
 
 .arg-scene-leaderboard-btn{
@@ -2155,6 +2157,10 @@ input[type="color"] {
   text-transform:uppercase;
   cursor:pointer;
   padding:0;
+  display:inline-flex;
+  width:max-content;
+  flex:0 0 auto;
+  pointer-events:auto;
 }
 
 .arg-scene-rename-title{

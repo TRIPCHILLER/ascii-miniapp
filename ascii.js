@@ -1791,6 +1791,7 @@ const ARG_RESULT_REPLIES = {
     popupBox.innerHTML = '';
     popupBox.appendChild(tpl);
     popupLayer.hidden = false;
+    popupBox.addEventListener('click', (ev) => ev.stopPropagation());
 
     const input = popupBox.querySelector('#argSceneRenameInput');
     const errorEl = popupBox.querySelector('#argSceneRenameError');
@@ -1801,6 +1802,8 @@ const ARG_RESULT_REPLIES = {
     const bgSwatch = popupBox.querySelector('#argSceneAvatarBgSwatch');
     const pickerMount = popupBox.querySelector('#argScenePickerMount');
     if (!input || !errorEl || !saveBtn || !cancelBtn || !preview || !fgSwatch || !bgSwatch || !pickerMount) return false;
+    tpl.addEventListener('click', (ev) => ev.stopPropagation());
+    pickerMount.addEventListener('click', (ev) => ev.stopPropagation());
     input.value = draftName;
     const cpBody = document.getElementById('cp-body');
     const cpActions = document.getElementById('cp-actions');
@@ -1852,7 +1855,10 @@ const ARG_RESULT_REPLIES = {
       openPickerInline(draftBg);
     });
     cpOk.addEventListener('click', onPickConfirm);
-    cpCancel.addEventListener('click', (ev) => ev.preventDefault());
+    cpCancel.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+    });
 
     input.focus();
 
@@ -1905,9 +1911,10 @@ const ARG_RESULT_REPLIES = {
     const overlay = ensureArgOverlay();
     const leaderboardLayer = overlay.querySelector('#argSceneLeaderboardLayer');
     const leaderboardScroll = overlay.querySelector('#argSceneLeaderboardScroll');
+    const leaderboardActions = overlay.querySelector('.arg-scene-leaderboard-actions');
     const backBtn = overlay.querySelector('#argSceneLeaderboardBackBtn');
     const renameBtn = overlay.querySelector('#argSceneLeaderboardRenameBtn');
-    if (!leaderboardLayer || !leaderboardScroll || !backBtn || !renameBtn) return;
+    if (!leaderboardLayer || !leaderboardScroll || !backBtn || !renameBtn || !leaderboardActions) return;
 
     const ballStickLayer = overlay.querySelector('#argSceneBallStickLayer');
     const eyeLayer = overlay.querySelector('#argSceneEyeLayer');
@@ -1969,6 +1976,7 @@ const ARG_RESULT_REPLIES = {
         closed = true;
         backBtn.removeEventListener('click', onBack);
         renameBtn.removeEventListener('click', onRename);
+        leaderboardActions.removeEventListener('click', stopFooterClick);
         if (!openRename) leaderboardLayer.hidden = true;
         if (eyeLayer) eyeLayer.hidden = false;
         playUiSoundNoThrow(ARG_SCENE_SOUNDS.click);
@@ -1979,8 +1987,18 @@ const ARG_RESULT_REPLIES = {
         }
         resolve();
       };
-      const onBack = (ev) => { ev.preventDefault(); close(); };
-      const onRename = (ev) => { ev.preventDefault(); close({ openRename: true }); };
+      const stopFooterClick = (ev) => { ev.stopPropagation(); };
+      const onBack = (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        close();
+      };
+      const onRename = (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        close({ openRename: true });
+      };
+      leaderboardActions.addEventListener('click', stopFooterClick);
       backBtn.addEventListener('click', onBack);
       renameBtn.addEventListener('click', onRename);
     });
