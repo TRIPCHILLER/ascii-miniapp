@@ -1268,6 +1268,7 @@ const ARG_RESULT_REPLIES = {
       <div class="arg-scene-layer arg-scene-leaderboard" id="argSceneLeaderboardLayer" hidden>
         <div class="arg-scene-leaderboard-screen">
           <div class="arg-scene-leaderboard-scroll" id="argSceneLeaderboardScroll"></div>
+          <div class="arg-scene-leaderboard-divider arg-scene-leaderboard-divider--footer" aria-hidden="true"></div>
           <div class="arg-scene-leaderboard-actions">
             <button type="button" class="arg-scene-leaderboard-btn" id="argSceneLeaderboardBackBtn">[ВЕРНУТЬСЯ]</button>
             <button type="button" class="arg-scene-leaderboard-btn" id="argSceneLeaderboardRenameBtn">[ИЗМЕНИТЬ СЕБЯ]</button>
@@ -1729,6 +1730,25 @@ const ARG_RESULT_REPLIES = {
     return normalized;
   }
 
+  function formatArgDefaultName(playerNumber) {
+    const normalizedNumber = Number(playerNumber);
+    const safeNumber = Number.isFinite(normalizedNumber) && normalizedNumber > 0 ? normalizedNumber : 0;
+    return `СУБЪ3КТ_${String(safeNumber).padStart(2, '0')}`;
+  }
+
+  function resolveArgLeaderboardName(player) {
+    const rawName = String(player?.displayName || '').trim();
+    const upperName = rawName.toUpperCase();
+    const hasCustomName = player?.isCustomName === true;
+    const playerNumber = Number(player?.playerNumber || 0);
+    const isLegacySystemName = /^ЦИФРОВОЙ[_\s-]*СУБЪ(?:Е|3)КТ[_\s-]*\d+$/i.test(upperName);
+    const isNewSystemName = /^СУБЪ(?:Е|3)КТ[_\s-]*\d+$/i.test(upperName);
+    if (!hasCustomName || !rawName || isLegacySystemName || isNewSystemName) {
+      return formatArgDefaultName(playerNumber);
+    }
+    return upperName;
+  }
+
   function renderArgLeaderboardRow(player, rank, { isCurrentUser = false } = {}) {
     const row = document.createElement('div');
     row.className = `arg-scene-leaderboard-row${isCurrentUser ? ' is-current-user' : ''}`;
@@ -1744,7 +1764,7 @@ const ARG_RESULT_REPLIES = {
     avatarEl.appendChild(avatarIcon);
     const nameEl = document.createElement('div');
     nameEl.className = 'arg-scene-leaderboard-name';
-    nameEl.textContent = String(player?.displayName || 'БЕЗЫМЯННЫЙ').trim().toUpperCase();
+    nameEl.textContent = resolveArgLeaderboardName(player);
     const scoreEl = document.createElement('div');
     scoreEl.className = 'arg-scene-leaderboard-score';
     scoreEl.textContent = String(Math.max(0, Number(player?.bestScore) || 0));
@@ -1824,6 +1844,7 @@ const ARG_RESULT_REPLIES = {
     const looksSystemName = (name) => {
       const normalized = String(name || '').trim().toUpperCase();
       return /^ЦИФРОВОЙ[_\s-]*СУБЪ(?:Е|3)КТ[_\s-]*\d+$/i.test(normalized)
+        || /^СУБЪ(?:Е|3)КТ[_\s-]*\d+$/i.test(normalized)
         || /^БЕЗЫМ(?:Я|9)НН/i.test(normalized);
     };
     const syncNameTone = () => {
@@ -1952,6 +1973,10 @@ const ARG_RESULT_REPLIES = {
       const userId = String(tg?.initDataUnsafe?.user?.id || '');
       const currentRank = leaderboard.findIndex((p) => String(p?.userId || '') === userId);
       const frag = document.createDocumentFragment();
+      const topDivider = document.createElement('div');
+      topDivider.className = 'arg-scene-leaderboard-divider';
+      topDivider.setAttribute('aria-hidden', 'true');
+      frag.append(topDivider);
       const title = document.createElement('div');
       title.className = 'arg-scene-leaderboard-title';
       title.textContent = 'СТАТИСТИКА:';
