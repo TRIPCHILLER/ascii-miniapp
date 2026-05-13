@@ -1093,6 +1093,35 @@ app.post('/api/pong/profile/name', (req, res) => {
   return res.json({ ok: true, player });
 });
 
+app.post('/api/pong/profile/customize', (req, res) => {
+  let userId = '';
+  try {
+    userId = parseInitDataUserIdOrThrow(req);
+  } catch {
+    return res.status(401).json({ ok: false, error: 'invalid_init_data' });
+  }
+
+  const nextName = String(req.body?.displayName || '').replace(/[\u0000-\u001F\u007F]/g, '').trim();
+  const avatarFg = String(req.body?.avatarFg || '').trim();
+  const avatarBg = String(req.body?.avatarBg || '').trim();
+  const isHexColor = (v) => /^#([0-9a-fA-F]{6})$/.test(v);
+  if (nextName.length < 2 || nextName.length > 20) {
+    return res.status(400).json({ ok: false, error: 'invalid_display_name' });
+  }
+  if (!isHexColor(avatarFg) || !isHexColor(avatarBg)) {
+    return res.status(400).json({ ok: false, error: 'invalid_avatar_colors' });
+  }
+
+  const { player, players } = getOrCreatePlayer(userId);
+  player.displayName = nextName;
+  player.isCustomName = true;
+  player.avatarFg = avatarFg.toLowerCase();
+  player.avatarBg = avatarBg.toLowerCase();
+  player.updatedAt = new Date().toISOString();
+  writeLeaderboard(players);
+  return res.json({ ok: true, player });
+});
+
 // === ОБНОВЛЁННЫЙ ХЕНДЛЕР ДЛЯ /api/upload и /upload ===
 // Принимаем любой из ключей: file ИЛИ document, а также initdata ИЛИ initData, mediatype ИЛИ mediaType
 const uploadHandler = [

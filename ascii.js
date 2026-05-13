@@ -1118,11 +1118,11 @@ const ARG_GOAL_FLASH_STEPS = {
   third: 3
 };
 const ARG_RESULT_REPLIES = {
-  low: 'СТАТУС: LOW SCORE',
-  normal: 'СТАТУС: NORMAL SCORE',
-  personalBest: 'СТАТУС: NEW PERSONAL BEST',
-  enteredTop: 'СТАТУС: ENTERED TOP',
-  globalBest: 'СТАТУС: GLOBAL BEST'
+  low: 'СЛИШКОМ СЛАБЫЙ СИГНАЛ...',
+  normal: 'НЕПЛОХО...',
+  personalBest: 'НОВЫЙ ЛИЧНЫЙ РЕКОРД.',
+  enteredTop: 'ТЫ ВОШЁЛ В ТАБЛИЦУ.',
+  globalBest: 'ТЫ СТАЛ ЛУЧШИМ.'
 };
   const argBossAscii = {
     root: null,
@@ -1712,6 +1712,17 @@ const ARG_RESULT_REPLIES = {
     return json.player || null;
   }
 
+  async function updateArgProfileCustomize({ displayName, avatarFg, avatarBg }) {
+    const res = await fetch(`${API_BASE}/api/pong/profile/customize`, {
+      method: 'POST',
+      headers: applyTelegramInitDataHeader({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ displayName, avatarFg, avatarBg })
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json?.ok) throw new Error(json?.error || 'pong_profile_customize_failed');
+    return json.player || null;
+  }
+
   function sanitizeArgDisplayName(input) {
     const normalized = String(input || '').replace(/[\u0000-\u001F\u007F]/g, '').trim();
     if (normalized.length < 2 || normalized.length > 20) return '';
@@ -1748,13 +1759,31 @@ const ARG_RESULT_REPLIES = {
     if (!popupLayer || !popupBox) return false;
 
     const tpl = document.createElement('div');
-    tpl.className = 'arg-scene-rename';
+    const fallbackPlayer = (await fetchArgLeaderboard().catch(() => []))
+      .find((p) => String(p?.userId || '') === String(tg?.initDataUnsafe?.user?.id || '')) || null;
+    let draftName = String(fallbackPlayer?.displayName || '').trim();
+    let draftFg = String(fallbackPlayer?.avatarFg || '#ffffff');
+    let draftBg = String(fallbackPlayer?.avatarBg || '#181818');
+    let activeColorTarget = 'fg';
+    tpl.className = 'arg-scene-rename arg-scene-rename--customize';
     tpl.innerHTML = `
-      <div class="arg-scene-rename-title">ИЗМЕНИТЬ ИМЯ</div>
-      <input type="text" class="arg-scene-rename-input" id="argSceneRenameInput" maxlength="20" autocomplete="off" spellcheck="false" />
+      <div class="arg-scene-rename-name-block">
+        <div class="arg-scene-rename-title">НАЗОВИСЬ:</div>
+        <input type="text" class="arg-scene-rename-input" id="argSceneRenameInput" maxlength="20" autocomplete="off" spellcheck="false" />
+      </div>
+      <div class="arg-scene-avatar-editor">
+        <div class="arg-scene-avatar-preview" id="argSceneAvatarPreview">
+          <div class="arg-scene-avatar-preview-icon"></div>
+        </div>
+        <div class="arg-scene-avatar-swatches">
+          <button type="button" class="arg-scene-avatar-swatch is-active" data-target="fg" id="argSceneAvatarFgSwatch"></button>
+          <button type="button" class="arg-scene-avatar-swatch" data-target="bg" id="argSceneAvatarBgSwatch"></button>
+        </div>
+      </div>
+      <div class="arg-scene-picker-wrap" id="argScenePickerMount"></div>
       <div class="arg-scene-rename-error" id="argSceneRenameError" hidden>ИМЯ: 2–20 СИМВОЛОВ</div>
       <div class="arg-scene-rename-actions">
-        <button type="button" class="arg-scene-leaderboard-btn" id="argSceneRenameSaveBtn">[СОХРАНИТЬ]</button>
+        <button type="button" class="arg-scene-leaderboard-btn" id="argSceneRenameSaveBtn">[ГОТОВО]</button>
         <button type="button" class="arg-scene-leaderboard-btn" id="argSceneRenameCancelBtn">[ОТМЕНА]</button>
       </div>
     `;
@@ -1767,7 +1796,63 @@ const ARG_RESULT_REPLIES = {
     const errorEl = popupBox.querySelector('#argSceneRenameError');
     const saveBtn = popupBox.querySelector('#argSceneRenameSaveBtn');
     const cancelBtn = popupBox.querySelector('#argSceneRenameCancelBtn');
-    if (!input || !errorEl || !saveBtn || !cancelBtn) return false;
+    const preview = popupBox.querySelector('#argSceneAvatarPreview');
+    const fgSwatch = popupBox.querySelector('#argSceneAvatarFgSwatch');
+    const bgSwatch = popupBox.querySelector('#argSceneAvatarBgSwatch');
+    const pickerMount = popupBox.querySelector('#argScenePickerMount');
+    if (!input || !errorEl || !saveBtn || !cancelBtn || !preview || !fgSwatch || !bgSwatch || !pickerMount) return false;
+    input.value = draftName;
+    const cpBody = document.getElementById('cp-body');
+    const cpActions = document.getElementById('cp-actions');
+    const cpModal = document.getElementById('cp-modal');
+    const cpCancel = document.getElementById('cp-cancel');
+    const cpOk = document.getElementById('cp-ok');
+    if (!cpBody || !cpActions || !cpModal || !cpCancel || !cpOk) return false;
+    const updateAvatarPreview = () => {
+      preview.style.setProperty('--arg-avatar-bg', draftBg);
+      preview.style.setProperty('--arg-avatar-fg', draftFg);
+      fgSwatch.style.backgroundColor = draftFg;
+      bgSwatch.style.backgroundColor = draftBg;
+      fgSwatch.classList.toggle('is-active', activeColorTarget === 'fg');
+      bgSwatch.classList.toggle('is-active', activeColorTarget === 'bg');
+    };
+    const applyPickerColor = () => {
+      const swatch = document.getElementById('cp-preview-swatch');
+      const raw = swatch ? getComputedStyle(swatch).backgroundColor : '';
+      const m = String(raw).match(/\d+/g) || [];
+      if (m.length < 3) return;
+      const hex = `#${m.slice(0, 3).map((n) => Number(n).toString(16).padStart(2, '0')).join('')}`;
+      if (activeColorTarget === 'fg') draftFg = hex;
+      else draftBg = hex;
+      updateAvatarPreview();
+    };
+    const openPickerInline = (hex) => {
+      const fakeInput = document.createElement('input');
+      fakeInput.id = activeColorTarget === 'fg' ? 'fg' : 'bg';
+      fakeInput.value = hex;
+      CP.open(fakeInput);
+      cpActions.hidden = true;
+      pickerMount.appendChild(cpBody);
+      cpModal.hidden = true;
+    };
+    const onPickConfirm = (ev) => {
+      ev.preventDefault();
+      applyPickerColor();
+    };
+    updateAvatarPreview();
+    openPickerInline(draftFg);
+    fgSwatch.addEventListener('click', () => {
+      activeColorTarget = 'fg';
+      updateAvatarPreview();
+      openPickerInline(draftFg);
+    });
+    bgSwatch.addEventListener('click', () => {
+      activeColorTarget = 'bg';
+      updateAvatarPreview();
+      openPickerInline(draftBg);
+    });
+    cpOk.addEventListener('click', onPickConfirm);
+    cpCancel.addEventListener('click', (ev) => ev.preventDefault());
 
     input.focus();
 
@@ -1797,7 +1882,7 @@ const ARG_RESULT_REPLIES = {
         saveBtn.disabled = true;
         cancelBtn.disabled = true;
         try {
-          await updateArgDisplayName(nextName);
+          await updateArgProfileCustomize({ displayName: nextName, avatarFg: draftFg, avatarBg: draftBg });
           close(true);
         } catch (_) {
           saveBtn.disabled = false;
@@ -1884,7 +1969,7 @@ const ARG_RESULT_REPLIES = {
         closed = true;
         backBtn.removeEventListener('click', onBack);
         renameBtn.removeEventListener('click', onRename);
-        leaderboardLayer.hidden = true;
+        if (!openRename) leaderboardLayer.hidden = true;
         if (eyeLayer) eyeLayer.hidden = false;
         playUiSoundNoThrow(ARG_SCENE_SOUNDS.click);
         if (openRename) {

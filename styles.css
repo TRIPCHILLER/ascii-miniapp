@@ -2036,6 +2036,7 @@ input[type="color"] {
   text-align:center;
   text-transform:uppercase;
   line-height:1.25;
+  white-space:pre-line;
 }
 
 .arg-scene-popup-text.is-glitching{
@@ -2078,28 +2079,28 @@ input[type="color"] {
 
 .arg-scene-leaderboard-title,
 .arg-scene-leaderboard-you{
-  font-size:clamp(42px, 8vw, 56px);
+  font-size:clamp(28px, 5.2vw, 38px);
   text-align:center;
 }
 
-.arg-scene-leaderboard-you{ margin-top:22px; }
+.arg-scene-leaderboard-you{ margin-top:14px; }
 
 .arg-scene-leaderboard-divider{
-  font-size:clamp(28px, 5.5vw, 40px);
+  font-size:clamp(18px, 3.5vw, 26px);
   line-height:1;
   text-align:center;
-  margin:10px auto 12px;
+  margin:7px auto 9px;
 }
 
 .arg-scene-leaderboard-row{
   display:grid;
   grid-template-columns:78px 64px minmax(0, 1fr) 88px;
   align-items:center;
-  column-gap:12px;
-  font-size:clamp(34px, 6.4vw, 48px);
-  line-height:1.05;
+  column-gap:10px;
+  font-size:clamp(22px, 4.1vw, 31px);
+  line-height:1.12;
   text-align:left;
-  margin-bottom:7px;
+  margin-bottom:5px;
 }
 
 .arg-scene-leaderboard-rank,
@@ -2131,7 +2132,7 @@ input[type="color"] {
 
 .arg-scene-leaderboard-empty{
   text-align:center;
-  font-size:clamp(34px, 6vw, 44px);
+  font-size:clamp(24px, 4.2vw, 30px);
   margin-top:26px;
 }
 
@@ -2150,7 +2151,7 @@ input[type="color"] {
   background:transparent;
   color:#fff;
   font:inherit;
-  font-size:clamp(30px, 5.5vw, 42px);
+  font-size:clamp(20px, 3.8vw, 28px);
   text-transform:uppercase;
   cursor:pointer;
   padding:0;
@@ -2160,8 +2161,8 @@ input[type="color"] {
   font-family:'PixPlus', monospace;
   text-transform:uppercase;
   text-align:center;
-  font-size:clamp(30px, 5vw, 40px);
-  margin-bottom:12px;
+  font-size:clamp(20px, 3.7vw, 28px);
+  margin-bottom:8px;
 }
 
 .arg-scene-rename-input{
@@ -2170,10 +2171,55 @@ input[type="color"] {
   background:#000;
   color:#fff;
   font-family:'PixPlus', monospace;
-  font-size:clamp(24px, 4vw, 34px);
+  font-size:clamp(19px, 3.2vw, 24px);
   text-transform:uppercase;
   padding:8px 10px;
   box-sizing:border-box;
+}
+.arg-scene-rename--customize{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+.arg-scene-rename-name-block{
+  border:2px solid #fff;
+  padding:10px;
+}
+.arg-scene-avatar-editor{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:9px;
+}
+.arg-scene-avatar-preview{
+  width:74px;
+  height:74px;
+  border:2px solid #fff;
+  background:var(--arg-avatar-bg, #111);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.arg-scene-avatar-preview-icon{
+  width:82%;
+  height:82%;
+  background:var(--arg-avatar-fg, #fff);
+  -webkit-mask:url('./assets/player_avatar.svg') center/contain no-repeat;
+  mask:url('./assets/player_avatar.svg') center/contain no-repeat;
+}
+.arg-scene-avatar-swatches{
+  display:flex;
+  gap:10px;
+}
+.arg-scene-avatar-swatch{
+  width:34px;
+  height:34px;
+  border:2px solid #666;
+  background:#000;
+}
+.arg-scene-avatar-swatch.is-active{ border-color:#fff; }
+.arg-scene-picker-wrap #cp-body{
+  margin:0 auto;
 }
 
 .arg-scene-rename-error{
