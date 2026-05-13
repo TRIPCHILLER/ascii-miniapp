@@ -222,6 +222,16 @@ console.log('[startup] data-stats', {
   backup: backupResult
 });
 const { spawn } = require('child_process');
+const {
+  readLeaderboard,
+  writeLeaderboard,
+  readRuns,
+  writeRuns,
+  getOrCreatePlayer,
+  createRun,
+  validateFinishResult,
+  calculateImpulses,
+} = require('./pongStore');
 // ==== STORE / FFMPEG INTEGRATION ====
 // @section STORE_INTEGRATION_AND_FFMPEG_RUNNER
 function runFfmpeg(args) {
@@ -959,6 +969,126 @@ app.delete('/api/user-style-presets/:presetId', (req, res) => {
     return res.status(500).json({ ok: false, error: 'delete_failed' });
   }
 });
+
+app.post('/api/pong/start', (req, res) => {
+  let userId = '';
+  try {
+    userId = parseInitDataUserIdOrThrow(req);
+  } catch {
+    return res.status(401).json({ ok: false, error: 'invalid_init_data' });
+  }
+
+  ensureUser(userId);
+  const { player } = getOrCreatePlayer(userId);
+  const run = createRun(userId);
+
+  return res.json({ ok: true, runId: run.runId, startedAt: run.startedAt, player });
+});
+
+app.post('/api/pong/finish', (req, res) => {
+  let userId = '';
+  try {
+    userId = parseInitDataUserIdOrThrow(req);
+  } catch {
+    return res.status(401).json({ ok: false, error: 'invalid_init_data' });
+  }
+
+  const runId = String(req.body?.runId || '').trim();
+  const playerScore = Number(req.body?.playerScore);
+  const botScore = Number(req.body?.botScore);
+  if (!runId) return res.status(400).json({ ok: false, error: 'run_id_required' });
+
+  const runs = readRuns();
+  const runIndex = runs.findIndex((r) => String(r?.runId || '') === runId);
+  const run = runIndex >= 0 ? runs[runIndex] : null;
+
+  const verdict = validateFinishResult({ run, userId, playerScore, botScore });
+  if (!verdict.ok) {
+    if (run && !run.finishedAt) {
+      run.finishedAt = new Date().toISOString();
+      run.durationMs = Math.max(0, Number(verdict.durationMs || 0));
+      run.playerScore = Number.isFinite(playerScore) ? playerScore : null;
+      run.botScore = Number.isFinite(botScore) ? botScore : null;
+      run.accepted = false;
+      run.rejectReason = verdict.reason;
+      runs[runIndex] = run;
+      writeRuns(runs);
+    }
+    return res.status(400).json({ ok: false, error: verdict.reason });
+  }
+
+  const impulsesAwarded = calculateImpulses(playerScore);
+  run.finishedAt = new Date().toISOString();
+  run.durationMs = verdict.durationMs;
+  run.playerScore = playerScore;
+  run.botScore = botScore;
+  run.impulsesAwarded = impulsesAwarded;
+  run.accepted = true;
+  run.rejectReason = null;
+  runs[runIndex] = run;
+  writeRuns(runs);
+
+  ensureUser(userId);
+  if (impulsesAwarded > 0) add(userId, impulsesAwarded);
+
+  const nowIso = new Date().toISOString();
+  const { player, players } = getOrCreatePlayer(userId);
+  player.gamesPlayed = Number(player.gamesPlayed || 0) + 1;
+  player.totalImpulsesEarned = Number(player.totalImpulsesEarned || 0) + impulsesAwarded;
+  if (playerScore > Number(player.bestScore || 0)) player.bestScore = playerScore;
+  if (playerScore > botScore) player.totalWins = Number(player.totalWins || 0) + 1;
+  player.updatedAt = nowIso;
+  writeLeaderboard(players);
+
+  return res.json({
+    ok: true,
+    run: {
+      runId: run.runId,
+      accepted: true,
+      impulsesAwarded,
+      playerScore,
+      botScore,
+      durationMs: run.durationMs,
+      finishedAt: run.finishedAt,
+    },
+    player,
+    balance: getBalance(userId),
+  });
+});
+
+app.get('/api/pong/leaderboard', (req, res) => {
+  maybeUpsertUserFromInitData(req);
+  const players = readLeaderboard()
+    .sort((a, b) => {
+      const bestDiff = Number(b?.bestScore || 0) - Number(a?.bestScore || 0);
+      if (bestDiff !== 0) return bestDiff;
+      const aUpdated = Date.parse(String(a?.updatedAt || a?.createdAt || '')) || 0;
+      const bUpdated = Date.parse(String(b?.updatedAt || b?.createdAt || '')) || 0;
+      return aUpdated - bUpdated;
+    });
+  return res.json({ ok: true, leaderboard: players });
+});
+
+app.post('/api/pong/profile/name', (req, res) => {
+  let userId = '';
+  try {
+    userId = parseInitDataUserIdOrThrow(req);
+  } catch {
+    return res.status(401).json({ ok: false, error: 'invalid_init_data' });
+  }
+
+  const nextName = String(req.body?.displayName || '').trim();
+  if (!nextName || nextName.length > 32) return res.status(400).json({ ok: false, error: 'invalid_display_name' });
+
+  const { player, players } = getOrCreatePlayer(userId);
+  player.displayName = nextName;
+  player.isCustomName = true;
+  player.updatedAt = new Date().toISOString();
+  writeLeaderboard(players);
+
+  return res.json({ ok: true, player });
+});
+
 // === ОБНОВЛЁННЫЙ ХЕНДЛЕР ДЛЯ /api/upload и /upload ===
 // Принимаем любой из ключей: file ИЛИ document, а также initdata ИЛИ initData, mediatype ИЛИ mediaType
 const uploadHandler = [
