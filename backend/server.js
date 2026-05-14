@@ -1508,6 +1508,7 @@ app.post('/admin/set', (req, res) => {
 // ===============         Telegram webhook       =============
 // ============================================================
 const TG_MESSAGE_SOFT_LIMIT = 3600;
+const TG_MESSAGE_HARD_LIMIT = 4096;
 
 function buildMessagePreview(text, maxLen = 120) {
   return String(text || '')
@@ -1523,26 +1524,58 @@ function truncateMessageText(text, maxLen = TG_MESSAGE_SOFT_LIMIT) {
   return src.slice(0, Math.max(0, maxLen - marker.length)) + marker;
 }
 
-function logTelegramSendError(err, { method, chatId, text }) {
-  console.error('[TG sendMessage error]', {
-    method,
+function sanitizeTelegramError(err) {
+  return {
     status: err?.response?.status,
+    errorCode: err?.response?.data?.error_code,
     description: err?.response?.data?.description,
+    code: err?.code
+  };
+}
+
+function splitTelegramMessage(text, maxLen = TG_MESSAGE_SOFT_LIMIT) {
+  const src = String(text || '');
+  if (src.length <= maxLen) return [src];
+  const chunks = [];
+  let remaining = src;
+  while (remaining.length > maxLen) {
+    let splitAt = remaining.lastIndexOf('\n', maxLen);
+    if (splitAt < Math.floor(maxLen * 0.5)) splitAt = maxLen;
+    chunks.push(remaining.slice(0, splitAt));
+    remaining = remaining.slice(splitAt).replace(/^\n+/, '');
+  }
+  if (remaining.length) chunks.push(remaining);
+  return chunks;
+}
+
+function logTelegramSendError(err, { endpoint, chatId, userId, runId, messageLength }) {
+  console.error('[telegram-send-failed]', {
     chatId: String(chatId),
-    textLength: String(text || '').length,
-    textPreview: buildMessagePreview(text)
+    userId: userId ? String(userId) : undefined,
+    runId: runId ? String(runId) : undefined,
+    messageLength: Number(messageLength) || 0,
+    endpoint,
+    ...sanitizeTelegramError(err)
   });
 }
 
 async function sendMessage(chatId, text, extra = {}) {
-  const method = 'sendMessage';
-  const url = `https://api.telegram.org/bot${process.env.BOT_TOKEN}/${method}`;
-  const safeText = truncateMessageText(text);
-  try {
-    await axios.post(url, { chat_id: String(chatId), text: safeText, ...extra });
-  } catch (err) {
-    logTelegramSendError(err, { method, chatId, text: safeText });
-    throw err;
+  const endpoint = 'sendMessage';
+  const url = `https://api.telegram.org/bot${process.env.BOT_TOKEN}/${endpoint}`;
+  const chunks = splitTelegramMessage(text, TG_MESSAGE_SOFT_LIMIT).map((part) => truncateMessageText(part, TG_MESSAGE_HARD_LIMIT));
+  for (const chunk of chunks) {
+    try {
+      await axios.post(url, { chat_id: String(chatId), text: chunk, ...extra });
+    } catch (err) {
+      logTelegramSendError(err, {
+        endpoint,
+        chatId,
+        userId: extra?.userId,
+        runId: extra?.runId,
+        messageLength: String(chunk || '').length
+      });
+      throw err;
+    }
   }
 }
 async function getChatSafe(chatId) {
@@ -2241,7 +2274,7 @@ if (!firstUnknownShown.has(fromId)) {
 }
 return res.json({ ok: true });
   } catch (e) {
-    console.error('[TG webhook error]', e);
+    console.error('[tg-webhook-failed]', sanitizeTelegramError(e));
     // Telegram ждёт 200 ОК
     res.sendStatus(200);
   }
