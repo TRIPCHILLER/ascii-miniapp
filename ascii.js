@@ -535,6 +535,7 @@ const ARG_BOSS_ASCII_PRESET = Object.freeze({
   invert: true
 });
 const AUDIO_UNLOCK_STORAGE_KEY = 'asciiVisorAudioUnlocked';
+const ARG_INTRO_FAST_DELAY_MS = 40;
 let errorSoundAudio = null;
 
 function playErrorSound() {
@@ -1037,6 +1038,12 @@ let DITHER_ENABLED = false;
   let argPongRafId = 0;
   let argPongServeTimer = 0;
   let argPongFlashTimers = [];
+  let argIntroSkippable = false;
+  let argIntroFastForward = false;
+  let argIntroTypingActive = false;
+  let argIntroTypingSkip = null;
+  let argIntroWaitSkip = null;
+  let argIntroTapListenerBound = false;
   const argPongState = {
     running: false,
     ended: false,
@@ -1144,6 +1151,53 @@ const ARG_RESULT_REPLIES = {
 
   function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+  }
+
+  function handleArgIntroFastForwardTap(ev) {
+    if (!argIntroSkippable) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    argIntroFastForward = true;
+    if (typeof argIntroTypingSkip === 'function') argIntroTypingSkip();
+    if (typeof argIntroWaitSkip === 'function') argIntroWaitSkip();
+  }
+
+  function disableArgIntroFastForward() {
+    argIntroSkippable = false;
+    argIntroFastForward = false;
+    argIntroTypingActive = false;
+    argIntroTypingSkip = null;
+    if (typeof argIntroWaitSkip === 'function') argIntroWaitSkip();
+    argIntroWaitSkip = null;
+    if (argIntroTapListenerBound) {
+      document.removeEventListener('pointerdown', handleArgIntroFastForwardTap, true);
+      argIntroTapListenerBound = false;
+    }
+  }
+
+  function enableArgIntroFastForward() {
+    disableArgIntroFastForward();
+    argIntroSkippable = true;
+    if (!argIntroTapListenerBound) {
+      document.addEventListener('pointerdown', handleArgIntroFastForwardTap, { capture: true, passive: false });
+      argIntroTapListenerBound = true;
+    }
+  }
+
+  function waitArgIntro(ms) {
+    const delayMs = argIntroFastForward ? ARG_INTRO_FAST_DELAY_MS : ms;
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timerId);
+        if (argIntroWaitSkip === finish) argIntroWaitSkip = null;
+        resolve();
+      };
+      const timerId = setTimeout(() => finish(), Math.max(0, Number(delayMs) || 0));
+      argIntroWaitSkip = finish;
+    });
   }
 
   function playUiSound(src) {
@@ -1627,19 +1681,40 @@ const ARG_RESULT_REPLIES = {
     textEl.textContent = '|';
     startPrintNextSound = 0;
     startLastPrintSoundAt = 0;
-    for (let i = 0; i < text.length; i += 1) {
-      const fixedPart = text.slice(0, i);
-      textEl.classList.add('is-glitching');
-      textEl.textContent = `${fixedPart}${randomSymbol()}|`;
-      await sleep(ARG_SCENE_TIMINGS.popupGlitchMs);
+    argIntroTypingActive = true;
+    let revealRequested = false;
+    let settled = false;
+    argIntroTypingSkip = () => {
+      if (revealRequested || settled) return;
+      revealRequested = true;
+    };
+    try {
+      for (let i = 0; i < text.length; i += 1) {
+        if (revealRequested || settled) break;
+        const fixedPart = text.slice(0, i);
+        textEl.classList.add('is-glitching');
+        textEl.textContent = `${fixedPart}${randomSymbol()}|`;
+        await waitArgIntro(ARG_SCENE_TIMINGS.popupGlitchMs);
+        if (revealRequested || settled) break;
+        textEl.classList.remove('is-glitching');
+        textEl.textContent = `${fixedPart}${text[i]}|`;
+        playStartPrintSound();
+        tgTextHaptic();
+        await waitArgIntro(text[i] === ' ' ? ARG_SCENE_TIMINGS.popupSpaceTypeMs : ARG_SCENE_TIMINGS.popupCharTypeMs);
+      }
+      if (!settled) {
+        textEl.classList.remove('is-glitching');
+        await waitArgIntro(120);
+      }
+      if (settled) return;
+      settled = true;
+      textEl.textContent = text;
+    } finally {
+      settled = true;
       textEl.classList.remove('is-glitching');
-      textEl.textContent = `${fixedPart}${text[i]}|`;
-      playStartPrintSound();
-      tgTextHaptic();
-      await sleep(text[i] === ' ' ? ARG_SCENE_TIMINGS.popupSpaceTypeMs : ARG_SCENE_TIMINGS.popupCharTypeMs);
+      if (argIntroTypingSkip) argIntroTypingSkip = null;
+      argIntroTypingActive = false;
     }
-    await sleep(120);
-    textEl.textContent = text;
   }
 
   async function showArgPopup(text, { openSoundSrc = '', popupClass = '' } = {}) {
@@ -2256,6 +2331,7 @@ const ARG_RESULT_REPLIES = {
   }
 
   function stopArgPongLoop() {
+    disableArgIntroFastForward();
     argPongState.running = false;
     argBossAscii.ready = false;
     argBossAscii.visualReady = false;
@@ -2281,6 +2357,7 @@ const ARG_RESULT_REPLIES = {
   }
 
   function resetArgOverlayState() {
+    disableArgIntroFastForward();
     const overlay = ensureArgOverlay();
     stopArgPongMusic();
     argSceneActive = false;
@@ -3334,6 +3411,7 @@ const ARG_RESULT_REPLIES = {
       return;
     }
 
+    disableArgIntroFastForward();
     overlay.hidden = false;
     argSceneActive = true;
     argPongState.runId = '';
@@ -3414,6 +3492,7 @@ const ARG_RESULT_REPLIES = {
 
     playUiSoundNoThrow(ARG_SCENE_SOUNDS.turnOff);
     await sleep(ARG_SCENE_TIMINGS.afterBlackMs);
+    enableArgIntroFastForward();
 
     argPongState.ballX = 0.5;
     argPongState.ballY = 0.5;
@@ -3434,7 +3513,7 @@ const ARG_RESULT_REPLIES = {
     playUiSoundNoThrow(ARG_SCENE_SOUNDS.bitClick);
     tgEventHaptic();
 
-    await sleep(ARG_SCENE_TIMINGS.ballToPopupMs);
+    await waitArgIntro(ARG_SCENE_TIMINGS.ballToPopupMs);
     await showArgPopup('NH73ЛЛЗК7 - Э70\nСП0С06Н0С7Ь\n4Д4П7NР0847ЬСЯ\nК ИЗМ3Н3НNЯМ', {
       openSoundSrc: ARG_SCENE_SOUNDS.danger,
       popupClass: 'arg-scene-popup-box--intel'
@@ -3454,7 +3533,7 @@ const ARG_RESULT_REPLIES = {
     playUiSoundNoThrow(ARG_SCENE_SOUNDS.bitClick);
     tgEventHaptic();
 
-    await sleep(ARG_SCENE_TIMINGS.topToBottomStickMs);
+    await waitArgIntro(ARG_SCENE_TIMINGS.topToBottomStickMs);
 
     const bottomStick = document.createElement('div');
     bottomStick.className = 'arg-scene-stick arg-scene-stick--bottom';
@@ -3470,7 +3549,7 @@ const ARG_RESULT_REPLIES = {
     playUiSoundNoThrow(ARG_SCENE_SOUNDS.bitClick);
     tgEventHaptic();
 
-    await sleep(ARG_SCENE_TIMINGS.bottomToSecondPopupMs);
+    await waitArgIntro(ARG_SCENE_TIMINGS.bottomToSecondPopupMs);
     await showArgPopup('ПР0Т0К0Л ИНТ3Р4КТИВН0Г0\nИЗВЛ3Ч3НИ9 ЭН3РГИИ\nЗ4ПУЩ3Н.', {
       openSoundSrc: ARG_SCENE_SOUNDS.danger2,
       popupClass: 'arg-scene-popup-box--score'
@@ -3545,7 +3624,8 @@ const ARG_RESULT_REPLIES = {
       setArgBossVisualReady(overlay, { showAscii: true });
     }
 
-    await sleep(ARG_SCENE_TIMINGS.eyeToCountdownMs);
+    await waitArgIntro(ARG_SCENE_TIMINGS.eyeToCountdownMs);
+    disableArgIntroFastForward();
     await runArgCountdown();
     startArgPong({ overlay, ballStickLayer, ball, topStick, bottomStick, visorBody, visorEye, visorPupil, scoreLayer, aiScoreEl, playerScoreEl, preserveBossState: true });
 
