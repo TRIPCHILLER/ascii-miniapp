@@ -2350,7 +2350,7 @@ const ARG_RESULT_REPLIES = {
         isGlobalBest: !!topPlayer && String(topPlayer?.userId || '') === userId && Number(topPlayer?.bestScore || 0) === Number(finishData?.player?.bestScore || 0)
       };
     } catch (_) {
-      showAsciiPopup({ type: 'error', title: 'ОШИБКА', message: 'Не удалось подтвердить результат ARG/PONG.' });
+      showAsciiPopup({ type: 'error', title: 'СБОЙ ПОДТВЕРЖДЕНИЯ...', message: 'РЕЗУЛЬТАТ НЕ ПРИНЯТ ЯДРОМ.' });
       resetArgOverlayState();
       returnToStartMenu();
       startArgSessionLocked = true;
@@ -2362,8 +2362,8 @@ const ARG_RESULT_REPLIES = {
 
     const replyLine = ARG_RESULT_REPLIES[getArgResultReplyKey(resultMeta)] || ARG_RESULT_REPLIES.normal;
     await showArgPopup(`${replyLine}
-ИЗВЛЕЧЕНО ИМПУЛЬСОВ: [+${resultMeta.impulsesAwarded}]
-ЛИЧНЫЙ РЕКОРД: [${resultMeta.bestScore}]`, {
+ИЗВЛ3Ч3Н0 ИМПУЛЬС0В: [+${resultMeta.impulsesAwarded}]
+ЛИЧНЫЙ М4КСИМУМ: [${resultMeta.bestScore}]`, {
       openSoundSrc: ARG_SCENE_SOUNDS.danger2,
       popupClass: 'arg-scene-popup-box--score'
     });
