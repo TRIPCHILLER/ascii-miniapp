@@ -3550,15 +3550,15 @@ const ARG_RESULT_REPLIES = {
     tgEventHaptic();
 
     await waitArgIntro(ARG_SCENE_TIMINGS.bottomToSecondPopupMs);
-    await showArgPopup('ПР0Т0К0Л ИНТ3Р4КТИВН0Г0\nИЗВЛ3Ч3НИ9 ЭН3РГИИ\nЗ4ПУЩ3Н.', {
+    await showArgPopup(':: ПР0Т0К0Л ИНТ3Р4КТИВН0Г0\nИЗВЛ3Ч3НИ9 ЭН3РГИИ\nЗ4ПУЩ3Н ::', {
       openSoundSrc: ARG_SCENE_SOUNDS.danger2,
       popupClass: 'arg-scene-popup-box--score'
     });
-    await showArgPopup('9 БУДУ ПР0Д0ЛЖ4ТЬ,\nП0К4 ТЫ Н3\nСЛ0М43ШЬС9.', {
+    await showArgPopup('9 БУДУ ПР0Д0ЛЖ4ТЬ,\nП0К4 ТЫ Н3\nСЛ0М43ШЬС9', {
       openSoundSrc: ARG_SCENE_SOUNDS.danger,
       popupClass: 'arg-scene-popup-box--score'
     });
-    await showArgPopup('У Т3Б9 ТРИ П0ПЫТКИ.', {
+    await showArgPopup('У Т3Б9 ТРИ П0ПЫТКИ', {
       openSoundSrc: ARG_SCENE_SOUNDS.danger2,
       popupClass: 'arg-scene-popup-box--score'
     });
