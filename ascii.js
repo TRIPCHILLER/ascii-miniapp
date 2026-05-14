@@ -1800,10 +1800,12 @@ const ARG_RESULT_REPLIES = {
     const tpl = document.createElement('div');
     const fallbackPlayer = (await fetchArgLeaderboard().catch(() => []))
       .find((p) => String(p?.userId || '') === String(tg?.initDataUnsafe?.user?.id || '')) || null;
-    let draftName = resolveArgLeaderboardName(fallbackPlayer || {});
+    let draftName = String(fallbackPlayer?.displayName || '');
     let draftFg = String(fallbackPlayer?.avatarFg || '#ffffff');
     let draftBg = String(fallbackPlayer?.avatarBg || '#181818');
     let draftAvatarRendered = resolveArgAvatarRendered(fallbackPlayer || {});
+    let draftAvatarSource = '';
+    let avatarRenderToken = 0;
     let latestLeaderboard = await fetchArgLeaderboard().catch(() => []);
     let activeColorTarget = 'fg';
     tpl.className = 'arg-scene-rename arg-scene-rename--customize';
@@ -1917,7 +1919,8 @@ const ARG_RESULT_REPLIES = {
       if (!hex) return;
       if (activeColorTarget === 'fg') draftFg = hex;
       else draftBg = hex;
-      updateAvatarPreview();
+      if (draftAvatarSource) renderDraftAvatarFromSource().catch(() => {});
+      else updateAvatarPreview();
     };
     updateAvatarPreview();
     fgSwatch.addEventListener('click', () => {
@@ -1943,8 +1946,26 @@ const ARG_RESULT_REPLIES = {
       const sx = (img.width - s) * 0.5;
       const sy = (img.height - s) * 0.5;
       ctx.drawImage(img, sx, sy, s, s, 0, 0, size, size);
-
-      // Обязательный pipeline: crop -> Classic ASCII render (size=75, gamma=1, contrast=1)
+      draftAvatarSource = sampleCanvas.toDataURL('image/png');
+      renderDraftAvatarFromSource().catch(() => {});
+    };
+    const renderDraftAvatarFromSource = async () => {
+      if (!draftAvatarSource) return;
+      const token = ++avatarRenderToken;
+      const img = new Image();
+      img.decoding = 'async';
+      img.src = draftAvatarSource;
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+      });
+      if (token !== avatarRenderToken) return;
+      const size = 75;
+      const sampleCanvas = document.createElement('canvas');
+      sampleCanvas.width = size;
+      sampleCanvas.height = size;
+      const ctx = sampleCanvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, size, size);
       const sourceData = ctx.getImageData(0, 0, size, size);
       const px = sourceData.data;
       const classicCharset = '@%#*+=-:. ';
@@ -1955,9 +1976,9 @@ const ARG_RESULT_REPLIES = {
       glyphCanvas.width = outSize;
       glyphCanvas.height = outSize;
       const gctx = glyphCanvas.getContext('2d');
-      gctx.fillStyle = '#000';
+      gctx.fillStyle = draftBg;
       gctx.fillRect(0, 0, outSize, outSize);
-      gctx.fillStyle = '#fff';
+      gctx.fillStyle = draftFg;
       const cell = outSize / size;
       gctx.font = `${Math.ceil(cell * 1.15)}px "PxPlus IBM VGA", monospace`;
       gctx.textBaseline = 'middle';

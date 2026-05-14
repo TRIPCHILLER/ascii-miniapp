@@ -2277,7 +2277,7 @@ input[type="color"] {
   position:absolute; inset:0;
   background:rgba(0,0,0,.5);
   display:flex; align-items:center; justify-content:center;
-  color:#fff; font-size:80px; line-height:1;
+  color:#fff; font-size:92px; line-height:1;
 }
 .arg-scene-avatar-preview-empty + .arg-scene-avatar-preview-overlay{
   background:transparent;
