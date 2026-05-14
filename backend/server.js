@@ -255,12 +255,20 @@ function pluralRu(n, one, few, many) {
 const IMPULSE_FORMS = ['импульс', 'импульса', 'импульсов'];
 const impulseWord = (n) => pluralRu(n, ...IMPULSE_FORMS);
 const ARG_TOP_RANK_MESSAGES = {
-  1: '— ТВ0Ё М3СТ0 ЗД3СЬ: Н4 ВЕРШИН3 Ц3ПИ ЦИФР0В0Й С3ТИ. 
-    ТЫ М0Ж3ШЬ П0-ПР4ВУ СЧИТ4ТЬ С3Б9 ВЫШ3 ДРУГИХ.',
-  2: '— ВТ0Р03 М3СТ0 П0 ЦИФР0В0Й С3ТИ — Т0ЖЕ Н3ПЛ0Х0... 
-  М0И П0ЗДР4ВЛ3НИЯ.',
-  3: '— БР0НЗ0ВЫЙ В0ИН... 
-  СМ0Ж3ШЬ ЛИ ТЫ 0Д0Л3ТЬ 3ЩЁ ДВ0ИХ ВЫШ3 С3БЯ ИЛИ В0ВР3МЯ 0СТ4Н0ВИШЬСЯ?..',
+  1: [
+    '— ТВОЁ МЕСТО ЗДЭСЬ: НА ВЕРШИНЕ ЦЭПИ ЦИФРОВОЙ СЭТИ.',
+    'ТЫ МОЖЭШЬ ПО-ПРАВУ СЧИТАТЬ СЭБЯ ВЫШЭ ДРУГИХ.',
+  ].join('\n'),
+
+  2: [
+    '— ВТОРОЭ МЭСТО ПО ЦИФРОВОЙ СЭТИ — ТОЖЕ НЭПЛОХО...',
+    'МОИ ПОЗДРАВЛЭНИЯ.',
+  ].join('\n'),
+
+  3: [
+    '— БРОНЗОВЫЙ ВОИН...',
+    'СМОЖЭШЬ ЛИ ТЫ ОДОЛЭТЬ ЭЩЁ ДВОИХ ВЫШЭ СЭБЯ ИЛИ ВОВРЭМЯ ОСТАНОВИШЬСЯ?..',
+  ].join('\n'),
 };
 function composeArgRunMessage({ impulsesEarned, impulseBalance, rank, consolationBonus, extractedImpulsesForDisplay }) {
   const normalizedEarned = Math.max(0, Number(impulsesEarned) || 0);
