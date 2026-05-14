@@ -8,7 +8,6 @@ const RUNS_FILE = path.join(DATA_DIR, 'pong_runs.json');
 
 const MIN_DURATION_MS = 2500;
 const MAX_PLAYER_SCORE = 999;
-const IMPULSES_PER_WIN = 3;
 
 function ensureDataDir() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -131,8 +130,10 @@ function validateFinishResult({ run, userId, playerScore, botScore }) {
   return { ok: true, durationMs };
 }
 
-function calculateImpulses(playerScore) {
-  return playerScore >= 3 ? IMPULSES_PER_WIN : 0;
+function calculateImpulses(winsInRun) {
+  const wins = Number(winsInRun);
+  if (!Number.isFinite(wins)) return 0;
+  return Math.max(0, Math.floor(wins));
 }
 
 module.exports = {
