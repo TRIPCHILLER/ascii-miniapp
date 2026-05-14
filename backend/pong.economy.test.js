@@ -26,16 +26,30 @@ async function finishRun({ userId, runId, playerScore, botScore }) {
   const idx = runs.findIndex((r) => String(r.runId) === String(runId));
   const run = idx >= 0 ? runs[idx] : null;
   if (run?.finishedAt && run?.accepted && String(run.userId) === String(userId)) {
-    return { status: 200, json: { ok: true, success: true, duplicate: true, impulsesEarned: Math.max(0, Number(run.impulsesAwarded || 0)), impulseBalance: getBalance(userId), messageSent: false } };
+    return {
+      status: 200,
+      json: {
+        ok: true,
+        success: true,
+        duplicate: true,
+        impulsesEarned: Math.max(0, Number(run.impulsesAwarded || 0)),
+        impulseBalance: getBalance(userId),
+        messageSent: false,
+        consolationBonus: !!run.consolationBonus,
+      }
+    };
   }
   const verdict = validateFinishResult({ run, userId, playerScore, botScore });
   if (!verdict.ok) return { status: 400, json: { ok: false, error: verdict.reason } };
-  const impulsesAwarded = calculateImpulses(playerScore);
+  const winsInRun = Math.max(0, Number(playerScore) || 0);
+  const consolationBonus = winsInRun <= 0;
+  const impulsesAwarded = consolationBonus ? 1 : calculateImpulses(winsInRun);
   run.finishedAt = new Date().toISOString();
   run.durationMs = verdict.durationMs;
   run.playerScore = playerScore;
   run.botScore = botScore;
   run.impulsesAwarded = impulsesAwarded;
+  run.consolationBonus = consolationBonus;
   run.accepted = true;
   runs[idx] = run;
   writeRuns(runs);
@@ -45,7 +59,7 @@ async function finishRun({ userId, runId, playerScore, botScore }) {
     await Module._load('axios').post('https://api.telegram.org/botX/sendMessage', {});
     messageSent = !sendShouldFail;
   } catch {}
-  return { status: 200, json: { ok: true, success: true, impulsesEarned: impulsesAwarded, impulseBalance: getBalance(userId), messageSent } };
+  return { status: 200, json: { ok: true, success: true, impulsesEarned: impulsesAwarded, impulseBalance: getBalance(userId), messageSent, consolationBonus, duplicate: false } };
 }
 
 test('Pong economy smoke', async () => {
@@ -66,13 +80,16 @@ test('Pong economy smoke', async () => {
   const user3 = 'u3'; ensureUser(user3);
   const b3 = getBalance(user3); const run3 = createRun(user3);
   const fin3 = await finishRun({ userId: user3, runId: run3.runId, playerScore: 0, botScore: 3 });
-  assert.equal(fin3.status, 200); assert.equal(fin3.json.impulsesEarned, 0); assert.equal(getBalance(user3), b3);
+  assert.equal(fin3.status, 200); assert.equal(fin3.json.impulsesEarned, 1); assert.equal(fin3.json.consolationBonus, true); assert.equal(getBalance(user3), b3 + 1);
+  const b3d = getBalance(user3);
+  const dup3 = await finishRun({ userId: user3, runId: run3.runId, playerScore: 0, botScore: 3 });
+  assert.equal(dup3.status, 200); assert.equal(dup3.json.duplicate, true); assert.equal(dup3.json.consolationBonus, true); assert.equal(getBalance(user3), b3d);
 
   const user4 = 'u4'; ensureUser(user4);
   const b4 = getBalance(user4); const run4 = createRun(user4);
   sendShouldFail = true;
   const fin4 = await finishRun({ userId: user4, runId: run4.runId, playerScore: 2, botScore: 3 });
-  assert.equal(fin4.status, 200); assert.equal(fin4.json.messageSent, false); assert.equal(getBalance(user4), b4 + 2);
+  assert.equal(fin4.status, 200); assert.equal(fin4.json.messageSent, false); assert.equal(fin4.json.consolationBonus, false); assert.equal(getBalance(user4), b4 + 2);
 
   Module._load = originalLoad;
   fs.rmSync(tmpRoot, { recursive: true, force: true });

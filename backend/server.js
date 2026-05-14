@@ -259,8 +259,10 @@ const ARG_TOP_RANK_MESSAGES = {
   2: 'ВТ0Р03 М3СТ0 Т0ЖЕ Н3ПЛ0Х0... М0И П0ЗДР4ВЛ3НИЯ.',
   3: 'БР0НЗ0ВЫЙ В0ИН... СМ0Ж3ШЬ ЛИ ТЫ 0Д0Л3ТЬ 3ЩЁ ДВ0ИХ ВЫШ3 С3БЯ ИЛИ В0ВР3МЯ 0СТ4Н0ВИШЬСЯ?',
 };
-function composeArgRunMessage({ impulsesEarned, impulseBalance, rank }) {
+function composeArgRunMessage({ impulsesEarned, impulseBalance, rank, consolationBonus, extractedImpulsesForDisplay }) {
   const normalizedEarned = Math.max(0, Number(impulsesEarned) || 0);
+  const normalizedExtracted = Math.max(0, Number.isFinite(Number(extractedImpulsesForDisplay)) ? Number(extractedImpulsesForDisplay) : normalizedEarned);
+  const hasConsolationBonus = !!consolationBonus;
   const normalizedBalance = Math.max(0, Number(impulseBalance) || 0);
   const normalizedRank = Number(rank);
   const topRankLine = ARG_TOP_RANK_MESSAGES[normalizedRank] || '';
@@ -271,10 +273,9 @@ function composeArgRunMessage({ impulsesEarned, impulseBalance, rank }) {
   if (topRankLine) {
     lines.push(topRankLine, '');
   }
-  lines.push(
-    `ИЗВЛ3Ч3Н0 ИМПУЛЬС0В: [+${normalizedEarned}]`,
-    `В ЭНЕРГОХРАНИЛИЩЕ: [${normalizedBalance}]`
-  );
+  lines.push(`ИЗВЛ3Ч3Н0 ИМПУЛЬС0В: [+${normalizedExtracted}]`);
+  if (hasConsolationBonus) lines.push('УТ3ШИТ3ЛЬНЫЙ Б0НУС: [+1]');
+  lines.push(`В ЭНЕРГОХРАНИЛИЩЕ: [${normalizedBalance}]`);
   return lines.join('\n');
 }
 // ==== /pluralRu ====
@@ -1071,6 +1072,8 @@ app.post('/api/pong/finish', async (req, res) => {
         finishedAt: run.finishedAt,
       },
       impulsesEarned: Math.max(0, Number(run.impulsesAwarded || 0)),
+      extractedImpulsesForDisplay: Math.max(0, Number(run.playerScore || 0)),
+      consolationBonus: !!run.consolationBonus,
       impulseBalance: getBalance(userId),
       rank: rankIndex >= 0 ? rankIndex + 1 : null,
       messageSent: false,
@@ -1093,12 +1096,14 @@ app.post('/api/pong/finish', async (req, res) => {
   }
 
   const winsInRun = Math.max(0, Number(playerScore) || 0);
-  const impulsesAwarded = calculateImpulses(winsInRun);
+  const consolationBonus = winsInRun <= 0;
+  const impulsesAwarded = consolationBonus ? 1 : calculateImpulses(winsInRun);
   run.finishedAt = new Date().toISOString();
   run.durationMs = verdict.durationMs;
   run.playerScore = playerScore;
   run.botScore = botScore;
   run.impulsesAwarded = impulsesAwarded;
+  run.consolationBonus = consolationBonus;
   run.accepted = true;
   run.rejectReason = null;
   runs[runIndex] = run;
@@ -1128,7 +1133,7 @@ app.post('/api/pong/finish', async (req, res) => {
   const rank = rankIndex >= 0 ? rankIndex + 1 : null;
   let messageSent = false;
   try {
-    await sendMessage(userId, composeArgRunMessage({ impulsesEarned: impulsesAwarded, impulseBalance: nextImpulseBalance, rank }));
+    await sendMessage(userId, composeArgRunMessage({ impulsesEarned: impulsesAwarded, impulseBalance: nextImpulseBalance, rank, consolationBonus, extractedImpulsesForDisplay: winsInRun }));
     messageSent = true;
   } catch (err) {
     console.error('[pong-result] failed_to_send_message', {
@@ -1142,6 +1147,8 @@ app.post('/api/pong/finish', async (req, res) => {
     runId: String(run.runId),
     winsInRun,
     impulsesEarned: impulsesAwarded,
+    extractedImpulsesForDisplay: winsInRun,
+    consolationBonus,
     previousImpulseBalance,
     nextImpulseBalance,
     rank,
@@ -1163,9 +1170,12 @@ app.post('/api/pong/finish', async (req, res) => {
     player,
     balance: nextImpulseBalance,
     impulsesEarned: impulsesAwarded,
+    extractedImpulsesForDisplay: winsInRun,
     impulseBalance: nextImpulseBalance,
     rank,
     messageSent,
+    duplicate: false,
+    consolationBonus,
   });
 });
 

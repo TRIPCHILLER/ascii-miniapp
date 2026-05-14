@@ -2344,6 +2344,8 @@ const ARG_RESULT_REPLIES = {
       resultMeta = {
         score: runScore,
         impulsesAwarded: Math.max(0, Number(finishData?.run?.impulsesAwarded || 0)),
+        extractedImpulsesForDisplay: Math.max(0, Number.isFinite(Number(finishData?.extractedImpulsesForDisplay)) ? Number(finishData?.extractedImpulsesForDisplay) : runScore),
+        consolationBonus: !!finishData?.consolationBonus,
         bestScore: Math.max(0, Number(finishData?.player?.bestScore || 0)),
         isNewPersonalBest: Number(finishData?.player?.bestScore || 0) === runScore,
         enteredTop: currentRank >= 0 && currentRank < 10,
@@ -2361,8 +2363,10 @@ const ARG_RESULT_REPLIES = {
     }
 
     const replyLine = ARG_RESULT_REPLIES[getArgResultReplyKey(resultMeta)] || ARG_RESULT_REPLIES.normal;
+    const extractedLineValue = Math.max(0, Number(resultMeta?.extractedImpulsesForDisplay ?? resultMeta?.impulsesAwarded ?? 0));
+    const bonusLine = resultMeta?.consolationBonus && extractedLineValue === 0 ? '\nУТ3ШИТ3ЛЬНЫЙ Б0НУС: [+1]' : '';
     await showArgPopup(`${replyLine}
-ИЗВЛ3Ч3Н0 ИМПУЛЬС0В: [+${resultMeta.impulsesAwarded}]
+ИЗВЛ3Ч3Н0 ИМПУЛЬС0В: [+${extractedLineValue}]${bonusLine}
 ЛИЧНЫЙ Р3К0РД: [${resultMeta.bestScore}]`, {
       openSoundSrc: ARG_SCENE_SOUNDS.danger2,
       popupClass: 'arg-scene-popup-box--score'
