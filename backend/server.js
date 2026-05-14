@@ -267,15 +267,15 @@ function composeArgRunMessage({ impulsesEarned, impulseBalance, rank, consolatio
   const normalizedRank = Number(rank);
   const topRankLine = ARG_TOP_RANK_MESSAGES[normalizedRank] || '';
   const lines = [
-    '[ПРОТОКОЛ ПОПЫТКИ ИЗВЛЕЧЕНИЯ]',
+    '<code>[ПРОТОКОЛ ПОПЫТКИ ИЗВЛЕЧЕНИЯ]</code>',
     '',
   ];
   if (topRankLine) {
-    lines.push(topRankLine, '');
+    lines.push(`<blockquote>${topRankLine}</blockquote>`, '');
   }
-  lines.push(`ИЗВЛ3Ч3Н0 ИМПУЛЬС0В: [+${normalizedExtracted}]`);
-  if (hasConsolationBonus) lines.push('УТ3ШИТ3ЛЬНЫЙ Б0НУС: [+1]');
-  lines.push(`В ЭНЕРГОХРАНИЛИЩЕ: [${normalizedBalance}]`);
+  lines.push(`<b>ИЗВЛ3Ч3Н0 ИМПУЛЬС0В:</b> <code>[+${normalizedExtracted}]</code>`);
+  if (hasConsolationBonus) lines.push('<b>УТ3ШИТ3ЛЬНЫЙ Б0НУС:</b> <code>[+1]</code>');
+  lines.push(`<b>В ЭНЕРГОХРАНИЛИЩЕ:</b> <code>[${normalizedBalance}]</code>`);
   return lines.join('\n');
 }
 // ==== /pluralRu ====
@@ -1133,7 +1133,7 @@ app.post('/api/pong/finish', async (req, res) => {
   const rank = rankIndex >= 0 ? rankIndex + 1 : null;
   let messageSent = false;
   try {
-    await sendMessage(userId, composeArgRunMessage({ impulsesEarned: impulsesAwarded, impulseBalance: nextImpulseBalance, rank, consolationBonus, extractedImpulsesForDisplay: winsInRun }));
+    await sendMessage(userId, composeArgRunMessage({ impulsesEarned: impulsesAwarded, impulseBalance: nextImpulseBalance, rank, consolationBonus, extractedImpulsesForDisplay: winsInRun }), { parse_mode: 'HTML' });
     messageSent = true;
   } catch (err) {
     console.error('[pong-result] failed_to_send_message', {
