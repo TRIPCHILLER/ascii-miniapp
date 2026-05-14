@@ -59,10 +59,66 @@ function formatDefaultName(playerNumber) {
   return `СУБЪ3КТ_${String(safeNumber).padStart(2, '0')}`;
 }
 
+function parseIsoTimestamp(value, fallback = 0) {
+  const ts = Date.parse(String(value || ''));
+  return Number.isFinite(ts) ? ts : fallback;
+}
+
+function pickLatestEntry(entries) {
+  return entries
+    .slice()
+    .sort((a, b) => parseIsoTimestamp(b?.updatedAt || b?.createdAt) - parseIsoTimestamp(a?.updatedAt || a?.createdAt))[0];
+}
+
+function mergeDuplicatePlayers(uid, sameUserEntries) {
+  const latest = pickLatestEntry(sameUserEntries) || {};
+  const playerNumbers = sameUserEntries
+    .map((p) => Number(p?.playerNumber))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  const minPlayerNumber = playerNumbers.length ? Math.min(...playerNumbers) : 0;
+  const createdAtTs = sameUserEntries.reduce((acc, p) => {
+    const ts = parseIsoTimestamp(p?.createdAt, Infinity);
+    return ts < acc ? ts : acc;
+  }, Infinity);
+  const updatedAtTs = sameUserEntries.reduce((acc, p) => {
+    const ts = parseIsoTimestamp(p?.updatedAt || p?.createdAt, 0);
+    return ts > acc ? ts : acc;
+  }, 0);
+  const bestScore = sameUserEntries.reduce((acc, p) => Math.max(acc, Number(p?.bestScore || 0)), 0);
+  const totalWins = sameUserEntries.reduce((acc, p) => Math.max(acc, Number(p?.totalWins || 0)), 0);
+  const totalImpulsesEarned = sameUserEntries.reduce((acc, p) => Math.max(acc, Number(p?.totalImpulsesEarned || 0)), 0);
+  const gamesPlayed = sameUserEntries.reduce((acc, p) => Math.max(acc, Number(p?.gamesPlayed || 0)), 0);
+
+  return {
+    ...latest,
+    userId: uid,
+    playerNumber: minPlayerNumber,
+    bestScore: Number.isFinite(bestScore) ? bestScore : 0,
+    totalWins: Number.isFinite(totalWins) ? totalWins : 0,
+    totalImpulsesEarned: Number.isFinite(totalImpulsesEarned) ? totalImpulsesEarned : 0,
+    gamesPlayed: Number.isFinite(gamesPlayed) ? gamesPlayed : 0,
+    avatarRendered: latest?.avatarRendered || sameUserEntries.find((p) => p?.avatarRendered)?.avatarRendered || '',
+    avatarSource: latest?.avatarSource || sameUserEntries.find((p) => p?.avatarSource)?.avatarSource || '',
+    createdAt: Number.isFinite(createdAtTs) ? new Date(createdAtTs).toISOString() : new Date().toISOString(),
+    updatedAt: Number.isFinite(updatedAtTs) && updatedAtTs > 0 ? new Date(updatedAtTs).toISOString() : new Date().toISOString(),
+  };
+}
+
 function getOrCreatePlayer(userId) {
   const uid = String(userId);
   const players = readLeaderboard();
-  let player = players.find((p) => String(p.userId) === uid);
+  const sameUserEntries = players.filter((p) => String(p?.userId) === uid);
+  let player = sameUserEntries[0];
+
+  if (sameUserEntries.length > 1) {
+    player = mergeDuplicatePlayers(uid, sameUserEntries);
+
+    const dedupedPlayers = players.filter((p) => String(p?.userId) !== uid);
+    dedupedPlayers.push(player);
+    writeLeaderboard(dedupedPlayers);
+    return { player, players: dedupedPlayers, created: false };
+  }
+
   if (player) return { player, players, created: false };
 
   const now = new Date().toISOString();
