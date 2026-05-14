@@ -1717,7 +1717,7 @@ const ARG_RESULT_REPLIES = {
     const res = await fetch(`${API_BASE}/api/pong/profile/customize`, {
       method: 'POST',
       headers: applyTelegramInitDataHeader({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ displayName, avatarFg, avatarBg })
+      body: JSON.stringify({ displayName, avatarFg, avatarBg, avatarRendered: arguments[0]?.avatarRendered || '' })
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok || !json?.ok) throw new Error(json?.error || 'pong_profile_customize_failed');
@@ -1726,8 +1726,12 @@ const ARG_RESULT_REPLIES = {
 
   function sanitizeArgDisplayName(input) {
     const normalized = String(input || '').replace(/[\u0000-\u001F\u007F]/g, '').trim();
-    if (normalized.length < 2 || normalized.length > 20) return '';
+    if (normalized.length > 20) return '';
     return normalized;
+  }
+
+  function normalizeArgDisplayName(input) {
+    return String(input || '').replace(/[\u0000-\u001F\u007F]/g, '').trim().toUpperCase();
   }
 
   function formatArgDefaultName(playerNumber) {
@@ -1749,6 +1753,11 @@ const ARG_RESULT_REPLIES = {
     return upperName;
   }
 
+  function resolveArgAvatarRendered(player) {
+    const raw = String(player?.avatarRendered || '');
+    return raw.startsWith('data:image/') ? raw : '';
+  }
+
   function renderArgLeaderboardRow(player, rank, { isCurrentUser = false } = {}) {
     const row = document.createElement('div');
     row.className = `arg-scene-leaderboard-row${isCurrentUser ? ' is-current-user' : ''}`;
@@ -1759,9 +1768,18 @@ const ARG_RESULT_REPLIES = {
     avatarEl.className = 'arg-scene-leaderboard-avatar';
     avatarEl.style.setProperty('--arg-avatar-bg', String(player?.avatarBg || '#181818'));
     avatarEl.style.setProperty('--arg-avatar-fg', String(player?.avatarFg || '#ffffff'));
-    const avatarIcon = document.createElement('div');
-    avatarIcon.className = 'arg-scene-leaderboard-avatar-icon';
-    avatarEl.appendChild(avatarIcon);
+    const renderedAvatar = resolveArgAvatarRendered(player);
+    if (renderedAvatar) {
+      const img = document.createElement('img');
+      img.className = 'arg-scene-leaderboard-avatar-custom';
+      img.alt = '';
+      img.src = renderedAvatar;
+      avatarEl.appendChild(img);
+    } else {
+      const avatarIcon = document.createElement('div');
+      avatarIcon.className = 'arg-scene-leaderboard-avatar-icon';
+      avatarEl.appendChild(avatarIcon);
+    }
     const nameEl = document.createElement('div');
     nameEl.className = 'arg-scene-leaderboard-name';
     nameEl.textContent = resolveArgLeaderboardName(player);
@@ -1785,6 +1803,8 @@ const ARG_RESULT_REPLIES = {
     let draftName = resolveArgLeaderboardName(fallbackPlayer || {});
     let draftFg = String(fallbackPlayer?.avatarFg || '#ffffff');
     let draftBg = String(fallbackPlayer?.avatarBg || '#181818');
+    let draftAvatarRendered = resolveArgAvatarRendered(fallbackPlayer || {});
+    let latestLeaderboard = await fetchArgLeaderboard().catch(() => []);
     let activeColorTarget = 'fg';
     tpl.className = 'arg-scene-rename arg-scene-rename--customize';
     tpl.innerHTML = `
@@ -1796,15 +1816,18 @@ const ARG_RESULT_REPLIES = {
       </div>
       <div class="arg-scene-avatar-editor">
         <div class="arg-scene-avatar-preview" id="argSceneAvatarPreview">
-          <div class="arg-scene-avatar-preview-icon"></div>
+          <img class="arg-scene-avatar-preview-custom" id="argSceneAvatarPreviewCustom" alt="" hidden />
+          <div class="arg-scene-avatar-preview-empty" id="argSceneAvatarPreviewEmpty"></div>
+          <div class="arg-scene-avatar-preview-overlay"><span>+</span></div>
         </div>
+        <input type="file" id="argSceneAvatarFileInput" accept=".png,.jpg,.jpeg,.webm" hidden />
         <div class="arg-scene-avatar-swatches">
           <button type="button" class="arg-scene-avatar-swatch is-active" data-target="fg" id="argSceneAvatarFgSwatch"></button>
           <button type="button" class="arg-scene-avatar-swatch" data-target="bg" id="argSceneAvatarBgSwatch"></button>
         </div>
       </div>
       <div class="arg-scene-picker-wrap" id="argScenePickerMount"></div>
-      <div class="arg-scene-rename-error" id="argSceneRenameError" hidden>ИМЯ: 2–20 СИМВОЛОВ</div>
+      <div class="arg-scene-rename-error" id="argSceneRenameError" hidden>ТАКОЙ ИГРОК УЖЕ ЕСТЬ</div>
       <div class="arg-scene-rename-actions">
         <button type="button" class="arg-scene-leaderboard-btn" id="argSceneRenameCancelBtn">[ОТМЕНА]</button>
         <button type="button" class="arg-scene-leaderboard-btn" id="argSceneRenameSaveBtn">[УСТАНОВИТЬ]</button>
@@ -1823,6 +1846,9 @@ const ARG_RESULT_REPLIES = {
     const preview = popupBox.querySelector('#argSceneAvatarPreview');
     const fgSwatch = popupBox.querySelector('#argSceneAvatarFgSwatch');
     const bgSwatch = popupBox.querySelector('#argSceneAvatarBgSwatch');
+    const avatarPreviewCustom = popupBox.querySelector('#argSceneAvatarPreviewCustom');
+    const avatarPreviewEmpty = popupBox.querySelector('#argSceneAvatarPreviewEmpty');
+    const avatarFileInput = popupBox.querySelector('#argSceneAvatarFileInput');
     const pickerMount = popupBox.querySelector('#argScenePickerMount');
     const missing = [];
     if (!input) missing.push('input');
@@ -1878,6 +1904,14 @@ const ARG_RESULT_REPLIES = {
       bgSwatch.style.backgroundColor = draftBg;
       fgSwatch.classList.toggle('is-active', activeColorTarget === 'fg');
       bgSwatch.classList.toggle('is-active', activeColorTarget === 'bg');
+      fgSwatch.classList.toggle('is-white-active', activeColorTarget === 'fg' && normalizeHexColor(draftFg) === '#ffffff');
+      bgSwatch.classList.toggle('is-white-active', activeColorTarget === 'bg' && normalizeHexColor(draftBg) === '#ffffff');
+      const hasAvatar = !!draftAvatarRendered;
+      if (avatarPreviewCustom) {
+        avatarPreviewCustom.hidden = !hasAvatar;
+        if (hasAvatar) avatarPreviewCustom.src = draftAvatarRendered;
+      }
+      if (avatarPreviewEmpty) avatarPreviewEmpty.hidden = hasAvatar;
     };
     const applyPickerColor = (hex) => {
       if (!hex) return;
@@ -1898,6 +1932,74 @@ const ARG_RESULT_REPLIES = {
       const btn = ev.target.closest('.arg-scene-picker-cell');
       if (!btn) return;
       applyPickerColor(String(btn.dataset.color || ''));
+    });
+    const renderAvatarFromImageBitmap = (img) => {
+      const size = 75;
+      const sampleCanvas = document.createElement('canvas');
+      sampleCanvas.width = size;
+      sampleCanvas.height = size;
+      const ctx = sampleCanvas.getContext('2d');
+      const s = Math.min(img.width, img.height);
+      const sx = (img.width - s) * 0.5;
+      const sy = (img.height - s) * 0.5;
+      ctx.drawImage(img, sx, sy, s, s, 0, 0, size, size);
+
+      // Обязательный pipeline: crop -> Classic ASCII render (size=75, gamma=1, contrast=1)
+      const sourceData = ctx.getImageData(0, 0, size, size);
+      const px = sourceData.data;
+      const classicCharset = '@%#*+=-:. ';
+      const contrast = 1;
+      const gamma = 1;
+      const glyphCanvas = document.createElement('canvas');
+      const outSize = 300;
+      glyphCanvas.width = outSize;
+      glyphCanvas.height = outSize;
+      const gctx = glyphCanvas.getContext('2d');
+      gctx.fillStyle = '#000';
+      gctx.fillRect(0, 0, outSize, outSize);
+      gctx.fillStyle = '#fff';
+      const cell = outSize / size;
+      gctx.font = `${Math.ceil(cell * 1.15)}px "PxPlus IBM VGA", monospace`;
+      gctx.textBaseline = 'middle';
+      gctx.textAlign = 'center';
+      for (let y = 0; y < size; y += 1) {
+        for (let x = 0; x < size; x += 1) {
+          const i = (y * size + x) * 4;
+          const r = px[i] / 255;
+          const g = px[i + 1] / 255;
+          const b = px[i + 2] / 255;
+          let luma = r * 0.2126 + g * 0.7152 + b * 0.0722;
+          luma = Math.max(0, Math.min(1, (luma - 0.5) * contrast + 0.5));
+          luma = Math.pow(luma, gamma);
+          const idx = Math.max(0, Math.min(classicCharset.length - 1, Math.floor((1 - luma) * (classicCharset.length - 1))));
+          const ch = classicCharset[idx] || ' ';
+          gctx.fillText(ch, x * cell + cell * 0.5, y * cell + cell * 0.55);
+        }
+      }
+      draftAvatarRendered = glyphCanvas.toDataURL('image/png');
+      updateAvatarPreview();
+    };
+    preview.addEventListener('click', () => avatarFileInput?.click());
+    avatarFileInput?.addEventListener('change', async () => {
+      const file = avatarFileInput.files?.[0];
+      if (!file) return;
+      try {
+        if (file.type === 'video/webm' || /\.webm$/i.test(file.name || '')) {
+          const video = document.createElement('video');
+          video.muted = true;
+          video.playsInline = true;
+          video.src = URL.createObjectURL(file);
+          await new Promise((r) => video.addEventListener('loadeddata', r, { once: true }));
+          const frame = document.createElement('canvas');
+          frame.width = video.videoWidth; frame.height = video.videoHeight;
+          frame.getContext('2d').drawImage(video, 0, 0);
+          URL.revokeObjectURL(video.src);
+          renderAvatarFromImageBitmap(frame);
+        } else {
+          const img = await createImageBitmap(file);
+          renderAvatarFromImageBitmap(img);
+        }
+      } catch (_) {}
     });
 
     return await new Promise((resolve) => {
@@ -1920,14 +2022,18 @@ const ARG_RESULT_REPLIES = {
       const onSave = async (ev) => {
         ev.preventDefault();
         const nextName = sanitizeArgDisplayName(input.value);
-        if (!nextName) {
-          errorEl.hidden = false;
-          return;
-        }
+        const normalizedNextName = normalizeArgDisplayName(nextName);
+        const myUserId = String(tg?.initDataUnsafe?.user?.id || '');
+        const duplicate = !!normalizedNextName && latestLeaderboard.some((p) => {
+          const uid = String(p?.userId || '');
+          if (uid === myUserId) return false;
+          return normalizeArgDisplayName(resolveArgLeaderboardName(p)) === normalizedNextName;
+        });
+        if (duplicate) { errorEl.textContent = 'ТАКОЙ ИГРОК УЖЕ ЕСТЬ'; errorEl.hidden = false; return; }
         saveBtn.disabled = true;
         cancelBtn.disabled = true;
         try {
-          await updateArgProfileCustomize({ displayName: nextName, avatarFg: draftFg, avatarBg: draftBg });
+          await updateArgProfileCustomize({ displayName: nextName, avatarFg: draftFg, avatarBg: draftBg, avatarRendered: draftAvatarRendered });
           close(true);
         } catch (_) {
           saveBtn.disabled = false;
