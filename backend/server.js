@@ -2227,9 +2227,15 @@ if (/^\/all(?:@[\w_]+)?\s+([\s\S]+)$/i.test(text)) {
     if (text === '/buy_energy') {
       const kb = {
         inline_keyboard: [
-          [{ text: '10 ◇',  callback_data: 'pay:10' },  { text: '25 ◈',  callback_data: 'pay:25' }],
-          [{ text: '50 ◆',  callback_data: 'pay:50' },  { text: '100 ✦', callback_data: 'pay:100' }],
-          [{ text: 'Назад',   callback_data: 'pay:back' }],
+          [
+            { text: '10',  callback_data: 'pay:10',  style: 'primary', icon_custom_emoji_id: '5298643454484581082' },
+            { text: '25',  callback_data: 'pay:25',  style: 'primary', icon_custom_emoji_id: '5298643454484581082' }
+          ],
+          [
+            { text: '50',  callback_data: 'pay:50',  style: 'primary', icon_custom_emoji_id: '5298643454484581082' },
+            { text: '100', callback_data: 'pay:100', style: 'primary', icon_custom_emoji_id: '5298643454484581082' }
+          ],
+          [{ text: 'Назад', callback_data: 'pay:back', style: 'danger' }],
         ]
       };
      await sendMessage(fromId, `
