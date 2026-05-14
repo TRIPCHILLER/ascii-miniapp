@@ -1731,8 +1731,13 @@ const ARG_RESULT_REPLIES = {
       body: JSON.stringify(payload)
     });
     const json = await res.json().catch(() => ({}));
-    console.log('[profile-save] response', { ok: res.ok, json });
-    if (!res.ok || !json?.ok) throw new Error(json?.error || 'pong_profile_customize_failed');
+    console.log('[profile-save] response', { ok: res.ok, status: res.status, json });
+    if (!res.ok || !json?.ok) {
+      const err = new Error(json?.error || 'pong_profile_customize_failed');
+      err.status = res.status;
+      err.code = json?.error || '';
+      throw err;
+    }
     return json.player || null;
   }
 
@@ -2104,10 +2109,11 @@ const ARG_RESULT_REPLIES = {
       };
       const onSave = async (ev) => {
         ev.preventDefault();
-        const rawNextName = sanitizeArgDisplayName(input.value);
-        const nextName = (!rawNextName || looksSystemName(rawNextName)) ? rawNextName : applyLeetNameFilter(rawNextName);
-        if (nextName.length > 20) { errorEl.textContent = 'СЛИШКОМ ДЛИННОЕ ИМЯ'; errorEl.hidden = false; return; }
-        const normalizedNextName = normalizeArgDisplayName(nextName);
+        const rawName = String(input.value || '');
+        const trimmedName = sanitizeArgDisplayName(rawName);
+        const finalDisplayName = (!trimmedName || looksSystemName(trimmedName)) ? trimmedName : applyLeetNameFilter(trimmedName);
+        if (finalDisplayName.length > 20) { errorEl.textContent = 'СЛИШКОМ ДЛИННОЕ ИМЯ'; errorEl.hidden = false; return; }
+        const normalizedNextName = normalizeArgDisplayName(finalDisplayName);
         const myUserId = String(tg?.initDataUnsafe?.user?.id || '');
         const duplicate = !!normalizedNextName && latestLeaderboard.some((p) => {
           const uid = String(p?.userId || '');
@@ -2119,7 +2125,7 @@ const ARG_RESULT_REPLIES = {
         cancelBtn.disabled = true;
         try {
           const savedPlayer = await updateArgProfileCustomize({
-            displayName: nextName,
+            displayName: finalDisplayName,
             avatarFg: draftFg,
             avatarBg: draftBg,
             avatarRendered: draftAvatarRendered,
@@ -2140,7 +2146,11 @@ const ARG_RESULT_REPLIES = {
           console.error('[profile-save] failed', err);
           saveBtn.disabled = false;
           cancelBtn.disabled = false;
-          errorEl.textContent = 'НЕ УДАЛОСЬ СОХРАНИТЬ';
+          if (err?.status === 409 || err?.code === 'duplicate_display_name') {
+            errorEl.textContent = 'ТАКОЙ ИГРОК УЖЕ ЕСТЬ';
+          } else {
+            errorEl.textContent = 'НЕ УДАЛОСЬ СОХРАНИТЬ';
+          }
           errorEl.hidden = false;
         }
       };
