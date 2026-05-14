@@ -1315,6 +1315,9 @@ const ARG_RESULT_REPLIES = {
         <div class="arg-scene-score-bottom" id="argScenePlayerScore">0</div>
       </div>
       <div class="arg-scene-layer arg-scene-goal-flash" id="argSceneGoalFlashLayer" hidden></div>
+      <div class="arg-scene-layer" id="argSceneRenderMutationLayer" hidden aria-live="polite">
+        <div id="argSceneRenderMutationText">: : МУТ4ЦИЯ Р3НД3Р4 : :</div>
+      </div>
       <div class="arg-scene-layer arg-scene-popup" id="argScenePopupLayer" hidden>
         <div class="arg-scene-popup-box">
           <div class="arg-scene-popup-text" id="argScenePopupText"></div>
@@ -2352,6 +2355,7 @@ const ARG_RESULT_REPLIES = {
     const overlay = document.getElementById('argSceneOverlay');
     const goalFlashLayer = overlay?.querySelector('#argSceneGoalFlashLayer');
     if (goalFlashLayer) goalFlashLayer.hidden = true;
+    hideRenderMutationOverlay();
     if (overlay) overlay.classList.remove('arg-scene-overlay--goal-eye-zoom');
     argPongState.goalEyeZoomActive = false;
   }
@@ -2371,6 +2375,7 @@ const ARG_RESULT_REPLIES = {
     const popupText = overlay.querySelector('#argScenePopupText');
     if (popupLayer) popupLayer.hidden = true;
     if (goalFlashLayer) goalFlashLayer.hidden = true;
+    hideRenderMutationOverlay();
     overlay.classList.remove('arg-scene-overlay--goal-eye-zoom');
     argPongState.goalEyeZoomActive = false;
     if (countdownLayer) countdownLayer.textContent = '';
@@ -2891,14 +2896,16 @@ const ARG_RESULT_REPLIES = {
       if (popupLayer) popupLayer.style.filter = 'none';
     };
     const applyRandomBossFightPreset = () => {
-      if (!PRESETS.length) return;
-      let nextPreset = PRESETS[Math.floor(Math.random() * PRESETS.length)];
-      if (nextPreset && PRESETS.length > 1 && nextPreset.id === argPongState.bossPresetId) {
-        nextPreset = PRESETS[Math.floor(Math.random() * PRESETS.length)];
-      }
+      if (!PRESETS.length) return false;
+      const candidates = PRESETS.length > 1
+        ? PRESETS.filter((preset) => preset?.id !== argPongState.bossPresetId)
+        : PRESETS;
+      const pool = candidates.length ? candidates : PRESETS;
+      const nextPreset = pool[Math.floor(Math.random() * pool.length)] || PRESETS[0];
       const colors = getPresetColorsById(nextPreset?.id);
-      if (!colors) return;
+      if (!colors) return false;
       applyBossFightPalette({ ...colors, presetId: nextPreset.id });
+      return true;
     };
     const resolveBossCharsetPreset = (value) => {
       if (!value || value === 'CUSTOM') return '';
@@ -2937,6 +2944,69 @@ const ARG_RESULT_REPLIES = {
       argPongState.bossCharsetRotationIndex = Math.max(0, pool.indexOf(nextCharset));
       argPongState.bossAsciiOptions.charset = nextCharset;
     };
+    const hideRenderMutationOverlay = () => {
+      const layer = overlay.querySelector('#argSceneRenderMutationLayer');
+      const textEl = overlay.querySelector('#argSceneRenderMutationText');
+      if (!layer || !textEl) return;
+      layer.hidden = true;
+      layer.style.opacity = '0';
+      layer.style.background = 'rgba(0, 0, 0, 0)';
+      layer.style.display = 'flex';
+      layer.style.alignItems = 'center';
+      layer.style.justifyContent = 'center';
+      layer.style.pointerEvents = 'none';
+      layer.style.transition = 'opacity 180ms ease, background 180ms ease';
+      textEl.style.color = argPongState.bossAsciiOptions.color || '#ffffff';
+      textEl.style.fontFamily = "'Consolas', 'Menlo', 'Monaco', monospace";
+      textEl.style.fontSize = 'clamp(20px, 4.5vw, 42px)';
+      textEl.style.fontWeight = '700';
+      textEl.style.letterSpacing = '0.08em';
+      textEl.style.textAlign = 'center';
+      textEl.style.textShadow = '0 0 12px currentColor';
+      textEl.style.transform = 'scale(0.96)';
+      textEl.style.transition = 'transform 220ms ease';
+    };
+    const showRenderMutationOverlay = () => new Promise((resolve) => {
+      const layer = overlay.querySelector('#argSceneRenderMutationLayer');
+      const textEl = overlay.querySelector('#argSceneRenderMutationText');
+      const mutationText = ': : МУТ4ЦИЯ Р3НД3Р4 : :';
+      if (!layer || !textEl || !argPongState.running) {
+        resolve();
+        return;
+      }
+      hideRenderMutationOverlay();
+      layer.hidden = false;
+      textEl.style.color = argPongState.bossAsciiOptions.color || '#ffffff';
+      textEl.textContent = '';
+      requestAnimationFrame(() => {
+        layer.style.opacity = '1';
+        layer.style.background = 'rgba(0, 0, 0, 0.42)';
+        textEl.style.transform = 'scale(1)';
+      });
+      const typeMsPerChar = 36;
+      const totalTypeMs = Math.max(600, Math.min(900, mutationText.length * typeMsPerChar));
+      const perCharMs = Math.max(20, Math.floor(totalTypeMs / Math.max(1, mutationText.length)));
+      let idx = 0;
+      const typeTimer = setInterval(() => {
+        idx += 1;
+        textEl.textContent = mutationText.slice(0, idx);
+        if (idx >= mutationText.length) {
+          clearInterval(typeTimer);
+          const holdTimer = setTimeout(() => {
+            layer.style.opacity = '0';
+            layer.style.background = 'rgba(0, 0, 0, 0)';
+            textEl.style.transform = 'scale(0.98)';
+            const hideTimer = setTimeout(() => {
+              hideRenderMutationOverlay();
+              resolve();
+            }, 220);
+            argPongFlashTimers.push(hideTimer);
+          }, 260);
+          argPongFlashTimers.push(holdTimer);
+        }
+      }, perCharMs);
+      argPongFlashTimers.push(typeTimer);
+    });
     applyBossFightPalette({ text: '#ffffff', bg: '#000000', presetId: null });
     resetBossCharsetRotation();
     overlay.classList.remove('arg-scene-overlay--goal-eye-zoom');
@@ -3107,7 +3177,6 @@ const ARG_RESULT_REPLIES = {
         argPongState.ballX = clamp(argPongState.ballX, wallNorm + ballHalfX, 1 - wallNorm - ballHalfX);
         argPongState.ballVX *= -1;
         playUiSoundNoThrow(ARG_SCENE_SOUNDS.pongPunch);
-        applyRandomBossFightPreset();
         applyTinyShake();
         tgEventHaptic();
       }
@@ -3161,7 +3230,8 @@ const ARG_RESULT_REPLIES = {
             if (flashStep === ARG_GOAL_FLASH_STEPS.first) {
               argPongState.bossFlashHidden = true;
             } else if (flashStep === ARG_GOAL_FLASH_STEPS.third) {
-              rotateBossCharset();
+              const presetMutated = applyRandomBossFightPreset();
+              if (presetMutated) rotateBossCharset();
               argPongState.bossFlashHidden = false;
             }
           },
@@ -3172,7 +3242,7 @@ const ARG_RESULT_REPLIES = {
         argPongServeTimer = setTimeout(() => {
           if (!argPongState.running) return;
           argPongServeTimer = 0;
-          flashBurstPromise.then(() => {
+          flashBurstPromise.then(() => showRenderMutationOverlay()).then(() => {
             if (!argPongState.running) return;
             argPongServeTimer = setTimeout(() => {
               if (!argPongState.running) return;
