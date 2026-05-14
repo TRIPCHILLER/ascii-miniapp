@@ -252,6 +252,29 @@ function pluralRu(n, one, few, many) {
 }
 const IMPULSE_FORMS = ['импульс', 'импульса', 'импульсов'];
 const impulseWord = (n) => pluralRu(n, ...IMPULSE_FORMS);
+const ARG_TOP_RANK_MESSAGES = {
+  1: 'ПЕРВЫЙ СИГНАЛ ЗАХВАЧЕН',
+  2: 'ТЫ ВО ВТОРОМ КОНТУРЕ',
+  3: 'ТРЕТИЙ СЛЕД ЗАФИКСИРОВАН',
+};
+function composeArgRunMessage({ impulsesEarned, impulseBalance, rank }) {
+  const normalizedEarned = Math.max(0, Number(impulsesEarned) || 0);
+  const normalizedBalance = Math.max(0, Number(impulseBalance) || 0);
+  const normalizedRank = Number(rank);
+  const topRankLine = ARG_TOP_RANK_MESSAGES[normalizedRank] || '';
+  const lines = [
+    ': ASCII ⛶ VISOR :',
+    '',
+  ];
+  if (topRankLine) {
+    lines.push(topRankLine, '');
+  }
+  lines.push(
+    `ИЗВЛЕЧЕНО ИМПУЛЬСОВ: +${normalizedEarned}`,
+    `В ЭНЕРГОХРАНИЛИЩЕ: ${normalizedBalance}`
+  );
+  return lines.join('\n');
+}
 // ==== /pluralRu ====
 const PORT      = process.env.PORT || 8080;
 const ADMIN_ID  = String(process.env.ADMIN_TELEGRAM_ID || '');
@@ -985,7 +1008,7 @@ app.post('/api/pong/start', (req, res) => {
   return res.json({ ok: true, runId: run.runId, startedAt: run.startedAt, player });
 });
 
-app.post('/api/pong/finish', (req, res) => {
+app.post('/api/pong/finish', async (req, res) => {
   let userId = '';
   try {
     userId = parseInitDataUserIdOrThrow(req);
@@ -1002,6 +1025,36 @@ app.post('/api/pong/finish', (req, res) => {
   const runIndex = runs.findIndex((r) => String(r?.runId || '') === runId);
   const run = runIndex >= 0 ? runs[runIndex] : null;
 
+  if (run?.finishedAt && run?.accepted && String(run.userId) === String(userId)) {
+    const players = readLeaderboard();
+    const sortedPlayers = [...players].sort((a, b) => {
+      const bestDiff = Number(b?.bestScore || 0) - Number(a?.bestScore || 0);
+      if (bestDiff !== 0) return bestDiff;
+      const aUpdated = Date.parse(String(a?.updatedAt || a?.createdAt || '')) || 0;
+      const bUpdated = Date.parse(String(b?.updatedAt || b?.createdAt || '')) || 0;
+      return aUpdated - bUpdated;
+    });
+    const rankIndex = sortedPlayers.findIndex((p) => String(p?.userId || '') === String(userId));
+    return res.json({
+      ok: true,
+      success: true,
+      duplicate: true,
+      run: {
+        runId: run.runId,
+        accepted: true,
+        impulsesAwarded: Math.max(0, Number(run.impulsesAwarded || 0)),
+        playerScore: Number(run.playerScore || 0),
+        botScore: Number(run.botScore || 0),
+        durationMs: Number(run.durationMs || 0),
+        finishedAt: run.finishedAt,
+      },
+      impulsesEarned: Math.max(0, Number(run.impulsesAwarded || 0)),
+      impulseBalance: getBalance(userId),
+      rank: rankIndex >= 0 ? rankIndex + 1 : null,
+      messageSent: false,
+    });
+  }
+
   const verdict = validateFinishResult({ run, userId, playerScore, botScore });
   if (!verdict.ok) {
     if (run && !run.finishedAt) {
@@ -1017,7 +1070,8 @@ app.post('/api/pong/finish', (req, res) => {
     return res.status(400).json({ ok: false, error: verdict.reason });
   }
 
-  const impulsesAwarded = calculateImpulses(playerScore);
+  const winsInRun = Math.max(0, Number(playerScore) || 0);
+  const impulsesAwarded = calculateImpulses(winsInRun);
   run.finishedAt = new Date().toISOString();
   run.durationMs = verdict.durationMs;
   run.playerScore = playerScore;
@@ -1029,7 +1083,9 @@ app.post('/api/pong/finish', (req, res) => {
   writeRuns(runs);
 
   ensureUser(userId);
+  const previousImpulseBalance = Number(getBalance(userId) || 0);
   if (impulsesAwarded > 0) add(userId, impulsesAwarded);
+  const nextImpulseBalance = Number(getBalance(userId) || 0);
 
   const nowIso = new Date().toISOString();
   const { player, players } = getOrCreatePlayer(userId);
@@ -1039,9 +1095,40 @@ app.post('/api/pong/finish', (req, res) => {
   if (playerScore > botScore) player.totalWins = Number(player.totalWins || 0) + 1;
   player.updatedAt = nowIso;
   writeLeaderboard(players);
+  const sortedPlayers = [...players].sort((a, b) => {
+    const bestDiff = Number(b?.bestScore || 0) - Number(a?.bestScore || 0);
+    if (bestDiff !== 0) return bestDiff;
+    const aUpdated = Date.parse(String(a?.updatedAt || a?.createdAt || '')) || 0;
+    const bUpdated = Date.parse(String(b?.updatedAt || b?.createdAt || '')) || 0;
+    return aUpdated - bUpdated;
+  });
+  const rankIndex = sortedPlayers.findIndex((p) => String(p?.userId || '') === String(userId));
+  const rank = rankIndex >= 0 ? rankIndex + 1 : null;
+  let messageSent = false;
+  try {
+    await sendMessage(userId, composeArgRunMessage({ impulsesEarned: impulsesAwarded, impulseBalance: nextImpulseBalance, rank }));
+    messageSent = true;
+  } catch (err) {
+    console.error('[pong-result] failed_to_send_message', {
+      userId: String(userId),
+      runId: String(run.runId),
+      error: err?.message || String(err),
+    });
+  }
+  console.log('[pong-result]', {
+    playerId: String(userId),
+    runId: String(run.runId),
+    winsInRun,
+    impulsesEarned: impulsesAwarded,
+    previousImpulseBalance,
+    nextImpulseBalance,
+    rank,
+    messageSent,
+  });
 
   return res.json({
     ok: true,
+    success: true,
     run: {
       runId: run.runId,
       accepted: true,
@@ -1052,7 +1139,11 @@ app.post('/api/pong/finish', (req, res) => {
       finishedAt: run.finishedAt,
     },
     player,
-    balance: getBalance(userId),
+    balance: nextImpulseBalance,
+    impulsesEarned: impulsesAwarded,
+    impulseBalance: nextImpulseBalance,
+    rank,
+    messageSent,
   });
 });
 
