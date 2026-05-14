@@ -4272,17 +4272,24 @@ const ARG_RESULT_REPLIES = {
       const intensity = clamp(startEasterBigEyeMotionIntensity, 0, 1);
       const shakeAmpMul = soundIndex === START_EASTER_EGG_MAX_SOUND ? 2 : 1;
       const maxShiftY = ARG_PONG.visorEyeMaxShiftYPx * ARG_PONG.visorFollowRadiusBoost;
-      const clutchSpringShakeAmpPx = maxShiftY * ARG_PONG.visorClutchSpringShakeAmpRatio * intensity * shakeAmpMul;
-      const clutchSpringShakeAmpXPx = clutchSpringShakeAmpPx * 0.42;
+      const baseShakeAmpPx = maxShiftY * ARG_PONG.visorClutchSpringShakeAmpRatio * intensity * shakeAmpMul;
+      const baseShakeAmpXPx = baseShakeAmpPx * 0.42;
       const roundShakeSpeedY = ARG_PONG.visorClutchSpringShakeSpeedY * ARG_PONG.visorRoundShakeSpeedFactor;
       const roundShakeSpeedX = roundShakeSpeedY * 1.18;
       const phaseX = Math.random() * Math.PI * 2;
       const phaseY = Math.random() * Math.PI * 2;
       const startAt = performance.now();
+      let resolvedDurationMs = 4200;
       eyeOverlay.classList.add('start-easter-eye-layer--countdown-shake');
       const loop = (ts) => {
         if (shakeToken !== startEasterBigEyeShakeToken) return;
         const now = ts || performance.now();
+        const elapsedSinceStart = Math.max(0, now - startAt);
+        const shakeProgress = clamp(elapsedSinceStart / Math.max(200, resolvedDurationMs), 0, 1);
+        const shakeAccel = shakeProgress * shakeProgress;
+        const shakeRampMul = 1 + shakeAccel;
+        const clutchSpringShakeAmpPx = baseShakeAmpPx * shakeRampMul;
+        const clutchSpringShakeAmpXPx = baseShakeAmpXPx * shakeRampMul;
         const roundSpringShakeY = (
           Math.sin(now * roundShakeSpeedY + phaseY * 1.37)
           + Math.sin(now * roundShakeSpeedY * 1.91 + phaseX * 0.92) * 0.45
@@ -4306,6 +4313,7 @@ const ARG_RESULT_REPLIES = {
       };
       resolveRemainingAudioDurationMs(audio, 4200, (durationMs) => {
         if (shakeToken !== startEasterBigEyeShakeToken) return;
+        resolvedDurationMs = Math.max(200, durationMs);
         const elapsed = Math.max(0, performance.now() - startAt);
         const remainingMs = Math.max(0, durationMs - elapsed);
         startEasterBigEyeShakeTimer = setTimeout(finalize, remainingMs);
@@ -4343,10 +4351,10 @@ const ARG_RESULT_REPLIES = {
           return;
         }
         const phase = Math.min(1, elapsed / durationMs);
-        const minDelay = 24;
+        const minDelay = 20;
         const maxDelay = 520;
-        const easedPhase = 1 - Math.pow(1 - phase, 4);
-        const nextDelay = minDelay + (maxDelay - minDelay) * easedPhase;
+        const easedPhase = phase * phase;
+        const nextDelay = maxDelay - (maxDelay - minDelay) * easedPhase;
         startEasterEggRouletteTimer = setTimeout(tick, nextDelay);
       };
       tick();
