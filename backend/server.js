@@ -1080,13 +1080,13 @@ app.post('/api/pong/profile/name', (req, res) => {
   const nextName = String(req.body?.displayName || '')
     .replace(/[\u0000-\u001F\u007F]/g, '')
     .trim();
-  if (nextName.length < 2 || nextName.length > 20) {
+  if (nextName.length > 20) {
     return res.status(400).json({ ok: false, error: 'invalid_display_name' });
   }
 
   const { player, players } = getOrCreatePlayer(userId);
   player.displayName = nextName;
-  player.isCustomName = true;
+  player.isCustomName = nextName.length > 0;
   player.updatedAt = new Date().toISOString();
   writeLeaderboard(players);
 
@@ -1104,19 +1104,25 @@ app.post('/api/pong/profile/customize', (req, res) => {
   const nextName = String(req.body?.displayName || '').replace(/[\u0000-\u001F\u007F]/g, '').trim();
   const avatarFg = String(req.body?.avatarFg || '').trim();
   const avatarBg = String(req.body?.avatarBg || '').trim();
+  const avatarRenderedRaw = typeof req.body?.avatarRendered === 'string' ? req.body.avatarRendered.trim() : '';
+  const avatarRendered = avatarRenderedRaw.startsWith('data:image/') ? avatarRenderedRaw : '';
   const isHexColor = (v) => /^#([0-9a-fA-F]{6})$/.test(v);
-  if (nextName.length < 2 || nextName.length > 20) {
+  if (nextName.length > 20) {
     return res.status(400).json({ ok: false, error: 'invalid_display_name' });
   }
   if (!isHexColor(avatarFg) || !isHexColor(avatarBg)) {
     return res.status(400).json({ ok: false, error: 'invalid_avatar_colors' });
   }
+  if (avatarRenderedRaw && !avatarRendered) {
+    return res.status(400).json({ ok: false, error: 'invalid_avatar_rendered' });
+  }
 
   const { player, players } = getOrCreatePlayer(userId);
   player.displayName = nextName;
-  player.isCustomName = true;
+  player.isCustomName = nextName.length > 0;
   player.avatarFg = avatarFg.toLowerCase();
   player.avatarBg = avatarBg.toLowerCase();
+  player.avatarRendered = avatarRendered;
   player.updatedAt = new Date().toISOString();
   writeLeaderboard(players);
   return res.json({ ok: true, player });

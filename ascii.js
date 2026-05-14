@@ -1713,13 +1713,22 @@ const ARG_RESULT_REPLIES = {
     return json.player || null;
   }
 
-  async function updateArgProfileCustomize({ displayName, avatarFg, avatarBg }) {
+  async function updateArgProfileCustomize({ displayName, avatarFg, avatarBg, avatarRendered }) {
+    const payload = { displayName, avatarFg, avatarBg, avatarRendered };
+    console.log('[profile-save] payload', {
+      displayName,
+      hasAvatarRendered: Boolean(avatarRendered),
+      avatarRenderedLength: avatarRendered?.length || 0,
+      avatarFg,
+      avatarBg
+    });
     const res = await fetch(`${API_BASE}/api/pong/profile/customize`, {
       method: 'POST',
       headers: applyTelegramInitDataHeader({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ displayName, avatarFg, avatarBg, avatarRendered: arguments[0]?.avatarRendered || '' })
+      body: JSON.stringify(payload)
     });
     const json = await res.json().catch(() => ({}));
+    console.log('[profile-save] response', { ok: res.ok, json });
     if (!res.ok || !json?.ok) throw new Error(json?.error || 'pong_profile_customize_failed');
     return json.player || null;
   }
@@ -2054,9 +2063,18 @@ const ARG_RESULT_REPLIES = {
         saveBtn.disabled = true;
         cancelBtn.disabled = true;
         try {
-          await updateArgProfileCustomize({ displayName: nextName, avatarFg: draftFg, avatarBg: draftBg, avatarRendered: draftAvatarRendered });
+          const savedPlayer = await updateArgProfileCustomize({ displayName: nextName, avatarFg: draftFg, avatarBg: draftBg, avatarRendered: draftAvatarRendered });
+          console.log('[profile-save] saved player', {
+            userId: savedPlayer?.userId,
+            displayName: savedPlayer?.displayName,
+            hasAvatarRendered: Boolean(savedPlayer?.avatarRendered),
+            avatarRenderedLength: savedPlayer?.avatarRendered?.length || 0,
+            avatarFg: savedPlayer?.avatarFg,
+            avatarBg: savedPlayer?.avatarBg
+          });
           close(true);
-        } catch (_) {
+        } catch (err) {
+          console.error('[profile-save] failed', err);
           saveBtn.disabled = false;
           cancelBtn.disabled = false;
           errorEl.textContent = 'НЕ УДАЛОСЬ СОХРАНИТЬ';
