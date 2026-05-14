@@ -288,6 +288,26 @@ const SUPPORTED_COMMANDS = new Set([
   '/who', '/who_refs', '/stats', '/all', '/say', '/penalise', '/punish', '/send'
 ]);
 const app = express();
+
+const MAX_AVATAR_RENDERED_BYTES = 14 * 1024;
+const MAX_AVATAR_SOURCE_BYTES = 10 * 1024;
+
+function parseDataImageUrl(raw, { maxBytes, allowedMime = ['image/png'] } = {}) {
+  const value = typeof raw === 'string' ? raw.trim() : '';
+  if (!value) return { ok: true, value: '' };
+  const m = /^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=]+)$/.exec(value);
+  if (!m) return { ok: false, error: 'invalid_data_url' };
+  const mime = String(m[1] || '').toLowerCase();
+  if (Array.isArray(allowedMime) && allowedMime.length && !allowedMime.includes(mime)) {
+    return { ok: false, error: 'invalid_mime_type' };
+  }
+  const b64 = m[2] || '';
+  const estimatedBytes = Math.floor((b64.length * 3) / 4) - (b64.endsWith('==') ? 2 : b64.endsWith('=') ? 1 : 0);
+  if (Number.isFinite(maxBytes) && estimatedBytes > maxBytes) {
+    return { ok: false, error: 'payload_too_large' };
+  }
+  return { ok: true, value, mime, estimatedBytes };
+}
 function isAdminUser(userId) {
   return String(userId) === String(ADMIN_ID);
 }
@@ -1197,10 +1217,12 @@ app.post('/api/pong/profile/customize', (req, res) => {
   const nextName = String(req.body?.displayName || '').replace(/[\u0000-\u001F\u007F]/g, '').trim();
   const avatarFg = String(req.body?.avatarFg || '').trim();
   const avatarBg = String(req.body?.avatarBg || '').trim();
-  const avatarRenderedRaw = typeof req.body?.avatarRendered === 'string' ? req.body.avatarRendered.trim() : '';
-  const avatarSourceRaw = typeof req.body?.avatarSource === 'string' ? req.body.avatarSource.trim() : '';
-  const avatarRendered = avatarRenderedRaw.startsWith('data:image/') ? avatarRenderedRaw : '';
-  const avatarSource = avatarSourceRaw.startsWith('data:image/') ? avatarSourceRaw : '';
+  const avatarRenderedRaw = req.body?.avatarRendered;
+  const avatarSourceRaw = req.body?.avatarSource;
+  const avatarRenderedParsed = parseDataImageUrl(avatarRenderedRaw, { maxBytes: MAX_AVATAR_RENDERED_BYTES, allowedMime: ['image/png'] });
+  const avatarSourceParsed = parseDataImageUrl(avatarSourceRaw, { maxBytes: MAX_AVATAR_SOURCE_BYTES, allowedMime: ['image/png'] });
+  const avatarRendered = avatarRenderedParsed.ok ? avatarRenderedParsed.value : '';
+  const avatarSource = avatarSourceParsed.ok ? avatarSourceParsed.value : '';
   const isHexColor = (v) => /^#([0-9a-fA-F]{6})$/.test(v);
   if (nextName.length > 20) {
     return res.status(400).json({ ok: false, error: 'invalid_display_name' });
@@ -1208,11 +1230,13 @@ app.post('/api/pong/profile/customize', (req, res) => {
   if (!isHexColor(avatarFg) || !isHexColor(avatarBg)) {
     return res.status(400).json({ ok: false, error: 'invalid_avatar_colors' });
   }
-  if (avatarRenderedRaw && !avatarRendered) {
-    return res.status(400).json({ ok: false, error: 'invalid_avatar_rendered' });
+  if (!avatarRenderedParsed.ok) {
+    const error = avatarRenderedParsed.error === 'payload_too_large' ? 'avatar_rendered_too_large' : 'invalid_avatar_rendered';
+    return res.status(400).json({ ok: false, error });
   }
-  if (avatarSourceRaw && !avatarSource) {
-    return res.status(400).json({ ok: false, error: 'invalid_avatar_source' });
+  if (!avatarSourceParsed.ok) {
+    const error = avatarSourceParsed.error === 'payload_too_large' ? 'avatar_source_too_large' : 'invalid_avatar_source';
+    return res.status(400).json({ ok: false, error });
   }
 
   const { player, players } = getOrCreatePlayer(userId);

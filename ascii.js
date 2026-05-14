@@ -31,6 +31,7 @@
   const TEXT_TELEGRAM_CELL_ASPECT = 0.50;
   const TEXT_PREVIEW_LINE_HEIGHT = 1.10;
   const TEXT_FINAL_GRID_EXTRA_ROWS = 0;
+  const AVATAR_LEADERBOARD_SIZE = 30;
   const DOTS_BRAILLE_CFG = Object.freeze({
     CELL_W: 2,
     CELL_H: 4,
@@ -1981,7 +1982,7 @@ const ARG_RESULT_REPLIES = {
       applyPickerColor(String(btn.dataset.color || ''));
     });
     const renderAvatarFromImageBitmap = (img) => {
-      const size = 75;
+      const size = AVATAR_LEADERBOARD_SIZE;
       const sampleCanvas = document.createElement('canvas');
       sampleCanvas.width = size;
       sampleCanvas.height = size;
@@ -2004,7 +2005,7 @@ const ARG_RESULT_REPLIES = {
         img.onerror = reject;
       });
       if (token !== avatarRenderToken) return;
-      const size = 75;
+      const size = AVATAR_LEADERBOARD_SIZE;
       const sampleCanvas = document.createElement('canvas');
       sampleCanvas.width = size;
       sampleCanvas.height = size;
@@ -2016,7 +2017,7 @@ const ARG_RESULT_REPLIES = {
       const contrast = 1;
       const gamma = 1;
       const glyphCanvas = document.createElement('canvas');
-      const outSize = 300;
+      const outSize = AVATAR_LEADERBOARD_SIZE;
       glyphCanvas.width = outSize;
       glyphCanvas.height = outSize;
       const gctx = glyphCanvas.getContext('2d');
