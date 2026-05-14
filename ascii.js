@@ -1713,12 +1713,14 @@ const ARG_RESULT_REPLIES = {
     return json.player || null;
   }
 
-  async function updateArgProfileCustomize({ displayName, avatarFg, avatarBg, avatarRendered }) {
-    const payload = { displayName, avatarFg, avatarBg, avatarRendered };
+  async function updateArgProfileCustomize({ displayName, avatarFg, avatarBg, avatarRendered, avatarSource }) {
+    const payload = { displayName, avatarFg, avatarBg, avatarRendered, avatarSource };
     console.log('[profile-save] payload', {
       displayName,
       hasAvatarRendered: Boolean(avatarRendered),
       avatarRenderedLength: avatarRendered?.length || 0,
+      hasAvatarSource: Boolean(avatarSource),
+      avatarSourceLength: avatarSource?.length || 0,
       avatarFg,
       avatarBg
     });
@@ -1813,7 +1815,7 @@ const ARG_RESULT_REPLIES = {
     let draftFg = String(fallbackPlayer?.avatarFg || '#ffffff');
     let draftBg = String(fallbackPlayer?.avatarBg || '#181818');
     let draftAvatarRendered = resolveArgAvatarRendered(fallbackPlayer || {});
-    let draftAvatarSource = '';
+    let draftAvatarSource = String(fallbackPlayer?.avatarSource || '');
     let avatarRenderToken = 0;
     let latestLeaderboard = await fetchArgLeaderboard().catch(() => []);
     let activeColorTarget = 'fg';
@@ -1924,11 +1926,44 @@ const ARG_RESULT_REPLIES = {
       }
       if (avatarPreviewEmpty) avatarPreviewEmpty.hidden = hasAvatar;
     };
+    const recolorAvatarRendered = async () => {
+      if (!draftAvatarRendered) return;
+      const img = new Image();
+      img.decoding = 'async';
+      img.src = draftAvatarRendered;
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+      });
+      const out = document.createElement('canvas');
+      out.width = img.width;
+      out.height = img.height;
+      const octx = out.getContext('2d');
+      octx.drawImage(img, 0, 0);
+      const imageData = octx.getImageData(0, 0, out.width, out.height);
+      const px = imageData.data;
+      const fg = hexToRgb(draftFg);
+      const bg = hexToRgb(draftBg);
+      if (!fg || !bg) return;
+      for (let i = 0; i < px.length; i += 4) {
+        const alpha = px[i + 3];
+        if (alpha === 0) continue;
+        const luma = (px[i] * 0.2126 + px[i + 1] * 0.7152 + px[i + 2] * 0.0722) / 255;
+        px[i] = Math.round(bg.r + (fg.r - bg.r) * (1 - luma));
+        px[i + 1] = Math.round(bg.g + (fg.g - bg.g) * (1 - luma));
+        px[i + 2] = Math.round(bg.b + (fg.b - bg.b) * (1 - luma));
+      }
+      octx.putImageData(imageData, 0, 0);
+      draftAvatarRendered = out.toDataURL('image/png');
+      if (!draftAvatarSource) draftAvatarSource = draftAvatarRendered;
+      updateAvatarPreview();
+    };
     const applyPickerColor = (hex) => {
       if (!hex) return;
       if (activeColorTarget === 'fg') draftFg = hex;
       else draftBg = hex;
       if (draftAvatarSource) renderDraftAvatarFromSource().catch(() => {});
+      else if (draftAvatarRendered) recolorAvatarRendered().catch(() => {});
       else updateAvatarPreview();
     };
     updateAvatarPreview();
@@ -2063,12 +2098,20 @@ const ARG_RESULT_REPLIES = {
         saveBtn.disabled = true;
         cancelBtn.disabled = true;
         try {
-          const savedPlayer = await updateArgProfileCustomize({ displayName: nextName, avatarFg: draftFg, avatarBg: draftBg, avatarRendered: draftAvatarRendered });
+          const savedPlayer = await updateArgProfileCustomize({
+            displayName: nextName,
+            avatarFg: draftFg,
+            avatarBg: draftBg,
+            avatarRendered: draftAvatarRendered,
+            avatarSource: draftAvatarSource
+          });
           console.log('[profile-save] saved player', {
             userId: savedPlayer?.userId,
             displayName: savedPlayer?.displayName,
             hasAvatarRendered: Boolean(savedPlayer?.avatarRendered),
             avatarRenderedLength: savedPlayer?.avatarRendered?.length || 0,
+            hasAvatarSource: Boolean(savedPlayer?.avatarSource),
+            avatarSourceLength: savedPlayer?.avatarSource?.length || 0,
             avatarFg: savedPlayer?.avatarFg,
             avatarBg: savedPlayer?.avatarBg
           });

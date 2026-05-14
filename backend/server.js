@@ -1198,7 +1198,9 @@ app.post('/api/pong/profile/customize', (req, res) => {
   const avatarFg = String(req.body?.avatarFg || '').trim();
   const avatarBg = String(req.body?.avatarBg || '').trim();
   const avatarRenderedRaw = typeof req.body?.avatarRendered === 'string' ? req.body.avatarRendered.trim() : '';
+  const avatarSourceRaw = typeof req.body?.avatarSource === 'string' ? req.body.avatarSource.trim() : '';
   const avatarRendered = avatarRenderedRaw.startsWith('data:image/') ? avatarRenderedRaw : '';
+  const avatarSource = avatarSourceRaw.startsWith('data:image/') ? avatarSourceRaw : '';
   const isHexColor = (v) => /^#([0-9a-fA-F]{6})$/.test(v);
   if (nextName.length > 20) {
     return res.status(400).json({ ok: false, error: 'invalid_display_name' });
@@ -1209,6 +1211,9 @@ app.post('/api/pong/profile/customize', (req, res) => {
   if (avatarRenderedRaw && !avatarRendered) {
     return res.status(400).json({ ok: false, error: 'invalid_avatar_rendered' });
   }
+  if (avatarSourceRaw && !avatarSource) {
+    return res.status(400).json({ ok: false, error: 'invalid_avatar_source' });
+  }
 
   const { player, players } = getOrCreatePlayer(userId);
   player.displayName = nextName;
@@ -1216,6 +1221,7 @@ app.post('/api/pong/profile/customize', (req, res) => {
   player.avatarFg = avatarFg.toLowerCase();
   player.avatarBg = avatarBg.toLowerCase();
   player.avatarRendered = avatarRendered;
+  player.avatarSource = avatarSource;
   player.updatedAt = new Date().toISOString();
   writeLeaderboard(players);
   return res.json({ ok: true, player });
