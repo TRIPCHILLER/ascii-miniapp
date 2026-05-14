@@ -785,6 +785,9 @@ let DITHER_ENABLED = false;
   function isBlockCharset(charsetValue) {
     return String(charsetValue || '') === TEXT_CHARSETS.BLOCKS;
   }
+  function isKatakanaCharset(charsetValue) {
+    return /[\u30A0-\u30FF]/.test(String(charsetValue || ''));
+  }
 
   function isTextMode(){ return state.visorMode === 'text'; }
 
@@ -1117,7 +1120,9 @@ let DITHER_ENABLED = false;
     bossAsciiOptions: {
       ...ARG_BOSS_ASCII_PRESET,
       color: '#ffffff',
-      background: '#000000'
+      background: '#000000',
+      fontFamily: FONT_STACK_MAIN,
+      fontWeight: '700'
   }
 };
 const ARG_GOAL_FLASH_STEPS = {
@@ -2881,6 +2886,7 @@ const ARG_RESULT_REPLIES = {
       const safeBg = toHex(bg || '#000000');
       const bossShade = getBossShadeFromText(safeText);
       argPongState.bossPresetId = presetId;
+      argPongState.bossAsciiOptions.invert = ARG_BOSS_ASCII_PRESET.invert;
       argPongState.bossAsciiOptions.color = safeText;
       argPongState.bossAsciiOptions.background = safeBg;
       argPongState.bossAsciiOptions.bossColor = bossShade;
@@ -2913,6 +2919,15 @@ const ARG_RESULT_REPLIES = {
       if (isBlockCharset(value)) return TEXT_CHARSETS.BLOCKS;
       return autoSortCharset(String(value));
     };
+    const syncBossCharsetFontMode = (charset) => {
+      if (isKatakanaCharset(charset)) {
+        argPongState.bossAsciiOptions.fontFamily = FONT_STACK_CJK;
+        argPongState.bossAsciiOptions.fontWeight = '400';
+      } else {
+        argPongState.bossAsciiOptions.fontFamily = FONT_STACK_MAIN;
+        argPongState.bossAsciiOptions.fontWeight = '700';
+      }
+    };
     const getBossCharsetPresetPool = () => {
       const optionValues = Array.from(app.ui.charset?.options || [])
         .map((option) => option?.value)
@@ -2931,7 +2946,9 @@ const ARG_RESULT_REPLIES = {
     };
     const resetBossCharsetRotation = () => {
       argPongState.bossCharsetRotationIndex = 0;
+      argPongState.bossAsciiOptions.invert = ARG_BOSS_ASCII_PRESET.invert;
       argPongState.bossAsciiOptions.charset = ARG_BOSS_ASCII_PRESET.charset;
+      syncBossCharsetFontMode(argPongState.bossAsciiOptions.charset);
     };
     const rotateBossCharset = () => {
       const pool = getBossCharsetPresetPool();
@@ -2942,7 +2959,9 @@ const ARG_RESULT_REPLIES = {
       }
       const nextCharset = candidates[Math.floor(Math.random() * candidates.length)] || pool[0] || ARG_BOSS_ASCII_PRESET.charset;
       argPongState.bossCharsetRotationIndex = Math.max(0, pool.indexOf(nextCharset));
+      argPongState.bossAsciiOptions.invert = ARG_BOSS_ASCII_PRESET.invert;
       argPongState.bossAsciiOptions.charset = nextCharset;
+      syncBossCharsetFontMode(nextCharset);
     };
     const hideRenderMutationOverlay = () => {
       const layer = overlay.querySelector('#argSceneRenderMutationLayer');
@@ -3530,7 +3549,10 @@ const ARG_RESULT_REPLIES = {
     argPongState.bossAsciiOptions.color = '#ffffff';
     argPongState.bossAsciiOptions.background = '#000000';
     argPongState.bossAsciiOptions.bossColor = '#808080';
+    argPongState.bossAsciiOptions.invert = ARG_BOSS_ASCII_PRESET.invert;
     argPongState.bossAsciiOptions.charset = ARG_BOSS_CHARSET_ROTATION[0] || ARG_BOSS_ASCII_PRESET.charset;
+    argPongState.bossAsciiOptions.fontFamily = FONT_STACK_MAIN;
+    argPongState.bossAsciiOptions.fontWeight = '700';
     overlay.style.backgroundColor = '#000000';
     let bossInitOk = false;
     const renderArgSceneStaticAscii = ({ ballEl = null, topStickEl = null, bottomStickEl = null } = {}) => {
@@ -6152,6 +6174,8 @@ function renderAsciiFromSource(sourceCanvas, targetCtx, options = {}) {
     renderCharset10: state.renderCharset10,
     invert: state.invert
   };
+  const optionFontFamily = String(options.fontFamily || '').trim();
+  const optionFontWeight = String(options.fontWeight || '').trim();
 
   try {
     state.widthChars = Number(options.size) || ARG_BOSS_ASCII_PRESET.size;
@@ -6178,14 +6202,15 @@ function renderAsciiFromSource(sourceCanvas, targetCtx, options = {}) {
     targetCtx.fillStyle = state.background;
     targetCtx.fillRect(0, 0, targetW, targetH);
 
-    const ff = getComputedStyle(app.out).fontFamily || 'monospace';
+    const ff = optionFontFamily || getComputedStyle(app.out).fontFamily || 'monospace';
+    const fw = optionFontWeight || getComputedStyle(app.out).fontWeight || '700';
     const lines = asciiText.split('\n');
     const maxRows = Math.min(h, lines.length);
     const fontSize = Math.max(1, Math.floor(targetH / Math.max(1, h)));
     const stepY = targetH / Math.max(1, h);
 
     targetCtx.fillStyle = state.color;
-    targetCtx.font = `${fontSize}px ${ff}`;
+    targetCtx.font = `${fw} ${fontSize}px ${ff}`;
     targetCtx.textBaseline = 'top';
     targetCtx.textAlign = 'left';
     for (let y = 0; y < maxRows; y += 1) {
