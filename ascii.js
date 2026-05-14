@@ -1742,6 +1742,23 @@ const ARG_RESULT_REPLIES = {
     return normalized;
   }
 
+  function applyLeetNameFilter(input) {
+    return String(input || '').replace(/[OAEIОАЕЁЯ]/g, (ch) => {
+      const map = {
+        O: '0',
+        A: '4',
+        E: '3',
+        I: '1',
+        О: '0',
+        А: '4',
+        Е: '3',
+        Ё: '3',
+        Я: '9'
+      };
+      return map[ch] || ch;
+    });
+  }
+
   function normalizeArgDisplayName(input) {
     return String(input || '').replace(/[\u0000-\u001F\u007F]/g, '').trim().toUpperCase();
   }
@@ -2087,7 +2104,9 @@ const ARG_RESULT_REPLIES = {
       };
       const onSave = async (ev) => {
         ev.preventDefault();
-        const nextName = sanitizeArgDisplayName(input.value);
+        const rawNextName = sanitizeArgDisplayName(input.value);
+        const nextName = (!rawNextName || looksSystemName(rawNextName)) ? rawNextName : applyLeetNameFilter(rawNextName);
+        if (nextName.length > 20) { errorEl.textContent = 'СЛИШКОМ ДЛИННОЕ ИМЯ'; errorEl.hidden = false; return; }
         const normalizedNextName = normalizeArgDisplayName(nextName);
         const myUserId = String(tg?.initDataUnsafe?.user?.id || '');
         const duplicate = !!normalizedNextName && latestLeaderboard.some((p) => {
@@ -7810,20 +7829,7 @@ function layoutSettingsPanel() {
     const closeSaveStyleModal = () => { if (app.ui.saveStyleModal) app.ui.saveStyleModal.hidden = true; };
     const closeDeleteStyleModal = () => { if (app.ui.deleteStyleModal) app.ui.deleteStyleModal.hidden = true; };
     const sanitizePresetName = (value) => String(value || '').toUpperCase().trim().replace(/[^A-ZА-ЯЁ0-9 _-]/g, '').slice(0, 16);
-    const applyPresetNameLeetFilter = (value) => String(value || '').replace(/[OAEIОАЕЁЯ]/g, (ch) => {
-      const map = {
-        O: '0',
-        A: '4',
-        E: '3',
-        I: '1',
-        О: '0',
-        А: '4',
-        Е: '3',
-        Ё: '3',
-        Я: '9'
-      };
-      return map[ch] || ch;
-    });
+    const applyPresetNameLeetFilter = (value) => applyLeetNameFilter(value);
     const loadUserStylePresets = async () => {
       try {
         const res = await fetch(`${API_BASE}/api/user-style-presets`, { headers: applyTelegramInitDataHeader({}) });
