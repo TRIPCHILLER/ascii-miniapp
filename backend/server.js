@@ -287,7 +287,11 @@ function composeArgRunMessage({ impulsesEarned, impulseBalance, rank, consolatio
   }
   lines.push(`<b>ИЗВЛ3Ч3Н0 ИМПУЛЬС0В:</b> <code>[+${normalizedExtracted}]</code>`);
   if (hasConsolationBonus) lines.push('<b>УТ3ШИТ3ЛЬНЫЙ Б0НУС:</b> <code>[+1]</code>');
-  lines.push('', `<blockquote><b>В ЭНЕРГОХР4НИЛИЩ3:</b> <code>[${normalizedBalance}]</code>\n\u2800</blockquote>`);
+  lines.push(
+    '',
+    `<blockquote><b>В ЭНЕРГОХР4НИЛИЩ3:</b> <code>[${normalizedBalance}]</code></blockquote>`,
+    '\u2800'
+  );
   return lines.join('\n');
 }
 // ==== /pluralRu ====
