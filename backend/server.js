@@ -1679,7 +1679,7 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 async function sendInvoice(chatId, pack) {
   const title = `${pack} ИМПУЛЬСОВ`;
   const description =
-'<b>П0ДТВ3РДИ СВ0Ё НАМ3Р3НИ3:</b>';
+'П0ДТВ3РДИ СВ0Ё НАМ3Р3НИ3:';
   // payload сохраняем в том же формате, ты уже его парсишь в successful_payment
   const payload = `buy:${pack}:${Date.now()}`;
   // ВАЖНО: для Stars суммы — это ЦЕЛОЕ число звёзд
@@ -1695,8 +1695,7 @@ async function sendInvoice(chatId, pack) {
     prices,
     start_parameter: 'buy_energy',
     need_name: false,
-    is_flexible: false,
-    parse_mode: 'HTML'
+    is_flexible: false
   });
 }
 // /tg/webhook (команды, баланс, /send и т.п.)
