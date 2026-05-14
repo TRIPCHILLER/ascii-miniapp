@@ -2990,6 +2990,7 @@ const ARG_RESULT_REPLIES = {
       const typeTimer = setInterval(() => {
         idx += 1;
         textEl.textContent = mutationText.slice(0, idx);
+        tgTextHaptic();
         if (idx >= mutationText.length) {
           clearInterval(typeTimer);
           const holdTimer = setTimeout(() => {
