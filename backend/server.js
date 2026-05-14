@@ -1679,7 +1679,7 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 async function sendInvoice(chatId, pack) {
   const title = `${pack} ИМПУЛЬСОВ`;
   const description =
-'ПОДТВЕРДИ СВОЁ НАМЕРЕНИЕ:';
+'<b>П0ДТВ3РДИ СВ0Ё НАМ3Р3НИ3:</b>';
   // payload сохраняем в том же формате, ты уже его парсишь в successful_payment
   const payload = `buy:${pack}:${Date.now()}`;
   // ВАЖНО: для Stars суммы — это ЦЕЛОЕ число звёзд
@@ -1695,7 +1695,8 @@ async function sendInvoice(chatId, pack) {
     prices,
     start_parameter: 'buy_energy',
     need_name: false,
-    is_flexible: false
+    is_flexible: false,
+    parse_mode: 'HTML'
   });
 }
 // /tg/webhook (команды, баланс, /send и т.п.)
@@ -1715,7 +1716,7 @@ app.post('/tg/webhook', async (req, res) => {
       const fromId = String(cb.from.id);
       const data = String(cb.data || '');
       if (data === 'pay:back') {
-        await sendMessage(fromId, 'ТЫ ПЕРЕДУМАЛ?.. Подумай ещё раз.');
+        await sendMessage(fromId, '<b>ТЫ П3Р3ДУМ4Л?... П0ДУМ4Й ЕЩЁ РАЗ.</b>', { parse_mode: 'HTML' });
         return res.json({ ok: true });
       }
       if (data.startsWith('pay:')) {
@@ -2228,14 +2229,14 @@ if (/^\/all(?:@[\w_]+)?\s+([\s\S]+)$/i.test(text)) {
       const kb = {
         inline_keyboard: [
           [
-            { text: '10',  callback_data: 'pay:10',  style: 'primary', icon_custom_emoji_id: '5298643454484581082' },
-            { text: '25',  callback_data: 'pay:25',  style: 'primary', icon_custom_emoji_id: '5298643454484581082' }
+            { text: '10',  callback_data: 'pay:10',  icon_custom_emoji_id: '5298643454484581082' },
+            { text: '25',  callback_data: 'pay:25',  icon_custom_emoji_id: '5298643454484581082' }
           ],
           [
-            { text: '50',  callback_data: 'pay:50',  style: 'primary', icon_custom_emoji_id: '5298643454484581082' },
-            { text: '100', callback_data: 'pay:100', style: 'primary', icon_custom_emoji_id: '5298643454484581082' }
+            { text: '50',  callback_data: 'pay:50',  icon_custom_emoji_id: '5298643454484581082' },
+            { text: '100', callback_data: 'pay:100', icon_custom_emoji_id: '5298643454484581082' }
           ],
-          [{ text: 'Назад', callback_data: 'pay:back', style: 'danger' }],
+          [{ text: 'В3РНУТЬС9', callback_data: 'pay:back', style: 'danger' }],
         ]
       };
      await sendMessage(fromId, `
