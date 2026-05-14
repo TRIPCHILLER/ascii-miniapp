@@ -4313,7 +4313,7 @@ const ARG_RESULT_REPLIES = {
         const now = ts || performance.now();
         const elapsedSinceStart = Math.max(0, now - startAt);
         const shakeProgress = clamp(elapsedSinceStart / Math.max(200, resolvedDurationMs), 0, 1);
-        const shakeAccel = shakeProgress * shakeProgress;
+        const shakeAccel = 0.16 + 0.84 * Math.pow(shakeProgress, 1.6);
         const shakeRampMul = 1 + shakeAccel;
         const clutchSpringShakeAmpPx = baseShakeAmpPx * shakeRampMul;
         const clutchSpringShakeAmpXPx = baseShakeAmpXPx * shakeRampMul;
@@ -4379,8 +4379,8 @@ const ARG_RESULT_REPLIES = {
         }
         const phase = Math.min(1, elapsed / durationMs);
         const minDelay = 20;
-        const maxDelay = 520;
-        const easedPhase = phase * phase;
+        const maxDelay = 460;
+        const easedPhase = 0.18 + 0.82 * Math.pow(phase, 1.4);
         const nextDelay = maxDelay - (maxDelay - minDelay) * easedPhase;
         startEasterEggRouletteTimer = setTimeout(tick, nextDelay);
       };
