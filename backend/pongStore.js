@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const DATA_DIR = path.join(__dirname, '..', 'data');
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const LEADERBOARD_FILE = path.join(DATA_DIR, 'pong_leaderboard.json');
 const RUNS_FILE = path.join(DATA_DIR, 'pong_runs.json');
 

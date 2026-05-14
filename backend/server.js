@@ -29,12 +29,14 @@ const exec = promisify(execFile);
 // @section IMPORTS_AND_PROCESS_BOOTSTRAP
 // ==== РЕФЕРАЛЬНАЯ СИСТЕМА (файл referrals.json) ====
 // @section REFERRAL_DATABASE_LAYER
-const REF_DB_PATH = path.join(__dirname, '..', 'referrals.json');
-const BAL_FILE = path.join(__dirname, '..', 'data', 'balances.json');
-const UNAME_FILE = path.join(__dirname, '..', 'data', 'usernames.json');
-const REGISTRY_FILE = path.join(__dirname, '..', 'data', 'user_registry.json');
-const USERNAME_INDEX_FILE = path.join(__dirname, '..', 'data', 'username_index.json');
-const USER_STYLE_PRESETS_FILE = path.join(__dirname, '..', 'data', 'user_style_presets.json');
+const APP_ROOT_DIR = process.env.APP_ROOT_DIR || path.join(__dirname, '..');
+const APP_DATA_DIR = process.env.DATA_DIR || path.join(APP_ROOT_DIR, 'data');
+const REF_DB_PATH = process.env.REF_DB_PATH || path.join(APP_ROOT_DIR, 'referrals.json');
+const BAL_FILE = path.join(APP_DATA_DIR, 'balances.json');
+const UNAME_FILE = path.join(APP_DATA_DIR, 'usernames.json');
+const REGISTRY_FILE = path.join(APP_DATA_DIR, 'user_registry.json');
+const USERNAME_INDEX_FILE = path.join(APP_DATA_DIR, 'username_index.json');
+const USER_STYLE_PRESETS_FILE = path.join(APP_DATA_DIR, 'user_style_presets.json');
 const USER_STYLE_PRESETS_LIMIT = 20;
 const USER_PRESET_ID_PREFIX = 'usp_';
 function loadRefDb() {
@@ -137,7 +139,7 @@ function readJsonObjectSafe(filePath) {
   }
 }
 function backupDataFiles() {
-  const dataDir = path.join(__dirname, '..', 'data');
+  const dataDir = APP_DATA_DIR;
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
   const backupDir = path.join(dataDir, 'backups');
   if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
@@ -2250,6 +2252,10 @@ app.use((req, res) => {
   res.type('text').status(404).send('fallback 404 ' + req.method + ' ' + req.url);
 });
 // Run
-cleanupStaleTmpArtifacts().catch(() => {});
-setInterval(() => { cleanupStaleTmpArtifacts().catch(() => {}); }, 6 * 60 * 60 * 1000);
-app.listen(PORT, () => console.log(`[BOOT] API listening on ${PORT}`));
+if (require.main === module) {
+  cleanupStaleTmpArtifacts().catch(() => {});
+  setInterval(() => { cleanupStaleTmpArtifacts().catch(() => {}); }, 6 * 60 * 60 * 1000);
+  app.listen(PORT, () => console.log(`[BOOT] API listening on ${PORT}`));
+}
+
+module.exports = { app };
