@@ -2900,15 +2900,42 @@ const ARG_RESULT_REPLIES = {
       if (!colors) return;
       applyBossFightPalette({ ...colors, presetId: nextPreset.id });
     };
+    const resolveBossCharsetPreset = (value) => {
+      if (!value || value === 'CUSTOM') return '';
+      if (isBrailleDotsCharset(value)) return TEXT_CHARSETS.DOTS;
+      if (isBlockCharset(value)) return TEXT_CHARSETS.BLOCKS;
+      return autoSortCharset(String(value));
+    };
+    const getBossCharsetPresetPool = () => {
+      const optionValues = Array.from(app.ui.charset?.options || [])
+        .map((option) => option?.value)
+        .filter(Boolean);
+      const staticFallback = ARG_BOSS_CHARSET_ROTATION;
+      const combined = optionValues.length ? optionValues : staticFallback;
+      const seen = new Set();
+      const pool = [];
+      combined.forEach((value) => {
+        const normalized = resolveBossCharsetPreset(value);
+        if (!normalized || seen.has(normalized)) return;
+        seen.add(normalized);
+        pool.push(normalized);
+      });
+      return pool.length ? pool : [ARG_BOSS_ASCII_PRESET.charset];
+    };
     const resetBossCharsetRotation = () => {
       argPongState.bossCharsetRotationIndex = 0;
-      argPongState.bossAsciiOptions.charset = ARG_BOSS_CHARSET_ROTATION[0] || ARG_BOSS_ASCII_PRESET.charset;
+      argPongState.bossAsciiOptions.charset = ARG_BOSS_ASCII_PRESET.charset;
     };
     const rotateBossCharset = () => {
-      const total = ARG_BOSS_CHARSET_ROTATION.length || 1;
-      const nextIndex = (argPongState.bossCharsetRotationIndex + 1) % total;
-      argPongState.bossCharsetRotationIndex = nextIndex;
-      argPongState.bossAsciiOptions.charset = ARG_BOSS_CHARSET_ROTATION[nextIndex] || ARG_BOSS_ASCII_PRESET.charset;
+      const pool = getBossCharsetPresetPool();
+      const previous = String(argPongState.bossAsciiOptions.charset || '');
+      let candidates = pool;
+      if (pool.length > 1) {
+        candidates = pool.filter((preset) => preset !== previous);
+      }
+      const nextCharset = candidates[Math.floor(Math.random() * candidates.length)] || pool[0] || ARG_BOSS_ASCII_PRESET.charset;
+      argPongState.bossCharsetRotationIndex = Math.max(0, pool.indexOf(nextCharset));
+      argPongState.bossAsciiOptions.charset = nextCharset;
     };
     applyBossFightPalette({ text: '#ffffff', bg: '#000000', presetId: null });
     resetBossCharsetRotation();
