@@ -255,9 +255,9 @@ function pluralRu(n, one, few, many) {
 const IMPULSE_FORMS = ['импульс', 'импульса', 'импульсов'];
 const impulseWord = (n) => pluralRu(n, ...IMPULSE_FORMS);
 const ARG_TOP_RANK_MESSAGES = {
-  1: 'ПЕРВЫЙ СИГНАЛ ЗАХВАЧЕН',
-  2: 'ТЫ ВО ВТОРОМ КОНТУРЕ',
-  3: 'ТРЕТИЙ СЛЕД ЗАФИКСИРОВАН',
+  1: 'ТЫ Н4 ВЕРШИН3 Ц3ПИ. М0Ж3ШЬ П0-ПР4ВУ СЧИТ4ТЬ С3Б9 ВЫШ3 ДРУГИХ.',
+  2: 'ВТ0Р03 М3СТ0 Т0ЖЕ Н3ПЛ0Х0... М0И П0ЗДР4ВЛ3НИЯ.',
+  3: 'БР0НЗ0ВЫЙ В0ИН... СМ0Ж3ШЬ ЛИ ТЫ 0Д0Л3ТЬ 3ЩЁ ДВ0ИХ ВЫШ3 С3БЯ ИЛИ В0ВР3МЯ 0СТ4Н0ВИШЬСЯ?',
 };
 function composeArgRunMessage({ impulsesEarned, impulseBalance, rank }) {
   const normalizedEarned = Math.max(0, Number(impulsesEarned) || 0);
@@ -265,15 +265,15 @@ function composeArgRunMessage({ impulsesEarned, impulseBalance, rank }) {
   const normalizedRank = Number(rank);
   const topRankLine = ARG_TOP_RANK_MESSAGES[normalizedRank] || '';
   const lines = [
-    ': ASCII ⛶ VISOR :',
+    '[ПРОТОКОЛ ПОПЫТКИ ИЗВЛЕЧЕНИЯ]',
     '',
   ];
   if (topRankLine) {
     lines.push(topRankLine, '');
   }
   lines.push(
-    `ИЗВЛЕЧЕНО ИМПУЛЬСОВ: +${normalizedEarned}`,
-    `В ЭНЕРГОХРАНИЛИЩЕ: ${normalizedBalance}`
+    `ИЗВЛ3Ч3Н0 ИМПУЛЬС0В: [+${normalizedEarned}]`,
+    `В ЭНЕРГОХРАНИЛИЩЕ: [${normalizedBalance}]`
   );
   return lines.join('\n');
 }

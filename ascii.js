@@ -1119,11 +1119,11 @@ const ARG_GOAL_FLASH_STEPS = {
   third: 3
 };
 const ARG_RESULT_REPLIES = {
-  low: 'СЛИШКОМ СЛАБЫЙ СИГНАЛ...',
-  normal: 'НЕПЛОХО...',
-  personalBest: 'НОВЫЙ ЛИЧНЫЙ РЕКОРД.',
-  enteredTop: 'ТЫ ВОШЁЛ В ТАБЛИЦУ.',
-  globalBest: 'ТЫ СТАЛ ЛУЧШИМ.'
+  low: 'ЭТ0 ВЫГЛ9Д3Л0 0Ч3НЬ Ж4ЛК0...\nН0 ТЫ ВС3ГД4 М0Ж3ШЬ В3РНУТЬС9 СЮД4 3ЩЁ Р4З.',
+  normal: 'СЛ4Б0В4Т4Я П0ПЫТК4...',
+  personalBest: 'Н0ВЫЙ ЛИЧНЫЙ Р3К0РД.',
+  enteredTop: 'ТАК03 9 ВИЖУ Р3ДК0...\nТЫ В0ШЁЛ В СПИС0К ЛУЧШИХ.',
+  globalBest: 'П0ЗДР4ВЛ3НИ3 ОТ ИМЕНИ СИСТ3МЫ:\nТЫ СТ4Л ЛУЧШИМ В Т0П3.'
 };
   const argBossAscii = {
     root: null,
@@ -2363,7 +2363,7 @@ const ARG_RESULT_REPLIES = {
     const replyLine = ARG_RESULT_REPLIES[getArgResultReplyKey(resultMeta)] || ARG_RESULT_REPLIES.normal;
     await showArgPopup(`${replyLine}
 ИЗВЛ3Ч3Н0 ИМПУЛЬС0В: [+${resultMeta.impulsesAwarded}]
-ЛИЧНЫЙ М4КСИМУМ: [${resultMeta.bestScore}]`, {
+ЛИЧНЫЙ Р3К0РД: [${resultMeta.bestScore}]`, {
       openSoundSrc: ARG_SCENE_SOUNDS.danger2,
       popupClass: 'arg-scene-popup-box--score'
     });
