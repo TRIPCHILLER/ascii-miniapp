@@ -1116,6 +1116,11 @@ let DITHER_ENABLED = false;
     bossCharsetRotationIndex: 0,
     bossFlashHidden: false,
     goalEyeZoomActive: false,
+    renderMutationActive: false,
+    renderMutationTypeTimer: 0,
+    renderMutationHoldTimer: 0,
+    renderMutationHideTimer: 0,
+    renderMutationResolver: null,
     runId: '',
     bossPresetId: null,
     bossAsciiOptions: {
@@ -2452,6 +2457,99 @@ const ARG_RESULT_REPLIES = {
     }
   }
 
+  function hideRenderMutationOverlay() {
+    const overlay = document.getElementById('argSceneOverlay');
+    const layer = overlay?.querySelector('#argSceneRenderMutationLayer');
+    const textEl = overlay?.querySelector('#argSceneRenderMutationText');
+    if (!layer || !textEl) {
+      argPongState.renderMutationActive = false;
+      argPongState.renderMutationResolver = null;
+      return;
+    }
+    if (argPongState.renderMutationTypeTimer) {
+      clearInterval(argPongState.renderMutationTypeTimer);
+      argPongState.renderMutationTypeTimer = 0;
+    }
+    if (argPongState.renderMutationHoldTimer) {
+      clearTimeout(argPongState.renderMutationHoldTimer);
+      argPongState.renderMutationHoldTimer = 0;
+    }
+    if (argPongState.renderMutationHideTimer) {
+      clearTimeout(argPongState.renderMutationHideTimer);
+      argPongState.renderMutationHideTimer = 0;
+    }
+    layer.hidden = true;
+    layer.style.opacity = '0';
+    layer.style.background = 'rgba(0, 0, 0, 0)';
+    layer.style.display = 'flex';
+    layer.style.alignItems = 'center';
+    layer.style.justifyContent = 'center';
+    layer.style.pointerEvents = 'none';
+    layer.style.transition = 'opacity 180ms ease, background 180ms ease';
+    textEl.style.color = argPongState.bossAsciiOptions.color || '#ffffff';
+    textEl.style.fontFamily = "'Consolas', 'Menlo', 'Monaco', monospace";
+    textEl.style.fontSize = 'clamp(20px, 4.5vw, 42px)';
+    textEl.style.fontWeight = '700';
+    textEl.style.letterSpacing = '0.08em';
+    textEl.style.textAlign = 'center';
+    textEl.style.textShadow = '0 0 12px currentColor';
+    textEl.style.transform = 'scale(0.96)';
+    textEl.style.transition = 'transform 220ms ease';
+    textEl.textContent = '';
+    argPongState.renderMutationActive = false;
+    const resolve = argPongState.renderMutationResolver;
+    argPongState.renderMutationResolver = null;
+    if (typeof resolve === 'function') resolve();
+  }
+
+  function showRenderMutationOverlay() {
+    return new Promise((resolve) => {
+      const overlay = document.getElementById('argSceneOverlay');
+      const layer = overlay?.querySelector('#argSceneRenderMutationLayer');
+      const textEl = overlay?.querySelector('#argSceneRenderMutationText');
+      const mutationText = ': : МУТ4ЦИЯ Р3НД3Р4 : :';
+      if (!layer || !textEl || !argPongState.running) {
+        resolve();
+        return;
+      }
+      hideRenderMutationOverlay();
+      argPongState.renderMutationResolver = resolve;
+      argPongState.renderMutationActive = true;
+      layer.hidden = false;
+      textEl.style.color = argPongState.bossAsciiOptions.color || '#ffffff';
+      textEl.textContent = '';
+      requestAnimationFrame(() => {
+        if (!argPongState.renderMutationActive) return;
+        layer.style.opacity = '1';
+        layer.style.background = 'rgba(0, 0, 0, 0.42)';
+        textEl.style.transform = 'scale(1)';
+      });
+      const totalTypeMs = Math.max(600, Math.min(900, mutationText.length * 36));
+      const perCharMs = Math.max(20, Math.floor(totalTypeMs / Math.max(1, mutationText.length)));
+      let idx = 0;
+      argPongState.renderMutationTypeTimer = setInterval(() => {
+        if (!argPongState.renderMutationActive) return;
+        idx += 1;
+        textEl.textContent = mutationText.slice(0, idx);
+        tgTextHaptic();
+        if (idx >= mutationText.length) {
+          clearInterval(argPongState.renderMutationTypeTimer);
+          argPongState.renderMutationTypeTimer = 0;
+          argPongState.renderMutationHoldTimer = setTimeout(() => {
+            if (!argPongState.renderMutationActive) return;
+            layer.style.opacity = '0';
+            layer.style.background = 'rgba(0, 0, 0, 0)';
+            textEl.style.transform = 'scale(0.98)';
+            argPongState.renderMutationHideTimer = setTimeout(() => {
+              argPongState.renderMutationHideTimer = 0;
+              hideRenderMutationOverlay();
+            }, 220);
+          }, 260);
+        }
+      }, perCharMs);
+    });
+  }
+
   function pushArgDebug(event, data = {}) {
     window.__ARG_DEBUG_EVENTS = window.__ARG_DEBUG_EVENTS || [];
     const entry = { t: Date.now(), event, ...data };
@@ -3057,70 +3155,6 @@ const ARG_RESULT_REPLIES = {
       argPongState.bossAsciiOptions.charset = nextCharset;
       syncBossCharsetFontMode(nextCharset);
     };
-    const hideRenderMutationOverlay = () => {
-      const layer = overlay.querySelector('#argSceneRenderMutationLayer');
-      const textEl = overlay.querySelector('#argSceneRenderMutationText');
-      if (!layer || !textEl) return;
-      layer.hidden = true;
-      layer.style.opacity = '0';
-      layer.style.background = 'rgba(0, 0, 0, 0)';
-      layer.style.display = 'flex';
-      layer.style.alignItems = 'center';
-      layer.style.justifyContent = 'center';
-      layer.style.pointerEvents = 'none';
-      layer.style.transition = 'opacity 180ms ease, background 180ms ease';
-      textEl.style.color = argPongState.bossAsciiOptions.color || '#ffffff';
-      textEl.style.fontFamily = "'Consolas', 'Menlo', 'Monaco', monospace";
-      textEl.style.fontSize = 'clamp(20px, 4.5vw, 42px)';
-      textEl.style.fontWeight = '700';
-      textEl.style.letterSpacing = '0.08em';
-      textEl.style.textAlign = 'center';
-      textEl.style.textShadow = '0 0 12px currentColor';
-      textEl.style.transform = 'scale(0.96)';
-      textEl.style.transition = 'transform 220ms ease';
-    };
-    const showRenderMutationOverlay = () => new Promise((resolve) => {
-      const layer = overlay.querySelector('#argSceneRenderMutationLayer');
-      const textEl = overlay.querySelector('#argSceneRenderMutationText');
-      const mutationText = ': : МУТ4ЦИЯ Р3НД3Р4 : :';
-      if (!layer || !textEl || !argPongState.running) {
-        resolve();
-        return;
-      }
-      hideRenderMutationOverlay();
-      layer.hidden = false;
-      textEl.style.color = argPongState.bossAsciiOptions.color || '#ffffff';
-      textEl.textContent = '';
-      requestAnimationFrame(() => {
-        layer.style.opacity = '1';
-        layer.style.background = 'rgba(0, 0, 0, 0.42)';
-        textEl.style.transform = 'scale(1)';
-      });
-      const typeMsPerChar = 36;
-      const totalTypeMs = Math.max(600, Math.min(900, mutationText.length * typeMsPerChar));
-      const perCharMs = Math.max(20, Math.floor(totalTypeMs / Math.max(1, mutationText.length)));
-      let idx = 0;
-      const typeTimer = setInterval(() => {
-        idx += 1;
-        textEl.textContent = mutationText.slice(0, idx);
-        tgTextHaptic();
-        if (idx >= mutationText.length) {
-          clearInterval(typeTimer);
-          const holdTimer = setTimeout(() => {
-            layer.style.opacity = '0';
-            layer.style.background = 'rgba(0, 0, 0, 0)';
-            textEl.style.transform = 'scale(0.98)';
-            const hideTimer = setTimeout(() => {
-              hideRenderMutationOverlay();
-              resolve();
-            }, 220);
-            argPongFlashTimers.push(hideTimer);
-          }, 260);
-          argPongFlashTimers.push(holdTimer);
-        }
-      }, perCharMs);
-      argPongFlashTimers.push(typeTimer);
-    });
     applyBossFightPalette({ text: '#ffffff', bg: '#000000', presetId: null });
     resetBossCharsetRotation();
     overlay.classList.remove('arg-scene-overlay--goal-eye-zoom');
@@ -3398,13 +3432,17 @@ const ARG_RESULT_REPLIES = {
         argPongState.playerScore += 1;
         playerScoreEl.textContent = String(argPongState.playerScore);
         serveLocked = true;
+        let shouldShowMutationOverlay = false;
         const flashBurstPromise = playGoalFlashBurst({
           onFlashOnStep: (flashStep) => {
             if (flashStep === ARG_GOAL_FLASH_STEPS.first) {
               argPongState.bossFlashHidden = true;
             } else if (flashStep === ARG_GOAL_FLASH_STEPS.third) {
               const presetMutated = applyRandomBossFightPreset();
-              if (presetMutated) rotateBossCharset();
+              if (presetMutated) {
+                rotateBossCharset();
+                shouldShowMutationOverlay = true;
+              }
               argPongState.bossFlashHidden = false;
             }
           },
@@ -3415,7 +3453,9 @@ const ARG_RESULT_REPLIES = {
         argPongServeTimer = setTimeout(() => {
           if (!argPongState.running) return;
           argPongServeTimer = 0;
-          flashBurstPromise.then(() => showRenderMutationOverlay()).then(() => {
+          flashBurstPromise
+            .then(() => (shouldShowMutationOverlay ? showRenderMutationOverlay() : Promise.resolve()))
+            .then(() => {
             if (!argPongState.running) return;
             argPongServeTimer = setTimeout(() => {
               if (!argPongState.running) return;
@@ -3424,7 +3464,7 @@ const ARG_RESULT_REPLIES = {
               serveLocked = false;
               argPongServeTimer = 0;
             }, ARG_SCENE_TIMINGS.goalRespawnDelayMs);
-          });
+            });
         }, ARG_SCENE_TIMINGS.serveDelayMs);
       } else if (!serveLocked && argPongState.ballVY > 0 && argPongState.ballY > bottomGoalLine) {
         stopArgPongMusic();
