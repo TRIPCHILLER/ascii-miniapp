@@ -2917,7 +2917,7 @@ const ARG_RESULT_REPLIES = {
       if (!value || value === 'CUSTOM') return '';
       if (isBrailleDotsCharset(value)) return TEXT_CHARSETS.DOTS;
       if (isBlockCharset(value)) return TEXT_CHARSETS.BLOCKS;
-      return autoSortCharset(String(value));
+      return String(value);
     };
     const syncBossCharsetFontMode = (charset) => {
       if (isKatakanaCharset(charset)) {
