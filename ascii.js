@@ -1110,6 +1110,7 @@ let DITHER_ENABLED = false;
     introCountdownShakeUntilMs: 0,
     introCountdownFastShakeUntilMs: 0,
     argBossCountdownZoomActive: false,
+    argBossCountdownZoomMul: 1,
     shakeX: 0,
     shakeY: 0,
     bossCharsetRotationIndex: 0,
@@ -2525,8 +2526,30 @@ const ARG_RESULT_REPLIES = {
       layer.classList.remove('arg-scene-countdown--dim');
       argPongState.introCountdownShakeUntilMs = 0;
       argPongState.introCountdownFastShakeUntilMs = 0;
-      argPongState.argBossCountdownZoomActive = false;
     }
+  }
+
+  async function runArgBossCountdownExitTransition(durationMs = 300) {
+    argPongState.argBossCountdownZoomActive = true;
+    const start = performance.now();
+    const phaseA = 0.78;
+    const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+    const easeOutQuad = (t) => 1 - (1 - t) * (1 - t);
+    while (true) {
+      const elapsed = performance.now() - start;
+      const t = Math.min(1, elapsed / durationMs);
+      if (t < phaseA) {
+        const localT = t / phaseA;
+        argPongState.argBossCountdownZoomMul = 2 + (0.95 - 2) * easeOutCubic(localT);
+      } else {
+        const localT = (t - phaseA) / (1 - phaseA || 1);
+        argPongState.argBossCountdownZoomMul = 0.95 + (1 - 0.95) * easeOutQuad(localT);
+      }
+      if (t >= 1) break;
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+    argPongState.argBossCountdownZoomMul = 1;
+    argPongState.argBossCountdownZoomActive = false;
   }
 
   function triggerArgCountdownPulseVibration() {
@@ -2628,7 +2651,9 @@ const ARG_RESULT_REPLIES = {
       );
       const visorBodyX = visorBodyOffsetX;
       const visorBodyY = visorBodyOffsetY;
-      const countdownZoomMul = argPongState.argBossCountdownZoomActive ? 2 : 1;
+      const countdownZoomMul = argPongState.argBossCountdownZoomActive
+        ? (argPongState.argBossCountdownZoomMul || 2)
+        : 1;
       const bodyCountdownScaleX = (bodyScale + bodySqueeze) * countdownZoomMul;
       const bodyCountdownScaleY = (bodyScale - bodySqueeze * 0.75) * countdownZoomMul;
       visorBody.style.transform = `translate(${visorBodyX}px, ${visorBodyY}px) rotate(${bodyRotate}deg) scale(${bodyCountdownScaleX}, ${bodyCountdownScaleY})`;
@@ -3479,7 +3504,9 @@ const ARG_RESULT_REPLIES = {
       const bodyBandSway = Math.cos(
         now * ARG_PONG.visorBodySwaySpeed * 1.21 + argPongState.visorBodyPhaseSway * 1.24
       );
-      const countdownZoomMul = argPongState.argBossCountdownZoomActive ? 2 : 1;
+      const countdownZoomMul = argPongState.argBossCountdownZoomActive
+        ? (argPongState.argBossCountdownZoomMul || 2)
+        : 1;
       const bodyCountdownScaleX = (bodyScale + bodySqueeze) * countdownZoomMul;
       const bodyCountdownScaleY = (bodyScale - bodySqueeze * 0.75) * countdownZoomMul;
       visorBody.style.transform = `translate(${visorBodyX}px, ${visorBodyY}px) rotate(${bodyRotate}deg) scale(${bodyCountdownScaleX}, ${bodyCountdownScaleY})`;
@@ -3683,7 +3710,7 @@ const ARG_RESULT_REPLIES = {
       popupClass: 'arg-scene-popup-box--score',
       typing: { glitchMs: 12, spaceTypeMs: 8, charTypeMs: 14 }
     });
-    await showArgPopup('9 БУДУ ПР0Д0ЛЖ4ТЬ,\nП0К4 ТЫ Н3\nСЛ0М43ШЬС9', {
+    await showArgPopup('9 БУДУ ПР0Д0ЛЖ4ТЬ,\nП0К4 ТЫ Н3 СЛ0М43ШЬС9.', {
       openSoundSrc: ARG_SCENE_SOUNDS.danger,
       popupClass: 'arg-scene-popup-box--score'
     });
@@ -3694,6 +3721,7 @@ const ARG_RESULT_REPLIES = {
     // Включаем countdown-зум заранее (сразу после закрытия третьего pop-up),
     // чтобы не было скачка масштаба перед появлением первой цифры.
     argPongState.argBossCountdownZoomActive = true;
+    argPongState.argBossCountdownZoomMul = 2;
 
     const visorBody = document.createElement('img');
     visorBody.className = 'arg-scene-boss-layer arg-scene-boss-layer--body';
@@ -3756,6 +3784,7 @@ const ARG_RESULT_REPLIES = {
     await waitArgIntro(ARG_SCENE_TIMINGS.eyeToCountdownMs);
     disableArgIntroFastForward();
     await runArgCountdown();
+    await runArgBossCountdownExitTransition();
     startArgPong({ overlay, ballStickLayer, ball, topStick, bottomStick, visorBody, visorEye, visorPupil, scoreLayer, aiScoreEl, playerScoreEl, preserveBossState: true });
 
     startArgSceneRunning = false;
