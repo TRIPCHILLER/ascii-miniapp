@@ -2452,21 +2452,47 @@ const ARG_RESULT_REPLIES = {
     }
   }
 
-  async function finishArgMatch() {
+  async function finishArgMatch(snapshot = null) {
+    const finishSnapshot = {
+      runId: String(snapshot?.runId || argPongState.runId || ''),
+      playerScore: Math.max(0, Number(snapshot?.playerScore ?? argPongState.playerScore) || 0),
+      aiScore: Math.max(0, Number(snapshot?.aiScore ?? argPongState.aiScore) || 0),
+      reason: snapshot?.reason ? String(snapshot.reason) : 'unknown'
+    };
+    pushArgDebug('finishArgMatch-enter', {
+      reason: finishSnapshot.reason,
+      playerScore: finishSnapshot.playerScore,
+      aiScore: finishSnapshot.aiScore,
+      hasRunId: Boolean(finishSnapshot.runId),
+      ended: !!argPongState.ended
+    });
     if (argPongState.ended) return;
     argPongState.ended = true;
-    stopArgPongMusic();
-    stopArgPongLoop();
-    clearArgMatchSceneObjects();
-    const runScore = Math.max(0, Number(argPongState.playerScore) || 0);
-    const botScore = Math.max(0, Number(argPongState.aiScore) || 0);
-    let resultMeta = { score: runScore, impulsesAwarded: runScore, bestScore: runScore, isNewPersonalBest: false, enteredTop: false, isGlobalBest: false };
     try {
-      const finishData = await finishArgRunOnBackend({ runId: argPongState.runId, playerScore: runScore, botScore });
+      stopArgPongMusic();
+      stopArgPongLoop();
+      clearArgMatchSceneObjects();
+      const runScore = finishSnapshot.playerScore;
+      const botScore = finishSnapshot.aiScore;
+      let resultMeta = { score: runScore, impulsesAwarded: runScore, bestScore: runScore, isNewPersonalBest: false, enteredTop: false, isGlobalBest: false };
+      pushArgDebug('finishArgMatch-before-api', {
+        reason: finishSnapshot.reason,
+        playerScore: runScore,
+        aiScore: botScore,
+        hasRunId: Boolean(finishSnapshot.runId)
+      });
+      const finishData = await finishArgRunOnBackend({ runId: finishSnapshot.runId, playerScore: runScore, botScore });
       const leaderboard = await fetchArgLeaderboard();
       const userId = String(tg?.initDataUnsafe?.user?.id || '');
       const currentRank = leaderboard.findIndex((p) => String(p?.userId || '') === userId);
       const topPlayer = leaderboard[0] || null;
+      pushArgDebug('finishArgMatch-after-api', {
+        reason: finishSnapshot.reason,
+        playerScore: runScore,
+        aiScore: botScore,
+        hasRunId: Boolean(finishSnapshot.runId),
+        leaderboardSize: leaderboard.length
+      });
       resultMeta = {
         score: runScore,
         impulsesAwarded: Math.max(0, Number(finishData?.run?.impulsesAwarded || 0)),
@@ -2477,7 +2503,40 @@ const ARG_RESULT_REPLIES = {
         enteredTop: currentRank >= 0 && currentRank < 10,
         isGlobalBest: !!topPlayer && String(topPlayer?.userId || '') === userId && Number(topPlayer?.bestScore || 0) === Number(finishData?.player?.bestScore || 0)
       };
-    } catch (_) {
+      pushArgDebug('finishArgMatch-before-result-ui', {
+        reason: finishSnapshot.reason,
+        playerScore: runScore,
+        aiScore: botScore
+      });
+      const replyLine = ARG_RESULT_REPLIES[getArgResultReplyKey(resultMeta)] || ARG_RESULT_REPLIES.normal;
+      const extractedLineValue = Math.max(0, Number(resultMeta?.extractedImpulsesForDisplay ?? resultMeta?.impulsesAwarded ?? 0));
+      const bonusLine = resultMeta?.consolationBonus && extractedLineValue === 0 ? '\nУТ3ШИТ3ЛЬНЫЙ Б0НУС: [+1]' : '';
+      await showArgPopup(`${replyLine}
+ИЗВЛ3Ч3Н0 ИМПУЛЬС0В: [+${extractedLineValue}]${bonusLine}
+ЛИЧНЫЙ Р3К0РД: [${resultMeta.bestScore}]`, {
+        openSoundSrc: ARG_SCENE_SOUNDS.danger2,
+        popupClass: 'arg-scene-popup-box--score'
+      });
+      await openArgLeaderboardFullscreen();
+      resetArgOverlayState();
+      returnToStartMenu();
+      startArgSessionLocked = true;
+      startArgScenePending = false;
+      startArgSceneRunning = false;
+      startArgSceneStarted = false;
+      pushArgDebug('finishArgMatch-done', {
+        reason: finishSnapshot.reason,
+        playerScore: runScore,
+        aiScore: botScore
+      });
+      return true;
+    } catch (err) {
+      pushArgDebug('finishArgMatch-error', {
+        reason: finishSnapshot.reason,
+        message: err?.message || 'unknown',
+        stack: String(err?.stack || '').slice(0, 800)
+      });
+      console.error('[finishArgMatch-error]', err);
       showAsciiPopup({ type: 'error', title: 'СБОЙ ПОДТВЕРЖДЕНИЯ...', message: 'РЕЗУЛЬТАТ НЕ ПРИНЯТ ЯДРОМ.' });
       resetArgOverlayState();
       returnToStartMenu();
@@ -2485,25 +2544,8 @@ const ARG_RESULT_REPLIES = {
       startArgScenePending = false;
       startArgSceneRunning = false;
       startArgSceneStarted = false;
-      return;
+      return false;
     }
-
-    const replyLine = ARG_RESULT_REPLIES[getArgResultReplyKey(resultMeta)] || ARG_RESULT_REPLIES.normal;
-    const extractedLineValue = Math.max(0, Number(resultMeta?.extractedImpulsesForDisplay ?? resultMeta?.impulsesAwarded ?? 0));
-    const bonusLine = resultMeta?.consolationBonus && extractedLineValue === 0 ? '\nУТ3ШИТ3ЛЬНЫЙ Б0НУС: [+1]' : '';
-    await showArgPopup(`${replyLine}
-ИЗВЛ3Ч3Н0 ИМПУЛЬС0В: [+${extractedLineValue}]${bonusLine}
-ЛИЧНЫЙ Р3К0РД: [${resultMeta.bestScore}]`, {
-      openSoundSrc: ARG_SCENE_SOUNDS.danger2,
-      popupClass: 'arg-scene-popup-box--score'
-    });
-    await openArgLeaderboardFullscreen();
-    resetArgOverlayState();
-    returnToStartMenu();
-    startArgSessionLocked = true;
-    startArgScenePending = false;
-    startArgSceneRunning = false;
-    startArgSceneStarted = false;
   }
 
   async function runArgCountdown() {
@@ -3115,9 +3157,25 @@ const ARG_RESULT_REPLIES = {
       tick();
     });
 
+    const pushArgDebug = (event, data = {}) => {
+      window.__ARG_DEBUG_EVENTS = window.__ARG_DEBUG_EVENTS || [];
+      const entry = { t: Date.now(), event, ...data };
+      window.__ARG_DEBUG_EVENTS.push(entry);
+      window.__ARG_DEBUG_EVENTS = window.__ARG_DEBUG_EVENTS.slice(-100);
+      console.log('[arg-debug]', entry);
+    };
     let serveLocked = false;
     let argMatchFinishing = false;
+    let argMatchFinishDone = false;
     const triggerArgMatchFinish = (reason) => {
+      pushArgDebug('finish-trigger-enter', {
+        reason: reason || 'unknown',
+        aiScore: argPongState.aiScore,
+        playerScore: argPongState.playerScore,
+        hasRunId: Boolean(argPongState.runId),
+        isFinishing: argMatchFinishing,
+        ended: !!argPongState.ended
+      });
       if (argMatchFinishing || argPongState.ended) return;
       argMatchFinishing = true;
       serveLocked = true;
@@ -3136,7 +3194,31 @@ const ARG_RESULT_REPLIES = {
         playerLosses: argPongState.aiScore,
         isFinishing: argMatchFinishing
       });
-      void finishArgMatch();
+      const finishSnapshot = {
+        reason: reason || 'unknown',
+        playerScore: argPongState.playerScore,
+        aiScore: argPongState.aiScore,
+        runId: argPongState.runId
+      };
+      pushArgDebug('finish-trigger-before-finishArgMatch', {
+        reason: finishSnapshot.reason,
+        playerScore: finishSnapshot.playerScore,
+        aiScore: finishSnapshot.aiScore,
+        hasRunId: Boolean(finishSnapshot.runId)
+      });
+      void finishArgMatch(finishSnapshot).then((done) => {
+        argMatchFinishDone = !!done;
+      });
+      setTimeout(() => {
+        if (argMatchFinishing && !argMatchFinishDone) {
+          pushArgDebug('finish-watchdog-timeout', {
+            aiScore: argPongState?.aiScore,
+            playerScore: argPongState?.playerScore,
+            hasRunId: Boolean(argPongState?.runId)
+          });
+          console.error('[arg-finish-watchdog]', window.__ARG_DEBUG_EVENTS);
+        }
+      }, 3000);
     };
     let prevTs = 0;
     const loop = () => {
@@ -3339,6 +3421,11 @@ const ARG_RESULT_REPLIES = {
         stopArgPongMusic();
         playUiSoundNoThrow(ARG_SCENE_SOUNDS.bitClick2);
         argPongState.aiScore += 1;
+        pushArgDebug('ai-score-increment', {
+          aiScore: argPongState.aiScore,
+          playerScore: argPongState.playerScore,
+          hasRunId: Boolean(argPongState.runId)
+        });
         aiScoreEl.textContent = String(argPongState.aiScore);
         console.log('[arg-score-debug]', {
           scorer: 'ai',
