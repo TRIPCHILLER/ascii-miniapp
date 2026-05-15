@@ -1123,7 +1123,8 @@ let DITHER_ENABLED = false;
       color: '#ffffff',
       background: '#000000',
       fontFamily: FONT_STACK_MAIN,
-      fontWeight: '700'
+      fontWeight: '700',
+      eastAsianFullWidth: false
   }
 };
 const ARG_GOAL_FLASH_STEPS = {
@@ -2956,9 +2957,11 @@ const ARG_RESULT_REPLIES = {
       if (isKatakanaCharset(charset)) {
         argPongState.bossAsciiOptions.fontFamily = FONT_STACK_CJK;
         argPongState.bossAsciiOptions.fontWeight = '400';
+        argPongState.bossAsciiOptions.eastAsianFullWidth = true;
       } else {
         argPongState.bossAsciiOptions.fontFamily = FONT_STACK_MAIN;
         argPongState.bossAsciiOptions.fontWeight = '700';
+        argPongState.bossAsciiOptions.eastAsianFullWidth = false;
       }
     };
     const getBossCharsetPresetPool = () => {
@@ -3272,6 +3275,11 @@ const ARG_RESULT_REPLIES = {
 
       const topGoalLine = ballHalfY;
       const bottomGoalLine = 1 - ballHalfY;
+      if (argPongState.aiScore >= ARG_PONG.scoreToWin) {
+        serveLocked = true;
+        finishArgMatch();
+        return;
+      }
       if (!serveLocked && argPongState.ballVY < 0 && argPongState.ballY < topGoalLine) {
         stopArgPongMusic();
         playUiSoundNoThrow(ARG_SCENE_SOUNDS.bitClick2);
@@ -3588,6 +3596,7 @@ const ARG_RESULT_REPLIES = {
     argPongState.bossAsciiOptions.charset = ARG_BOSS_CHARSET_ROTATION[0] || ARG_BOSS_ASCII_PRESET.charset;
     argPongState.bossAsciiOptions.fontFamily = FONT_STACK_MAIN;
     argPongState.bossAsciiOptions.fontWeight = '700';
+    argPongState.bossAsciiOptions.eastAsianFullWidth = false;
     overlay.style.backgroundColor = '#000000';
     let bossInitOk = false;
     const renderArgSceneStaticAscii = ({ ballEl = null, topStickEl = null, bottomStickEl = null } = {}) => {
@@ -3707,8 +3716,7 @@ const ARG_RESULT_REPLIES = {
     await waitArgIntro(ARG_SCENE_TIMINGS.bottomToSecondPopupMs);
     await showArgPopup(':: ПР0Т0К0Л ИНТ3Р4КТИВН0Г0\nИЗВЛ3Ч3НИ9 ЭН3РГИИ\nЗ4ПУЩ3Н ::', {
       openSoundSrc: ARG_SCENE_SOUNDS.danger2,
-      popupClass: 'arg-scene-popup-box--score',
-      typing: { glitchMs: 12, spaceTypeMs: 8, charTypeMs: 14 }
+      popupClass: 'arg-scene-popup-box--score'
     });
     await showArgPopup('9 БУДУ ПР0Д0ЛЖ4ТЬ,\nП0К4 ТЫ Н3 СЛ0М43ШЬС9.', {
       openSoundSrc: ARG_SCENE_SOUNDS.danger,
@@ -6214,6 +6222,7 @@ function renderAsciiFromSource(sourceCanvas, targetCtx, options = {}) {
   };
   const optionFontFamily = String(options.fontFamily || '').trim();
   const optionFontWeight = String(options.fontWeight || '').trim();
+  const optionEastAsianFullWidth = !!options.eastAsianFullWidth;
 
   try {
     state.widthChars = Number(options.size) || ARG_BOSS_ASCII_PRESET.size;
@@ -6249,12 +6258,30 @@ function renderAsciiFromSource(sourceCanvas, targetCtx, options = {}) {
 
     targetCtx.fillStyle = state.color;
     targetCtx.font = `${fw} ${fontSize}px ${ff}`;
-    targetCtx.textBaseline = 'top';
-    targetCtx.textAlign = 'left';
-    for (let y = 0; y < maxRows; y += 1) {
-      const rowText = lines[y];
-      if (!rowText) continue;
-      targetCtx.fillText(rowText, 0, y * stepY);
+    if ('fontVariantEastAsian' in targetCtx) targetCtx.fontVariantEastAsian = optionEastAsianFullWidth ? 'full-width' : 'normal';
+    if (!optionEastAsianFullWidth) {
+      targetCtx.textBaseline = 'top';
+      targetCtx.textAlign = 'left';
+      for (let y = 0; y < maxRows; y += 1) {
+        const rowText = lines[y];
+        if (!rowText) continue;
+        targetCtx.fillText(rowText, 0, y * stepY);
+      }
+    } else {
+      const stepX = targetW / Math.max(1, w);
+      const drawSize = Math.max(1, Math.floor(Math.min(stepX, stepY) * 1.05));
+      targetCtx.font = `${fw} ${drawSize}px ${ff}`;
+      targetCtx.textBaseline = 'middle';
+      targetCtx.textAlign = 'center';
+      for (let y = 0; y < maxRows; y += 1) {
+        const rowText = lines[y] || '';
+        const chars = Array.from(rowText);
+        for (let x = 0; x < Math.min(w, chars.length); x += 1) {
+          const ch = chars[x];
+          if (!ch) continue;
+          targetCtx.fillText(ch, x * stepX + stepX * 0.5, y * stepY + stepY * 0.55);
+        }
+      }
     }
 
     return { ok: true, asciiText, cols: w, rows: h };
