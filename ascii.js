@@ -1121,6 +1121,8 @@ let DITHER_ENABLED = false;
     renderMutationHoldTimer: 0,
     renderMutationHideTimer: 0,
     renderMutationResolver: null,
+    renderMutationPrevZoomActive: false,
+    renderMutationPrevZoomMul: 1,
     runId: '',
     bossPresetId: null,
     bossAsciiOptions: {
@@ -2497,6 +2499,10 @@ const ARG_RESULT_REPLIES = {
     textEl.style.transition = 'transform 220ms ease';
     textEl.textContent = '';
     argPongState.renderMutationActive = false;
+    argPongState.argBossCountdownZoomActive = argPongState.renderMutationPrevZoomActive === true;
+    argPongState.argBossCountdownZoomMul = Number(argPongState.renderMutationPrevZoomMul) > 0
+      ? Number(argPongState.renderMutationPrevZoomMul)
+      : 1;
     const resolve = argPongState.renderMutationResolver;
     argPongState.renderMutationResolver = null;
     if (typeof resolve === 'function') resolve();
@@ -2515,6 +2521,12 @@ const ARG_RESULT_REPLIES = {
       hideRenderMutationOverlay();
       argPongState.renderMutationResolver = resolve;
       argPongState.renderMutationActive = true;
+      argPongState.renderMutationPrevZoomActive = argPongState.argBossCountdownZoomActive === true;
+      argPongState.renderMutationPrevZoomMul = Number(argPongState.argBossCountdownZoomMul) > 0
+        ? Number(argPongState.argBossCountdownZoomMul)
+        : 1;
+      argPongState.argBossCountdownZoomActive = true;
+      argPongState.argBossCountdownZoomMul = 2.08;
       layer.hidden = false;
       textEl.style.color = argPongState.bossAsciiOptions.color || '#ffffff';
       textEl.textContent = '';
@@ -3453,9 +3465,12 @@ const ARG_RESULT_REPLIES = {
         argPongServeTimer = setTimeout(() => {
           if (!argPongState.running) return;
           argPongServeTimer = 0;
-          flashBurstPromise
-            .then(() => (shouldShowMutationOverlay ? showRenderMutationOverlay() : Promise.resolve()))
-            .then(() => {
+          (async () => {
+            await flashBurstPromise;
+            if (!argPongState.running) return;
+            if (shouldShowMutationOverlay) {
+              await showRenderMutationOverlay();
+            }
             if (!argPongState.running) return;
             argPongServeTimer = setTimeout(() => {
               if (!argPongState.running) return;
@@ -3464,7 +3479,7 @@ const ARG_RESULT_REPLIES = {
               serveLocked = false;
               argPongServeTimer = 0;
             }, ARG_SCENE_TIMINGS.goalRespawnDelayMs);
-            });
+          })();
         }, ARG_SCENE_TIMINGS.serveDelayMs);
       } else if (!serveLocked && argPongState.ballVY > 0 && argPongState.ballY > bottomGoalLine) {
         stopArgPongMusic();
