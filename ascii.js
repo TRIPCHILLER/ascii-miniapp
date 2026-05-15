@@ -1675,7 +1675,15 @@ const ARG_RESULT_REPLIES = {
     setArgBossVisualReady(overlay, { showAscii: true });
   }
 
-  async function animateArgPopupText(textEl, text) {
+  async function animateArgPopupText(
+    textEl,
+    text,
+    {
+      glitchMs = ARG_SCENE_TIMINGS.popupGlitchMs,
+      spaceTypeMs = ARG_SCENE_TIMINGS.popupSpaceTypeMs,
+      charTypeMs = ARG_SCENE_TIMINGS.popupCharTypeMs
+    } = {}
+  ) {
     if (!textEl) return;
     const alphabet = 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ';
     const numberPool = ['1','2','3','4','5','6','7','8','9','10'];
@@ -1702,13 +1710,13 @@ const ARG_RESULT_REPLIES = {
         const fixedPart = text.slice(0, i);
         textEl.classList.add('is-glitching');
         textEl.textContent = `${fixedPart}${randomSymbol()}|`;
-        await waitArgIntro(ARG_SCENE_TIMINGS.popupGlitchMs);
+        await waitArgIntro(glitchMs);
         if (revealRequested || settled) break;
         textEl.classList.remove('is-glitching');
         textEl.textContent = `${fixedPart}${text[i]}|`;
         playStartPrintSound();
         tgTextHaptic();
-        await waitArgIntro(text[i] === ' ' ? ARG_SCENE_TIMINGS.popupSpaceTypeMs : ARG_SCENE_TIMINGS.popupCharTypeMs);
+        await waitArgIntro(text[i] === ' ' ? spaceTypeMs : charTypeMs);
       }
       if (!settled) {
         textEl.classList.remove('is-glitching');
@@ -1725,7 +1733,7 @@ const ARG_RESULT_REPLIES = {
     }
   }
 
-  async function showArgPopup(text, { openSoundSrc = '', popupClass = '' } = {}) {
+  async function showArgPopup(text, { openSoundSrc = '', popupClass = '', typing = null } = {}) {
     const overlay = ensureArgOverlay();
     const popupLayer = overlay.querySelector('#argScenePopupLayer');
     const popupBox = overlay.querySelector('.arg-scene-popup-box');
@@ -1736,7 +1744,7 @@ const ARG_RESULT_REPLIES = {
     popupBox.className = 'arg-scene-popup-box';
     if (popupClass) popupBox.classList.add(popupClass);
     if (openSoundSrc) playUiSoundNoThrow(openSoundSrc);
-    await animateArgPopupText(textEl, text);
+    await animateArgPopupText(textEl, text, typing || undefined);
 
     await new Promise((resolve) => {
       let closed = false;
@@ -3672,7 +3680,8 @@ const ARG_RESULT_REPLIES = {
     await waitArgIntro(ARG_SCENE_TIMINGS.bottomToSecondPopupMs);
     await showArgPopup(':: ПР0Т0К0Л ИНТ3Р4КТИВН0Г0\nИЗВЛ3Ч3НИ9 ЭН3РГИИ\nЗ4ПУЩ3Н ::', {
       openSoundSrc: ARG_SCENE_SOUNDS.danger2,
-      popupClass: 'arg-scene-popup-box--score'
+      popupClass: 'arg-scene-popup-box--score',
+      typing: { glitchMs: 12, spaceTypeMs: 8, charTypeMs: 14 }
     });
     await showArgPopup('9 БУДУ ПР0Д0ЛЖ4ТЬ,\nП0К4 ТЫ Н3\nСЛ0М43ШЬС9', {
       openSoundSrc: ARG_SCENE_SOUNDS.danger,
