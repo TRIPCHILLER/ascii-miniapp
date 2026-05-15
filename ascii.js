@@ -3116,6 +3116,28 @@ const ARG_RESULT_REPLIES = {
     });
 
     let serveLocked = false;
+    let argMatchFinishing = false;
+    const triggerArgMatchFinish = (reason) => {
+      if (argMatchFinishing || argPongState.ended) return;
+      argMatchFinishing = true;
+      serveLocked = true;
+      if (argPongServeTimer) {
+        clearTimeout(argPongServeTimer);
+        argPongServeTimer = 0;
+      }
+      if (argPongFlashTimers.length) {
+        argPongFlashTimers.forEach((id) => clearTimeout(id));
+        argPongFlashTimers = [];
+      }
+      console.log('[arg-finish-debug]', {
+        reason,
+        aiScore: argPongState.aiScore,
+        playerScore: argPongState.playerScore,
+        playerLosses: argPongState.aiScore,
+        isFinishing: argMatchFinishing
+      });
+      void finishArgMatch();
+    };
     let prevTs = 0;
     const loop = () => {
       if (!argPongState.running) return;
@@ -3276,8 +3298,7 @@ const ARG_RESULT_REPLIES = {
       const topGoalLine = ballHalfY;
       const bottomGoalLine = 1 - ballHalfY;
       if (argPongState.aiScore >= ARG_PONG.scoreToWin) {
-        serveLocked = true;
-        finishArgMatch();
+        triggerArgMatchFinish('ai_score_limit_guard');
         return;
       }
       if (!serveLocked && argPongState.ballVY < 0 && argPongState.ballY < topGoalLine) {
@@ -3319,8 +3340,14 @@ const ARG_RESULT_REPLIES = {
         playUiSoundNoThrow(ARG_SCENE_SOUNDS.bitClick2);
         argPongState.aiScore += 1;
         aiScoreEl.textContent = String(argPongState.aiScore);
+        console.log('[arg-score-debug]', {
+          scorer: 'ai',
+          aiScore: argPongState.aiScore,
+          playerScore: argPongState.playerScore,
+          playerLosses: argPongState.aiScore
+        });
         if (argPongState.aiScore >= ARG_PONG.scoreToWin) {
-          finishArgMatch();
+          triggerArgMatchFinish('ai_score_limit_scoring');
           return;
         }
         serveLocked = true;
