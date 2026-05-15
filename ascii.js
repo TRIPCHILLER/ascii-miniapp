@@ -2452,6 +2452,22 @@ const ARG_RESULT_REPLIES = {
     }
   }
 
+  function pushArgDebug(event, data = {}) {
+    window.__ARG_DEBUG_EVENTS = window.__ARG_DEBUG_EVENTS || [];
+    const entry = { t: Date.now(), event, ...data };
+    window.__ARG_DEBUG_EVENTS.push(entry);
+    window.__ARG_DEBUG_EVENTS = window.__ARG_DEBUG_EVENTS.slice(-100);
+    console.log('[arg-debug]', entry);
+  }
+
+  function safePushArgDebug(event, data = {}) {
+    try {
+      pushArgDebug(event, data);
+    } catch (err) {
+      console.warn('[arg-debug-failed]', event, err?.message || err);
+    }
+  }
+
   async function finishArgMatch(snapshot = null) {
     const finishSnapshot = {
       runId: String(snapshot?.runId || argPongState.runId || ''),
@@ -2459,7 +2475,7 @@ const ARG_RESULT_REPLIES = {
       aiScore: Math.max(0, Number(snapshot?.aiScore ?? argPongState.aiScore) || 0),
       reason: snapshot?.reason ? String(snapshot.reason) : 'unknown'
     };
-    pushArgDebug('finishArgMatch-enter', {
+    safePushArgDebug('finishArgMatch-enter', {
       reason: finishSnapshot.reason,
       playerScore: finishSnapshot.playerScore,
       aiScore: finishSnapshot.aiScore,
@@ -2475,7 +2491,7 @@ const ARG_RESULT_REPLIES = {
       const runScore = finishSnapshot.playerScore;
       const botScore = finishSnapshot.aiScore;
       let resultMeta = { score: runScore, impulsesAwarded: runScore, bestScore: runScore, isNewPersonalBest: false, enteredTop: false, isGlobalBest: false };
-      pushArgDebug('finishArgMatch-before-api', {
+      safePushArgDebug('finishArgMatch-before-api', {
         reason: finishSnapshot.reason,
         playerScore: runScore,
         aiScore: botScore,
@@ -2486,7 +2502,7 @@ const ARG_RESULT_REPLIES = {
       const userId = String(tg?.initDataUnsafe?.user?.id || '');
       const currentRank = leaderboard.findIndex((p) => String(p?.userId || '') === userId);
       const topPlayer = leaderboard[0] || null;
-      pushArgDebug('finishArgMatch-after-api', {
+      safePushArgDebug('finishArgMatch-after-api', {
         reason: finishSnapshot.reason,
         playerScore: runScore,
         aiScore: botScore,
@@ -2503,7 +2519,7 @@ const ARG_RESULT_REPLIES = {
         enteredTop: currentRank >= 0 && currentRank < 10,
         isGlobalBest: !!topPlayer && String(topPlayer?.userId || '') === userId && Number(topPlayer?.bestScore || 0) === Number(finishData?.player?.bestScore || 0)
       };
-      pushArgDebug('finishArgMatch-before-result-ui', {
+      safePushArgDebug('finishArgMatch-before-result-ui', {
         reason: finishSnapshot.reason,
         playerScore: runScore,
         aiScore: botScore
@@ -2524,14 +2540,14 @@ const ARG_RESULT_REPLIES = {
       startArgScenePending = false;
       startArgSceneRunning = false;
       startArgSceneStarted = false;
-      pushArgDebug('finishArgMatch-done', {
+      safePushArgDebug('finishArgMatch-done', {
         reason: finishSnapshot.reason,
         playerScore: runScore,
         aiScore: botScore
       });
       return true;
     } catch (err) {
-      pushArgDebug('finishArgMatch-error', {
+      safePushArgDebug('finishArgMatch-error', {
         reason: finishSnapshot.reason,
         message: err?.message || 'unknown',
         stack: String(err?.stack || '').slice(0, 800)
@@ -3157,18 +3173,11 @@ const ARG_RESULT_REPLIES = {
       tick();
     });
 
-    const pushArgDebug = (event, data = {}) => {
-      window.__ARG_DEBUG_EVENTS = window.__ARG_DEBUG_EVENTS || [];
-      const entry = { t: Date.now(), event, ...data };
-      window.__ARG_DEBUG_EVENTS.push(entry);
-      window.__ARG_DEBUG_EVENTS = window.__ARG_DEBUG_EVENTS.slice(-100);
-      console.log('[arg-debug]', entry);
-    };
     let serveLocked = false;
     let argMatchFinishing = false;
     let argMatchFinishDone = false;
     const triggerArgMatchFinish = (reason) => {
-      pushArgDebug('finish-trigger-enter', {
+      safePushArgDebug('finish-trigger-enter', {
         reason: reason || 'unknown',
         aiScore: argPongState.aiScore,
         playerScore: argPongState.playerScore,
@@ -3200,7 +3209,7 @@ const ARG_RESULT_REPLIES = {
         aiScore: argPongState.aiScore,
         runId: argPongState.runId
       };
-      pushArgDebug('finish-trigger-before-finishArgMatch', {
+      safePushArgDebug('finish-trigger-before-finishArgMatch', {
         reason: finishSnapshot.reason,
         playerScore: finishSnapshot.playerScore,
         aiScore: finishSnapshot.aiScore,
@@ -3211,7 +3220,7 @@ const ARG_RESULT_REPLIES = {
       });
       setTimeout(() => {
         if (argMatchFinishing && !argMatchFinishDone) {
-          pushArgDebug('finish-watchdog-timeout', {
+          safePushArgDebug('finish-watchdog-timeout', {
             aiScore: argPongState?.aiScore,
             playerScore: argPongState?.playerScore,
             hasRunId: Boolean(argPongState?.runId)
@@ -3421,7 +3430,7 @@ const ARG_RESULT_REPLIES = {
         stopArgPongMusic();
         playUiSoundNoThrow(ARG_SCENE_SOUNDS.bitClick2);
         argPongState.aiScore += 1;
-        pushArgDebug('ai-score-increment', {
+        safePushArgDebug('ai-score-increment', {
           aiScore: argPongState.aiScore,
           playerScore: argPongState.playerScore,
           hasRunId: Boolean(argPongState.runId)
