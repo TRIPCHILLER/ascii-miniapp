@@ -7371,17 +7371,41 @@ async function uploadBlobToBot(blob, filename, options = {}) {
   uploadInFlight = false;
   setTimeout(() => clearShotVisualEffects(), 220);
 
-  function tryLocalDownload(file) {
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      navigator.share({ files: [file], title: ': 4SC11 ⛶ V1S0R :', text: file.name }).catch(()=>{});
-      return;
-    }
-    const url = URL.createObjectURL(file);
-    const a = document.createElement('a');
-    a.href = url; a.download = file.name; a.rel = 'noopener';
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url), 3000);
+function tryLocalDownload(file) {
+  const isLocalVisor = !!window.ASCII_VISOR_LOCAL;
+
+  // В локальной ПК-версии НЕ открываем системное "Поделиться".
+  // Нам нужен прямой download в браузере.
+  const canUseSystemShare =
+    !isLocalVisor &&
+    navigator.canShare &&
+    navigator.canShare({ files: [file] });
+
+  if (canUseSystemShare) {
+    navigator
+      .share({
+        files: [file],
+        title: ': 4SC11 ⛶ V1S0R :',
+        text: file.name,
+      })
+      .catch(() => {});
+    return;
   }
+
+  const url = URL.createObjectURL(file);
+  const a = document.createElement('a');
+
+  a.href = url;
+  a.download = file.name;
+  a.rel = 'noopener';
+  a.style.display = 'none';
+
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
+}
 }
 
   // Подбор font-size
