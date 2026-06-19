@@ -7227,16 +7227,24 @@ if (window.ASCII_VISOR_LOCAL) {
   };
 }
 
-// Первый движущийся локальный тест:
-// текущее видео → разные ASCII PNG frames → FFmpeg MP4.
-// Это ещё не финальный export, а smoke test на коротком фрагменте.
+// Потоковый локальный MP4-рендер:
+// текущее видео → ASCII PNG frames по одному → Electron пишет на диск → FFmpeg MP4.
+// Главное отличие от старого теста: больше не держим весь массив PNG-кадров в памяти.
 if (window.ASCII_VISOR_LOCAL) {
-window.asciiVisorMp4VideoSegmentTest = async function asciiVisorMp4VideoSegmentTest(options = {}) {
-    if (!window.asciiVisorDesktop?.renderPngFramesToMp4Test) {
-      console.error('[ASCII VISOR MP4 VIDEO TEST] Desktop bridge is not available.');
+  window.asciiVisorMp4VideoSegmentTest = async function asciiVisorMp4VideoSegmentTest(options = {}) {
+    const desktop = window.asciiVisorDesktop;
+
+    const hasStreamingBridge =
+      !!desktop?.startMp4RenderSession &&
+      !!desktop?.writeMp4RenderFrame &&
+      !!desktop?.finishMp4RenderSession &&
+      !!desktop?.cancelMp4RenderSession;
+
+    if (!hasStreamingBridge) {
+      console.error('[ASCII VISOR MP4 STREAM] Desktop streaming bridge is not available.');
       return {
         ok: false,
-        error: 'Desktop bridge is not available.',
+        error: 'Desktop streaming bridge is not available.',
       };
     }
 
@@ -7269,19 +7277,19 @@ window.asciiVisorMp4VideoSegmentTest = async function asciiVisorMp4VideoSegmentT
 
     const originalTime = Number(app.vid.currentTime || 0);
     const wasPaused = app.vid.paused;
+    const originalOutText = app.out.textContent || '';
 
-// Управляемый тест: можно запускать из консоли с разным FPS/длительностью/scale.
-// Пример:
-// await window.asciiVisorMp4VideoSegmentTest({ fps: 24, durationSec: 2, scale: 3 })
-const requestedFps = Number(options.fps || state.fps || 24);
-const requestedDurationSec = Number(options.durationSec || 2);
-const requestedScale = Number(options.scale || 3);
+    const requestedFps = Number(options.fps || state.fps || 24);
+    const requestedDurationSec = Number(options.durationSec || duration);
+    const requestedScale = Number(options.scale || 3);
 
-const testFps = Math.max(1, Math.min(60, requestedFps));
-const testDurationSec = Math.max(0.25, Math.min(duration, requestedDurationSec));
-const frameCount = Math.max(2, Math.round(testDurationSec * testFps));
-const scale = Math.max(1, Math.min(6, requestedScale));
-const frames = [];
+    const testFps = Math.max(1, Math.min(60, requestedFps));
+    const testDurationSec = Math.max(0.25, Math.min(duration, requestedDurationSec));
+    const frameCount = Math.max(2, Math.round(testDurationSec * testFps));
+    const scale = Math.max(1, Math.min(6, requestedScale));
+
+    let sessionId = '';
+    let framesWritten = 0;
 
     function waitFrame() {
       return new Promise((resolve) => requestAnimationFrame(() => resolve()));
@@ -7316,8 +7324,8 @@ const frames = [];
         };
 
         const timer = setTimeout(() => {
-          // Некоторые браузеры/Electron могут не дать seeked, если время почти не изменилось.
-          // Для теста не падаем, а продолжаем.
+          // Иногда Electron не даёт seeked, если время почти не изменилось.
+          // Для рендера продолжаем, чтобы не зависнуть навсегда.
           finish();
         }, 1200);
 
@@ -7336,7 +7344,7 @@ const frames = [];
     try {
       app.vid.pause();
 
-      console.log('[ASCII VISOR MP4 VIDEO TEST] start', {
+      console.log('[ASCII VISOR MP4 STREAM] start', {
         testFps,
         testDurationSec,
         frameCount,
@@ -7344,7 +7352,22 @@ const frames = [];
         videoDuration: duration,
       });
 
+      const startResult = await desktop.startMp4RenderSession({
+        fps: testFps,
+        totalFrames: frameCount,
+        basename: `ascii_visor_video_stream_${testFps}fps_${Math.round(testDurationSec * 1000)}ms`,
+      });
+
+      if (!startResult?.ok) {
+        return startResult;
+      }
+
+      sessionId = startResult.sessionId;
+
+      const previewEvery = Math.max(10, Math.round(testFps / 2));
+
       for (let i = 0; i < frameCount; i += 1) {
+        const frameIndex = i + 1;
         const t = i / testFps;
 
         await seekVideoTo(t);
@@ -7362,49 +7385,80 @@ const frames = [];
           throw new Error(`Empty ASCII frame at index ${i}.`);
         }
 
-        // Показываем текущий кадр в интерфейсе, чтобы видеть прогресс глазами.
-        app.out.textContent = out;
-        refitFont(grid.w, grid.h);
+        // ВАЖНО:
+        // Для скорости больше НЕ обновляем DOM-превью на каждом кадре.
+        // Это не влияет на качество итогового MP4, потому что canvas рендерится напрямую из строки out.
+        if (frameIndex === 1 || frameIndex === frameCount || frameIndex % previewEvery === 0) {
+          app.out.textContent = out;
+          refitFont(grid.w, grid.h);
+        }
 
         renderAsciiToCanvas(out, grid.w, grid.h, scale);
-        frames.push(app.ui.render.toDataURL('image/png'));
 
-        if (i % 4 === 0 || i === frameCount - 1) {
-          console.log('[ASCII VISOR MP4 VIDEO TEST] frame', {
-            index: i + 1,
+        const frameDataUrl = app.ui.render.toDataURL('image/png');
+
+        const writeResult = await desktop.writeMp4RenderFrame({
+          sessionId,
+          index: frameIndex,
+          frame: frameDataUrl,
+        });
+
+        if (!writeResult?.ok) {
+          throw new Error(writeResult?.error || `Failed to write frame ${frameIndex}.`);
+        }
+
+        framesWritten = frameIndex;
+
+        if (frameIndex === 1 || frameIndex === frameCount || frameIndex % previewEvery === 0) {
+          console.log('[ASCII VISOR MP4 STREAM] frame', {
+            index: frameIndex,
             total: frameCount,
+            percent: Math.round((frameIndex / frameCount) * 100),
             time: Number(t.toFixed(3)),
           });
         }
 
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        // Маленькая пауза, чтобы Electron UI не превращался в кирпич.
+        await new Promise((resolve) => setTimeout(resolve, 1));
       }
 
-      console.log('[ASCII VISOR MP4 VIDEO TEST] sending frames to Electron', {
-        frames: frames.length,
+      console.log('[ASCII VISOR MP4 STREAM] finishing', {
+        sessionId,
+        framesWritten,
         fps: testFps,
       });
 
-const result = await window.asciiVisorDesktop.renderPngFramesToMp4Test({
-  frames,
-  fps: testFps,
-  basename: `ascii_visor_video_segment_${testFps}fps_${Math.round(testDurationSec * 1000)}ms`,
-});
+      const result = await desktop.finishMp4RenderSession({
+        sessionId,
+      });
 
-      console.log('[ASCII VISOR MP4 VIDEO TEST] result', result);
+      console.log('[ASCII VISOR MP4 STREAM] result', result);
       return result;
     } catch (error) {
-      console.error('[ASCII VISOR MP4 VIDEO TEST] failed', error);
+      console.error('[ASCII VISOR MP4 STREAM] failed', error);
+
+      if (sessionId) {
+        try {
+          await desktop.cancelMp4RenderSession({ sessionId });
+        } catch (_) {}
+      }
 
       return {
         ok: false,
         error: error.message,
-        frames: frames.length,
+        frames: framesWritten,
+        sessionId,
       };
     } finally {
       try {
         await seekVideoTo(originalTime);
       } catch (_) {}
+
+      // Возвращаем последний видимый ASCII-текст примерно как был.
+      // Это только интерфейс, на экспорт уже не влияет.
+      if (originalOutText && app.out) {
+        app.out.textContent = originalOutText;
+      }
 
       if (!wasPaused) {
         try {

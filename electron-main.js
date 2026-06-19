@@ -228,6 +228,214 @@ function decodePngDataUrl(dataUrl) {
   return Buffer.from(match[1], 'base64');
 }
 
+const mp4RenderSessions = new Map();
+let mp4RenderSessionSeq = 0;
+
+function sanitizeBasename(value, fallback = 'ascii_visor_video_stream') {
+  return String(value || fallback).replace(/[^\w.-]+/g, '_');
+}
+
+function createMp4MasterArgs({ fps, inputPattern, outputPath }) {
+  return [
+    '-y',
+
+    // Читаем PNG-последовательность как видео.
+    '-framerate', String(fps),
+    '-i', inputPattern,
+
+    // MASTER-качество для монтажа.
+    '-c:v', 'libx264',
+    '-preset', 'slow',
+    '-crf', '8',
+    '-pix_fmt', 'yuv444p',
+
+    // Не уменьшаем/не пересэмплим картинку.
+    // Если размер нечётный — добавляем паддинг до чётного.
+    '-vf', 'pad=ceil(iw/2)*2:ceil(ih/2)*2',
+
+    '-movflags', '+faststart',
+    outputPath,
+  ];
+}
+
+ipcMain.handle('desktop:mp4-render-session-start', async (_event, payload = {}) => {
+  const win = BrowserWindow.getFocusedWindow();
+
+  const fps = Math.max(1, Math.min(60, Number(payload.fps || 30)));
+  const totalFrames = Math.max(0, Number(payload.totalFrames || 0));
+  const basename = sanitizeBasename(payload.basename, 'ascii_visor_video_stream');
+
+  const saveResult = await dialog.showSaveDialog(win, {
+    title: 'Куда сохранить ASCII MP4',
+    defaultPath: `${basename}.mp4`,
+    filters: [
+      {
+        name: 'MP4 video',
+        extensions: ['mp4'],
+      },
+    ],
+  });
+
+  if (saveResult.canceled || !saveResult.filePath) {
+    return {
+      ok: false,
+      canceled: true,
+      step: 'save',
+    };
+  }
+
+  const outputPath = saveResult.filePath;
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ascii-visor-stream-'));
+  const sessionId = `mp4-${Date.now()}-${++mp4RenderSessionSeq}`;
+
+  const session = {
+    sessionId,
+    outputPath,
+    tempDir,
+    fps,
+    totalFrames,
+    frames: 0,
+    startedAt: Date.now(),
+  };
+
+  mp4RenderSessions.set(sessionId, session);
+
+  return {
+    ok: true,
+    sessionId,
+    outputPath,
+    tempDir,
+    fps,
+    totalFrames,
+  };
+});
+
+ipcMain.handle('desktop:mp4-render-session-write-frame', async (_event, payload = {}) => {
+  const sessionId = String(payload.sessionId || '');
+  const session = mp4RenderSessions.get(sessionId);
+
+  if (!session) {
+    return {
+      ok: false,
+      error: 'MP4 render session not found.',
+      sessionId,
+    };
+  }
+
+  const index = Math.max(1, Math.floor(Number(payload.index || session.frames + 1)));
+  const frameDataUrl = payload.frame;
+
+  if (!frameDataUrl) {
+    return {
+      ok: false,
+      error: 'No PNG frame data received.',
+      sessionId,
+      index,
+    };
+  }
+
+  try {
+    const frameNumber = String(index).padStart(6, '0');
+    const framePath = path.join(session.tempDir, `frame_${frameNumber}.png`);
+
+    await fs.writeFile(framePath, decodePngDataUrl(frameDataUrl));
+
+    session.frames = Math.max(session.frames, index);
+    session.lastFrameAt = Date.now();
+
+    return {
+      ok: true,
+      sessionId,
+      index,
+      frames: session.frames,
+      totalFrames: session.totalFrames,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error.message,
+      sessionId,
+      index,
+    };
+  }
+});
+
+ipcMain.handle('desktop:mp4-render-session-finish', async (_event, payload = {}) => {
+  const sessionId = String(payload.sessionId || '');
+  const session = mp4RenderSessions.get(sessionId);
+
+  if (!session) {
+    return {
+      ok: false,
+      error: 'MP4 render session not found.',
+      sessionId,
+    };
+  }
+
+  if (!session.frames) {
+    mp4RenderSessions.delete(sessionId);
+
+    return {
+      ok: false,
+      error: 'No frames were written.',
+      sessionId,
+      outputPath: session.outputPath,
+      tempDir: session.tempDir,
+      fps: session.fps,
+      frames: session.frames,
+    };
+  }
+
+  const result = await runFfmpeg(
+    createMp4MasterArgs({
+      fps: session.fps,
+      inputPattern: path.join(session.tempDir, 'frame_%06d.png'),
+      outputPath: session.outputPath,
+    })
+  );
+
+  mp4RenderSessions.delete(sessionId);
+
+  if (result.ok) {
+    shell.showItemInFolder(session.outputPath);
+  }
+
+  return {
+    ...result,
+    sessionId,
+    outputPath: session.outputPath,
+    tempDir: session.tempDir,
+    fps: session.fps,
+    frames: session.frames,
+    totalFrames: session.totalFrames,
+    renderDurationMs: Date.now() - session.startedAt,
+  };
+});
+
+ipcMain.handle('desktop:mp4-render-session-cancel', async (_event, payload = {}) => {
+  const sessionId = String(payload.sessionId || '');
+  const session = mp4RenderSessions.get(sessionId);
+
+  if (!session) {
+    return {
+      ok: true,
+      alreadyGone: true,
+      sessionId,
+    };
+  }
+
+  mp4RenderSessions.delete(sessionId);
+
+  return {
+    ok: true,
+    canceled: true,
+    sessionId,
+    outputPath: session.outputPath,
+    tempDir: session.tempDir,
+    frames: session.frames,
+  };
+});
+
 ipcMain.handle('desktop:render-png-frames-to-mp4-test', async (_event, payload = {}) => {
   const win = BrowserWindow.getFocusedWindow();
 
