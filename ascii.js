@@ -7227,6 +7227,189 @@ if (window.ASCII_VISOR_LOCAL) {
   };
 }
 
+// Первый движущийся локальный тест:
+// текущее видео → разные ASCII PNG frames → FFmpeg MP4.
+// Это ещё не финальный export, а smoke test на коротком фрагменте.
+if (window.ASCII_VISOR_LOCAL) {
+  window.asciiVisorMp4VideoSegmentTest = async function asciiVisorMp4VideoSegmentTest() {
+    if (!window.asciiVisorDesktop?.renderPngFramesToMp4Test) {
+      console.error('[ASCII VISOR MP4 VIDEO TEST] Desktop bridge is not available.');
+      return {
+        ok: false,
+        error: 'Desktop bridge is not available.',
+      };
+    }
+
+    if (!app.vid || !app.vid.src) {
+      showAsciiPopup({
+        type: 'info',
+        title: 'ВИДЕО НЕ ВЫБРАНО',
+        message: 'Сначала выбери видео в режиме ВИД30.',
+      });
+
+      return {
+        ok: false,
+        error: 'No video source selected.',
+      };
+    }
+
+    const duration = Number(app.vid.duration || 0);
+    if (!Number.isFinite(duration) || duration <= 0) {
+      showAsciiPopup({
+        type: 'error',
+        title: 'ВИДЕО НЕ ГОТОВО',
+        message: 'Не удалось прочитать длительность видео.',
+      });
+
+      return {
+        ok: false,
+        error: 'Video duration is not available.',
+      };
+    }
+
+    const originalTime = Number(app.vid.currentTime || 0);
+    const wasPaused = app.vid.paused;
+
+    // Для первого теста специально не берём 30/60 FPS:
+    // нам важно проверить движение и seek-логику, а не грузить систему сотнями кадров.
+    const testFps = 12;
+    const testDurationSec = Math.min(2, duration);
+    const frameCount = Math.max(2, Math.round(testDurationSec * testFps));
+    const scale = 3;
+    const frames = [];
+
+    function waitFrame() {
+      return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+    }
+
+    function seekVideoTo(timeSec) {
+      return new Promise((resolve, reject) => {
+        const video = app.vid;
+        const safeTime = Math.max(0, Math.min(timeSec, Math.max(0, duration - 0.001)));
+        let done = false;
+
+        const cleanup = () => {
+          video.removeEventListener('seeked', onSeeked);
+          video.removeEventListener('error', onError);
+          clearTimeout(timer);
+        };
+
+        const finish = () => {
+          if (done) return;
+          done = true;
+          cleanup();
+          resolve();
+        };
+
+        const onSeeked = () => finish();
+
+        const onError = () => {
+          if (done) return;
+          done = true;
+          cleanup();
+          reject(new Error('Video seek failed.'));
+        };
+
+        const timer = setTimeout(() => {
+          // Некоторые браузеры/Electron могут не дать seeked, если время почти не изменилось.
+          // Для теста не падаем, а продолжаем.
+          finish();
+        }, 1200);
+
+        video.addEventListener('seeked', onSeeked, { once: true });
+        video.addEventListener('error', onError, { once: true });
+
+        try {
+          video.currentTime = safeTime;
+        } catch (error) {
+          cleanup();
+          reject(error);
+        }
+      });
+    }
+
+    try {
+      app.vid.pause();
+
+      console.log('[ASCII VISOR MP4 VIDEO TEST] start', {
+        testFps,
+        testDurationSec,
+        frameCount,
+        scale,
+        videoDuration: duration,
+      });
+
+      for (let i = 0; i < frameCount; i += 1) {
+        const t = i / testFps;
+
+        await seekVideoTo(t);
+        await waitFrame();
+
+        const src = currentSource();
+        if (!src) {
+          throw new Error('No current video source after seek.');
+        }
+
+        const grid = updateGridSize();
+        const out = buildAsciiFromCurrentSource(src, grid.w, grid.h);
+
+        if (!out || !out.trim()) {
+          throw new Error(`Empty ASCII frame at index ${i}.`);
+        }
+
+        // Показываем текущий кадр в интерфейсе, чтобы видеть прогресс глазами.
+        app.out.textContent = out;
+        refitFont(grid.w, grid.h);
+
+        renderAsciiToCanvas(out, grid.w, grid.h, scale);
+        frames.push(app.ui.render.toDataURL('image/png'));
+
+        if (i % 4 === 0 || i === frameCount - 1) {
+          console.log('[ASCII VISOR MP4 VIDEO TEST] frame', {
+            index: i + 1,
+            total: frameCount,
+            time: Number(t.toFixed(3)),
+          });
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+
+      console.log('[ASCII VISOR MP4 VIDEO TEST] sending frames to Electron', {
+        frames: frames.length,
+        fps: testFps,
+      });
+
+      const result = await window.asciiVisorDesktop.renderPngFramesToMp4Test({
+        frames,
+        fps: testFps,
+        basename: 'ascii_visor_video_segment_test',
+      });
+
+      console.log('[ASCII VISOR MP4 VIDEO TEST] result', result);
+      return result;
+    } catch (error) {
+      console.error('[ASCII VISOR MP4 VIDEO TEST] failed', error);
+
+      return {
+        ok: false,
+        error: error.message,
+        frames: frames.length,
+      };
+    } finally {
+      try {
+        await seekVideoTo(originalTime);
+      } catch (_) {}
+
+      if (!wasPaused) {
+        try {
+          await app.vid.play();
+        } catch (_) {}
+      }
+    }
+  };
+}
+
 async function getVideoDurationSec(file) {
   if (!file) return 0;
   const tempVideo = document.createElement('video');
