@@ -5895,19 +5895,19 @@ async function startStream() {
 function applyWidthLimitsForMode(init = false) {
   let min, max;
 
-  if (isTextMode()) {
-    min = 25;
-    max = SAFE_TG_MAX_COLS;
-  } else if (isMobile) {
-    if (state.mode === 'live') {
-      min = 50;  max = 100;
-    } else {
-      min = 50;  max = 150;
-    }
+if (isTextMode()) {
+  min = 25;
+  max = SAFE_TG_MAX_COLS;
+} else if (isMobile) {
+  if (state.mode === 'live') {
+    min = 30;  max = 100;
   } else {
-    // Десктоп оставляем как было
-    min = 75; max = 150;
+    min = 30;  max = 150;
   }
+} else {
+  // Десктоп / Electron: даём грубые и детальные варианты
+  min = 30;  max = 175;
+}
 
   app.ui.width.min = min;
   app.ui.width.max = max;
@@ -9581,12 +9581,87 @@ async function doSave() {
   } else if (state.mode === 'video') {
     const hasGif = !!(state.gifFrames && state.gifFrames.length);
     const hasVideo = !!(app.vid && (app.vid.src || app.vid.srcObject));
+
     if (!hasGif && !hasVideo) {
-      showAsciiPopup({ type:'info', title:'НЕТ ВИДЕО', message:'Нет выбранного видео.' });
+      showAsciiPopup({
+        type: 'info',
+        title: 'НЕТ ВИДЕО',
+        message: 'Нет выбранного видео.',
+      });
       return;
     }
+
     const hasEnoughImpulses = await ensureEnoughBalanceBeforeExport('video', 15);
     if (!hasEnoughImpulses) return;
+
+    const canUseLocalMp4 =
+      !!window.ASCII_VISOR_LOCAL &&
+      !hasGif &&
+      !!window.asciiVisorDesktop?.renderPngFramesToMp4Test &&
+      typeof window.asciiVisorMp4VideoSegmentTest === 'function';
+
+    if (canUseLocalMp4) {
+      const duration = Number(app.vid?.duration || 0);
+      const fps = Math.max(1, Math.min(60, Number(state.fps || 30)));
+
+      if (!Number.isFinite(duration) || duration <= 0) {
+        showAsciiPopup({
+          type: 'error',
+          title: 'ВИДЕО НЕ ГОТОВО',
+          message: 'Не удалось прочитать длительность видео.',
+        });
+        return;
+      }
+
+      hudSet('MP4: покадровый рендер…');
+
+let stopBusyMp4Animation = () => {};
+
+try {
+  busyLock = true;
+  stopBusyMp4Animation = startBusyServiceTextAnimation('РЕНДЕР ASCII-ВИДЕО', {
+    withDots: true,
+  });
+
+  const result = await window.asciiVisorMp4VideoSegmentTest({
+    fps,
+    durationSec: duration,
+    scale: 3,
+  });
+
+  if (result?.ok) {
+    hudSet('MP4: готово');
+    showAsciiPopup({
+      type: 'success',
+      title: 'MP4 ГОТОВ',
+      message: 'Файл собран через локальный FFmpeg.',
+    });
+  } else if (!result?.canceled) {
+    hudSet('MP4: ошибка');
+    showAsciiPopup({
+      type: 'error',
+      title: 'MP4 НЕ СОБРАН',
+      message: String(result?.error || 'Неизвестная ошибка рендера.'),
+    });
+  }
+} catch (error) {
+  console.error('[LOCAL MP4 SAVE]', error);
+  hudSet('MP4: ошибка');
+  showAsciiPopup({
+    type: 'error',
+    title: 'MP4 НЕ СОБРАН',
+    message: String(error?.message || error || 'Неизвестная ошибка.'),
+  });
+} finally {
+  stopBusyMp4Animation();
+  busyLock = false;
+  busyHide(true);
+}
+
+return;
+    }
+
+    // Fallback для браузера, Telegram, GIF и всего, что ещё не переведено на FFmpeg.
     hudSet('VIDEO: запись… (дождитесь окончания)');
     saveVideo();
   }
