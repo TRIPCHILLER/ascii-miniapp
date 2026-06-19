@@ -279,16 +279,17 @@ ipcMain.handle('desktop:render-png-frames-to-mp4-test', async (_event, payload =
       '-i', path.join(tempDir, 'frame_%06d.png'),
 
       // Делаем совместимый MP4.
-      '-c:v', 'libx264',
-      '-preset', 'slow',
-      '-crf', '14',
-      '-pix_fmt', 'yuv420p',
+'-c:v', 'libx264',
+'-preset', 'slow',
+'-crf', '8',
+'-pix_fmt', 'yuv444p',
 
-      // На всякий случай приводим размеры к чётным значениям.
-      '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
+// Не уменьшаем/не пересэмплим картинку.
+// Если размер нечётный — просто добавляем 1 пиксель паддинга.
+'-vf', 'pad=ceil(iw/2)*2:ceil(ih/2)*2',
 
-      '-movflags', '+faststart',
-      outputPath,
+'-movflags', '+faststart',
+outputPath,
     ]);
 
     if (result.ok) {
