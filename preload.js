@@ -6,4 +6,5 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('asciiVisorDesktop', {
   ping: () => ipcRenderer.invoke('desktop:ping'),
   getInfo: () => ipcRenderer.invoke('desktop:get-info'),
+  getFfmpegInfo: () => ipcRenderer.invoke('desktop:ffmpeg-info'),
 });
