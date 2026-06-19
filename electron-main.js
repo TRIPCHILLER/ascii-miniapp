@@ -3,6 +3,8 @@
 
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('node:path');
+const os = require('node:os');
+const fs = require('node:fs/promises');
 const { spawn } = require('node:child_process');
 const ffmpegPath = require('ffmpeg-static');
 
@@ -194,18 +196,12 @@ ipcMain.handle('desktop:transcode-mp4-test', async () => {
   const result = await runFfmpeg([
     '-y',
     '-i', inputPath,
-
-    // Нормальный монтажный MP4-тест.
     '-c:v', 'libx264',
     '-preset', 'veryfast',
     '-crf', '18',
     '-pix_fmt', 'yuv420p',
-
-    // Если в исходнике есть звук — кодируем его в AAC.
-    // Если звука нет, FFmpeg просто продолжит без аудио.
     '-c:a', 'aac',
     '-b:a', '192k',
-
     '-movflags', '+faststart',
     outputPath,
   ]);
@@ -219,6 +215,103 @@ ipcMain.handle('desktop:transcode-mp4-test', async () => {
     inputPath,
     outputPath,
   };
+});
+
+function decodePngDataUrl(dataUrl) {
+  const text = String(dataUrl || '');
+  const match = text.match(/^data:image\/png;base64,(.+)$/);
+
+  if (!match) {
+    throw new Error('Invalid PNG data URL.');
+  }
+
+  return Buffer.from(match[1], 'base64');
+}
+
+ipcMain.handle('desktop:render-png-frames-to-mp4-test', async (_event, payload = {}) => {
+  const win = BrowserWindow.getFocusedWindow();
+
+  const frames = Array.isArray(payload.frames) ? payload.frames : [];
+  const fps = Math.max(1, Math.min(60, Number(payload.fps || 30)));
+  const basename = String(payload.basename || 'ascii_visor_ascii_frames_test').replace(/[^\w.-]+/g, '_');
+
+  if (!frames.length) {
+    return {
+      ok: false,
+      error: 'No PNG frames received.',
+    };
+  }
+
+  const saveResult = await dialog.showSaveDialog(win, {
+    title: 'Куда сохранить ASCII MP4 test',
+    defaultPath: `${basename}.mp4`,
+    filters: [
+      {
+        name: 'MP4 video',
+        extensions: ['mp4'],
+      },
+    ],
+  });
+
+  if (saveResult.canceled || !saveResult.filePath) {
+    return {
+      ok: false,
+      canceled: true,
+      step: 'save',
+    };
+  }
+
+  const outputPath = saveResult.filePath;
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ascii-visor-frames-'));
+
+  try {
+    for (let i = 0; i < frames.length; i += 1) {
+      const frameNumber = String(i + 1).padStart(6, '0');
+      const framePath = path.join(tempDir, `frame_${frameNumber}.png`);
+      await fs.writeFile(framePath, decodePngDataUrl(frames[i]));
+    }
+
+    const result = await runFfmpeg([
+      '-y',
+
+      // Читаем PNG-последовательность как видео.
+      '-framerate', String(fps),
+      '-i', path.join(tempDir, 'frame_%06d.png'),
+
+      // Делаем совместимый MP4.
+      '-c:v', 'libx264',
+      '-preset', 'slow',
+      '-crf', '14',
+      '-pix_fmt', 'yuv420p',
+
+      // На всякий случай приводим размеры к чётным значениям.
+      '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
+
+      '-movflags', '+faststart',
+      outputPath,
+    ]);
+
+    if (result.ok) {
+      shell.showItemInFolder(outputPath);
+    }
+
+    return {
+      ...result,
+      outputPath,
+      tempDir,
+      frames: frames.length,
+      fps,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error.message,
+      outputPath,
+      tempDir,
+      frames: frames.length,
+      fps,
+    };
+  }
 });
 
 app.whenReady().then(() => {

@@ -11,4 +11,8 @@ contextBridge.exposeInMainWorld('asciiVisorDesktop', {
   // Тестовый MP4 pipeline:
   // выбрать видео → выбрать место сохранения → FFmpeg делает MP4.
   transcodeMp4Test: () => ipcRenderer.invoke('desktop:transcode-mp4-test'),
+
+  // Первый ASCII → PNG frames → MP4 тест.
+  renderPngFramesToMp4Test: (payload) =>
+    ipcRenderer.invoke('desktop:render-png-frames-to-mp4-test', payload),
 });

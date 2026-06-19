@@ -7160,7 +7160,73 @@ console.log('[LOCAL VIDEO EXPORT] start', {
     app.vid.addEventListener('ended', onEnded, { once:true });
   }
 }
-  
+  // Первый локальный тест: текущий ASCII-кадр → PNG frames → FFmpeg MP4.
+// Это пока статичный MP4 smoke test, не полноценный video render.
+if (window.ASCII_VISOR_LOCAL) {
+  window.asciiVisorMp4FramesTest = async function asciiVisorMp4FramesTest() {
+    if (!window.asciiVisorDesktop?.renderPngFramesToMp4Test) {
+      console.error('[ASCII VISOR MP4 TEST] Desktop bridge is not available.');
+      return {
+        ok: false,
+        error: 'Desktop bridge is not available.',
+      };
+    }
+
+    const full = app.out.textContent || '';
+    if (!full.trim()) {
+      showAsciiPopup({
+        type: 'info',
+        title: 'ЗДЕСЬ ПУСТО...',
+        message: 'Сначала выбери фото или видео, чтобы появился ASCII-кадр.',
+      });
+
+      return {
+        ok: false,
+        error: 'No ASCII frame to render.',
+      };
+    }
+
+    const cols = Math.max(1, state.lastGrid?.w || 1);
+    const rows = Math.max(1, state.lastGrid?.h || 1);
+    const fps = Math.max(1, Math.min(60, Number(state.fps || 30)));
+
+    // Пока делаем 10 одинаковых кадров — проверяем не движение, а pipeline.
+    const frameCount = 10;
+    const scale = 3;
+    const frames = [];
+
+    console.log('[ASCII VISOR MP4 TEST] preparing PNG frames', {
+      frameCount,
+      fps,
+      cols,
+      rows,
+      scale,
+    });
+
+    for (let i = 0; i < frameCount; i += 1) {
+      renderAsciiToCanvas(full, cols, rows, scale);
+      frames.push(app.ui.render.toDataURL('image/png'));
+
+      // Даём интерфейсу вдохнуть между кадрами.
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+
+    console.log('[ASCII VISOR MP4 TEST] sending frames to Electron', {
+      frames: frames.length,
+      fps,
+    });
+
+    const result = await window.asciiVisorDesktop.renderPngFramesToMp4Test({
+      frames,
+      fps,
+      basename: 'ascii_visor_ascii_frames_test',
+    });
+
+    console.log('[ASCII VISOR MP4 TEST] result', result);
+    return result;
+  };
+}
+
 async function getVideoDurationSec(file) {
   if (!file) return 0;
   const tempVideo = document.createElement('video');
