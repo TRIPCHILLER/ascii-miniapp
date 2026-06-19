@@ -26,7 +26,7 @@
   const $ = s => document.querySelector(s);
   const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
   const API_BASE = 'https://api.tripchiller.com';
-  const MAX_VIDEO_DURATION_SEC = 60;
+const MAX_VIDEO_DURATION_SEC = window.ASCII_VISOR_LOCAL ? 300 : 60;
   const SAFE_TG_MAX_COLS = 40;
   const TEXT_TELEGRAM_CELL_ASPECT = 0.50;
   const TEXT_PREVIEW_LINE_HEIGHT = 1.10;
@@ -7294,6 +7294,22 @@ if (window.ASCII_VISOR_LOCAL) {
     function waitFrame() {
       return new Promise((resolve) => requestAnimationFrame(() => resolve()));
     }
+function canvasToPngArrayBuffer(canvas) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(async (blob) => {
+      if (!blob) {
+        reject(new Error('Canvas PNG blob export failed.'));
+        return;
+      }
+
+      try {
+        resolve(await blob.arrayBuffer());
+      } catch (error) {
+        reject(error);
+      }
+    }, 'image/png');
+  });
+}
 
     function seekVideoTo(timeSec) {
       return new Promise((resolve, reject) => {
@@ -7395,13 +7411,13 @@ if (window.ASCII_VISOR_LOCAL) {
 
         renderAsciiToCanvas(out, grid.w, grid.h, scale);
 
-        const frameDataUrl = app.ui.render.toDataURL('image/png');
+const frameBuffer = await canvasToPngArrayBuffer(app.ui.render);
 
-        const writeResult = await desktop.writeMp4RenderFrame({
-          sessionId,
-          index: frameIndex,
-          frame: frameDataUrl,
-        });
+const writeResult = await desktop.writeMp4RenderFrame({
+  sessionId,
+  index: frameIndex,
+  frameBuffer,
+});
 
         if (!writeResult?.ok) {
           throw new Error(writeResult?.error || `Failed to write frame ${frameIndex}.`);
@@ -7639,7 +7655,7 @@ async function uploadBlobToBot(blob, filename, options = {}) {
           type: 'error',
           sound: 'error',
           title: 'Я НЕ МОГУ ОБРАБОТАТЬ ЭТО...',
-          message: 'Твоё воспоминание длится более 60 секунд.\nСократи его время или выбери другое.'
+          message: `Твоё воспоминание длится более: ${Math.round(MAX_VIDEO_DURATION_SEC / 60)} мин.`
         });
         return;
       }

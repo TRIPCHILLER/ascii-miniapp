@@ -228,6 +228,32 @@ function decodePngDataUrl(dataUrl) {
   return Buffer.from(match[1], 'base64');
 }
 
+function decodePngFramePayload(payload = {}) {
+  // Новый быстрый путь: frontend присылает PNG как ArrayBuffer.
+  if (payload.frameBuffer) {
+    const frameBuffer = payload.frameBuffer;
+
+    if (frameBuffer instanceof ArrayBuffer) {
+      return Buffer.from(frameBuffer);
+    }
+
+    if (ArrayBuffer.isView(frameBuffer)) {
+      return Buffer.from(
+        frameBuffer.buffer,
+        frameBuffer.byteOffset,
+        frameBuffer.byteLength
+      );
+    }
+  }
+
+  // Запасной путь: если где-то остался старый dataURL.
+  if (payload.frame) {
+    return decodePngDataUrl(payload.frame);
+  }
+
+  throw new Error('No PNG frame data received.');
+}
+
 const mp4RenderSessions = new Map();
 let mp4RenderSessionSeq = 0;
 
@@ -323,22 +349,22 @@ ipcMain.handle('desktop:mp4-render-session-write-frame', async (_event, payload 
   }
 
   const index = Math.max(1, Math.floor(Number(payload.index || session.frames + 1)));
-  const frameDataUrl = payload.frame;
 
-  if (!frameDataUrl) {
-    return {
-      ok: false,
-      error: 'No PNG frame data received.',
-      sessionId,
-      index,
-    };
-  }
+if (!payload.frameBuffer && !payload.frame) {
+  return {
+    ok: false,
+    error: 'No PNG frame data received.',
+    sessionId,
+    index,
+  };
+}
 
   try {
     const frameNumber = String(index).padStart(6, '0');
     const framePath = path.join(session.tempDir, `frame_${frameNumber}.png`);
 
-    await fs.writeFile(framePath, decodePngDataUrl(frameDataUrl));
+    const frameBuffer = decodePngFramePayload(payload);
+    await fs.writeFile(framePath, frameBuffer);
 
     session.frames = Math.max(session.frames, index);
     session.lastFrameAt = Date.now();
