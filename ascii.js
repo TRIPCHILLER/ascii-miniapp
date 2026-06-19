@@ -7231,7 +7231,7 @@ if (window.ASCII_VISOR_LOCAL) {
 // текущее видео → разные ASCII PNG frames → FFmpeg MP4.
 // Это ещё не финальный export, а smoke test на коротком фрагменте.
 if (window.ASCII_VISOR_LOCAL) {
-  window.asciiVisorMp4VideoSegmentTest = async function asciiVisorMp4VideoSegmentTest() {
+window.asciiVisorMp4VideoSegmentTest = async function asciiVisorMp4VideoSegmentTest(options = {}) {
     if (!window.asciiVisorDesktop?.renderPngFramesToMp4Test) {
       console.error('[ASCII VISOR MP4 VIDEO TEST] Desktop bridge is not available.');
       return {
@@ -7270,13 +7270,18 @@ if (window.ASCII_VISOR_LOCAL) {
     const originalTime = Number(app.vid.currentTime || 0);
     const wasPaused = app.vid.paused;
 
-    // Для первого теста специально не берём 30/60 FPS:
-    // нам важно проверить движение и seek-логику, а не грузить систему сотнями кадров.
-    const testFps = 12;
-    const testDurationSec = Math.min(2, duration);
-    const frameCount = Math.max(2, Math.round(testDurationSec * testFps));
-    const scale = 3;
-    const frames = [];
+// Управляемый тест: можно запускать из консоли с разным FPS/длительностью/scale.
+// Пример:
+// await window.asciiVisorMp4VideoSegmentTest({ fps: 24, durationSec: 2, scale: 3 })
+const requestedFps = Number(options.fps || state.fps || 24);
+const requestedDurationSec = Number(options.durationSec || 2);
+const requestedScale = Number(options.scale || 3);
+
+const testFps = Math.max(1, Math.min(60, requestedFps));
+const testDurationSec = Math.max(0.25, Math.min(duration, requestedDurationSec));
+const frameCount = Math.max(2, Math.round(testDurationSec * testFps));
+const scale = Math.max(1, Math.min(6, requestedScale));
+const frames = [];
 
     function waitFrame() {
       return new Promise((resolve) => requestAnimationFrame(() => resolve()));
@@ -7380,11 +7385,11 @@ if (window.ASCII_VISOR_LOCAL) {
         fps: testFps,
       });
 
-      const result = await window.asciiVisorDesktop.renderPngFramesToMp4Test({
-        frames,
-        fps: testFps,
-        basename: 'ascii_visor_video_segment_test',
-      });
+const result = await window.asciiVisorDesktop.renderPngFramesToMp4Test({
+  frames,
+  fps: testFps,
+  basename: `ascii_visor_video_segment_${testFps}fps_${Math.round(testDurationSec * 1000)}ms`,
+});
 
       console.log('[ASCII VISOR MP4 VIDEO TEST] result', result);
       return result;
