@@ -1,7 +1,7 @@
 // electron-main.js
 // ASCII VISOR LOCAL — минимальная Electron-оболочка.
 
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('node:path');
 
 function createWindow() {
@@ -14,6 +14,7 @@ function createWindow() {
     autoHideMenuBar: true,
     title: 'ASCII VISOR LOCAL',
     webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -21,10 +22,26 @@ function createWindow() {
   });
 
   win.loadFile(path.join(__dirname, 'local.html'));
-
-  // На время разработки можно открыть DevTools клавишами Ctrl+Shift+I из окна.
-  // Если захочешь автозапуск DevTools — добавим позже.
 }
+
+ipcMain.handle('desktop:ping', async () => {
+  return {
+    ok: true,
+    message: 'ASCII VISOR DESKTOP BRIDGE ONLINE',
+    time: new Date().toISOString(),
+  };
+});
+
+ipcMain.handle('desktop:get-info', async () => {
+  return {
+    ok: true,
+    platform: process.platform,
+    arch: process.arch,
+    electron: process.versions.electron,
+    chrome: process.versions.chrome,
+    node: process.versions.node,
+  };
+});
 
 app.whenReady().then(() => {
   createWindow();
