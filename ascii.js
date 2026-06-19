@@ -6964,6 +6964,7 @@ function renderAsciiFrameLocked(text) {
 
   const cvs = app.ui.render;
   const c = cvs.getContext('2d');
+  c.imageSmoothingEnabled = false;
 // видео-кадр — всегда непрозрачный фон
 c.fillStyle = state.background;
 c.fillRect(0, 0, d.W, d.H);
@@ -6985,6 +6986,17 @@ c.fillRect(0, 0, d.W, d.H);
   for (let y = 0; y < rows; y++) {
     c.fillText(lines[y], 0, y * d.stepY);  // без измерений/смещений — фиксированная сетка
   }
+  
+const shouldSnapVideoPixels = false;
+
+if (window.ASCII_VISOR_LOCAL && shouldSnapVideoPixels) {
+  snapAsciiPixels(c, d.W, d.H, state.color, state.background, false);
+}
+
+  if (window.ASCII_VISOR_LOCAL && state.isRecording) {
+  state._recordFrameCount = (state._recordFrameCount || 0) + 1;
+}
+
 }
 function saveVideo(){
   if (state.mode !== 'video') {
@@ -7010,7 +7022,7 @@ function saveVideo(){
 
   // Фиксируем экспортный размер под текущую ASCII-сетку
   const C = state._recordCrop;
-  state.recordDims = computeRecordDims(C.cols, C.rows, 2);
+state.recordDims = computeRecordDims(C.cols, C.rows, window.ASCII_VISOR_LOCAL ? 3 : 2);
 
   // задаём размер канваса заранее (до captureStream)
   app.ui.render.width  = state.recordDims.W;
@@ -7023,17 +7035,27 @@ function saveVideo(){
   // создаём MediaRecorder с очень высоким битрейтом
   let recorder;
   try {
-    const bpp = 0.07; // эмпирически норм для «чистого» ASCII-видео
-    const vbr = Math.round(
-      (state.recordDims.W || 1280) *
-      (state.recordDims.H || 720) *
-      fps * bpp
-    );
 
-    recorder = new MediaRecorder(stream, {
-      mimeType: mime,
-      videoBitsPerSecond: Math.max(4_000_000, Math.min(20_000_000, vbr))
-    });
+const isLocalVisor = !!window.ASCII_VISOR_LOCAL;
+
+// Для ASCII-видео нужен намного более жирный поток:
+// тонкие символы и резкие края плохо переживают обычное видеосжатие.
+const bpp = isLocalVisor ? 0.35 : 0.07;
+
+const vbr = Math.round(
+  (state.recordDims.W || 1280) *
+  (state.recordDims.H || 720) *
+  fps * bpp
+);
+
+const minBitrate = isLocalVisor ? 30_000_000 : 4_000_000;
+const maxBitrate = isLocalVisor ? 120_000_000 : 20_000_000;
+
+recorder = new MediaRecorder(stream, {
+  mimeType: mime,
+  videoBitsPerSecond: Math.max(minBitrate, Math.min(maxBitrate, vbr))
+});
+    
   } catch (e) {
     console.warn('MediaRecorder error:', e);
     showAsciiPopup({ type:'error', title:'ОШИБКА ЗАПИСИ', message:'Браузер не дал записать видео.', extra:'Попробуй другой браузер или устройство.' });
@@ -7069,6 +7091,19 @@ function saveVideo(){
       ? 'ascii_visor.mp4'
       : 'ascii_visor.webm';
 
+if (window.ASCII_VISOR_LOCAL) {
+  const elapsedSec = Math.max(0.001, (performance.now() - (state._recordStartTime || performance.now())) / 1000);
+  const renderedFrames = state._recordFrameCount || 0;
+  console.log('[LOCAL VIDEO EXPORT] stop', {
+    requestedFps: fps,
+    renderedFrames,
+    elapsedSec: Number(elapsedSec.toFixed(2)),
+    approxRenderedFps: Number((renderedFrames / elapsedSec).toFixed(2)),
+    mime,
+    sizeMb: Number((blob.size / 1024 / 1024).toFixed(2))
+  });
+}
+
     await downloadBlob(blob, filename);
 
     // восстанавливаем loop у видео, если он был
@@ -7091,6 +7126,14 @@ function saveVideo(){
   }
 
   state.isRecording = true;
+  state._recordFrameCount = 0;
+state._recordStartTime = performance.now();
+console.log('[LOCAL VIDEO EXPORT] start', {
+  requestedFps: fps,
+  width: state.recordDims?.W,
+  height: state.recordDims?.H,
+  mime
+});
   stopBusyRecordAnimation = startBusyServiceTextAnimation('ЗАПИСЬ ASCII-ВИДЕО…');
   recorder.start(200);
 
