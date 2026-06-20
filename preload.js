@@ -19,7 +19,7 @@ contextBridge.exposeInMainWorld('asciiVisorDesktop', {
 },
 
   extractVideoFrames: (payload) => ipcRenderer.invoke('desktop:extract-video-frames', payload),
-
+cleanupTempDir: (payload) => ipcRenderer.invoke('desktop:cleanup-temp-dir', payload),
   // Тестовый MP4 pipeline:
   // выбрать видео → выбрать место сохранения → FFmpeg делает MP4.
   transcodeMp4Test: () => ipcRenderer.invoke('desktop:transcode-mp4-test'),

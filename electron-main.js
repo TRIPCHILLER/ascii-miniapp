@@ -260,6 +260,24 @@ ipcMain.handle('desktop:extract-video-frames', async (_event, payload = {}) => {
   }
 });
 
+ipcMain.handle('desktop:cleanup-temp-dir', async (_event, payload = {}) => {
+  try {
+    const tempDir = String(payload.tempDir || '').trim();
+    const removed = await removeDirSafe(tempDir);
+
+    return {
+      ok: true,
+      tempDir,
+      removed,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: String(error?.message || error),
+    };
+  }
+});
+
 ipcMain.handle('desktop:transcode-mp4-test', async () => {
   const win = BrowserWindow.getFocusedWindow();
 
@@ -422,6 +440,66 @@ function createMp4MasterArgs({ fps, inputPattern, outputPath, preset = 'medium' 
   ];
 }
 
+async function removeDirSafe(targetDir) {
+  const dir = String(targetDir || '').trim();
+  if (!dir) return false;
+
+  const normalized = path.resolve(dir);
+  const tmpRoot = path.resolve(os.tmpdir());
+
+  const allowedPrefixes = [
+    path.join(tmpRoot, 'ascii-visor-source-'),
+    path.join(tmpRoot, 'ascii-visor-stream-'),
+    path.join(tmpRoot, 'ascii-visor-frames-'),
+  ];
+
+  const isAllowed = allowedPrefixes.some((prefix) => normalized.startsWith(prefix));
+  if (!isAllowed) {
+    console.warn('[ASCII VISOR TEMP CLEANUP] blocked path:', normalized);
+    return false;
+  }
+
+  try {
+    await fs.rm(normalized, { recursive: true, force: true });
+    return true;
+  } catch (error) {
+    console.warn('[ASCII VISOR TEMP CLEANUP] failed:', normalized, error);
+    return false;
+  }
+}
+
+async function cleanupStaleAsciiVisorTempDirs({ olderThanMs = 24 * 60 * 60 * 1000 } = {}) {
+  const tmpRoot = os.tmpdir();
+  const prefixes = [
+    'ascii-visor-source-',
+    'ascii-visor-stream-',
+    'ascii-visor-frames-',
+  ];
+
+  try {
+    const names = await fs.readdir(tmpRoot);
+    const now = Date.now();
+
+    for (const name of names) {
+      if (!prefixes.some((prefix) => name.startsWith(prefix))) continue;
+
+      const fullPath = path.join(tmpRoot, name);
+
+      try {
+        const stat = await fs.stat(fullPath);
+        const lastTouchMs = Math.max(stat.mtimeMs || 0, stat.birthtimeMs || 0);
+        const ageMs = now - lastTouchMs;
+
+        if (ageMs >= olderThanMs) {
+          await fs.rm(fullPath, { recursive: true, force: true });
+        }
+      } catch (_) {}
+    }
+  } catch (error) {
+    console.warn('[ASCII VISOR TEMP CLEANUP] stale cleanup failed', error);
+  }
+}
+
 ipcMain.handle('desktop:mp4-render-session-start', async (_event, payload = {}) => {
   const win = BrowserWindow.getFocusedWindow();
 
@@ -564,12 +642,15 @@ ipcMain.handle('desktop:mp4-render-session-finish', async (_event, payload = {})
 
   mp4RenderSessions.delete(sessionId);
 
+  const cleanedTempDir = await removeDirSafe(session.tempDir);
+
   if (result.ok) {
     shell.showItemInFolder(session.outputPath);
   }
 
   return {
     ...result,
+    cleanedTempDir,
     sessionId,
     outputPath: session.outputPath,
     tempDir: session.tempDir,
@@ -594,10 +675,12 @@ ipcMain.handle('desktop:mp4-render-session-cancel', async (_event, payload = {})
   }
 
   mp4RenderSessions.delete(sessionId);
+  const cleanedTempDir = await removeDirSafe(session.tempDir);
 
   return {
     ok: true,
     canceled: true,
+    cleanedTempDir,
     sessionId,
     outputPath: session.outputPath,
     tempDir: session.tempDir,
@@ -692,7 +775,8 @@ outputPath,
   }
 });
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  await cleanupStaleAsciiVisorTempDirs();
   createWindow();
 
   app.on('activate', () => {

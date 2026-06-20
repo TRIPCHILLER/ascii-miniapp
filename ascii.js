@@ -7683,7 +7683,7 @@ if (window.ASCII_VISOR_LOCAL) {
     const encoderPreset = String(options.encoderPreset || 'medium');
 
     let sessionId = '';
-
+let extracted = null;
     function loadImageElement(src) {
       return new Promise((resolve, reject) => {
         const img = new Image();
@@ -7738,7 +7738,7 @@ if (window.ASCII_VISOR_LOCAL) {
 
       const extractStartedAt = performance.now();
 
-      const extracted = await desktop.extractVideoFrames({
+        extracted = await desktop.extractVideoFrames({
         inputPath,
         fps,
         startSec,
@@ -7912,7 +7912,7 @@ asciiMs += performance.now() - t0;
         result,
       });
 
-      return {
+            return {
         ...result,
         profile,
         extracted,
@@ -7931,6 +7931,20 @@ asciiMs += performance.now() - t0;
         error: String(error?.message || error),
         sessionId,
       };
+    } finally {
+      if (extracted?.tempDir && window.asciiVisorDesktop?.cleanupTempDir) {
+        try {
+          await window.asciiVisorDesktop.cleanupTempDir({
+            tempDir: extracted.tempDir,
+          });
+        } catch (error) {
+          console.warn(
+            '[ASCII VISOR EXTRACTED RENDER TEST] source temp cleanup failed',
+            extracted.tempDir,
+            error
+          );
+        }
+      }
     }
   };
 }
