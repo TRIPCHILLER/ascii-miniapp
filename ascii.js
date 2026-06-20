@@ -7545,6 +7545,359 @@ console.log('[ASCII VISOR MP4 STREAM] finishing', {
   };
 }
 
+// Локальный тест: FFmpeg быстро извлекает исходные кадры из видео.
+// Пока это НЕ финальный ASCII-рендер, а проверка скорости source-frame extraction.
+if (window.ASCII_VISOR_LOCAL) {
+  window.asciiVisorSourceExtractTest = async function asciiVisorSourceExtractTest(options = {}) {
+    try {
+      const desktop = window.asciiVisorDesktop;
+
+      if (!desktop?.pickVideoFile || !desktop?.extractVideoFrames) {
+        console.error('[ASCII VISOR SOURCE EXTRACT TEST] desktop bridge not available');
+
+        return {
+          ok: false,
+          error: 'desktop bridge not available',
+        };
+      }
+
+      const picked = await desktop.pickVideoFile();
+
+      if (!picked?.ok || picked?.canceled || !picked?.filePath) {
+        console.warn('[ASCII VISOR SOURCE EXTRACT TEST] file pick canceled');
+
+        return picked || {
+          ok: false,
+          canceled: true,
+        };
+      }
+
+      const fps = Math.max(1, Math.min(60, Number(options.fps || state.fps || 30)));
+      const startSec = Math.max(0, Number(options.startSec || 0));
+      const durationSec = Math.max(0.25, Number(options.durationSec || 3));
+      const format = String(options.format || 'png').toLowerCase() === 'jpg' ? 'jpg' : 'png';
+
+      console.log('[ASCII VISOR SOURCE EXTRACT TEST] start', {
+        inputPath: picked.filePath,
+        fps,
+        startSec,
+        durationSec,
+        format,
+      });
+
+      const startedAt = performance.now();
+
+      const result = await desktop.extractVideoFrames({
+        inputPath: picked.filePath,
+        fps,
+        startSec,
+        durationSec,
+        format,
+      });
+
+      const durationMs = Math.round(performance.now() - startedAt);
+
+      console.log('[ASCII VISOR SOURCE EXTRACT TEST] result', result);
+      console.log('[ASCII VISOR SOURCE EXTRACT TEST] durationMs', durationMs);
+
+      return {
+        ...result,
+        durationMs,
+      };
+    } catch (error) {
+      console.error('[ASCII VISOR SOURCE EXTRACT TEST] failed', error);
+
+      return {
+        ok: false,
+        error: String(error?.message || error),
+      };
+    }
+  };
+}
+
+// Локальный тест №2:
+// FFmpeg извлекает исходные кадры → VISOR рендерит ASCII → Electron собирает MP4.
+// Главная цель: убрать медленный browser video.currentTime seek на каждом кадре.
+if (window.ASCII_VISOR_LOCAL) {
+  window.asciiVisorExtractedFramesRenderTest = async function asciiVisorExtractedFramesRenderTest(options = {}) {
+    const desktop = window.asciiVisorDesktop;
+
+    if (
+      !desktop?.pickVideoFile ||
+      !desktop?.extractVideoFrames ||
+      !desktop?.startMp4RenderSession ||
+      !desktop?.writeMp4RenderFrame ||
+      !desktop?.finishMp4RenderSession ||
+      !desktop?.cancelMp4RenderSession
+    ) {
+      console.error('[ASCII VISOR EXTRACTED RENDER TEST] desktop bridge not available');
+
+      return {
+        ok: false,
+        error: 'desktop bridge not available',
+      };
+    }
+
+    const fps = Math.max(1, Math.min(60, Number(options.fps || state.fps || 30)));
+    const startSec = Math.max(0, Number(options.startSec || 0));
+    const durationSec = Math.max(0.25, Number(options.durationSec || 3));
+    const sourceFormat = String(options.sourceFormat || 'jpg').toLowerCase() === 'png'
+      ? 'png'
+      : 'jpg';
+    const scale = Math.max(1, Math.min(6, Number(options.scale || 3)));
+    const encoderPreset = String(options.encoderPreset || 'medium');
+
+    let sessionId = '';
+
+    function loadImageElement(src) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error(`Failed to load source frame: ${src}`));
+
+        img.src = src;
+      });
+    }
+
+    function canvasToPngArrayBuffer(canvas) {
+      return new Promise((resolve, reject) => {
+        canvas.toBlob(async (blob) => {
+          if (!blob) {
+            reject(new Error('Canvas PNG blob export failed.'));
+            return;
+          }
+
+          try {
+            resolve(await blob.arrayBuffer());
+          } catch (error) {
+            reject(error);
+          }
+        }, 'image/png');
+      });
+    }
+
+    try {
+      const picked = await desktop.pickVideoFile();
+
+      if (!picked?.ok || picked?.canceled || !picked?.filePath) {
+        return picked || {
+          ok: false,
+          canceled: true,
+        };
+      }
+
+      console.log('[ASCII VISOR EXTRACTED RENDER TEST] extracting source frames', {
+        inputPath: picked.filePath,
+        fps,
+        startSec,
+        durationSec,
+        sourceFormat,
+      });
+
+      const extractStartedAt = performance.now();
+
+      const extracted = await desktop.extractVideoFrames({
+        inputPath: picked.filePath,
+        fps,
+        startSec,
+        durationSec,
+        format: sourceFormat,
+      });
+
+      const extractMs = Math.round(performance.now() - extractStartedAt);
+
+      if (!extracted?.ok || !extracted.frames?.length) {
+        console.error('[ASCII VISOR EXTRACTED RENDER TEST] extract failed', extracted);
+
+        return {
+          ok: false,
+          step: 'extract',
+          extractMs,
+          extracted,
+        };
+      }
+
+const requestedMaxFrames = options.maxFrames == null ? 1 : Number(options.maxFrames);
+const maxFrames = Math.max(1, Math.min(240, requestedMaxFrames));
+const frames = extracted.frames.slice(0, maxFrames);
+const totalFrames = frames.length;
+const outputDurationSec = totalFrames / Math.max(1, fps);
+
+      console.log('[ASCII VISOR EXTRACTED RENDER TEST] source frames ready', {
+        totalFrames,
+        extractMs,
+        tempDir: extracted.tempDir,
+        sourceFormat,
+      });
+
+      const startResult = await desktop.startMp4RenderSession({
+        fps,
+        totalFrames,
+        encoderPreset,
+        basename: `ascii_visor_extracted_${sourceFormat}_${fps}fps_${totalFrames}frames_${Math.round(outputDurationSec * 1000)}ms`,
+      });
+
+      if (!startResult?.ok) {
+        return startResult;
+      }
+
+      sessionId = startResult.sessionId;
+
+      const renderStartedAt = performance.now();
+
+      let asciiMs = 0;
+      let canvasMs = 0;
+      let pngMs = 0;
+      let writeMs = 0;
+      let loadMs = 0;
+
+      const previewEvery = Math.max(10, Math.round(fps / 2));
+
+      for (let i = 0; i < totalFrames; i += 1) {
+        const frameIndex = i + 1;
+        const frame = frames[i];
+
+        let t0 = performance.now();
+
+const img = await loadImageElement(frame.fileUrl);
+loadMs += performance.now() - t0;
+
+const src = {
+  el: img,
+  w: img.naturalWidth || img.width || 1,
+  h: img.naturalHeight || img.height || 1,
+};
+
+t0 = performance.now();
+
+const prevMirror = state.mirror;
+state.mirror = false;
+
+const grid = updateGridSize(src);
+const out = buildAsciiFromCurrentSource(src, grid.w, grid.h);
+
+state.mirror = prevMirror;
+
+if (frameIndex === 1) {
+  const lines = String(out || '').split('\n').filter(Boolean);
+
+  console.log('[ASCII VISOR EXTRACTED RENDER TEST] first frame grid', {
+    sourceW: src.w,
+    sourceH: src.h,
+    gridW: grid.w,
+    gridH: grid.h,
+    lines: lines.length,
+    firstLineLength: lines[0]?.length || 0,
+  });
+}
+
+asciiMs += performance.now() - t0;
+
+        if (!out || !out.trim()) {
+          throw new Error(`Empty ASCII frame at index ${i}.`);
+        }
+
+        if (frameIndex === 1 || frameIndex === totalFrames || frameIndex % previewEvery === 0) {
+          app.out.textContent = out;
+          refitFont(grid.w, grid.h);
+
+          if (app.ui.busyText) {
+            const percent = Math.round((frameIndex / totalFrames) * 100);
+            app.ui.busyText.textContent = `РЕНДЕР ASCII-ВИДЕО ${percent}%`;
+          }
+
+          console.log('[ASCII VISOR EXTRACTED RENDER TEST] frame', {
+            index: frameIndex,
+            total: totalFrames,
+            percent: Math.round((frameIndex / totalFrames) * 100),
+          });
+        }
+
+        t0 = performance.now();
+        renderAsciiToCanvas(out, grid.w, grid.h, scale);
+        canvasMs += performance.now() - t0;
+
+        t0 = performance.now();
+        const frameBuffer = await canvasToPngArrayBuffer(app.ui.render);
+        pngMs += performance.now() - t0;
+
+        t0 = performance.now();
+        const writeResult = await desktop.writeMp4RenderFrame({
+          sessionId,
+          index: frameIndex,
+          frameBuffer,
+        });
+        writeMs += performance.now() - t0;
+
+        if (!writeResult?.ok) {
+          throw new Error(writeResult?.error || `Failed to write frame ${frameIndex}.`);
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 1));
+      }
+
+      const finishStartedAt = performance.now();
+
+      const result = await desktop.finishMp4RenderSession({
+        sessionId,
+      });
+
+      const ffmpegMs = Math.round(performance.now() - finishStartedAt);
+      const renderMs = Math.round(performance.now() - renderStartedAt);
+      const totalMs = extractMs + renderMs;
+
+      const profile = {
+        ok: !!result?.ok,
+        sourceFormat,
+        fps,
+        sourceDurationSec: durationSec,
+        outputDurationSec: Number(outputDurationSec.toFixed(2)),
+        totalFrames,
+        extractSec: Number((extractMs / 1000).toFixed(2)),
+        renderSec: Number((renderMs / 1000).toFixed(2)),
+        ffmpegSec: Number((ffmpegMs / 1000).toFixed(2)),
+        totalSec: Number((totalMs / 1000).toFixed(2)),
+        avgFrameMs: Number((renderMs / Math.max(1, totalFrames)).toFixed(2)),
+        loadSec: Number((loadMs / 1000).toFixed(2)),
+        asciiSec: Number((asciiMs / 1000).toFixed(2)),
+        canvasSec: Number((canvasMs / 1000).toFixed(2)),
+        pngSec: Number((pngMs / 1000).toFixed(2)),
+        writeSec: Number((writeMs / 1000).toFixed(2)),
+        encoderPreset,
+        extractTempDir: extracted.tempDir,
+        outputPath: result?.outputPath,
+      };
+
+      console.table(profile);
+      console.log('[ASCII VISOR EXTRACTED RENDER TEST] result', {
+        profile,
+        result,
+      });
+
+      return {
+        ...result,
+        profile,
+        extracted,
+      };
+    } catch (error) {
+      console.error('[ASCII VISOR EXTRACTED RENDER TEST] failed', error);
+
+      if (sessionId) {
+        try {
+          await desktop.cancelMp4RenderSession({ sessionId });
+        } catch (_) {}
+      }
+
+      return {
+        ok: false,
+        error: String(error?.message || error),
+        sessionId,
+      };
+    }
+  };
+}
+
 async function getVideoDurationSec(file) {
   if (!file) return 0;
   const tempVideo = document.createElement('video');

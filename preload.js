@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld('asciiVisorDesktop', {
   ping: () => ipcRenderer.invoke('desktop:ping'),
   getInfo: () => ipcRenderer.invoke('desktop:get-info'),
   getFfmpegInfo: () => ipcRenderer.invoke('desktop:ffmpeg-info'),
+  pickVideoFile: () => ipcRenderer.invoke('desktop:pick-video-file'),
+  extractVideoFrames: (payload) => ipcRenderer.invoke('desktop:extract-video-frames', payload),
 
   // Тестовый MP4 pipeline:
   // выбрать видео → выбрать место сохранения → FFmpeg делает MP4.

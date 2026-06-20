@@ -7,6 +7,7 @@ const os = require('node:os');
 const fs = require('node:fs/promises');
 const { spawn } = require('node:child_process');
 const ffmpegPath = require('ffmpeg-static');
+const { pathToFileURL } = require('url');
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -45,6 +46,39 @@ ipcMain.handle('desktop:get-info', async () => {
     chrome: process.versions.chrome,
     node: process.versions.node,
   };
+});
+
+ipcMain.handle('desktop:pick-video-file', async () => {
+  try {
+    const result = await dialog.showOpenDialog({
+      title: 'Выбери видео для ASCII VISOR',
+      properties: ['openFile'],
+      filters: [
+        {
+          name: 'Video',
+          extensions: ['mp4', 'mov', 'webm', 'mkv', 'avi', 'm4v'],
+        },
+      ],
+    });
+
+    if (result.canceled || !result.filePaths || !result.filePaths[0]) {
+      return {
+        ok: false,
+        canceled: true,
+      };
+    }
+
+    return {
+      ok: true,
+      canceled: false,
+      filePath: result.filePaths[0],
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: String(error && error.message ? error.message : error),
+    };
+  }
 });
 
 ipcMain.handle('desktop:ffmpeg-info', async () => {
@@ -142,6 +176,89 @@ function runFfmpeg(args) {
     });
   });
 }
+
+ipcMain.handle('desktop:extract-video-frames', async (_event, payload = {}) => {
+  try {
+    const inputPath = String(payload.inputPath || '').trim();
+    const fps = Math.max(1, Math.min(60, Number(payload.fps || 30)));
+    const startSec = Math.max(0, Number(payload.startSec || 0));
+    const durationSec = Math.max(0, Number(payload.durationSec || 0));
+    const format = String(payload.format || 'png').toLowerCase() === 'jpg' ? 'jpg' : 'png';
+
+    if (!inputPath) {
+      return {
+        ok: false,
+        error: 'inputPath is required',
+      };
+    }
+
+    const sessionId = `src-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const tempDir = path.join(os.tmpdir(), `ascii-visor-source-${sessionId}`);
+
+    await fs.mkdir(tempDir, { recursive: true });
+
+    const outputPattern = path.join(tempDir, `source_%06d.${format}`);
+
+    const args = [
+      '-y',
+      '-ss', String(startSec),
+      '-i', inputPath,
+    ];
+
+    if (durationSec > 0) {
+      args.push('-t', String(durationSec));
+    }
+
+    if (format === 'jpg') {
+      args.push(
+        '-vf', `fps=${fps}`,
+        '-q:v', '2',
+        outputPattern
+      );
+    } else {
+      args.push(
+        '-vf', `fps=${fps}`,
+        outputPattern
+      );
+    }
+
+    const ffmpegResult = await runFfmpeg(args);
+
+    const names = (await fs.readdir(tempDir))
+      .filter((name) => new RegExp(`^source_\\d+\\.${format}$`, 'i').test(name))
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+
+    const frames = names.map((name) => {
+      const filePath = path.join(tempDir, name);
+
+      return {
+        name,
+        filePath,
+        fileUrl: pathToFileURL(filePath).href,
+      };
+    });
+
+    return {
+      ok: ffmpegResult.ok,
+      sessionId,
+      tempDir,
+      fps,
+      startSec,
+      durationSec,
+      format,
+      frameCount: frames.length,
+      frames,
+      ffmpegPath,
+      args,
+      ffmpegResult,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: String(error && error.message ? error.message : error),
+    };
+  }
+});
 
 ipcMain.handle('desktop:transcode-mp4-test', async () => {
   const win = BrowserWindow.getFocusedWindow();
