@@ -78,8 +78,27 @@ function busyShow(msg){
   if (app.ui.busyText) {
     app.ui.busyText.textContent = msg || 'Пожалуйста, подождите…';
   }
-  if (app.ui.busy) {
+  if (app?.ui?.busy) {
     app.ui.busy.hidden = false;
+    app.ui.busy.style.display = '';
+    app.ui.busy.style.pointerEvents = '';
+    app.ui.busy.classList.add('active');
+  }
+}
+
+function busyHide(force = false){
+  if (busyLock && !force) return;
+
+  if (app?.ui?.busy) {
+    app.ui.busy.hidden = true;
+    app.ui.busy.classList.remove('active', 'show', 'visible', 'is-active', 'busy--active');
+    app.ui.busy.style.display = '';
+    app.ui.busy.style.pointerEvents = '';
+  }
+
+  if (app?.ui?.busyText) {
+    app.ui.busyText.textContent = '';
+    app.ui.busyText.style.whiteSpace = '';
   }
 }
 
@@ -173,29 +192,6 @@ function stopBusyRenderProgress({ hide = true } = {}) {
     } catch (_) {}
 
     hardHideBusyOverlay();
-  }
-}
-
-function stopBusyRenderProgress({ hide = true } = {}) {
-  if (busyRenderProgressDotsTimer) {
-    clearInterval(busyRenderProgressDotsTimer);
-    busyRenderProgressDotsTimer = null;
-  }
-
-  busyRenderProgressDots = 0;
-  busyRenderProgressPercent = 0;
-  busyLock = false;
-
-  if (app?.ui?.busyText) {
-    app.ui.busyText.textContent = '';
-  }
-
-  if (hide) {
-    busyHide(true);
-
-    if (app?.ui?.busy) {
-      app.ui.busy.hidden = true;
-    }
   }
 }
 
