@@ -1,13 +1,23 @@
 // preload.js
 // Безопасный мост между ASCII VISOR UI и Electron main process.
 
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('asciiVisorDesktop', {
   ping: () => ipcRenderer.invoke('desktop:ping'),
   getInfo: () => ipcRenderer.invoke('desktop:get-info'),
   getFfmpegInfo: () => ipcRenderer.invoke('desktop:ffmpeg-info'),
+
   pickVideoFile: () => ipcRenderer.invoke('desktop:pick-video-file'),
+
+  getPathForFile: (file) => {
+  try {
+    return webUtils?.getPathForFile?.(file) || '';
+  } catch (_) {
+    return '';
+  }
+},
+
   extractVideoFrames: (payload) => ipcRenderer.invoke('desktop:extract-video-frames', payload),
 
   // Тестовый MP4 pipeline:

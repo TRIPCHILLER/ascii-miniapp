@@ -83,81 +83,120 @@ function busyShow(msg){
   }
 }
 
-function busyHide(force = false){
-  if (busyLock && !force) return;  // <— защищаемся от чужих вызовов
-  if (app.ui.busy) app.ui.busy.hidden = true;
+let busyRenderProgressDotsTimer = null;
+let busyRenderProgressDots = 0;
+let busyRenderProgressPercent = 0;
+
+function formatBusyRenderProgressText() {
+  const dots = '.'.repeat(busyRenderProgressDots);
+
+  return `РЕНДЕР ASCII-ВИДЕО${dots}\n\n${busyRenderProgressPercent}%`;
 }
 
-let busyTextAnimationToken = 0;
+function hardHideBusyOverlay() {
+  busyLock = false;
 
-function startBusyServiceTextAnimation(targetText, {
-  glitchMs = 18,
-  charMs = 30,
-  spaceMs = 16,
-  withDots = false,
-  dotsMs = 500,
-  withHaptic = true
-} = {}) {
-  const localToken = ++busyTextAnimationToken;
-  const noiseAlphabet = '0123456789АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ';
-  const randomNoiseChar = () => noiseAlphabet[Math.floor(Math.random() * noiseAlphabet.length)];
-  let dotsTimer = null;
+  if (app?.ui?.busyText) {
+    app.ui.busyText.textContent = '';
+    app.ui.busyText.style.whiteSpace = '';
+  }
 
-  const isActive = () => (
-    localToken === busyTextAnimationToken &&
-    !!app?.ui?.busyText &&
-    !!app?.ui?.busy &&
-    !app.ui.busy.hidden
-  );
+  const busy = app?.ui?.busy;
 
-  busyShow('');
+  if (busy) {
+    busy.hidden = true;
+    busy.classList.remove('active', 'show', 'visible', 'is-active', 'busy--active');
+    busy.style.display = 'none';
+    busy.style.pointerEvents = 'none';
+  }
+}
 
-  (async () => {
-    if (!isActive()) return;
-    app.ui.busyText.textContent = '|';
-    startPrintNextSound = 0;
-    startLastPrintSoundAt = 0;
+function prepareBusyOverlayForShow() {
+  const busy = app?.ui?.busy;
 
-    for (let i = 0; i < targetText.length; i += 1) {
-      if (!isActive()) return;
-      const fixedPart = targetText.slice(0, i);
-      const ch = targetText[i];
+  if (busy) {
+    busy.hidden = false;
+    busy.style.display = '';
+    busy.style.pointerEvents = '';
+  }
 
-      if (ch === ' ') {
-        app.ui.busyText.textContent = `${fixedPart} |`;
-        await sleep(spaceMs);
-        continue;
-      }
+  if (app?.ui?.busyText) {
+    app.ui.busyText.style.whiteSpace = 'pre-line';
+  }
+}
 
-      app.ui.busyText.textContent = `${fixedPart}${randomNoiseChar()}|`;
-      await sleep(glitchMs);
-      if (!isActive()) return;
-      app.ui.busyText.textContent = `${fixedPart}${ch}|`;
-      playStartPrintSound();
-      if (withHaptic) tgTextHaptic();
-      await sleep(charMs);
+function setBusyRenderProgress(percent) {
+  busyRenderProgressPercent = Math.max(0, Math.min(100, Math.round(percent)));
+
+  if (!app?.ui?.busyText) return;
+
+  app.ui.busyText.style.whiteSpace = 'pre-line';
+  app.ui.busyText.textContent = formatBusyRenderProgressText();
+}
+
+function startBusyRenderProgress() {
+  stopBusyRenderProgress({ hide: true });
+
+  busyRenderProgressDots = 0;
+  busyRenderProgressPercent = 0;
+
+  prepareBusyOverlayForShow();
+
+  busyLock = true;
+  busyShow(formatBusyRenderProgressText());
+  setBusyRenderProgress(0);
+
+  busyRenderProgressDotsTimer = setInterval(() => {
+    busyRenderProgressDots = (busyRenderProgressDots + 1) % 4;
+    setBusyRenderProgress(busyRenderProgressPercent);
+  }, 500);
+}
+
+function stopBusyRenderProgress({ hide = true } = {}) {
+  if (busyRenderProgressDotsTimer) {
+    clearInterval(busyRenderProgressDotsTimer);
+    busyRenderProgressDotsTimer = null;
+  }
+
+  busyRenderProgressDots = 0;
+  busyRenderProgressPercent = 0;
+
+  busyLock = false;
+
+  if (app?.ui?.busyText) {
+    app.ui.busyText.textContent = '';
+  }
+
+  if (hide) {
+    try {
+      busyHide(true);
+    } catch (_) {}
+
+    hardHideBusyOverlay();
+  }
+}
+
+function stopBusyRenderProgress({ hide = true } = {}) {
+  if (busyRenderProgressDotsTimer) {
+    clearInterval(busyRenderProgressDotsTimer);
+    busyRenderProgressDotsTimer = null;
+  }
+
+  busyRenderProgressDots = 0;
+  busyRenderProgressPercent = 0;
+  busyLock = false;
+
+  if (app?.ui?.busyText) {
+    app.ui.busyText.textContent = '';
+  }
+
+  if (hide) {
+    busyHide(true);
+
+    if (app?.ui?.busy) {
+      app.ui.busy.hidden = true;
     }
-
-    if (!isActive()) return;
-    app.ui.busyText.textContent = targetText;
-
-    if (withDots) {
-      let dots = 0;
-      dotsTimer = setInterval(() => {
-        if (!isActive()) return;
-        dots = (dots + 1) % 4;
-        app.ui.busyText.textContent = targetText + '.'.repeat(dots);
-      }, dotsMs);
-    }
-  })();
-
-  return () => {
-    if (dotsTimer) {
-      clearInterval(dotsTimer);
-      dotsTimer = null;
-    }
-    if (busyTextAnimationToken === localToken) busyTextAnimationToken += 1;
-  };
+  }
 }
 
 // ==== /HUD ====
@@ -7677,18 +7716,24 @@ if (window.ASCII_VISOR_LOCAL) {
       });
     }
 
-    try {
-      const picked = await desktop.pickVideoFile();
+        try {
+      let inputPath = String(options.inputPath || state.localVideoFilePath || '').trim();
 
-      if (!picked?.ok || picked?.canceled || !picked?.filePath) {
-        return picked || {
-          ok: false,
-          canceled: true,
-        };
+      if (!inputPath) {
+        const picked = await desktop.pickVideoFile();
+
+        if (!picked?.ok || picked?.canceled || !picked?.filePath) {
+          return picked || {
+            ok: false,
+            canceled: true,
+          };
+        }
+
+        inputPath = picked.filePath;
       }
 
       console.log('[ASCII VISOR EXTRACTED RENDER TEST] extracting source frames', {
-        inputPath: picked.filePath,
+        inputPath,
         fps,
         startSec,
         durationSec,
@@ -7698,7 +7743,7 @@ if (window.ASCII_VISOR_LOCAL) {
       const extractStartedAt = performance.now();
 
       const extracted = await desktop.extractVideoFrames({
-        inputPath: picked.filePath,
+        inputPath,
         fps,
         startSec,
         durationSec,
@@ -7798,14 +7843,10 @@ asciiMs += performance.now() - t0;
           throw new Error(`Empty ASCII frame at index ${i}.`);
         }
 
+        setBusyRenderProgress((frameIndex / totalFrames) * 100);
         if (frameIndex === 1 || frameIndex === totalFrames || frameIndex % previewEvery === 0) {
           app.out.textContent = out;
           refitFont(grid.w, grid.h);
-
-          if (app.ui.busyText) {
-            const percent = Math.round((frameIndex / totalFrames) * 100);
-            app.ui.busyText.textContent = `РЕНДЕР ASCII-ВИДЕО ${percent}%`;
-          }
 
           console.log('[ASCII VISOR EXTRACTED RENDER TEST] frame', {
             index: frameIndex,
@@ -9871,10 +9912,26 @@ fileVideo.addEventListener('change', async (e) => {
   const sourceMime = String(original.type || '');
   const sourceSizeBytes = Number(original.size || 0);
   const sourceIsGif = sourceFilename.toLowerCase().endsWith('.gif') || sourceMime === 'image/gif';
+
   state.sourceFilename = sourceFilename;
   state.sourceMime = sourceMime;
   state.sourceSizeBytes = sourceSizeBytes;
   state.sourceIsGif = sourceIsGif;
+  
+  state.localVideoFilePath = '';
+
+if (window.ASCII_VISOR_LOCAL && window.asciiVisorDesktop?.getPathForFile) {
+  try {
+    state.localVideoFilePath = window.asciiVisorDesktop.getPathForFile(original) || '';
+  } catch (_) {
+    state.localVideoFilePath = '';
+  }
+}
+
+console.log('[LOCAL VIDEO SOURCE PATH]', {
+  sourceFilename,
+  localVideoFilePath: state.localVideoFilePath,
+});
   console.log('[MEDIA-SOURCE] selected', {
     sourceFilename,
     sourceMime,
@@ -10051,6 +10108,13 @@ function dbgState(tag, data) {
   }
 }
 async function doSave() {
+  console.log('[SAVE BUTTON] doSave clicked', {
+  mode: state.mode,
+  visorMode: state.visorMode,
+  local: window.ASCII_VISOR_LOCAL,
+  hasExtractedRenderer: typeof window.asciiVisorExtractedFramesRenderTest,
+  localVideoFilePath: state.localVideoFilePath,
+});
   dbgState('doSave.enter', { isTextMode: isTextMode(), visorMode: state.visorMode, mode: state.mode });
   const saveTextHandled = await routeTextSaveIfNeeded();
   dbgState('doSave.routeTextSaveIfNeeded', { handled: saveTextHandled, mode: state.mode });
@@ -10061,6 +10125,7 @@ async function doSave() {
     if (!hasEnoughImpulses) return;
     hudSet('PNG: экспорт…');
     savePNG();
+
   } else if (state.mode === 'video') {
     const hasGif = !!(state.gifFrames && state.gifFrames.length);
     const hasVideo = !!(app.vid && (app.vid.src || app.vid.srcObject));
@@ -10074,16 +10139,22 @@ async function doSave() {
       return;
     }
 
-    const hasEnoughImpulses = await ensureEnoughBalanceBeforeExport('video', 15);
-    if (!hasEnoughImpulses) return;
+const hasEnoughImpulses = window.ASCII_VISOR_LOCAL
+  ? true
+  : await ensureEnoughBalanceBeforeExport('video', 15);
 
-    const canUseLocalMp4 =
-      !!window.ASCII_VISOR_LOCAL &&
-      !hasGif &&
-      !!window.asciiVisorDesktop?.renderPngFramesToMp4Test &&
-      typeof window.asciiVisorMp4VideoSegmentTest === 'function';
+if (!hasEnoughImpulses) return;
 
-    if (canUseLocalMp4) {
+const canUseLocalMp4 =
+  !!window.ASCII_VISOR_LOCAL &&
+  !hasGif &&
+  !!window.asciiVisorDesktop?.extractVideoFrames &&
+  !!window.asciiVisorDesktop?.startMp4RenderSession &&
+  !!window.asciiVisorDesktop?.writeMp4RenderFrame &&
+  !!window.asciiVisorDesktop?.finishMp4RenderSession &&
+  typeof window.asciiVisorExtractedFramesRenderTest === 'function';
+
+        if (canUseLocalMp4) {
       const duration = Number(app.vid?.duration || 0);
       const fps = Math.max(1, Math.min(60, Number(state.fps || 30)));
 
@@ -10098,50 +10169,62 @@ async function doSave() {
 
       hudSet('MP4: покадровый рендер…');
 
-let stopBusyMp4Animation = () => {};
+      try {
+        const inputPath = String(state.localVideoFilePath || '').trim();
 
-try {
-  busyLock = true;
-  stopBusyMp4Animation = startBusyServiceTextAnimation('РЕНДЕР ASCII-ВИДЕО', {
-    withDots: true,
-  });
+        if (!inputPath) {
+          showAsciiPopup({
+            type: 'error',
+            title: 'НЕТ ПУТИ К ВИДЕО',
+            message: 'Локальный путь к выбранному видео не найден. Выбери видео заново через ВИДЗО.',
+          });
+          return;
+        }
 
-  const result = await window.asciiVisorMp4VideoSegmentTest({
-    fps,
-    durationSec: duration,
-    scale: 3,
-  });
+        startBusyRenderProgress();
 
-  if (result?.ok) {
-    hudSet('MP4: готово');
-    showAsciiPopup({
-      type: 'success',
-      title: 'MP4 ГОТОВ',
-      message: 'Файл собран через локальный FFmpeg.',
-    });
-  } else if (!result?.canceled) {
-    hudSet('MP4: ошибка');
-    showAsciiPopup({
-      type: 'error',
-      title: 'MP4 НЕ СОБРАН',
-      message: String(result?.error || 'Неизвестная ошибка рендера.'),
-    });
-  }
-} catch (error) {
-  console.error('[LOCAL MP4 SAVE]', error);
-  hudSet('MP4: ошибка');
-  showAsciiPopup({
-    type: 'error',
-    title: 'MP4 НЕ СОБРАН',
-    message: String(error?.message || error || 'Неизвестная ошибка.'),
-  });
-} finally {
-  stopBusyMp4Animation();
-  busyLock = false;
-  busyHide(true);
-}
+        const result = await window.asciiVisorExtractedFramesRenderTest({
+          inputPath,
+          fps,
+          durationSec: duration,
+          sourceFormat: 'jpg',
+          scale: 2,
+          encoderPreset: 'medium',
+          maxFrames: Math.max(1, Math.round(duration * fps)),
+        });
 
-return;
+        stopBusyRenderProgress({ hide: true });
+
+        if (result?.ok) {
+          hudSet('MP4: готово');
+          showAsciiPopup({
+            type: 'success',
+            title: 'MP4 ГОТОВ',
+            message: 'Файл собран через локальный FFmpeg.',
+          });
+        } else if (!result?.canceled) {
+          hudSet('MP4: ошибка');
+          showAsciiPopup({
+            type: 'error',
+            title: 'MP4 НЕ СОБРАН',
+            message: String(result?.error || 'Неизвестная ошибка рендера.'),
+          });
+        }
+      } catch (error) {
+        stopBusyRenderProgress({ hide: true });
+
+        console.error('[LOCAL MP4 SAVE]', error);
+        hudSet('MP4: ошибка');
+        showAsciiPopup({
+          type: 'error',
+          title: 'MP4 НЕ СОБРАН',
+          message: String(error?.message || error || 'Неизвестная ошибка.'),
+        });
+      } finally {
+        stopBusyRenderProgress({ hide: true });
+      }
+
+      return;
     }
 
     // Fallback для браузера, Telegram, GIF и всего, что ещё не переведено на FFmpeg.
