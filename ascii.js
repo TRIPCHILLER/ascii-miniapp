@@ -78,8 +78,11 @@ function busyShow(msg){
   if (app.ui.busyText) {
     app.ui.busyText.textContent = msg || 'Пожалуйста, подождите…';
   }
-  if (app.ui.busy) {
+  if (app?.ui?.busy) {
     app.ui.busy.hidden = false;
+    app.ui.busy.style.display = '';
+    app.ui.busy.style.pointerEvents = '';
+    app.ui.busy.classList.add('active');
   }
 }
 
