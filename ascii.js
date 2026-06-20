@@ -7288,8 +7288,11 @@ if (window.ASCII_VISOR_LOCAL) {
     const frameCount = Math.max(2, Math.round(testDurationSec * testFps));
     const scale = Math.max(1, Math.min(6, requestedScale));
 
-    let sessionId = '';
-    let framesWritten = 0;
+let sessionId = '';
+let framesWritten = 0;
+let seekEventCount = 0;
+let seekTimeoutCount = 0;
+let seekErrorCount = 0;
 
     function waitFrame() {
       return new Promise((resolve) => requestAnimationFrame(() => resolve()));
@@ -7311,51 +7314,105 @@ function canvasToPngArrayBuffer(canvas) {
   });
 }
 
-    function seekVideoTo(timeSec) {
-      return new Promise((resolve, reject) => {
-        const video = app.vid;
-        const safeTime = Math.max(0, Math.min(timeSec, Math.max(0, duration - 0.001)));
-        let done = false;
+   function waitVideoFrameFast(timeoutMs = 40) {
+  const video = app.vid;
 
-        const cleanup = () => {
-          video.removeEventListener('seeked', onSeeked);
-          video.removeEventListener('error', onError);
-          clearTimeout(timer);
-        };
+  return new Promise((resolve) => {
+    let done = false;
+    let timer = null;
 
-        const finish = () => {
-          if (done) return;
-          done = true;
-          cleanup();
-          resolve();
-        };
+    const finish = (source) => {
+      if (done) return;
+      done = true;
+      if (timer) clearTimeout(timer);
+      resolve(source);
+    };
 
-        const onSeeked = () => finish();
+    timer = setTimeout(() => {
+      finish('timeout');
+    }, timeoutMs);
 
-        const onError = () => {
-          if (done) return;
-          done = true;
-          cleanup();
-          reject(new Error('Video seek failed.'));
-        };
-
-        const timer = setTimeout(() => {
-          // Иногда Electron не даёт seeked, если время почти не изменилось.
-          // Для рендера продолжаем, чтобы не зависнуть навсегда.
-          finish();
-        }, 1200);
-
-        video.addEventListener('seeked', onSeeked, { once: true });
-        video.addEventListener('error', onError, { once: true });
-
-        try {
-          video.currentTime = safeTime;
-        } catch (error) {
-          cleanup();
-          reject(error);
-        }
-      });
+    if (video && typeof video.requestVideoFrameCallback === 'function') {
+      try {
+        video.requestVideoFrameCallback(() => {
+          finish('video-frame');
+        });
+        return;
+      } catch (_) {}
     }
+
+    requestAnimationFrame(() => {
+      finish('raf');
+    });
+  });
+}
+
+function seekVideoTo(timeSec) {
+  return new Promise((resolve, reject) => {
+    const video = app.vid;
+    const safeTime = Math.max(0, Math.min(timeSec, Math.max(0, duration - 0.001)));
+
+    let done = false;
+    let timer = null;
+
+    const seekTimeoutMs = window.ASCII_VISOR_LOCAL ? 90 : 1200;
+
+    const cleanup = () => {
+      video.removeEventListener('seeked', onSeeked);
+      video.removeEventListener('error', onError);
+      if (timer) clearTimeout(timer);
+    };
+
+    const finish = async (source) => {
+      if (done) return;
+      done = true;
+      cleanup();
+
+      if (source === 'timeout') {
+        seekTimeoutCount += 1;
+      } else {
+        seekEventCount += 1;
+      }
+
+      await waitVideoFrameFast(35);
+      resolve(source);
+    };
+
+    const onSeeked = () => {
+      finish('seeked');
+    };
+
+    const onError = () => {
+      if (done) return;
+      done = true;
+      cleanup();
+      seekErrorCount += 1;
+      reject(new Error('Video seek failed.'));
+    };
+
+    timer = setTimeout(() => {
+      finish('timeout');
+    }, seekTimeoutMs);
+
+    video.addEventListener('seeked', onSeeked, { once: true });
+    video.addEventListener('error', onError, { once: true });
+
+    try {
+      const delta = Math.abs(Number(video.currentTime || 0) - safeTime);
+
+      if (delta < 0.002) {
+        finish('same-time');
+        return;
+      }
+
+      video.currentTime = safeTime;
+    } catch (error) {
+      cleanup();
+      seekErrorCount += 1;
+      reject(error);
+    }
+  });
+}
 
     try {
       app.vid.pause();
@@ -7438,11 +7495,14 @@ const writeResult = await desktop.writeMp4RenderFrame({
         await new Promise((resolve) => setTimeout(resolve, 1));
       }
 
-      console.log('[ASCII VISOR MP4 STREAM] finishing', {
-        sessionId,
-        framesWritten,
-        fps: testFps,
-      });
+console.log('[ASCII VISOR MP4 STREAM] finishing', {
+  sessionId,
+  framesWritten,
+  fps: testFps,
+  seekEventCount,
+  seekTimeoutCount,
+  seekErrorCount,
+});
 
       const result = await desktop.finishMp4RenderSession({
         sessionId,

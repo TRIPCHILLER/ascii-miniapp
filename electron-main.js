@@ -246,7 +246,7 @@ function decodePngFramePayload(payload = {}) {
     }
   }
 
-  // Запасной путь: если где-то остался старый dataURL.
+  // Старый запасной путь: если где-то ещё остался dataURL.
   if (payload.frame) {
     return decodePngDataUrl(payload.frame);
   }
@@ -261,7 +261,27 @@ function sanitizeBasename(value, fallback = 'ascii_visor_video_stream') {
   return String(value || fallback).replace(/[^\w.-]+/g, '_');
 }
 
-function createMp4MasterArgs({ fps, inputPattern, outputPath }) {
+function normalizeX264Preset(value) {
+  const preset = String(value || 'medium').toLowerCase();
+
+  const allowed = new Set([
+    'ultrafast',
+    'superfast',
+    'veryfast',
+    'faster',
+    'fast',
+    'medium',
+    'slow',
+    'slower',
+    'veryslow',
+  ]);
+
+  return allowed.has(preset) ? preset : 'medium';
+}
+
+function createMp4MasterArgs({ fps, inputPattern, outputPath, preset = 'medium' }) {
+  const safePreset = normalizeX264Preset(preset);
+
   return [
     '-y',
 
@@ -270,8 +290,9 @@ function createMp4MasterArgs({ fps, inputPattern, outputPath }) {
     '-i', inputPattern,
 
     // MASTER-качество для монтажа.
+    // CRF и yuv444p оставляем, меняем только скорость энкодера.
     '-c:v', 'libx264',
-    '-preset', 'slow',
+    '-preset', safePreset,
     '-crf', '8',
     '-pix_fmt', 'yuv444p',
 
@@ -290,6 +311,7 @@ ipcMain.handle('desktop:mp4-render-session-start', async (_event, payload = {}) 
   const fps = Math.max(1, Math.min(60, Number(payload.fps || 30)));
   const totalFrames = Math.max(0, Number(payload.totalFrames || 0));
   const basename = sanitizeBasename(payload.basename, 'ascii_visor_video_stream');
+  const encoderPreset = normalizeX264Preset(payload.encoderPreset || 'medium');
 
   const saveResult = await dialog.showSaveDialog(win, {
     title: 'Куда сохранить ASCII MP4',
@@ -320,6 +342,7 @@ ipcMain.handle('desktop:mp4-render-session-start', async (_event, payload = {}) 
     tempDir,
     fps,
     totalFrames,
+    encoderPreset,
     frames: 0,
     startedAt: Date.now(),
   };
@@ -333,6 +356,7 @@ ipcMain.handle('desktop:mp4-render-session-start', async (_event, payload = {}) 
     tempDir,
     fps,
     totalFrames,
+    encoderPreset,
   };
 });
 
@@ -350,14 +374,14 @@ ipcMain.handle('desktop:mp4-render-session-write-frame', async (_event, payload 
 
   const index = Math.max(1, Math.floor(Number(payload.index || session.frames + 1)));
 
-if (!payload.frameBuffer && !payload.frame) {
-  return {
-    ok: false,
-    error: 'No PNG frame data received.',
-    sessionId,
-    index,
-  };
-}
+  if (!payload.frameBuffer && !payload.frame) {
+    return {
+      ok: false,
+      error: 'No PNG frame data received.',
+      sessionId,
+      index,
+    };
+  }
 
   try {
     const frameNumber = String(index).padStart(6, '0');
@@ -417,6 +441,7 @@ ipcMain.handle('desktop:mp4-render-session-finish', async (_event, payload = {})
       fps: session.fps,
       inputPattern: path.join(session.tempDir, 'frame_%06d.png'),
       outputPath: session.outputPath,
+      preset: session.encoderPreset,
     })
   );
 
@@ -434,6 +459,7 @@ ipcMain.handle('desktop:mp4-render-session-finish', async (_event, payload = {})
     fps: session.fps,
     frames: session.frames,
     totalFrames: session.totalFrames,
+    encoderPreset: session.encoderPreset,
     renderDurationMs: Date.now() - session.startedAt,
   };
 });
