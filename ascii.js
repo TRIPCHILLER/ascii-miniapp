@@ -83,6 +83,22 @@ function busyShow(msg){
   }
 }
 
+function busyHide(force = false){
+  if (busyLock && !force) return;
+
+  if (app?.ui?.busy) {
+    app.ui.busy.hidden = true;
+    app.ui.busy.classList.remove('active', 'show', 'visible', 'is-active', 'busy--active');
+    app.ui.busy.style.display = '';
+    app.ui.busy.style.pointerEvents = '';
+  }
+
+  if (app?.ui?.busyText) {
+    app.ui.busyText.textContent = '';
+    app.ui.busyText.style.whiteSpace = '';
+  }
+}
+
 let busyRenderProgressDotsTimer = null;
 let busyRenderProgressDots = 0;
 let busyRenderProgressPercent = 0;
@@ -173,29 +189,6 @@ function stopBusyRenderProgress({ hide = true } = {}) {
     } catch (_) {}
 
     hardHideBusyOverlay();
-  }
-}
-
-function stopBusyRenderProgress({ hide = true } = {}) {
-  if (busyRenderProgressDotsTimer) {
-    clearInterval(busyRenderProgressDotsTimer);
-    busyRenderProgressDotsTimer = null;
-  }
-
-  busyRenderProgressDots = 0;
-  busyRenderProgressPercent = 0;
-  busyLock = false;
-
-  if (app?.ui?.busyText) {
-    app.ui.busyText.textContent = '';
-  }
-
-  if (hide) {
-    busyHide(true);
-
-    if (app?.ui?.busy) {
-      app.ui.busy.hidden = true;
-    }
   }
 }
 
