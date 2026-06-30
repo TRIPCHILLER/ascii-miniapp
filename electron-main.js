@@ -6,7 +6,8 @@ const path = require('node:path');
 const os = require('node:os');
 const fs = require('node:fs/promises');
 const { spawn } = require('node:child_process');
-const ffmpegPath = require('ffmpeg-static');
+const rawFfmpegPath = require('ffmpeg-static');
+const ffmpegPath = rawFfmpegPath ? rawFfmpegPath.replace('app.asar', 'app.asar.unpacked') : rawFfmpegPath;
 const { pathToFileURL } = require('url');
 
 function createWindow() {
