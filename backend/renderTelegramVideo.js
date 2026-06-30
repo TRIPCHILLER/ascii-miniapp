@@ -16,14 +16,24 @@ function resolveFfmpegPath() {
   return 'ffmpeg';
 }
 
+function resolveFfprobePath() {
+  if (ffmpegPath && ffmpegPath !== 'ffmpeg') {
+    const candidate = path.join(path.dirname(ffmpegPath), process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe');
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return 'ffprobe';
+}
+
 const ffmpegPath = resolveFfmpegPath();
+const ffprobePath = resolveFfprobePath();
 
 const CELL_W = 6;
 const CELL_H = 8;
-const COLS = 120;
-const ROWS = 68;
-const OUT_W = COLS * CELL_W;
-const OUT_H = ROWS * CELL_H;
+const OUTPUT_CANVASES = {
+  portrait: { width: 720, height: 1280 },
+  landscape: { width: 1280, height: 720 },
+  square: { width: 1080, height: 1080 }
+};
 const ASCII_RAMP = ' .:-=+*#%@';
 const CYAN = [80, 220, 255];
 
@@ -58,7 +68,66 @@ function runProcess(cmd, args, opts = {}) {
   });
 }
 
-function drawGlyph(rgb, x, y, glyph) {
+
+function runProcessOutput(cmd, args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    const stdout = [];
+    const stderr = [];
+    if (child.stdout) child.stdout.on('data', (chunk) => stdout.push(chunk));
+    if (child.stderr) {
+      child.stderr.on('data', (chunk) => {
+        stderr.push(chunk);
+        if (stderr.reduce((sum, item) => sum + item.length, 0) > 512 * 1024) stderr.shift();
+      });
+    }
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code === 0) return resolve(Buffer.concat(stdout).toString('utf8'));
+      reject(new Error(`${path.basename(cmd)} exited with code ${code}: ${Buffer.concat(stderr).toString('utf8').slice(-4000)}`));
+    });
+  });
+}
+
+async function probeVideoLayout(inputPath) {
+  const stdout = await runProcessOutput(ffprobePath, [
+    '-v', 'error',
+    '-select_streams', 'v:0',
+    '-show_entries', 'stream=width,height,side_data_list:stream_tags=rotate',
+    '-of', 'json',
+    inputPath
+  ]);
+  const parsed = JSON.parse(stdout || '{}');
+  const stream = parsed.streams?.[0] || {};
+  let width = Number(stream.width) || 0;
+  let height = Number(stream.height) || 0;
+  const rotation = getStreamRotation(stream);
+  if (Math.abs(rotation) % 180 === 90) {
+    [width, height] = [height, width];
+  }
+  const orientation = width === height ? 'square' : (height > width ? 'portrait' : 'landscape');
+  const canvas = OUTPUT_CANVASES[orientation];
+  return {
+    orientation,
+    outputWidth: canvas.width,
+    outputHeight: canvas.height,
+    cols: Math.floor(canvas.width / CELL_W),
+    rows: Math.floor(canvas.height / CELL_H)
+  };
+}
+
+function getStreamRotation(stream) {
+  const tagRotation = Number(stream.tags?.rotate);
+  if (Number.isFinite(tagRotation)) return tagRotation;
+  const sideData = Array.isArray(stream.side_data_list) ? stream.side_data_list : [];
+  for (const item of sideData) {
+    const rotation = Number(item.rotation ?? item.displaymatrix?.rotation);
+    if (Number.isFinite(rotation)) return rotation;
+  }
+  return 0;
+}
+
+function drawGlyph(rgb, x, y, glyph, layout) {
   const rows = FONT[glyph] || FONT[' '];
   for (let gy = 0; gy < rows.length; gy += 1) {
     const row = rows[gy];
@@ -66,8 +135,8 @@ function drawGlyph(rgb, x, y, glyph) {
       if (row[gx] !== '1') continue;
       const px = x + gx;
       const py = y + gy;
-      if (px < 0 || px >= OUT_W || py < 0 || py >= OUT_H) continue;
-      const offset = (py * OUT_W + px) * 3;
+      if (px < 0 || px >= layout.outputWidth || py < 0 || py >= layout.outputHeight) continue;
+      const offset = (py * layout.outputWidth + px) * 3;
       rgb[offset] = CYAN[0];
       rgb[offset + 1] = CYAN[1];
       rgb[offset + 2] = CYAN[2];
@@ -75,19 +144,19 @@ function drawGlyph(rgb, x, y, glyph) {
   }
 }
 
-function writeAsciiPpm(frameGray, outPath) {
-  const rgb = Buffer.alloc(OUT_W * OUT_H * 3, 0);
-  for (let row = 0; row < ROWS; row += 1) {
-    for (let col = 0; col < COLS; col += 1) {
-      const lum = frameGray[row * COLS + col];
+function writeAsciiPpm(frameGray, outPath, layout) {
+  const rgb = Buffer.alloc(layout.outputWidth * layout.outputHeight * 3, 0);
+  for (let row = 0; row < layout.rows; row += 1) {
+    for (let col = 0; col < layout.cols; col += 1) {
+      const lum = frameGray[row * layout.cols + col];
       const idx = Math.max(0, Math.min(ASCII_RAMP.length - 1, Math.floor((lum / 256) * ASCII_RAMP.length)));
-      drawGlyph(rgb, col * CELL_W, row * CELL_H, ASCII_RAMP[idx]);
+      drawGlyph(rgb, col * CELL_W, row * CELL_H, ASCII_RAMP[idx], layout);
     }
   }
-  fs.writeFileSync(outPath, Buffer.concat([Buffer.from(`P6\n${OUT_W} ${OUT_H}\n255\n`), rgb]));
+  fs.writeFileSync(outPath, Buffer.concat([Buffer.from(`P6\n${layout.outputWidth} ${layout.outputHeight}\n255\n`), rgb]));
 }
 
-async function extractRawFrames(inputPath, rawPath, fps, durationSec) {
+async function extractRawFrames(inputPath, rawPath, fps, durationSec, layout) {
   const safeFps = Math.min(renderLimits.TG_RENDER_MAX_FPS, Math.max(1, Number.parseInt(String(fps), 10) || renderLimits.TG_RENDER_MAX_FPS));
   const safeDuration = Math.min(renderLimits.TG_RENDER_MAX_DURATION_SEC, Math.max(0.1, Number(durationSec) || renderLimits.TG_RENDER_MAX_DURATION_SEC));
   await runProcess(ffmpegPath, [
@@ -95,7 +164,7 @@ async function extractRawFrames(inputPath, rawPath, fps, durationSec) {
     '-t', String(safeDuration),
     '-i', inputPath,
     '-an',
-    '-vf', `fps=${safeFps}:round=down,scale=${COLS}:${ROWS}:force_original_aspect_ratio=decrease,pad=${COLS}:${ROWS}:(ow-iw)/2:(oh-ih)/2:black,format=gray`,
+    '-vf', `fps=${safeFps}:round=down,scale=${layout.cols}:${layout.rows}:force_original_aspect_ratio=decrease,pad=${layout.cols}:${layout.rows}:(ow-iw)/2:(oh-ih)/2:black,format=gray`,
     '-f', 'rawvideo',
     '-pix_fmt', 'gray',
     rawPath
@@ -113,7 +182,7 @@ async function encodeFrames(framesDir, outputPath, fps) {
     '-pix_fmt', 'yuv420p',
     '-profile:v', 'main',
     '-preset', 'veryfast',
-    '-crf', '23',
+    '-crf', '20',
     '-movflags', '+faststart',
     outputPath
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
@@ -126,15 +195,16 @@ async function renderTelegramVideo(job) {
   const outputPath = path.join(job.workspaceDir, 'telegram_ascii_render.mp4');
   await fs.promises.mkdir(framesDir, { recursive: true });
 
-  const fps = await extractRawFrames(job.inputPath, rawPath, job.fps, job.durationSec);
+  const layout = await probeVideoLayout(job.inputPath);
+  const fps = await extractRawFrames(job.inputPath, rawPath, job.fps, job.durationSec, layout);
   const raw = await fs.promises.readFile(rawPath);
-  const frameSize = COLS * ROWS;
+  const frameSize = layout.cols * layout.rows;
   const frameCount = Math.floor(raw.length / frameSize);
   if (frameCount <= 0) throw new Error('ffmpeg produced no frames');
 
   for (let i = 0; i < frameCount; i += 1) {
     const frame = raw.subarray(i * frameSize, (i + 1) * frameSize);
-    writeAsciiPpm(frame, path.join(framesDir, `frame_${String(i + 1).padStart(6, '0')}.ppm`));
+    writeAsciiPpm(frame, path.join(framesDir, `frame_${String(i + 1).padStart(6, '0')}.ppm`), layout);
   }
 
   await encodeFrames(framesDir, outputPath, fps);
@@ -145,7 +215,7 @@ async function renderTelegramVideo(job) {
     err.outputSizeBytes = stat.size;
     throw err;
   }
-  return { path: outputPath, outputSizeBytes: stat.size, frameCount, fps };
+  return { path: outputPath, outputSizeBytes: stat.size, frameCount, fps, orientation: layout.orientation, outputWidth: layout.outputWidth, outputHeight: layout.outputHeight };
 }
 
 module.exports = { renderTelegramVideo };
