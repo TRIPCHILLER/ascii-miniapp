@@ -770,6 +770,7 @@ let DITHER_ENABLED = false;
     sourceMime: '',
     sourceSizeBytes: 0,
     sourceIsGif: false,
+    sourceVideoFile: null,
     
     isRecording: false,     // запись видео (экспорт)
     recorder: null,
@@ -7969,6 +7970,87 @@ async function getVideoDurationSec(file) {
   });
 }
 
+let telegramRenderJobTestInFlight = false;
+
+function showTelegramRenderJobTestPopup(message, type = 'info') {
+  showAsciiPopup({
+    type,
+    sound: type === 'error' ? 'error' : undefined,
+    title: message,
+    message: ''
+  });
+}
+
+async function asciiVisorTestTelegramRenderJob() {
+  if (window.ASCII_VISOR_LOCAL) {
+    showTelegramRenderJobTestPopup('ФОНОВЫЙ РЕНДЕР НЕДОСТУПЕН', 'error');
+    return null;
+  }
+
+  const tgWebApp = window.Telegram?.WebApp;
+  const initData = String(tgWebApp?.initData || '');
+  const file = state.sourceVideoFile;
+
+  if (!file || state.mode !== 'video') {
+    showTelegramRenderJobTestPopup('ВИДЕО НЕ ПРОЧИТАНО', 'error');
+    return null;
+  }
+
+  if (telegramRenderJobTestInFlight) {
+    showTelegramRenderJobTestPopup('РЕНДЕР УЖЕ ИДЁТ', 'error');
+    return null;
+  }
+
+  const errorMessages = {
+    TG_BACKGROUND_RENDER_DISABLED: 'ФОНОВЫЙ РЕНДЕР ВЫКЛЮЧЕН',
+    TG_RENDER_VIDEO_TOO_LONG: 'ДО 10 СЕКУНД',
+    USER_RENDER_JOB_ALREADY_ACTIVE: 'РЕНДЕР УЖЕ ИДЁТ',
+    INSUFFICIENT_FUNDS: 'НЕДОСТАТОЧНО ИМПУЛЬСОВ',
+    INVALID_VIDEO: 'ВИДЕО НЕ ПРОЧИТАНО',
+    NO_FILE: 'ВИДЕО НЕ ПРОЧИТАНО',
+    INVALID_INIT_DATA: 'ВИДЕО НЕ ПРОЧИТАНО'
+  };
+
+  telegramRenderJobTestInFlight = true;
+
+  try {
+    const filename = state.sourceFilename || file.name || 'video.bin';
+    const fps = Math.max(1, Math.min(60, Math.round(Number(state.fps || 30))));
+    const form = new FormData();
+    form.append('file', file, filename);
+    form.append('filename', filename);
+    form.append('initData', initData);
+    form.append('initdata', initData);
+    form.append('fps', String(fps));
+
+    const res = await fetch(`${API_BASE}/api/render-video-job`, {
+      method: 'POST',
+      body: form,
+      headers: applyTelegramInitDataHeader({})
+    });
+    const raw = await res.text();
+    let json = {};
+    try { json = JSON.parse(raw || '{}'); } catch (_) {}
+
+    if (res.status === 202 || json?.ok || json?.status === 'queued') {
+      showTelegramRenderJobTestPopup('РЕНДЕР ЗАПУЩЕН', 'success');
+      return json;
+    }
+
+    const code = String(json?.error || '');
+    showTelegramRenderJobTestPopup(errorMessages[code] || 'ВИДЕО НЕ ПРОЧИТАНО', 'error');
+    return json;
+  } catch (error) {
+    console.error('[TELEGRAM RENDER JOB TEST]', error);
+    showTelegramRenderJobTestPopup('ВИДЕО НЕ ПРОЧИТАНО', 'error');
+    return null;
+  } finally {
+    telegramRenderJobTestInFlight = false;
+  }
+}
+
+window.asciiVisorTestTelegramRenderJob = asciiVisorTestTelegramRenderJob;
+
 let uploadInFlight = false;
 let asciiPopupTypeToken = 0;
 
@@ -9982,6 +10064,7 @@ fileVideo.addEventListener('change', async (e) => {
   state.sourceMime = sourceMime;
   state.sourceSizeBytes = sourceSizeBytes;
   state.sourceIsGif = sourceIsGif;
+  state.sourceVideoFile = original;
   
   state.localVideoFilePath = '';
 
