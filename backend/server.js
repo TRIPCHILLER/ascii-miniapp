@@ -1281,10 +1281,6 @@ app.post('/api/pong/profile/customize', (req, res) => {
 });
 
 
-function isTelegramBackgroundRenderEnabled() {
-  return String(process.env.TG_BACKGROUND_RENDER_ENABLED || 'false').toLowerCase() === 'true';
-}
-
 function getRequestInitData(req) {
   return String(
     req.get('X-Telegram-Init-Data') ||
@@ -1308,7 +1304,7 @@ function parseRenderInitDataUserId(req) {
 }
 
 app.post('/api/render-video-job', (req, res, next) => {
-  if (!isTelegramBackgroundRenderEnabled()) {
+  if (!renderLimits.TG_BACKGROUND_RENDER_ENABLED) {
     return res.status(404).json({ ok: false, error: 'TG_BACKGROUND_RENDER_DISABLED' });
   }
   return next();
@@ -1330,8 +1326,11 @@ app.post('/api/render-video-job', (req, res, next) => {
       return res.status(409).json({ ok: false, error: 'USER_RENDER_JOB_ALREADY_ACTIVE' });
     }
 
-    const { duration } = await probeVideo(f.path);
-    const durationSec = Number(duration || 0);
+    const probe = await probeVideoStreams(f.path);
+    const durationSec = Number(probe.durationSec || 0);
+    if (!probe.hasVideo || !Number.isFinite(durationSec) || durationSec <= 0) {
+      return res.status(400).json({ ok: false, error: 'INVALID_VIDEO' });
+    }
     if (durationSec > renderLimits.TG_RENDER_MAX_DURATION_SEC) {
       return res.status(400).json({
         ok: false,
