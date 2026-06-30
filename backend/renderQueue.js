@@ -3,15 +3,20 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { TG_RENDER_MAX_CONCURRENCY } = require('./renderLimits');
+const { TG_RENDER_MAX_CONCURRENCY, TG_RENDER_COST } = require('./renderLimits');
 
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function createRenderQueue({ sendMessage, concurrency = TG_RENDER_MAX_CONCURRENCY } = {}) {
+function createRenderQueue({ sendMessage, sendVideoToUser, deduct, renderTelegramVideo, concurrency = TG_RENDER_MAX_CONCURRENCY } = {}) {
   if (typeof sendMessage !== 'function') {
     throw new Error('renderQueue requires sendMessage helper');
+  }
+  if (typeof sendVideoToUser !== 'function') {
+    throw new Error('renderQueue requires sendVideoToUser helper');
+  }
+  if (typeof deduct !== 'function') {
+    throw new Error('renderQueue requires deduct helper');
+  }
+  if (typeof renderTelegramVideo !== 'function') {
+    throw new Error('renderQueue requires renderTelegramVideo helper');
   }
 
   const queue = [];
@@ -78,19 +83,24 @@ function createRenderQueue({ sendMessage, concurrency = TG_RENDER_MAX_CONCURRENC
     job.updatedAt = new Date().toISOString();
     try {
       await sendMessage(job.userId, `▶️ Background render стартовал. jobId: ${job.jobId}`);
-      await sleep(1000 + Math.floor(Math.random() * 1000));
+      const result = await renderTelegramVideo(job);
+      const sent = await sendVideoToUser(job.userId, result.path, { caption: '#ascii_video #background_render' });
+      const nextBalance = deduct(job.userId, TG_RENDER_COST);
       job.status = 'done';
+      job.result = {
+        outputSizeBytes: result.outputSizeBytes,
+        frameCount: result.frameCount,
+        fps: result.fps,
+        telegramOk: !!sent?.ok,
+        balance: nextBalance
+      };
       job.updatedAt = new Date().toISOString();
-      await sendMessage(
-        job.userId,
-        `✅ Background render skeleton работает. Реальный ASCII-render пока не включён. jobId: ${job.jobId}`
-      );
     } catch (err) {
       job.status = 'failed';
       job.error = String(err?.message || err);
       job.updatedAt = new Date().toISOString();
       try {
-        await sendMessage(job.userId, `❌ Background render failed. jobId: ${job.jobId}`);
+        await sendMessage(job.userId, `❌ Background render failed. Импульсы не списаны. jobId: ${job.jobId}`);
       } catch (sendErr) {
         console.warn('[renderQueue] failed message failed', sendErr?.message || sendErr);
       }
