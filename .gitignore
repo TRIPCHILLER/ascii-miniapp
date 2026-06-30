@@ -47,3 +47,11 @@ backend/server.local.bak.js
 Thumbs.db
 .vscode/
 .idea/
+=======================
+# Electron build artifacts
+=======================
+dist/
+*.blockmap
+builder-debug.yml
+builder-effective-config.yaml
+latest.yml
