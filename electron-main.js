@@ -49,6 +49,149 @@ ipcMain.handle('desktop:get-info', async () => {
   };
 });
 
+function getStylesStorePath() {
+  return path.join(app.getPath('userData'), 'styles.json');
+}
+
+function normalizeLocalStyle(style = {}) {
+  const id = String(style.id || '').trim() || `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const name = String(style.name || '').trim().slice(0, 32);
+  const textColor = String(style.textColor || '').trim();
+  const bgColor = String(style.bgColor || '').trim();
+
+  if (!name || !/^#[0-9a-f]{6}$/i.test(textColor) || !/^#[0-9a-f]{6}$/i.test(bgColor)) {
+    return null;
+  }
+
+  return {
+    id,
+    type: 'user',
+    name,
+    textColor: textColor.toLowerCase(),
+    bgColor: bgColor.toLowerCase(),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+async function readLocalStyles() {
+  const storePath = getStylesStorePath();
+
+  try {
+    const raw = await fs.readFile(storePath, 'utf8');
+    const parsed = JSON.parse(raw || '[]');
+    const styles = Array.isArray(parsed) ? parsed : parsed?.styles;
+
+    if (!Array.isArray(styles)) return [];
+
+    return styles
+      .map(normalizeLocalStyle)
+      .filter(Boolean);
+  } catch (error) {
+    if (error?.code === 'ENOENT') return [];
+    throw error;
+  }
+}
+
+async function writeLocalStyles(styles) {
+  const storePath = getStylesStorePath();
+  await fs.mkdir(path.dirname(storePath), { recursive: true });
+  await fs.writeFile(storePath, JSON.stringify(styles, null, 2), 'utf8');
+}
+
+ipcMain.handle('desktop:styles-load', async () => {
+  try {
+    return {
+      ok: true,
+      styles: await readLocalStyles(),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: String(error?.message || error),
+      styles: [],
+    };
+  }
+});
+
+ipcMain.handle('desktop:styles-save', async (_event, payload = {}) => {
+  try {
+    const style = normalizeLocalStyle(payload.style || payload);
+    if (!style) {
+      return {
+        ok: false,
+        error: 'invalid_style',
+      };
+    }
+
+    const styles = await readLocalStyles();
+    const duplicateName = styles.find((item) => item.id !== style.id && item.name === style.name);
+    if (duplicateName) {
+      return {
+        ok: false,
+        error: 'duplicate_name',
+      };
+    }
+
+    const duplicateColors = styles.find((item) => (
+      item.id !== style.id &&
+      item.textColor === style.textColor &&
+      item.bgColor === style.bgColor
+    ));
+    if (duplicateColors) {
+      return {
+        ok: false,
+        error: 'duplicate_colors',
+      };
+    }
+
+    const nextStyles = [
+      ...styles.filter((item) => item.id !== style.id),
+      style,
+    ];
+
+    await writeLocalStyles(nextStyles);
+
+    return {
+      ok: true,
+      style,
+      styles: nextStyles,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: String(error?.message || error),
+    };
+  }
+});
+
+ipcMain.handle('desktop:styles-delete', async (_event, payload = {}) => {
+  try {
+    const id = String(payload.id || payload || '').trim();
+    if (!id) {
+      return {
+        ok: false,
+        error: 'invalid_id',
+      };
+    }
+
+    const styles = await readLocalStyles();
+    const nextStyles = styles.filter((item) => item.id !== id);
+
+    await writeLocalStyles(nextStyles);
+
+    return {
+      ok: true,
+      deletedId: id,
+      styles: nextStyles,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: String(error?.message || error),
+    };
+  }
+});
+
 ipcMain.handle('desktop:pick-video-file', async () => {
   try {
     const result = await dialog.showOpenDialog({
