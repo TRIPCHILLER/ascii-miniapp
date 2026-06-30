@@ -3,8 +3,20 @@
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
-const ffmpegPath = require('ffmpeg-static');
 const renderLimits = require('./renderLimits');
+
+function resolveFfmpegPath() {
+  const modulePaths = require.resolve.paths('ffmpeg-static') || [];
+  for (const modulePath of modulePaths) {
+    const entryPath = path.join(modulePath, 'ffmpeg-static', 'index.js');
+    if (!fs.existsSync(entryPath)) continue;
+    const staticFfmpeg = require(entryPath);
+    if (staticFfmpeg) return staticFfmpeg;
+  }
+  return 'ffmpeg';
+}
+
+const ffmpegPath = resolveFfmpegPath();
 
 const CELL_W = 6;
 const CELL_H = 8;
