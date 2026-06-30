@@ -735,6 +735,7 @@ let DITHER_ENABLED = false;
     sourceMime: '',
     sourceSizeBytes: 0,
     sourceIsGif: false,
+    sourceVideoFile: null,
     
     isRecording: false,     // запись видео (экспорт)
     recorder: null,
@@ -7209,6 +7210,43 @@ async function ensureEnoughBalanceBeforeExport(kind = 'photo', required = getReq
   return true;
 }
 
+async function asciiVisorTestTelegramRenderJob() {
+  const tgWebApp = window.Telegram?.WebApp;
+  const sourceVideoFile = state.sourceVideoFile;
+
+  if (!sourceVideoFile) {
+    throw new Error('Сначала выбери видео в режиме ВИД30.');
+  }
+
+  const form = new FormData();
+  form.append('file', sourceVideoFile, state.sourceFilename || sourceVideoFile.name || 'source-video');
+  form.append('filename', state.sourceFilename || sourceVideoFile.name || 'source-video');
+  form.append('initdata', tgWebApp?.initData || '');
+  form.append('initData', tgWebApp?.initData || '');
+  form.append('mediatype', 'video');
+  form.append('fps', String(Math.max(5, Math.min(60, Math.round(state.fps || 30)))));
+  form.append('sourceFilename', state.sourceFilename || sourceVideoFile.name || '');
+  form.append('sourceMime', state.sourceMime || sourceVideoFile.type || '');
+  form.append('sourceSizeBytes', String(Number(state.sourceSizeBytes || sourceVideoFile.size || 0)));
+  form.append('sourceIsGif', state.sourceIsGif ? '1' : '0');
+
+  const res = await fetch(`${API_BASE}/api/render-video-job`, {
+    method: 'POST',
+    body: form,
+    headers: applyTelegramInitDataHeader({})
+  });
+  const text = await res.text();
+  let json = null;
+  try { json = JSON.parse(text || '{}'); } catch (_) { json = null; }
+  if (!res.ok) {
+    const message = json?.error || text || `HTTP ${res.status}`;
+    throw new Error(String(message).slice(0, 500));
+  }
+  return json || text;
+}
+
+window.asciiVisorTestTelegramRenderJob = asciiVisorTestTelegramRenderJob;
+
 // Универсальная отправка: в Telegram → на сервер; иначе → локальная загрузка
 async function downloadBlob(blob, filename) {
   return uploadBlobToBot(blob, filename, { quality: 'high', retryAttempt: 0 });
@@ -9071,6 +9109,7 @@ fileVideo.addEventListener('change', async (e) => {
   state.sourceMime = sourceMime;
   state.sourceSizeBytes = sourceSizeBytes;
   state.sourceIsGif = sourceIsGif;
+  state.sourceVideoFile = original;
   console.log('[MEDIA-SOURCE] selected', {
     sourceFilename,
     sourceMime,
