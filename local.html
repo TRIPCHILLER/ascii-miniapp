@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta http-equiv="Content-Security-Policy"
+  content="default-src 'self' https: data: blob:;
+           img-src 'self' https: data: blob:;
+           style-src 'self' 'unsafe-inline' https:;
+           script-src 'self' https: 'unsafe-inline' 'unsafe-eval' blob:;
+           connect-src 'self' https://api.tripchiller.com https: data: blob:;">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+  <title>: 4SC11 ⛶ V1S0R :</title>
+  <link rel="preload" as="font" type="font/woff2" href="./assets/BetterVCR.woff2" crossorigin>
+  <link rel="preload" as="font" type="font/woff2" href="./assets/MS Gothic.woff2" crossorigin>
+  <link rel="preload" as="font" type="font/woff2" href="./assets/PxPlus IBM VGA.woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css?v=fit1" />
+</head>
+<body class="theme-dark app-booting">
+  <div id="fingerprintGate" class="fingerprint-gate" hidden>
+    <div class="fingerprint-gate__text fingerprint-gate__text--top" id="fingerprintGateTop"></div>
+    <button type="button" class="fingerprint-gate__touch" id="fingerprintGateTouch" aria-label="Сканер отпечатка">
+      <img id="fingerprintGateIcon" src="assets/fingerprintnoactive.svg" alt="" />
+    </button>
+    <div class="fingerprint-gate__text fingerprint-gate__text--bottom" id="fingerprintGateBottom"></div>
+  </div>
+
+  <div id="modeChooser" class="mode-chooser" hidden>
+    <div class="start-shell">
+      <div class="start-datetime" id="startDateTime"></div>
+
+      <div class="start-frame-stack">
+        <div class="start-core-box">
+          <pre id="startInitText"></pre>
+        </div>
+
+        <div class="start-blink start-hidden" id="startBlinkLine">&lt;&lt;&lt; ВЫБЕРИТЕ РЕЖИМ &gt;&gt;&gt;</div>
+
+        <div class="start-mode-block">
+          <button type="button" class="start-mode-btn" data-visor-mode="text">ТЕКСТ</button>
+          <div class="start-mode-note">Классические ASCII-арты<br>в формате текстового сообщения</div>
+        </div>
+
+        <div class="start-mode-block">
+          <button type="button" class="start-mode-btn" data-visor-mode="image">ГРАФИКА</button>
+          <div class="start-mode-note">ASCII-фильтр для фото,<br>видео и .GIF</div>
+        </div>
+
+        <div class="start-footer-gap" aria-hidden="true"></div>
+
+        <div class="start-footer-box">
+          <div class="start-footer-title">ASCII [] VISOR, v. 5.0</div>
+          <div class="start-footer-sub">based on TRIP_CORE</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap" id="app">
+
+    <!-- Верхняя панель -->
+    <div class="toolbar">
+      <button class="btn" id="flip">П0В3РНУТЬ</button>
+      <button class="btn" id="toggle">Н4СТР0ЙКИ</button>
+      <button class="btn ghost" id="fs" aria-label="Fullscreen">СКРЫТЬ</button>
+      <button class="btn ghost" id="save" hidden>С0ХР4НИТЬ</button>
+    </div>
+
+    <!-- Панель настроек (по умолчанию скрыта) -->
+    <div class="panel" id="settings" hidden>
+
+      <!-- 1) НАБОР -->
+      <div id="charsetRow" class="select-trigger-row">
+        <span>Н4Б0Р:</span>
+        <button type="button" id="charsetTrigger" class="ascii-select-trigger"></button>
+        <select id="charset" aria-hidden="true" tabindex="-1">
+          <option value='@%#*+=-:. '>CL4SS1C │ @#* ...</option>
+          <option value='01²346⁷𝟴⁸9+. ,'>NUMB3RS │ 1²3 ... </option>
+          <option value='Ａ 𝗠  E ᶠ ᵖ ⁱ t  x  ᶻ . , y W . '>L4T1N │ Ａ𝗠ᶠ ...</option>
+          <option value='а Б в Г д Е ж З и Й к Л м Н о П р С т У ф Х ц Ч ш Щ ъ Ы ь Э ю Я .  : '>КИРИJIJIИЦ4 │ аБв ...</option>
+          <option value='カタサシスセソラリルレロワヲンツッー '>カタカナ</option>
+          <option value='. · ▪ ■ '>P1X3L │ .·▪■</option>
+          <option value='····•○◦ '>D0TS │ .·• ○</option>
+          <option value='█▓▒░'>BL0CKS │ █ ▓ ▒ ░ </option>
+          <option value='CUSTOM'>(РУЧН0Й ВВ0Д)</option>
+        </select>
+        <input id="charset_custom" type="text" placeholder="[ВВ3ДИТ3 СИМВ0ЛЫ]" style="width:260px; display:none" />
+      </div>
+
+      <div class="mode-switch-row">
+        <span id="visorModeStatus">РЕЖИМ:</span>
+        <button class="btn ghost" id="resetModeBtn" type="button">ГРАФИКА</button>
+      </div>
+
+      <label>
+        <span>Р4ЗМЕР</span>
+        <input id="width" type="range" min="50" max="175" step="5" />
+        <output id="width_val"></output>
+      </label>
+
+      <!-- 3) КОНТРАСТ -->
+      <label>
+        <span>К0НТР4СТ</span>
+        <input id="contrast" type="range" min="1.0" max="3.0" step="0.1" />
+        <output id="contrast_val"></output>
+      </label>
+
+      <!-- 4) ГАММА -->
+      <label>
+        <span>Г4ММ4</span>
+        <input id="gamma" type="range" min="0.6" max="2.0" step="0.1" />
+        <output id="gamma_val"></output>
+      </label>
+
+      <!-- 5) СТИЛЬ -->
+      <div id="styleRow" class="select-trigger-row">
+        <span>СТИЛЬ:</span>
+        <button type="button" id="styleTrigger" class="ascii-select-trigger"></button>
+        <select id="stylePreset" aria-hidden="true" tabindex="-1"></select>
+      </div>
+
+      <!-- 6) ОТДЕЛЬНАЯ СТРОКА — ТЕКСТ + ФОН -->
+      <div class="row colors" id="colorRow">
+        <label class="color">
+          <span>Т3КСТ</span>
+          <input id="fg" type="color" />
+        </label>
+        <label class="color">
+          <span>Ф0Н</span>
+          <input id="bg" type="color" />
+        </label>
+        <button type="button" id="saveStyleBtn" class="btn ghost" hidden>СОХРАНИТЬ СТИЛЬ</button>
+      </div>
+
+      <!-- 7) ИНВЕРСИЯ -->
+      <div class="check-row">
+        <span>ИНВ3РСИЯ:</span>
+        <label class="check">
+          <input id="invert" type="checkbox" />
+          <span id="invert_label">ВКЛ.</span>
+        </label>
+      </div>
+
+      <!-- 8) FPS -->
+      <label>
+        <span>FPS</span>
+        <input id="fps" type="range" min="5" max="60" step="1" />
+        <output id="fps_val"></output>
+      </label>
+    </div>
+
+    <!-- Сцена вывода -->
+<div class="stage" id="stage">
+  <pre id="out"></pre>
+  <!-- Плейсхолдер (иконка «дискета» + текст), показывается, пока фото/видео не выбраны -->
+  <div id="placeholder" hidden>
+    <div class="ph-ico">💾</div>
+    <div class="ph-txt">ВЫБ3РИТ3 М0М3НТ ИЗ Г4Л3Р3И</div>
+  </div>
+
+  <!-- Оверлей таймера: крупные цифры по центру -->
+  <div id="camTimerOverlay" hidden>
+    <div id="camTimerNumber"></div>
+  </div>
+</div>
+
+    <!-- === КНОПКА ЗАТВОРА (только для режима КАМЕРА) === -->
+<div id="camShutter" hidden aria-label="Сделать кадр">
+  <img id="camBtnCircle" src="assets/camera_button_circle.svg" alt="" />
+  <img id="camBtnCore"   src="assets/camera_button.svg" alt="" />
+</div>
+      <!-- Оверлей "занято" во время записи/конвертации -->
+  <div id="busy" hidden>
+    <div class="busy-box">
+      <div class="busy-spinner">
+  <div class="spinner-layer flower">
+    <img src="assets/flower.svg" alt="spinner flower" />
+  </div>
+  <div class="spinner-layer pupil">
+    <img src="assets/pupil.svg" alt="spinner pupil" />
+  </div>
+</div>
+      <div class="busy-text" id="busyText">К0НВЕРТ4ЦИЯ…</div>
+    </div>
+  </div>
+    <!-- Ряд иконок камеры (вспышка, таймер и т.д.) -->
+<div class="cam-controls" id="camControls" hidden>
+
+  <!-- Вспышка вкл -->
+  <button class="cam-icon" id="flashBtn" aria-label="Вспышка">
+    <img id="flashIcon" src="assets/flash_no_active.svg" alt="">
+  </button>
+
+  <!-- Таймер выкл -->
+  <button class="cam-icon" id="timerOffBtn" aria-label="Таймер выключен">
+    <img id="timerOffIcon" src="assets/disable_timer_active.svg" alt="">
+  </button>
+
+  <!-- Таймер 3 сек -->
+  <button class="cam-icon" id="timer3Btn" aria-label="Таймер 3 секунды">
+    <img id="timer3Icon" src="assets/timer_3sec_no_active.svg" alt="">
+  </button>
+
+  <!-- Таймер 10 сек -->
+  <button class="cam-icon" id="timer10Btn" aria-label="Таймер 10 секунд">
+    <img id="timer10Icon" src="assets/timer_10sec_no_active.svg" alt="">
+  </button>
+</div>
+<div id="frozenFrameOverlay" hidden aria-hidden="true">
+  <img id="frozenFrameImage" alt="">
+</div>
+<div id="shutterFlashOverlay" hidden aria-hidden="true"></div>
+<div id="saveStyleModal" hidden>
+  <div class="save-style-modal__backdrop"></div>
+  <div class="save-style-modal__card">
+    <div class="save-style-modal__title">ДАЙ ИМЯ<br>НОВОМУ СТИЛЮ:</div>
+    <label class="save-style-modal__input-wrap" for="saveStyleInput">
+      <input id="saveStyleInput" type="text" maxlength="16" autocomplete="off" placeholder="ВВЕДИТЕ НАЗВАНИЕ ПРЕСЕТА" />
+    </label>
+  </div>
+  <div class="save-style-modal__actions">
+    <button type="button" id="saveStyleCancel" class="btn ghost">[ОТМЕНА]</button>
+    <button type="button" id="saveStyleDone" class="btn ghost">[ГОТОВО]</button>
+    </div>
+</div>
+<div id="deleteStyleModal" hidden>
+  <div class="save-style-modal__backdrop"></div>
+  <div class="save-style-modal__card">
+    <div class="save-style-modal__title">УНИЧТОЖИТЬ<br>ЭТОТ ПРЕСЕТ?</div>
+  </div>
+  <div class="save-style-modal__actions">
+    <button type="button" id="deleteStyleCancel" class="btn ghost">[ОТМЕНА]</button>
+    <button type="button" id="deleteStyleDone" class="btn ghost">[УДАЛИТЬ]</button>
+  </div>
+</div>
+
+    <!-- НИЖНИЙ ряд переключения режимов -->
+    <div class="modebar">
+      <button class="btn ghost" id="modePhoto">Ф0Т0</button>
+      <button class="btn ghost active" id="modeLive">К4МЕР4</button>
+      <button class="btn ghost" id="modeVideo" data-mode="video">ВИД30</button>
+    </div>
+
+<!-- Скрытые инпуты для выбора из галереи -->
+<input id="filePhoto" type="file" accept=".jpg,.jpeg,.png,.webp" hidden>
+<input id="fileVideo" type="file" accept="video/*,image/gif" hidden>
+
+  <!-- Скрытый канвас для экспорта (PNG/видео) -->
+  <canvas id="render" hidden></canvas>
+<!-- Видео-источник: переносим «за экран», но не скрываем display:none -->
+<video id="vid" playsinline autoplay muted class="capture-src" aria-hidden="true"></video>
+  </div>
+<!-- Telegram WebApp API (нужно для MainButton) -->
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+  
+<!-- Custom Color Picker (универсальный) -->
+<div id="cp-modal" hidden>
+  <div class="cp-backdrop"></div>
+  <div class="cp-card">
+
+    <!-- Вкладки -->
+    <div class="cp-tabs">
+      <button type="button" id="cp-tab-spectrum" class="cp-tab cp-tab-active">Спектр</button>
+      <button type="button" id="cp-tab-grid" class="cp-tab">Сетка</button>
+    </div>
+
+    <!-- Режим СПЕКТР (текущая палитра) -->
+    <div class="cp-body cp-body-spectrum" id="cp-body-spectrum">
+      <div class="cp-row">
+        <canvas id="cp-sv" width="220" height="190"></canvas>
+        <div class="cp-side">
+          <canvas id="cp-h" width="24" height="190"></canvas>
+          <div class="cp-preview">
+            <span id="cp-preview-swatch"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Режим СЕТКА (готовые квадратики) -->
+    <div class="cp-body cp-body-grid" id="cp-body-grid" hidden>
+      <div id="cp-grid"></div>
+    </div>
+
+    <!-- Чекбокс ПРОЗРАЧНЫЙ ФОН (только для ФОНА в режиме фото) -->
+    <div class="cp-transparent-row" id="cp-transparent-row" hidden>
+      <label class="cp-transparent-check">
+        <input type="checkbox" id="cp-transparent" />
+        <span>ПРОЗРАЧНЫЙ ФОН</span>
+      </label>
+    </div>
+
+    <div class="cp-actions">
+      <button id="cp-cancel">[ОТМЕНА]</button>
+      <button id="cp-ok">[УСТАНОВИТЬ]</button>
+    </div>
+  </div>
+</div>
+<div id="asciiPopup" class="ascii-popup" hidden>
+  <div class="ascii-popup__backdrop"></div>
+  <div class="ascii-popup__dialog" role="dialog" aria-modal="true" aria-live="polite">
+    <div id="asciiPopupText" class="ascii-popup__text"></div>
+    <button type="button" id="asciiPopupClose" class="ascii-popup__close">[ЗАКРЫТЬ]</button>
+  </div>
+</div>
+
+<div id="asciiSelectPopup" class="ascii-select-popup" hidden>
+  <div class="ascii-select-popup__backdrop"></div>
+  <div class="ascii-select-popup__dialog" role="dialog" aria-modal="true">
+    <div id="asciiSelectPopupTitle" class="ascii-select-popup__title"></div>
+    <div id="asciiSelectPopupList" class="ascii-select-popup__list" role="listbox"></div>
+  </div>
+</div>
+<script src="https://unpkg.com/gifuct-js@1.0.0/dist/gifuct-js.min.js"></script>
+<script src="local-adapter.js"></script>
+<script defer src="ascii.js"></script>
+</body>
+</html>

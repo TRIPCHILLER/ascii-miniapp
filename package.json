@@ -4,7 +4,10 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
-    "test:pong": "node --test backend/pong.economy.test.js"
+    "test:pong": "node --test backend/pong.economy.test.js",
+    "electron": "electron .",
+    "pack:win": "electron-builder --win --dir",
+    "dist:win": "electron-builder --win portable"
   },
   "dependencies": {
     "axios": "^1.7.9",
@@ -14,6 +17,54 @@
     "express": "^4.21.2",
     "form-data": "^4.0.1",
     "mime-types": "^2.1.35",
-    "multer": "^1.4.5-lts.1"
+    "multer": "^1.4.5-lts.1",
+    "ffmpeg-static": "^5.2.0"
+  },
+  "main": "electron-main.js",
+  "build": {
+    "appId": "com.tripchiller.asciivisor",
+    "productName": "ASCII VISOR Beta",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "index.html",
+      "local.html",
+      "ascii.js",
+      "styles.css",
+      "preload.js",
+      "electron-main.js",
+      "local-adapter.js",
+      "assets/**/*",
+      "package.json",
+      "node_modules/**/*",
+      "!**/*.diff",
+      "!**/*.zip",
+      "!visor-current-debug.zip",
+      "!visor-debug-overlay.zip",
+      "!visor-debug-extracted-*.zip",
+      "!**/visor-debug-extracted-*.zip",
+      "!**/*render*debug*.zip",
+      "!**/*debug*render*.zip"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/ffmpeg-static/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    }
+  },
+  "devDependencies": {
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3"
   }
 }
