@@ -216,6 +216,7 @@ const {
 } = require('./store');
 const renderLimits = require('./renderLimits');
 const { createRenderQueue } = require('./renderQueue');
+const { renderTelegramVideo } = require('./renderTelegramVideo');
 const storageStats = getStorageStats();
 console.log('[startup] data-stats', {
   balances_users: storageStats.balances,
@@ -574,7 +575,7 @@ function clampInt(v, min, max, def) {
 }
 const VIDEO_MAX_DURATION_SEC = 60;
 const VIDEO_OUTPUT_SAFE_LIMIT_BYTES = 45 * 1024 * 1024;
-const renderQueue = createRenderQueue({ sendMessage });
+const renderQueue = createRenderQueue({ sendMessage, sendVideoToUser, deduct, renderTelegramVideo });
 const ASCII_TEXT_LIMIT = 3800;
 const TEXT_MODE_COST = 1;
 const TEXT_COLS_MIN = 24;
