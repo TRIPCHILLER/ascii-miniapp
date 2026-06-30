@@ -10,6 +10,10 @@ contextBridge.exposeInMainWorld('asciiVisorDesktop', {
 
   pickVideoFile: () => ipcRenderer.invoke('desktop:pick-video-file'),
 
+  loadLocalStyles: () => ipcRenderer.invoke('desktop:styles-load'),
+  saveLocalStyle: (style) => ipcRenderer.invoke('desktop:styles-save', { style }),
+  deleteLocalStyle: (id) => ipcRenderer.invoke('desktop:styles-delete', { id }),
+
   getPathForFile: (file) => {
   try {
     return webUtils?.getPathForFile?.(file) || '';
