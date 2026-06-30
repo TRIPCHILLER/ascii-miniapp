@@ -1026,6 +1026,9 @@ let DITHER_ENABLED = false;
     if (app.ui.resetModeBtn) {
       app.ui.resetModeBtn.textContent = isTextMode() ? 'ТЕКСТ' : 'ГРАФИКА';
     }
+    if (app.ui.save) {
+      app.ui.save.textContent = (window.ASCII_VISOR_LOCAL && isTextMode()) ? 'СК0ПИР0В4ТЬ' : 'С0ХР4НИТЬ';
+    }
     applyWidthLimitsForMode();
     rebuildCharsetOptions();
   }
@@ -9141,8 +9144,26 @@ function layoutSettingsPanel() {
     const closeDeleteStyleModal = () => { if (app.ui.deleteStyleModal) app.ui.deleteStyleModal.hidden = true; };
     const sanitizePresetName = (value) => String(value || '').toUpperCase().trim().replace(/[^A-ZА-ЯЁ0-9 _-]/g, '').slice(0, 16);
     const applyPresetNameLeetFilter = (value) => applyLeetNameFilter(value);
+    const isLocalStyleFlow = () => !!(window.ASCII_VISOR_LOCAL && window.asciiVisorDesktop);
+    const normalizeLocalStylePreset = (preset) => ({
+      ...preset,
+      type: 'user',
+      textColor: normalizeHexColor(preset?.textColor),
+      bgColor: normalizeHexColor(preset?.bgColor)
+    });
     const loadUserStylePresets = async () => {
       try {
+        if (isLocalStyleFlow()) {
+          const result = await window.asciiVisorDesktop.loadLocalStyles?.();
+          if (!result?.ok || !Array.isArray(result.styles)) return;
+          userStylePresets = result.styles.map(normalizeLocalStylePreset).filter((p) => p.id && p.name && p.textColor && p.bgColor);
+          fillStyleSelect();
+          const matched = getPresetByPair(state.color, state.background);
+          app.ui.style.value = matched ? matched.id : 'custom';
+          syncAsciiSelectTriggers();
+          updateSaveStyleButtonVisibility();
+          return;
+        }
         const res = await fetch(`${API_BASE}/api/user-style-presets`, { headers: applyTelegramInitDataHeader({}) });
         const json = await res.json();
         if (!res.ok || !json?.ok || !Array.isArray(json.presets)) return;
@@ -9160,6 +9181,26 @@ function layoutSettingsPanel() {
       const finalName = applyPresetNameLeetFilter(cleanName);
       if (!finalName) return showAsciiPopup({ type:'info', title:'ОШИБКА', message:'Название пресета пустое.' });
       try {
+        if (isLocalStyleFlow()) {
+          const result = await window.asciiVisorDesktop.saveLocalStyle?.({
+            name: finalName,
+            textColor: normalizeHexColor(state.color),
+            bgColor: normalizeHexColor(state.background)
+          });
+          if (!result?.ok || !result.style) {
+            const em = result?.error === 'duplicate_name' ? 'Такой стиль уже существует.' : result?.error === 'duplicate_colors' ? 'Эта цветовая пара уже сохранена.' : 'Не удалось сохранить стиль локально.';
+            return showAsciiPopup({ type:'error', title:'ОШИБКА', message:em });
+          }
+          const localPreset = normalizeLocalStylePreset(result.style);
+          userStylePresets = userStylePresets.filter((p) => p.id !== localPreset.id);
+          userStylePresets.push(localPreset);
+          fillStyleSelect();
+          app.ui.style.value = localPreset.id;
+          applyPreset(localPreset.id);
+          closeSaveStyleModal();
+          updateSaveStyleButtonVisibility();
+          return;
+        }
         const res = await fetch(`${API_BASE}/api/user-style-presets`, { method:'POST', headers: applyTelegramInitDataHeader({ 'Content-Type':'application/json' }), body: JSON.stringify({ name: finalName, textColor: normalizeHexColor(state.color), bgColor: normalizeHexColor(state.background) }) });
         const json = await res.json();
         if (!res.ok || !json?.ok) {
@@ -9180,6 +9221,20 @@ function layoutSettingsPanel() {
       const pair = getPresetByPair(state.color, state.background);
       if (!pair || pair.type !== 'user') return;
       try {
+        if (isLocalStyleFlow()) {
+          const result = await window.asciiVisorDesktop.deleteLocalStyle?.(pair.id);
+          if (!result?.ok) {
+            return showAsciiPopup({ type:'error', title:'ОШИБКА', message:'Не удалось удалить локальный стиль.' });
+          }
+          userStylePresets = userStylePresets.filter((p) => p.id !== result.deletedId);
+          fillStyleSelect();
+          const matched = getPresetByPair(state.color, state.background);
+          app.ui.style.value = matched ? matched.id : 'custom';
+          syncAsciiSelectTriggers();
+          closeDeleteStyleModal();
+          updateSaveStyleButtonVisibility();
+          return;
+        }
         const res = await fetch(`${API_BASE}/api/user-style-presets/${encodeURIComponent(pair.id)}`, { method:'DELETE', headers: applyTelegramInitDataHeader({}) });
         const json = await res.json();
         if (!res.ok || !json?.ok) {
@@ -10413,6 +10468,39 @@ async function sendAsciiTextToBot() {
   }
 }
 
+async function copyAsciiTextLocal() {
+  const previewSnapshot = getAsciiSnapshotFromPreview();
+  const asciiText = String(previewSnapshot.asciiText || app.out?.textContent || '');
+
+  if (!asciiText.trim()) {
+    showAsciiPopup({ type:'info', title:'ОШИБКА', message:'Нет ASCII-превью для копирования.' });
+    return;
+  }
+
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(asciiText);
+    } else {
+      const textarea = document.createElement('textarea');
+      textarea.value = asciiText;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      textarea.style.top = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      const copied = document.execCommand('copy');
+      textarea.remove();
+      if (!copied) throw new Error('document.execCommand copy failed');
+    }
+
+    showAsciiPopup({ type:'success', title:'ASCII СК0ПИР0В4Н', message:'Текстовый ASCII скопирован в буфер обмена.' });
+  } catch (error) {
+    console.error('[LOCAL TEXT COPY]', error);
+    showAsciiPopup({ type:'error', title:'ОШИБКА', message:'Не удалось скопировать ASCII в буфер обмена.' });
+  }
+}
+
 // Кнопка в тулбаре
 app.ui.save.addEventListener('click', doSave);
 if (app.ui.resetModeBtn) {
@@ -10423,6 +10511,10 @@ if (app.ui.resetModeBtn) {
 
 async function routeTextSaveIfNeeded() {
   if (!isTextMode()) return false;
+  if (window.ASCII_VISOR_LOCAL) {
+    await copyAsciiTextLocal();
+    return true;
+  }
   await sendAsciiTextToBot();
   return true;
 }
