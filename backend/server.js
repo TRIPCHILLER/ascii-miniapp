@@ -214,6 +214,8 @@ const {
   sendAnimationToUser,
   probeVideo
 } = require('./store');
+const renderLimits = require('./renderLimits');
+const { createRenderQueue } = require('./renderQueue');
 const storageStats = getStorageStats();
 console.log('[startup] data-stats', {
   balances_users: storageStats.balances,
@@ -572,6 +574,7 @@ function clampInt(v, min, max, def) {
 }
 const VIDEO_MAX_DURATION_SEC = 60;
 const VIDEO_OUTPUT_SAFE_LIMIT_BYTES = 45 * 1024 * 1024;
+const renderQueue = createRenderQueue({ sendMessage });
 const ASCII_TEXT_LIMIT = 3800;
 const TEXT_MODE_COST = 1;
 const TEXT_COLS_MIN = 24;
@@ -1275,6 +1278,98 @@ app.post('/api/pong/profile/customize', (req, res) => {
   player.updatedAt = new Date().toISOString();
   writeLeaderboard(players);
   return res.json({ ok: true, player });
+});
+
+
+function isTelegramBackgroundRenderEnabled() {
+  return String(process.env.TG_BACKGROUND_RENDER_ENABLED || 'false').toLowerCase() === 'true';
+}
+
+function getRequestInitData(req) {
+  return String(
+    req.get('X-Telegram-Init-Data') ||
+    req.get('initData') ||
+    req.get('initdata') ||
+    req.body?.initData ||
+    req.body?.initdata ||
+    ''
+  ).trim();
+}
+
+function parseRenderInitDataUserId(req) {
+  const initData = getRequestInitData(req);
+  if (!initData) throw new Error('invalid_init_data');
+  const checked = validateTelegramInitData(initData, process.env.BOT_TOKEN);
+  if (!checked.ok) throw new Error('invalid_init_data');
+  const user = JSON.parse(String(checked.params.get('user') || '{}'));
+  if (!user?.id) throw new Error('invalid_init_data');
+  upsertUserFromTelegramUser(user, 'webapp_initdata');
+  return String(user.id);
+}
+
+app.post('/api/render-video-job', (req, res, next) => {
+  if (!isTelegramBackgroundRenderEnabled()) {
+    return res.status(404).json({ ok: false, error: 'TG_BACKGROUND_RENDER_DISABLED' });
+  }
+  return next();
+}, upload.any(), async (req, res) => {
+  let f = null;
+  let workspaceDir = '';
+  try {
+    const files = Array.isArray(req.files) ? req.files : [];
+    f = files.find(x => x.fieldname === 'file') || files.find(x => x.fieldname === 'video') || files.find(x => x.fieldname === 'document') || files[0];
+    if (!f) return res.status(400).json({ ok: false, error: 'NO_FILE' });
+
+    const userId = parseRenderInitDataUserId(req);
+    ensureUser(userId);
+    const balance = getBalance(userId);
+    if (balance < renderLimits.TG_RENDER_COST) {
+      return res.status(402).json({ ok: false, error: 'INSUFFICIENT_FUNDS', need: renderLimits.TG_RENDER_COST, balance });
+    }
+    if (renderQueue.hasOpenJobForUser(userId)) {
+      return res.status(409).json({ ok: false, error: 'USER_RENDER_JOB_ALREADY_ACTIVE' });
+    }
+
+    const { duration } = await probeVideo(f.path);
+    const durationSec = Number(duration || 0);
+    if (durationSec > renderLimits.TG_RENDER_MAX_DURATION_SEC) {
+      return res.status(400).json({
+        ok: false,
+        error: 'TG_RENDER_VIDEO_TOO_LONG',
+        maxDurationSec: renderLimits.TG_RENDER_MAX_DURATION_SEC,
+        durationSec
+      });
+    }
+
+    const requestedFps = clampInt(req.body?.fps, 1, renderLimits.TG_RENDER_MAX_FPS, renderLimits.TG_RENDER_MAX_FPS);
+    const jobIdHint = `pending_${Date.now().toString(36)}`;
+    workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), `ascii-render-job-${jobIdHint}-`));
+    const safeName = (f.originalname || 'input.video').replace(/[^\w.\-]+/g, '_');
+    const inputPath = path.join(workspaceDir, safeName);
+    await fs.promises.rename(f.path, inputPath);
+    f.path = '';
+
+    const job = renderQueue.enqueue({ userId, workspaceDir, inputPath, fps: requestedFps, durationSec });
+    workspaceDir = '';
+    return res.status(202).json({
+      ok: true,
+      jobId: job.jobId,
+      status: job.status,
+      fps: job.fps,
+      maxFps: renderLimits.TG_RENDER_MAX_FPS,
+      durationSec,
+      cost: renderLimits.TG_RENDER_COST,
+      charged: false
+    });
+  } catch (e) {
+    const status = e?.message === 'invalid_init_data' ? 401 : 500;
+    const error = e?.message === 'invalid_init_data' ? 'INVALID_INIT_DATA' : 'RENDER_JOB_CREATE_FAILED';
+    console.error('[ERR] /api/render-video-job', formatHttpError(e));
+    return res.status(status).json({ ok: false, error, detail: status === 500 ? formatHttpError(e) : undefined });
+  } finally {
+    try { if (f?.path) await fs.promises.rm(f.path, { force: true }); } catch {}
+    try { if (workspaceDir) await fs.promises.rm(workspaceDir, { recursive: true, force: true }); } catch {}
+  }
 });
 
 // === ОБНОВЛЁННЫЙ ХЕНДЛЕР ДЛЯ /api/upload и /upload ===
