@@ -681,7 +681,7 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   position:absolute; inset:0;
   display:flex; align-items:center; justify-content:center;
   background:rgba(0,0,0,.75);
-  z-index: 40;          /* поверх freeze-кадра и UI */
+  z-index: 2147483000;  /* выше всех панелей и модалок helper-flow */
   backdrop-filter: blur(2px);
 }
 #busy[hidden]{ display:none !important; }
@@ -703,27 +703,31 @@ body, .toolbar, .panel, .btn, label, output, select, option {
 
 #busy .busy-ok-button{
   appearance:none;
-  border:1px solid rgba(255,255,255,.9);
-  background:rgba(0,0,0,.35);
+  border:0;
+  background:transparent;
   color:#fff;
   font-family:'PxPlus IBM VGA', monospace;
   font-size:18px;
   line-height:1;
   letter-spacing:.08em;
-  padding:10px 28px;
+  padding:0;
   cursor:pointer;
   text-transform:uppercase;
+  text-shadow:0 0 8px rgba(255,255,255,.45);
 }
 
 #busy .busy-ok-button:focus,
 #busy .busy-ok-button:hover{
-  background:#fff;
-  color:#000;
+  background:transparent;
+  color:#fff;
   outline:none;
+  text-decoration:underline;
+  text-underline-offset:4px;
 }
 
 #busy .busy-ok-button:active{
   transform:translateY(1px);
+  opacity:.72;
 }
 
 /* === CUSTOM LOGO SPINNER === */

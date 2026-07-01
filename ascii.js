@@ -102,11 +102,19 @@ function hideQueuedRenderBusy(){
   busyHide(true);
 }
 
+function hideTransientPanelsForQueuedRender(){
+  app?.ui?.settings?.setAttribute('hidden', '');
+  document.querySelectorAll('#cp-modal, .save-style-modal').forEach((modal) => {
+    if (modal) modal.hidden = true;
+  });
+}
+
 function showQueuedRenderBusy(){
   const busy = app?.ui?.busy;
   const text = app?.ui?.busyText;
   if (!busy || !text) return;
 
+  hideTransientPanelsForQueuedRender();
   if (busyQueueHideTimer) clearTimeout(busyQueueHideTimer);
   busy.querySelector('.busy-ok-button')?.remove();
 
@@ -116,7 +124,7 @@ function showQueuedRenderBusy(){
   const okButton = document.createElement('button');
   okButton.type = 'button';
   okButton.className = 'busy-ok-button';
-  okButton.textContent = 'OK';
+  okButton.textContent = '[ЗАКРЫТЬ]';
   okButton.addEventListener('click', hideQueuedRenderBusy, { once: true });
 
   const box = busy.querySelector('.busy-box') || busy;
