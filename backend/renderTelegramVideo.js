@@ -114,6 +114,23 @@ function renderFramePpm(gray, opts) {
   return Buffer.concat([Buffer.from(`P6\n${outputWidth} ${outputHeight}\n255\n`), data]);
 }
 
+
+function resolveGridAndCell(config, outputWidth, outputHeight) {
+  const widthCharsRaw = Number(config.widthChars || config.size || 0);
+  if (Number.isFinite(widthCharsRaw) && widthCharsRaw > 0) {
+    const cols = clampInt(widthCharsRaw, 24, 260, 80);
+    const cellW = Math.max(1, Math.floor(outputWidth / cols));
+    const cellH = Math.max(1, Math.round(cellW * 2));
+    const rows = Math.max(1, Math.floor(outputHeight / cellH));
+    return { cols, rows, cellW, cellH, widthChars: cols, gridSource: 'widthChars' };
+  }
+  const cellW = clampInt(config.cellW, 4, 64, DEFAULT_CELL_W);
+  const cellH = clampInt(config.cellH, 6, 96, DEFAULT_CELL_H);
+  const cols = Math.max(1, Math.floor(outputWidth / cellW));
+  const rows = Math.max(1, Math.floor(outputHeight / cellH));
+  return { cols, rows, cellW, cellH, widthChars: null, gridSource: 'cellFallback' };
+}
+
 function waitForClose(child, label, getErr) {
   return new Promise((resolve, reject) => {
     child.on('error', reject);
@@ -128,10 +145,7 @@ async function renderProfile(inputPath, outputPath, config, profile, sourceSize)
   const fps = clampRenderFps(config.fps);
   const outputWidth = profile.width;
   const outputHeight = profile.height;
-  const cellW = clampInt(config.cellW, 4, 64, DEFAULT_CELL_W);
-  const cellH = clampInt(config.cellH, 6, 96, DEFAULT_CELL_H);
-  const cols = Math.max(1, Math.floor(outputWidth / cellW));
-  const rows = Math.max(1, Math.floor(outputHeight / cellH));
+  const { cols, rows, cellW, cellH, widthChars, gridSource } = resolveGridAndCell(config, outputWidth, outputHeight);
   const fillMode = String(config.fillMode || 'cover').toLowerCase() === 'contain' ? 'contain' : 'cover';
   const charset = resolveCharset(config);
   const fg = hexToRgb(config.fg || config.color, [255, 255, 255]);
@@ -142,10 +156,12 @@ async function renderProfile(inputPath, outputPath, config, profile, sourceSize)
   console.log('[telegram-render] config', {
     sourceSize,
     outputCanvas: { width: outputWidth, height: outputHeight, profile: profile.name },
+    widthChars,
     cols,
     rows,
     cellW,
     cellH,
+    gridSource,
     fillMode,
     extractionMode,
     glyphRenderer: 'vga',

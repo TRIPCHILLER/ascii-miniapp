@@ -1430,6 +1430,12 @@ app.post('/upload', ...uploadHandler);
 
 
 
+async function cleanupUploadedFile(file) {
+  try {
+    if (file?.path) await fs.promises.rm(file.path, { force: true });
+  } catch (_) {}
+}
+
 app.post('/api/render-video-job', upload.any(), async (req, res) => {
   if (!TG_BACKGROUND_RENDER_ENABLED) {
     const files = Array.isArray(req.files) ? req.files : [];
@@ -1444,18 +1450,30 @@ app.post('/api/render-video-job', upload.any(), async (req, res) => {
   try {
     const initDataUserId = maybeUpsertUserFromInitData(req);
     const userId = String(initDataUserId || req.body?.telegramId || req.body?.userId || '');
-    if (!userId) return res.status(400).json({ ok:false, error:'USER_ID_REQUIRED' });
-    if (renderQueue.hasUserJob(userId)) return res.status(429).json({ ok:false, error:'RENDER_JOB_ALREADY_ACTIVE' });
+    if (!userId) {
+      await cleanupUploadedFile(f);
+      return res.status(400).json({ ok:false, error:'USER_ID_REQUIRED' });
+    }
+    if (renderQueue.hasUserJob(userId)) {
+      await cleanupUploadedFile(f);
+      return res.status(429).json({ ok:false, error:'RENDER_JOB_ALREADY_ACTIVE' });
+    }
 
     ensureUser(userId);
     const balance = getBalance(userId);
     if (balance < RENDER_VIDEO_COST) {
+      await cleanupUploadedFile(f);
       return res.status(402).json({ ok:false, error:'INSUFFICIENT_FUNDS', need: RENDER_VIDEO_COST, balance });
     }
 
     const meta = await probeVideo(f.path);
     const durationSec = Number(meta?.duration || 0);
+    if (!meta || (!durationSec && !meta.width && !meta.height)) {
+      await cleanupUploadedFile(f);
+      return res.status(400).json({ ok:false, error:'VIDEO_PROBE_FAILED' });
+    }
     if (durationSec > RENDER_MAX_DURATION_SEC) {
+      await cleanupUploadedFile(f);
       return res.status(400).json({ ok:false, error:'VIDEO_TOO_LONG', maxDurationSec: RENDER_MAX_DURATION_SEC, durationSec });
     }
 
@@ -1499,7 +1517,7 @@ app.post('/api/render-video-job', upload.any(), async (req, res) => {
 
     return res.json({ ok:true, queued:true, jobId, queue: renderQueue.stats(), balance });
   } catch (err) {
-    try { if (f?.path) await fs.promises.rm(f.path, { force: true }); } catch {}
+    await cleanupUploadedFile(f);
     const detail = formatHttpError(err);
     console.error('[ERR] /api/render-video-job', detail);
     return res.status(500).json({ ok:false, error:'RENDER_JOB_FAILED', detail });
