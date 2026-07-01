@@ -331,6 +331,68 @@ async function renderGlyphMaskWithFont(ch, opts, fontProbe) {
   }
 }
 
+
+function decodeBase64Mask(value, expectedLength) {
+  if (typeof value !== 'string' || !value) return null;
+  let buffer;
+  try {
+    buffer = Buffer.from(value, 'base64');
+  } catch {
+    return null;
+  }
+  if (buffer.length !== expectedLength) return null;
+  return buffer;
+}
+
+function scaleGlyphMask(mask, srcW, srcH, dstW, dstH) {
+  if (srcW === dstW && srcH === dstH) return Buffer.from(mask);
+  const out = Buffer.alloc(dstW * dstH);
+  for (let y = 0; y < dstH; y += 1) {
+    const sy = Math.min(srcH - 1, Math.floor((y + 0.5) * srcH / dstH));
+    for (let x = 0; x < dstW; x += 1) {
+      const sx = Math.min(srcW - 1, Math.floor((x + 0.5) * srcW / dstW));
+      out[y * dstW + x] = mask[sy * srcW + sx];
+    }
+  }
+  return out;
+}
+
+function buildFrontendGlyphAtlas(config, opts) {
+  const src = config?.glyphAtlas;
+  const chars = Array.isArray(src?.chars) ? src.chars.map((ch) => String(ch)).filter((ch) => ch.length > 0) : [];
+  const masks = Array.isArray(src?.masks) ? src.masks : [];
+  const srcW = clampInt(src?.cellW, 1, 512, 0);
+  const srcH = clampInt(src?.cellH, 1, 512, 0);
+  const scale = clampInt(src?.scale, 1, 64, 0);
+  if (src?.source !== 'frontend-preview-canvas' || !chars.length || masks.length < chars.length || !srcW || !srcH) {
+    return { ok: false, atlas: new Map(), frontendAtlasGlyphCount: 0, missingFrontendGlyphs: [], frontendAtlasCellW: null, frontendAtlasCellH: null, frontendAtlasScale: null, atlasInkPixels: {} };
+  }
+
+  const atlas = new Map();
+  const expectedLength = srcW * srcH;
+  for (let i = 0; i < chars.length; i += 1) {
+    const raw = decodeBase64Mask(masks[i], expectedLength);
+    if (!raw) continue;
+    atlas.set(chars[i], scaleGlyphMask(raw, srcW, srcH, opts.cellW, opts.cellH));
+  }
+  const missingFrontendGlyphs = Array.from(new Set(Array.from(opts.charset))).filter((ch) => !atlas.has(ch));
+  const atlasInkPixels = {};
+  for (const ch of ['@', '+', '%', '#']) {
+    const mask = atlas.get(ch);
+    atlasInkPixels[ch] = mask ? countMaskInk(mask) : 0;
+  }
+  return {
+    ok: atlas.size > 0,
+    atlas,
+    frontendAtlasGlyphCount: atlas.size,
+    missingFrontendGlyphs,
+    frontendAtlasCellW: srcW,
+    frontendAtlasCellH: srcH,
+    frontendAtlasScale: scale,
+    atlasInkPixels
+  };
+}
+
 async function buildGlyphAtlas(opts, fontProbe) {
   const atlas = new Map();
   const missingGlyphs = [];
@@ -355,7 +417,7 @@ async function buildGlyphAtlas(opts, fontProbe) {
   return { atlas, atlasGlyphCount: atlas.size, missingGlyphs, atlasInkPixels };
 }
 
-function renderFrameAtlasPpm(gray, opts, atlas) {
+function renderFrameAtlasPpm(gray, opts, atlas, missingGlyphs = null) {
   const { cols, rows, outputWidth, outputHeight, cellW, cellH, charset, fg, bg, contrast, gamma, invert } = opts;
   const data = Buffer.alloc(outputWidth * outputHeight * 3);
   for (let i = 0; i < outputWidth * outputHeight; i += 1) {
@@ -370,7 +432,11 @@ function renderFrameAtlasPpm(gray, opts, atlas) {
       lum = Math.pow(Math.max(0, Math.min(1, (lum - 0.5) * contrast + 0.5)), 1 / gamma);
       if (invert) lum = 1 - lum;
       const ch = charset[Math.max(0, Math.min(shades, Math.round(lum * shades)))] || ' ';
-      const mask = atlas.get(ch) || atlas.get('#') || bitmapGlyphMask(ch, cellW, cellH);
+      let mask = atlas.get(ch);
+      if (!mask) {
+        if (missingGlyphs) missingGlyphs.add(ch);
+        mask = bitmapGlyphMask(ch, cellW, cellH);
+      }
       for (let gy = 0; gy < cellH; gy += 1) {
         for (let gx = 0; gx < cellW; gx += 1) {
           const alpha = mask[gy * cellW + gx] / 255;
@@ -495,8 +561,9 @@ async function renderProfile(inputPath, outputPath, config, profile, sourceSize,
     gamma: Math.max(0.1, Number(config.gamma || 1)),
     invert: !!config.invert
   };
-  const atlasInfo = await buildGlyphAtlas(frameOpts, fontProbe);
-  let useAtlasRenderer = fontProbe.fontRenderAvailable && atlasInfo.atlasGlyphCount > 0;
+  const frontendAtlasInfo = buildFrontendGlyphAtlas(config, frameOpts);
+  const atlasInfo = frontendAtlasInfo.ok ? { atlas: frontendAtlasInfo.atlas, atlasGlyphCount: frontendAtlasInfo.frontendAtlasGlyphCount, missingGlyphs: [], atlasInkPixels: frontendAtlasInfo.atlasInkPixels } : await buildGlyphAtlas(frameOpts, fontProbe);
+  let useAtlasRenderer = frontendAtlasInfo.ok || (fontProbe.fontRenderAvailable && atlasInfo.atlasGlyphCount > 0);
 
   console.log('[telegram-render] config', {
     sourceSize,
@@ -511,12 +578,17 @@ async function renderProfile(inputPath, outputPath, config, profile, sourceSize,
     extractionMode,
     fontRenderAvailable: fontProbe.fontRenderAvailable,
     selectedFontPath: fontProbe.selectedFontPath,
-    glyphRenderer: useAtlasRenderer ? 'font-atlas' : 'bitmap-fallback',
+    glyphRenderer: frontendAtlasInfo.ok ? 'frontend-atlas' : (useAtlasRenderer ? 'font-atlas' : 'bitmap-fallback'),
     rendererBackend: fontProbe.rendererBackend,
     reason: fontProbe.reason,
     fontCellMetric: `${FONT_CELL_W}x${FONT_CELL_H}`,
     atlasGlyphCount: atlasInfo.atlasGlyphCount,
-    missingGlyphs: atlasInfo.missingGlyphs,
+    frontendAtlasGlyphCount: frontendAtlasInfo.frontendAtlasGlyphCount,
+    frontendAtlasCellW: frontendAtlasInfo.frontendAtlasCellW,
+    frontendAtlasCellH: frontendAtlasInfo.frontendAtlasCellH,
+    frontendAtlasScale: frontendAtlasInfo.frontendAtlasScale,
+    missingFrontendGlyphs: frontendAtlasInfo.missingFrontendGlyphs,
+    missingGlyphs: frontendAtlasInfo.ok ? [] : atlasInfo.missingGlyphs,
     atlasInkPixels: atlasInfo.atlasInkPixels,
     fontProbeInkPixels: fontProbe.fontProbeInkPixels,
     fontProbeInkRatio: fontProbe.fontProbeInkRatio,
@@ -539,8 +611,9 @@ async function renderProfile(inputPath, outputPath, config, profile, sourceSize,
   const frameSize = cols * rows;
   let pending = Buffer.alloc(0);
 
+  const runtimeMissingFrontendGlyphs = new Set(frontendAtlasInfo.missingFrontendGlyphs || []);
   let useSystemRenderer = !useAtlasRenderer && fontProbe.fontRenderAvailable;
-  let effectiveGlyphRenderer = useAtlasRenderer ? 'font-atlas' : fontProbe.glyphRenderer;
+  let effectiveGlyphRenderer = useAtlasRenderer ? (frontendAtlasInfo.ok ? 'frontend-atlas' : 'font-atlas') : fontProbe.glyphRenderer;
   let effectiveRendererBackend = fontProbe.rendererBackend;
   let effectiveReason = fontProbe.reason;
   let firstFrameChecked = false;
@@ -553,7 +626,7 @@ async function renderProfile(inputPath, outputPath, config, profile, sourceSize,
       const gray = pending.subarray(0, frameSize);
       pending = pending.subarray(frameSize);
       let ppm = useAtlasRenderer
-        ? renderFrameAtlasPpm(gray, frameOpts, atlasInfo.atlas)
+        ? renderFrameAtlasPpm(gray, frameOpts, atlasInfo.atlas, frontendAtlasInfo.ok ? runtimeMissingFrontendGlyphs : null)
         : (useSystemRenderer ? await renderFrameSystemPpm(gray, frameOpts, fontProbe) : renderFrameBitmapPpm(gray, frameOpts));
 
       if ((useAtlasRenderer || useSystemRenderer) && !firstFrameChecked) {
@@ -562,7 +635,7 @@ async function renderProfile(inputPath, outputPath, config, profile, sourceSize,
         firstFrameInkPixels = firstFrameInk.inkPixels;
         firstFrameInkRatio = firstFrameInk.inkRatio;
         console.log('[telegram-render] first-frame-ink-check', {
-          glyphRenderer: firstFrameInk.ok ? (useAtlasRenderer ? 'font-atlas' : 'font-system') : 'bitmap-fallback',
+          glyphRenderer: firstFrameInk.ok ? (useAtlasRenderer ? (frontendAtlasInfo.ok ? 'frontend-atlas' : 'font-atlas') : 'font-system') : 'bitmap-fallback',
           selectedFontPath: fontProbe.selectedFontPath,
           rendererBackend: fontProbe.rendererBackend,
           fontCellMetric: `${FONT_CELL_W}x${FONT_CELL_H}`,
@@ -571,7 +644,12 @@ async function renderProfile(inputPath, outputPath, config, profile, sourceSize,
           cols,
           rows,
           atlasGlyphCount: atlasInfo.atlasGlyphCount,
-          missingGlyphs: atlasInfo.missingGlyphs,
+          frontendAtlasGlyphCount: frontendAtlasInfo.frontendAtlasGlyphCount,
+          frontendAtlasCellW: frontendAtlasInfo.frontendAtlasCellW,
+          frontendAtlasCellH: frontendAtlasInfo.frontendAtlasCellH,
+          frontendAtlasScale: frontendAtlasInfo.frontendAtlasScale,
+          missingFrontendGlyphs: Array.from(runtimeMissingFrontendGlyphs),
+          missingGlyphs: frontendAtlasInfo.ok ? [] : atlasInfo.missingGlyphs,
           atlasInkPixels: atlasInfo.atlasInkPixels,
           firstFrameInkPixels,
           firstFrameInkRatio,
@@ -595,7 +673,7 @@ async function renderProfile(inputPath, outputPath, config, profile, sourceSize,
   encode.stdin.end();
   await encodeDone;
   const outputSizeBytes = (await fs.promises.stat(outputPath)).size;
-  return { outputPath, outputSizeBytes, outputWidth, outputHeight, cols, rows, cellW, cellH, fillMode, extractionMode, glyphRenderer: effectiveGlyphRenderer, rendererBackend: effectiveRendererBackend, selectedFontPath: fontProbe.selectedFontPath, reason: effectiveReason, fontCellMetric: `${FONT_CELL_W}x${FONT_CELL_H}`, atlasGlyphCount: atlasInfo.atlasGlyphCount, missingGlyphs: atlasInfo.missingGlyphs, atlasInkPixels: atlasInfo.atlasInkPixels, fontProbeInkPixels: fontProbe.fontProbeInkPixels, fontProbeInkRatio: fontProbe.fontProbeInkRatio, firstFrameInkPixels, firstFrameInkRatio, glyphMatrixSize: `${GLYPH_W}x${GLYPH_H}`, glyphScaleMode: 'uniform-integer', glyphScale: glyphMetrics.glyphScale, renderedGlyphWidth: glyphMetrics.glyphWidthPx, renderedGlyphHeight: glyphMetrics.glyphHeightPx, profile: profile.name };
+  return { outputPath, outputSizeBytes, outputWidth, outputHeight, cols, rows, cellW, cellH, fillMode, extractionMode, glyphRenderer: effectiveGlyphRenderer, rendererBackend: effectiveRendererBackend, selectedFontPath: fontProbe.selectedFontPath, reason: effectiveReason, fontCellMetric: `${FONT_CELL_W}x${FONT_CELL_H}`, atlasGlyphCount: atlasInfo.atlasGlyphCount, frontendAtlasGlyphCount: frontendAtlasInfo.frontendAtlasGlyphCount, frontendAtlasCellW: frontendAtlasInfo.frontendAtlasCellW, frontendAtlasCellH: frontendAtlasInfo.frontendAtlasCellH, frontendAtlasScale: frontendAtlasInfo.frontendAtlasScale, missingFrontendGlyphs: Array.from(runtimeMissingFrontendGlyphs), missingGlyphs: frontendAtlasInfo.ok ? [] : atlasInfo.missingGlyphs, atlasInkPixels: atlasInfo.atlasInkPixels, fontProbeInkPixels: fontProbe.fontProbeInkPixels, fontProbeInkRatio: fontProbe.fontProbeInkRatio, firstFrameInkPixels, firstFrameInkRatio, glyphMatrixSize: `${GLYPH_W}x${GLYPH_H}`, glyphScaleMode: 'uniform-integer', glyphScale: glyphMetrics.glyphScale, renderedGlyphWidth: glyphMetrics.glyphWidthPx, renderedGlyphHeight: glyphMetrics.glyphHeightPx, profile: profile.name };
 }
 
 async function renderTelegramVideo(inputPath, outputPath, config = {}) {

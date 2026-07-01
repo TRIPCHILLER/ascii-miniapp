@@ -7257,6 +7257,80 @@ async function ensureEnoughBalanceBeforeExport(kind = 'photo', required = getReq
   return true;
 }
 
+
+function encodeUint8ToBase64(bytes) {
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+function buildPreviewGlyphAtlas() {
+  const charset = String(state.renderCharset10 || state.charset || '');
+  const chars = Array.from(new Set(Array.from(charset).filter((ch) => ch !== '\n' && ch !== '\r')));
+  const scale = 4;
+  const metricW = 9;
+  const metricH = 16;
+  const cellW = metricW * scale;
+  const cellH = metricH * scale;
+  const canvas = document.createElement('canvas');
+  canvas.width = cellW;
+  canvas.height = cellH;
+  canvas.hidden = true;
+  const c = canvas.getContext('2d', { willReadFrequently: true });
+  if (!c) return null;
+
+  const computed = app?.out ? getComputedStyle(app.out) : null;
+  const fontFamily = computed?.fontFamily || `'PxPlus IBM VGA','BetterVCR',monospace`;
+  const fontWeight = computed?.fontWeight || '700';
+  const fontSize = cellH;
+  const masks = [];
+  const inkPixels = {};
+
+  c.imageSmoothingEnabled = false;
+  if (typeof c.webkitImageSmoothingEnabled === 'boolean') c.webkitImageSmoothingEnabled = false;
+  c.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+  c.textBaseline = 'top';
+  c.textAlign = 'left';
+  c.fontKerning = 'none';
+  c.fontVariantLigatures = 'none';
+
+  for (const ch of chars) {
+    c.clearRect(0, 0, cellW, cellH);
+    c.fillStyle = '#000';
+    c.fillRect(0, 0, cellW, cellH);
+    c.fillStyle = '#fff';
+    c.fillText(ch, 0, 0);
+    const rgba = c.getImageData(0, 0, cellW, cellH).data;
+    const alpha = new Uint8Array(cellW * cellH);
+    let ink = 0;
+    for (let i = 0, j = 0; i < rgba.length; i += 4, j += 1) {
+      const a = rgba[i + 3];
+      const luma = Math.max(rgba[i], rgba[i + 1], rgba[i + 2]);
+      const v = Math.min(255, Math.round((a / 255) * luma));
+      alpha[j] = v;
+      if (v > 0) ink += 1;
+    }
+    masks.push(encodeUint8ToBase64(alpha));
+    inkPixels[ch] = ink;
+  }
+
+  return {
+    source: 'frontend-preview-canvas',
+    fontFamily,
+    fontWeight,
+    cellMetric: '9x16',
+    scale,
+    cellW,
+    cellH,
+    chars,
+    masks,
+    inkPixels
+  };
+}
+
 async function asciiVisorTestTelegramRenderJob() {
   const tgWebApp = window.Telegram?.WebApp;
   const sourceVideoFile = state.sourceVideoFile;
@@ -7276,6 +7350,7 @@ async function asciiVisorTestTelegramRenderJob() {
   const sourceWidth = Math.max(0, Math.round(Number(app.vid?.videoWidth || 0)));
   const sourceHeight = Math.max(0, Math.round(Number(app.vid?.videoHeight || 0)));
   const sourceOrientation = sourceWidth > sourceHeight ? 'landscape' : (sourceHeight > sourceWidth ? 'portrait' : (sourceWidth && sourceHeight ? 'square' : 'unknown'));
+  const glyphAtlas = buildPreviewGlyphAtlas();
   const renderConfig = {
     charset: String(state.charset || ''),
     renderCharset10: String(state.renderCharset10 || state.charset || ''),
@@ -7296,7 +7371,8 @@ async function asciiVisorTestTelegramRenderJob() {
     },
     sourceWidth,
     sourceHeight,
-    sourceOrientation
+    sourceOrientation,
+    glyphAtlas
   };
   form.append('renderConfig', JSON.stringify(renderConfig));
   form.append('sourceFilename', state.sourceFilename || sourceVideoFile.name || '');
