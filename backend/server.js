@@ -1499,7 +1499,7 @@ app.post('/api/render-video-job', upload.any(), async (req, res) => {
           if (Number(result.outputSizeBytes || 0) > RENDER_OUTPUT_SAFE_LIMIT_BYTES) {
             throw new Error(`RENDER_OUTPUT_TOO_LARGE:${result.outputSizeBytes}`);
           }
-          const sent = await sendVideoToUser(userId, outMp4, { caption: '#ascii_video_render' });
+          const sent = await sendVideoToUser(userId, outMp4, { caption: '#ascii_video' });
           if (!sent || sent.ok === false) {
             throw new Error('TELEGRAM_SEND_NOT_OK');
           }
