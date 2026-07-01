@@ -7267,54 +7267,142 @@ function encodeUint8ToBase64(bytes) {
   return btoa(binary);
 }
 
-function buildPreviewGlyphAtlas() {
+async function buildPreviewGlyphAtlas() {
   const charset = String(state.renderCharset10 || state.charset || '');
   const chars = Array.from(new Set(Array.from(charset).filter((ch) => ch !== '\n' && ch !== '\r')));
-  const scale = 4;
+  const scale = 8;
   const metricW = 9;
   const metricH = 16;
   const cellW = metricW * scale;
   const cellH = metricH * scale;
+  const padding = scale * 4;
+  const scratchW = cellW + padding * 2;
+  const scratchH = cellH + padding * 2;
   const canvas = document.createElement('canvas');
-  canvas.width = cellW;
-  canvas.height = cellH;
+  canvas.width = scratchW;
+  canvas.height = scratchH;
   canvas.hidden = true;
   const c = canvas.getContext('2d', { willReadFrequently: true });
   if (!c) return null;
 
+  try {
+    await document.fonts?.ready;
+  } catch (err) {
+    console.warn('[frontend-glyph-atlas] fonts ready wait failed', err);
+  }
+
   const computed = app?.out ? getComputedStyle(app.out) : null;
   const fontFamily = computed?.fontFamily || `'PxPlus IBM VGA','BetterVCR',monospace`;
   const fontWeight = computed?.fontWeight || '700';
-  const fontSize = cellH;
+  const baseFontSize = cellH;
+  const minFontSize = cellH * 0.82;
+  const safePaddingX = Math.max(2, scale * 2);
+  const safePaddingY = Math.max(2, scale * 2);
   const masks = [];
   const inkPixels = {};
+  const edgeInkPixels = {};
+  const bboxByChar = {};
+  const fontSizeByChar = {};
 
   c.imageSmoothingEnabled = false;
   if (typeof c.webkitImageSmoothingEnabled === 'boolean') c.webkitImageSmoothingEnabled = false;
-  c.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
-  c.textBaseline = 'top';
+  c.textBaseline = 'alphabetic';
   c.textAlign = 'left';
   c.fontKerning = 'none';
   c.fontVariantLigatures = 'none';
 
+  const applyFont = (fontSize) => {
+    c.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+  };
+
+  const measureGlyph = (ch, fontSize) => {
+    applyFont(fontSize);
+    const metrics = c.measureText(ch);
+    const hasBounds = Number.isFinite(metrics.actualBoundingBoxLeft)
+      && Number.isFinite(metrics.actualBoundingBoxRight)
+      && Number.isFinite(metrics.actualBoundingBoxAscent)
+      && Number.isFinite(metrics.actualBoundingBoxDescent);
+    if (!hasBounds) {
+      return {
+        hasBounds: false,
+        left: 0,
+        right: Math.max(1, Number(metrics.width || 0)),
+        ascent: fontSize,
+        descent: 0,
+        width: Math.max(1, Number(metrics.width || cellW * 0.84)),
+        height: fontSize
+      };
+    }
+    const left = Number(metrics.actualBoundingBoxLeft || 0);
+    const right = Number(metrics.actualBoundingBoxRight || 0);
+    const ascent = Number(metrics.actualBoundingBoxAscent || 0);
+    const descent = Number(metrics.actualBoundingBoxDescent || 0);
+    return {
+      hasBounds: true,
+      left,
+      right,
+      ascent,
+      descent,
+      width: Math.max(1, left + right),
+      height: Math.max(1, ascent + descent)
+    };
+  };
+
   for (const ch of chars) {
-    c.clearRect(0, 0, cellW, cellH);
-    c.fillStyle = '#000';
-    c.fillRect(0, 0, cellW, cellH);
+    let fontSize = baseFontSize;
+    let bounds = measureGlyph(ch, fontSize);
+    while ((bounds.width > cellW - safePaddingX || bounds.height > cellH - safePaddingY) && fontSize > minFontSize) {
+      fontSize = Math.max(minFontSize, fontSize - scale);
+      bounds = measureGlyph(ch, fontSize);
+    }
+
+    c.clearRect(0, 0, scratchW, scratchH);
     c.fillStyle = '#fff';
-    c.fillText(ch, 0, 0);
-    const rgba = c.getImageData(0, 0, cellW, cellH).data;
+    const x = bounds.hasBounds
+      ? padding + (cellW - bounds.width) / 2 + bounds.left
+      : padding + cellW * 0.08;
+    const y = bounds.hasBounds
+      ? padding + (cellH - bounds.height) / 2 + bounds.ascent
+      : padding;
+    applyFont(fontSize);
+    c.fillText(ch, x, y);
+
+    const image = c.getImageData(padding, padding, cellW, cellH).data;
     const alpha = new Uint8Array(cellW * cellH);
     let ink = 0;
-    for (let i = 0, j = 0; i < rgba.length; i += 4, j += 1) {
-      const a = rgba[i + 3];
-      const luma = Math.max(rgba[i], rgba[i + 1], rgba[i + 2]);
-      const v = Math.min(255, Math.round((a / 255) * luma));
-      alpha[j] = v;
-      if (v > 0) ink += 1;
+    const edges = { left: 0, right: 0, top: 0, bottom: 0 };
+    let minX = cellW;
+    let minY = cellH;
+    let maxX = -1;
+    let maxY = -1;
+    for (let yy = 0, j = 0; yy < cellH; yy += 1) {
+      for (let xx = 0; xx < cellW; xx += 1, j += 1) {
+        const i = j * 4;
+        const a = image[i + 3];
+        const luma = Math.max(image[i], image[i + 1], image[i + 2]);
+        const v = Math.min(255, Math.round((a / 255) * luma));
+        alpha[j] = v;
+        if (v > 0) {
+          ink += 1;
+          if (xx === 0) edges.left += 1;
+          if (xx === cellW - 1) edges.right += 1;
+          if (yy === 0) edges.top += 1;
+          if (yy === cellH - 1) edges.bottom += 1;
+          if (xx < minX) minX = xx;
+          if (xx > maxX) maxX = xx;
+          if (yy < minY) minY = yy;
+          if (yy > maxY) maxY = yy;
+        }
+      }
     }
     masks.push(encodeUint8ToBase64(alpha));
     inkPixels[ch] = ink;
+    edgeInkPixels[ch] = edges;
+    bboxByChar[ch] = ink > 0 ? { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1, measuredW: bounds.width, measuredH: bounds.height } : { x: null, y: null, w: 0, h: 0, measuredW: bounds.width, measuredH: bounds.height };
+    fontSizeByChar[ch] = fontSize;
+    if (edges.left > 0 || edges.right > 0 || edges.top > 0 || edges.bottom > 0) {
+      console.warn('[frontend-glyph-atlas] edge ink risk', { ch, edgeInkPixels: edges, bbox: bboxByChar[ch], fontSize });
+    }
   }
 
   return {
@@ -7327,7 +7415,10 @@ function buildPreviewGlyphAtlas() {
     cellH,
     chars,
     masks,
-    inkPixels
+    inkPixels,
+    edgeInkPixels,
+    bboxByChar,
+    fontSizeByChar
   };
 }
 
@@ -7350,7 +7441,7 @@ async function asciiVisorTestTelegramRenderJob() {
   const sourceWidth = Math.max(0, Math.round(Number(app.vid?.videoWidth || 0)));
   const sourceHeight = Math.max(0, Math.round(Number(app.vid?.videoHeight || 0)));
   const sourceOrientation = sourceWidth > sourceHeight ? 'landscape' : (sourceHeight > sourceWidth ? 'portrait' : (sourceWidth && sourceHeight ? 'square' : 'unknown'));
-  const glyphAtlas = buildPreviewGlyphAtlas();
+  const glyphAtlas = await buildPreviewGlyphAtlas();
   const renderConfig = {
     charset: String(state.charset || ''),
     renderCharset10: String(state.renderCharset10 || state.charset || ''),
