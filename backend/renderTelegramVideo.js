@@ -347,11 +347,33 @@ function decodeBase64Mask(value, expectedLength) {
 function scaleGlyphMask(mask, srcW, srcH, dstW, dstH) {
   if (srcW === dstW && srcH === dstH) return Buffer.from(mask);
   const out = Buffer.alloc(dstW * dstH);
+  const scaleX = srcW / dstW;
+  const scaleY = srcH / dstH;
+
   for (let y = 0; y < dstH; y += 1) {
-    const sy = Math.min(srcH - 1, Math.floor((y + 0.5) * srcH / dstH));
+    const y0 = y * scaleY;
+    const y1 = (y + 1) * scaleY;
+    const syStart = Math.floor(y0);
+    const syEnd = Math.min(srcH - 1, Math.ceil(y1) - 1);
     for (let x = 0; x < dstW; x += 1) {
-      const sx = Math.min(srcW - 1, Math.floor((x + 0.5) * srcW / dstW));
-      out[y * dstW + x] = mask[sy * srcW + sx];
+      const x0 = x * scaleX;
+      const x1 = (x + 1) * scaleX;
+      const sxStart = Math.floor(x0);
+      const sxEnd = Math.min(srcW - 1, Math.ceil(x1) - 1);
+      let weighted = 0;
+      let area = 0;
+      for (let sy = syStart; sy <= syEnd; sy += 1) {
+        const yOverlap = Math.max(0, Math.min(y1, sy + 1) - Math.max(y0, sy));
+        if (yOverlap <= 0) continue;
+        for (let sx = sxStart; sx <= sxEnd; sx += 1) {
+          const xOverlap = Math.max(0, Math.min(x1, sx + 1) - Math.max(x0, sx));
+          const weight = xOverlap * yOverlap;
+          if (weight <= 0) continue;
+          weighted += mask[sy * srcW + sx] * weight;
+          area += weight;
+        }
+      }
+      out[y * dstW + x] = area > 0 ? Math.max(0, Math.min(255, Math.round(weighted / area))) : 0;
     }
   }
   return out;
@@ -365,8 +387,17 @@ function buildFrontendGlyphAtlas(config, opts) {
   const srcH = clampInt(src?.cellH, 1, 512, 0);
   const scale = clampInt(src?.scale, 1, 64, 0);
   if (src?.source !== 'frontend-preview-canvas' || !chars.length || masks.length < chars.length || !srcW || !srcH) {
-    return { ok: false, atlas: new Map(), frontendAtlasGlyphCount: 0, missingFrontendGlyphs: [], frontendAtlasCellW: null, frontendAtlasCellH: null, frontendAtlasScale: null, atlasInkPixels: {} };
+    return { ok: false, atlas: new Map(), frontendAtlasGlyphCount: 0, missingFrontendGlyphs: [], frontendAtlasCellW: null, frontendAtlasCellH: null, frontendAtlasScale: null, atlasInkPixels: {}, frontendAtlasEdgeInkPixels: {}, frontendAtlasFontSizeByChar: {}, frontendAtlasBboxByChar: {} };
   }
+
+  const edgeInkPixels = src?.edgeInkPixels && typeof src.edgeInkPixels === 'object' ? src.edgeInkPixels : {};
+  const fontSizeByChar = src?.fontSizeByChar && typeof src.fontSizeByChar === 'object' ? src.fontSizeByChar : {};
+  const bboxByChar = src?.bboxByChar && typeof src.bboxByChar === 'object' ? src.bboxByChar : {};
+  const diagnosticChars = ['@', '+', '%', '#'];
+  const pickDiagnostics = (source) => Object.fromEntries(diagnosticChars.map((ch) => [ch, source?.[ch] ?? null]));
+  const frontendAtlasEdgeInkPixels = pickDiagnostics(edgeInkPixels);
+  const frontendAtlasFontSizeByChar = pickDiagnostics(fontSizeByChar);
+  const frontendAtlasBboxByChar = pickDiagnostics(bboxByChar);
 
   const atlas = new Map();
   const expectedLength = srcW * srcH;
@@ -389,7 +420,10 @@ function buildFrontendGlyphAtlas(config, opts) {
     frontendAtlasCellW: srcW,
     frontendAtlasCellH: srcH,
     frontendAtlasScale: scale,
-    atlasInkPixels
+    atlasInkPixels,
+    frontendAtlasEdgeInkPixels,
+    frontendAtlasFontSizeByChar,
+    frontendAtlasBboxByChar
   };
 }
 
@@ -587,6 +621,9 @@ async function renderProfile(inputPath, outputPath, config, profile, sourceSize,
     frontendAtlasCellW: frontendAtlasInfo.frontendAtlasCellW,
     frontendAtlasCellH: frontendAtlasInfo.frontendAtlasCellH,
     frontendAtlasScale: frontendAtlasInfo.frontendAtlasScale,
+    frontendAtlasEdgeInkPixels: frontendAtlasInfo.frontendAtlasEdgeInkPixels,
+    frontendAtlasFontSizeByChar: frontendAtlasInfo.frontendAtlasFontSizeByChar,
+    frontendAtlasBboxByChar: frontendAtlasInfo.frontendAtlasBboxByChar,
     missingFrontendGlyphs: frontendAtlasInfo.missingFrontendGlyphs,
     missingGlyphs: frontendAtlasInfo.ok ? [] : atlasInfo.missingGlyphs,
     atlasInkPixels: atlasInfo.atlasInkPixels,
@@ -648,6 +685,9 @@ async function renderProfile(inputPath, outputPath, config, profile, sourceSize,
           frontendAtlasCellW: frontendAtlasInfo.frontendAtlasCellW,
           frontendAtlasCellH: frontendAtlasInfo.frontendAtlasCellH,
           frontendAtlasScale: frontendAtlasInfo.frontendAtlasScale,
+          frontendAtlasEdgeInkPixels: frontendAtlasInfo.frontendAtlasEdgeInkPixels,
+          frontendAtlasFontSizeByChar: frontendAtlasInfo.frontendAtlasFontSizeByChar,
+          frontendAtlasBboxByChar: frontendAtlasInfo.frontendAtlasBboxByChar,
           missingFrontendGlyphs: Array.from(runtimeMissingFrontendGlyphs),
           missingGlyphs: frontendAtlasInfo.ok ? [] : atlasInfo.missingGlyphs,
           atlasInkPixels: atlasInfo.atlasInkPixels,
@@ -673,7 +713,7 @@ async function renderProfile(inputPath, outputPath, config, profile, sourceSize,
   encode.stdin.end();
   await encodeDone;
   const outputSizeBytes = (await fs.promises.stat(outputPath)).size;
-  return { outputPath, outputSizeBytes, outputWidth, outputHeight, cols, rows, cellW, cellH, fillMode, extractionMode, glyphRenderer: effectiveGlyphRenderer, rendererBackend: effectiveRendererBackend, selectedFontPath: fontProbe.selectedFontPath, reason: effectiveReason, fontCellMetric: `${FONT_CELL_W}x${FONT_CELL_H}`, atlasGlyphCount: atlasInfo.atlasGlyphCount, frontendAtlasGlyphCount: frontendAtlasInfo.frontendAtlasGlyphCount, frontendAtlasCellW: frontendAtlasInfo.frontendAtlasCellW, frontendAtlasCellH: frontendAtlasInfo.frontendAtlasCellH, frontendAtlasScale: frontendAtlasInfo.frontendAtlasScale, missingFrontendGlyphs: Array.from(runtimeMissingFrontendGlyphs), missingGlyphs: frontendAtlasInfo.ok ? [] : atlasInfo.missingGlyphs, atlasInkPixels: atlasInfo.atlasInkPixels, fontProbeInkPixels: fontProbe.fontProbeInkPixels, fontProbeInkRatio: fontProbe.fontProbeInkRatio, firstFrameInkPixels, firstFrameInkRatio, glyphMatrixSize: `${GLYPH_W}x${GLYPH_H}`, glyphScaleMode: 'uniform-integer', glyphScale: glyphMetrics.glyphScale, renderedGlyphWidth: glyphMetrics.glyphWidthPx, renderedGlyphHeight: glyphMetrics.glyphHeightPx, profile: profile.name };
+  return { outputPath, outputSizeBytes, outputWidth, outputHeight, cols, rows, cellW, cellH, fillMode, extractionMode, glyphRenderer: effectiveGlyphRenderer, rendererBackend: effectiveRendererBackend, selectedFontPath: fontProbe.selectedFontPath, reason: effectiveReason, fontCellMetric: `${FONT_CELL_W}x${FONT_CELL_H}`, atlasGlyphCount: atlasInfo.atlasGlyphCount, frontendAtlasGlyphCount: frontendAtlasInfo.frontendAtlasGlyphCount, frontendAtlasCellW: frontendAtlasInfo.frontendAtlasCellW, frontendAtlasCellH: frontendAtlasInfo.frontendAtlasCellH, frontendAtlasScale: frontendAtlasInfo.frontendAtlasScale, frontendAtlasEdgeInkPixels: frontendAtlasInfo.frontendAtlasEdgeInkPixels, frontendAtlasFontSizeByChar: frontendAtlasInfo.frontendAtlasFontSizeByChar, frontendAtlasBboxByChar: frontendAtlasInfo.frontendAtlasBboxByChar, missingFrontendGlyphs: Array.from(runtimeMissingFrontendGlyphs), missingGlyphs: frontendAtlasInfo.ok ? [] : atlasInfo.missingGlyphs, atlasInkPixels: atlasInfo.atlasInkPixels, fontProbeInkPixels: fontProbe.fontProbeInkPixels, fontProbeInkRatio: fontProbe.fontProbeInkRatio, firstFrameInkPixels, firstFrameInkRatio, glyphMatrixSize: `${GLYPH_W}x${GLYPH_H}`, glyphScaleMode: 'uniform-integer', glyphScale: glyphMetrics.glyphScale, renderedGlyphWidth: glyphMetrics.glyphWidthPx, renderedGlyphHeight: glyphMetrics.glyphHeightPx, profile: profile.name };
 }
 
 async function renderTelegramVideo(inputPath, outputPath, config = {}) {
