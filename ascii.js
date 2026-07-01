@@ -88,6 +88,45 @@ function busyHide(force = false){
   if (app.ui.busy) app.ui.busy.hidden = true;
 }
 
+let busyQueueHideTimer = null;
+
+function hideQueuedRenderBusy(){
+  if (busyQueueHideTimer) {
+    clearTimeout(busyQueueHideTimer);
+    busyQueueHideTimer = null;
+  }
+  const busy = app?.ui?.busy;
+  if (!busy) return;
+  busy.querySelector('.busy-ok-button')?.remove();
+  busyLock = false;
+  busyHide(true);
+}
+
+function showQueuedRenderBusy(){
+  const busy = app?.ui?.busy;
+  const text = app?.ui?.busyText;
+  if (!busy || !text) return;
+
+  if (busyQueueHideTimer) clearTimeout(busyQueueHideTimer);
+  busy.querySelector('.busy-ok-button')?.remove();
+
+  busyLock = true;
+  text.textContent = 'РЕНДЕР ВИДЕО ПОСТАВЛЕН В ОЧЕРЕДЬ\nМОЖНО ЗАКРЫТЬ ОКНО\nРЕЗУЛЬТАТ ПРИДЁТ В ЧАТ';
+
+  const okButton = document.createElement('button');
+  okButton.type = 'button';
+  okButton.className = 'busy-ok-button';
+  okButton.textContent = 'OK';
+  okButton.addEventListener('click', hideQueuedRenderBusy, { once: true });
+
+  const box = busy.querySelector('.busy-box') || busy;
+  box.appendChild(okButton);
+  busy.hidden = false;
+  okButton.focus({ preventScroll: true });
+
+  busyQueueHideTimer = setTimeout(hideQueuedRenderBusy, 5000);
+}
+
 let busyTextAnimationToken = 0;
 
 function startBusyServiceTextAnimation(targetText, {
@@ -7241,6 +7280,7 @@ async function asciiVisorTestTelegramRenderJob() {
     background: String(state.background || '#000000'),
     invert: !!state.invert,
     fps: renderFps,
+    fillMode: 'cover',
     source: {
       width: sourceWidth,
       height: sourceHeight,
@@ -7256,19 +7296,33 @@ async function asciiVisorTestTelegramRenderJob() {
   form.append('sourceSizeBytes', String(Number(state.sourceSizeBytes || sourceVideoFile.size || 0)));
   form.append('sourceIsGif', state.sourceIsGif ? '1' : '0');
 
-  const res = await fetch(`${API_BASE}/api/render-video-job`, {
-    method: 'POST',
-    body: form,
-    headers: applyTelegramInitDataHeader({})
-  });
-  const text = await res.text();
-  let json = null;
-  try { json = JSON.parse(text || '{}'); } catch (_) { json = null; }
-  if (!res.ok) {
-    const message = json?.error || text || `HTTP ${res.status}`;
-    throw new Error(String(message).slice(0, 500));
+  try {
+    const res = await fetch(`${API_BASE}/api/render-video-job`, {
+      method: 'POST',
+      body: form,
+      headers: applyTelegramInitDataHeader({})
+    });
+    const text = await res.text();
+    let json = null;
+    try { json = JSON.parse(text || '{}'); } catch (_) { json = null; }
+    if (!res.ok) {
+      const message = json?.error || text || `HTTP ${res.status}`;
+      throw new Error(String(message).slice(0, 500));
+    }
+    showQueuedRenderBusy();
+    return json || text;
+  } catch (err) {
+    console.warn('[render-video-job] failed:', err);
+    busyLock = false;
+    busyHide(true);
+    showAsciiPopup({
+      type: 'error',
+      sound: 'error',
+      title: 'РЕНДЕР НЕ ЗАПУЩЕН',
+      message: err?.message || 'Попробуй ещё раз.'
+    });
+    throw err;
   }
-  return json || text;
 }
 
 window.asciiVisorTestTelegramRenderJob = asciiVisorTestTelegramRenderJob;
