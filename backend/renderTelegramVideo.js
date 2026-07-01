@@ -150,6 +150,7 @@ function parseColor(input, fallback) {
 
 function normalizeRenderConfig(config = {}, fallbackFps) {
   const charset = Array.from(String(config.charset || config.renderCharset10 || DEFAULT_ASCII_RAMP).replace(/[\r\n]/g, '')).join('') || DEFAULT_ASCII_RAMP;
+  const fillMode = config.fillMode === 'contain' ? 'contain' : 'cover';
   return {
     charset,
     widthChars: Math.round(clampNumber(config.widthChars ?? config.size, 24, 260, 120)),
@@ -158,7 +159,8 @@ function normalizeRenderConfig(config = {}, fallbackFps) {
     fg: parseColor(config.fg || config.color, DEFAULT_FG),
     bg: parseColor(config.bg || config.background, DEFAULT_BG),
     invert: !!config.invert,
-    fps: clampNumber(config.fps ?? fallbackFps, 1, renderLimits.TG_RENDER_MAX_FPS, fallbackFps)
+    fps: clampNumber(config.fps ?? fallbackFps, 1, renderLimits.TG_RENDER_MAX_FPS, fallbackFps),
+    fillMode
   };
 }
 
@@ -229,12 +231,34 @@ function writeAsciiPpm(frameGray, outPath, layout, cfg) {
   fs.writeFileSync(outPath, Buffer.concat([Buffer.from(`P6\n${layout.outputWidth} ${layout.outputHeight}\n255\n`), rgb]));
 }
 
-async function extractRawFrames(inputPath, rawPath, fps, durationSec, layout) {
+function buildFrameExtractionFilter(layout, cfg) {
+  const fillMode = cfg.fillMode === 'contain' ? 'contain' : 'cover';
+  const scaleMode = fillMode === 'contain' ? 'decrease' : 'increase';
+  const fitFilter = fillMode === 'contain'
+    ? `pad=${layout.cols}:${layout.rows}:(ow-iw)/2:(oh-ih)/2:black`
+    : `crop=${layout.cols}:${layout.rows}`;
+  return {
+    fillMode,
+    scaleCropMode: fillMode === 'contain' ? 'contain/pad' : 'cover/crop',
+    filter: `scale=${layout.cols}:${layout.rows}:force_original_aspect_ratio=${scaleMode},${fitFilter}`
+  };
+}
+
+async function extractRawFrames(inputPath, rawPath, fps, durationSec, layout, cfg) {
   const safeFps = Math.min(renderLimits.TG_RENDER_MAX_FPS, Math.max(1, Number.parseInt(String(fps), 10) || renderLimits.TG_RENDER_MAX_FPS));
   const safeDuration = Math.min(renderLimits.TG_RENDER_MAX_DURATION_SEC, Math.max(0.1, Number(durationSec) || renderLimits.TG_RENDER_MAX_DURATION_SEC));
+  const extraction = buildFrameExtractionFilter(layout, cfg);
+  console.log('[telegram-render] frame extraction', {
+    fillMode: extraction.fillMode,
+    scaleCropMode: extraction.scaleCropMode,
+    sourceSize: `${layout.sourceWidth}x${layout.sourceHeight}`,
+    outputCanvas: `${layout.outputWidth}x${layout.outputHeight}`,
+    cols: layout.cols,
+    rows: layout.rows
+  });
   await runProcess(ffmpegPath, [
     '-hide_banner', '-loglevel', 'error', '-t', String(safeDuration), '-i', inputPath, '-an',
-    '-vf', `fps=${safeFps}:round=down,scale=${layout.cols}:${layout.rows}:force_original_aspect_ratio=decrease,pad=${layout.cols}:${layout.rows}:(ow-iw)/2:(oh-ih)/2:black,format=gray`,
+    '-vf', `fps=${safeFps}:round=down,${extraction.filter},format=gray`,
     '-f', 'rawvideo', '-pix_fmt', 'gray', rawPath
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
   return safeFps;
@@ -272,10 +296,12 @@ async function renderAttempt(job, probe, cfg, profile, fallbackNumber) {
     contrast: cfg.contrast,
     gamma: cfg.gamma,
     invert: cfg.invert,
-    crf: profile.crf
+    crf: profile.crf,
+    fillMode: cfg.fillMode,
+    sourceSize: `${layout.sourceWidth}x${layout.sourceHeight}`
   });
 
-  const fps = await extractRawFrames(job.inputPath, rawPath, cfg.fps, job.durationSec, layout);
+  const fps = await extractRawFrames(job.inputPath, rawPath, cfg.fps, job.durationSec, layout, cfg);
   const raw = await fs.promises.readFile(rawPath);
   const frameSize = layout.cols * layout.rows;
   const frameCount = Math.floor(raw.length / frameSize);
