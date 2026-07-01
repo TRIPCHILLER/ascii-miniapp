@@ -7224,7 +7224,33 @@ async function asciiVisorTestTelegramRenderJob() {
   form.append('initdata', tgWebApp?.initData || '');
   form.append('initData', tgWebApp?.initData || '');
   form.append('mediatype', 'video');
-  form.append('fps', String(Math.max(5, Math.min(60, Math.round(state.fps || 30)))));
+  const renderFps = Math.max(5, Math.min(60, Math.round(state.fps || 30)));
+  form.append('fps', String(renderFps));
+  const sourceWidth = Math.max(0, Math.round(Number(app.vid?.videoWidth || 0)));
+  const sourceHeight = Math.max(0, Math.round(Number(app.vid?.videoHeight || 0)));
+  const sourceOrientation = sourceWidth > sourceHeight ? 'landscape' : (sourceHeight > sourceWidth ? 'portrait' : (sourceWidth && sourceHeight ? 'square' : 'unknown'));
+  const renderConfig = {
+    charset: String(state.charset || ''),
+    renderCharset10: String(state.renderCharset10 || state.charset || ''),
+    widthChars: Math.max(1, Math.round(Number(state.widthChars || 0))),
+    contrast: Number(state.contrast || 1),
+    gamma: Number(state.gamma || 1),
+    fg: String(state.color || '#ffffff'),
+    color: String(state.color || '#ffffff'),
+    bg: String(state.background || '#000000'),
+    background: String(state.background || '#000000'),
+    invert: !!state.invert,
+    fps: renderFps,
+    source: {
+      width: sourceWidth,
+      height: sourceHeight,
+      orientation: sourceOrientation
+    },
+    sourceWidth,
+    sourceHeight,
+    sourceOrientation
+  };
+  form.append('renderConfig', JSON.stringify(renderConfig));
   form.append('sourceFilename', state.sourceFilename || sourceVideoFile.name || '');
   form.append('sourceMime', state.sourceMime || sourceVideoFile.type || '');
   form.append('sourceSizeBytes', String(Number(state.sourceSizeBytes || sourceVideoFile.size || 0)));
