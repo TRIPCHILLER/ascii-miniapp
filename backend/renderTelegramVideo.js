@@ -13,22 +13,22 @@ const {
 
 const exec = promisify(execFile);
 const DEFAULT_CHARSET = ' .:-=+*#%@';
-const VGA_W = 8;
-const VGA_H = 12;
+const GLYPH_W = 8;
+const GLYPH_H = 16;
 const DEFAULT_CELL_W = 8;
 const DEFAULT_CELL_H = 16;
 
-const GLYPHS_8X12 = {
-  ' ': ['00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000'],
-  '.': ['00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000','00011000','00011000','00000000'],
-  ':': ['00000000','00000000','00011000','00011000','00000000','00000000','00000000','00011000','00011000','00000000','00000000','00000000'],
-  '-': ['00000000','00000000','00000000','00000000','00000000','01111110','01111110','00000000','00000000','00000000','00000000','00000000'],
-  '=': ['00000000','00000000','00000000','01111110','01111110','00000000','01111110','01111110','00000000','00000000','00000000','00000000'],
-  '+': ['00000000','00000000','00011000','00011000','00011000','01111110','01111110','00011000','00011000','00011000','00000000','00000000'],
-  '*': ['00000000','00000000','01100110','00111100','00011000','01111110','00011000','00111100','01100110','00000000','00000000','00000000'],
-  '#': ['00000000','00100100','00100100','01111110','01111110','00100100','00100100','01111110','01111110','00100100','00100100','00000000'],
-  '%': ['00000000','01100010','10010100','10011000','01101000','00010000','00101100','00110010','01010010','10001100','00000000','00000000'],
-  '@': ['00000000','00111100','01000010','10011001','10100101','10100101','10111101','10000001','01000010','00111100','00000000','00000000']
+const GLYPHS_8X16 = {
+  ' ': ['00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000'],
+  '.': ['00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000','00011000','00011000','00011000','00000000','00000000','00000000'],
+  ':': ['00000000','00000000','00000000','00011000','00011000','00011000','00000000','00000000','00000000','00011000','00011000','00011000','00000000','00000000','00000000','00000000'],
+  '-': ['00000000','00000000','00000000','00000000','00000000','00000000','00000000','01111110','01111110','00000000','00000000','00000000','00000000','00000000','00000000','00000000'],
+  '=': ['00000000','00000000','00000000','00000000','01111110','01111110','00000000','00000000','01111110','01111110','00000000','00000000','00000000','00000000','00000000','00000000'],
+  '+': ['00000000','00000000','00000000','00011000','00011000','00011000','00011000','01111110','01111110','00011000','00011000','00011000','00011000','00000000','00000000','00000000'],
+  '*': ['00000000','00000000','00000000','00000000','01100110','00111100','00011000','01111110','01111110','00011000','00111100','01100110','00000000','00000000','00000000','00000000'],
+  '#': ['00000000','00000000','00100100','00100100','00100100','01111110','01111110','00100100','00100100','01111110','01111110','00100100','00100100','00100100','00000000','00000000'],
+  '%': ['00000000','00000000','01100010','10010100','10010100','10011000','01101000','00010000','00010000','00101100','00110010','01010010','01010010','10001100','00000000','00000000'],
+  '@': ['00000000','00000000','00111100','01000010','10011001','10100101','10100101','10100101','10111101','10000001','10000001','01000010','00111100','00000000','00000000','00000000']
 };
 
 function clampInt(value, min, max, fallback) {
@@ -73,18 +73,37 @@ function resolveRenderParams(inputPath, config, sourceSize) {
 
 function resolveCharset(config) {
   const src = String(config.renderCharset10 || config.charset || DEFAULT_CHARSET);
-  const chars = Array.from(src).filter((ch) => Object.prototype.hasOwnProperty.call(GLYPHS_8X12, ch));
+  const chars = Array.from(src).filter((ch) => Object.prototype.hasOwnProperty.call(GLYPHS_8X16, ch));
   return chars.length ? chars.join('') : DEFAULT_CHARSET;
 }
 
+function resolveGlyphMetrics(cellW, cellH) {
+  const glyphScale = Math.max(1, Math.floor(Math.min(cellW / GLYPH_W, cellH / GLYPH_H)));
+  const glyphWidthPx = GLYPH_W * glyphScale;
+  const glyphHeightPx = GLYPH_H * glyphScale;
+  return {
+    glyphScale,
+    glyphWidthPx,
+    glyphHeightPx,
+    glyphOffsetX: Math.max(0, Math.floor((cellW - glyphWidthPx) / 2)),
+    glyphOffsetY: Math.max(0, Math.floor((cellH - glyphHeightPx) / 2))
+  };
+}
+
 function drawGlyph(frame, ch, x0, y0, cellW, cellH, fg, bg) {
-  const glyph = GLYPHS_8X12[ch] || GLYPHS_8X12['#'];
+  const glyph = GLYPHS_8X16[ch] || GLYPHS_8X16['#'];
+  const { glyphScale, glyphWidthPx, glyphHeightPx, glyphOffsetX, glyphOffsetY } = resolveGlyphMetrics(cellW, cellH);
   for (let y = 0; y < cellH; y += 1) {
-    const gy = Math.min(VGA_H - 1, Math.floor((y / cellH) * VGA_H));
-    const row = glyph[gy] || GLYPHS_8X12[' '][0];
     for (let x = 0; x < cellW; x += 1) {
-      const gx = Math.min(VGA_W - 1, Math.floor((x / cellW) * VGA_W));
-      const c = row.charCodeAt(gx) === 49 ? fg : bg;
+      const glyphX = x - glyphOffsetX;
+      const glyphY = y - glyphOffsetY;
+      let c = bg;
+      if (glyphX >= 0 && glyphX < glyphWidthPx && glyphY >= 0 && glyphY < glyphHeightPx) {
+        const gx = Math.floor(glyphX / glyphScale);
+        const gy = Math.floor(glyphY / glyphScale);
+        const row = glyph[gy] || GLYPHS_8X16[' '][0];
+        c = row.charCodeAt(gx) === 49 ? fg : bg;
+      }
       const p = ((y0 + y) * frame.width + x0 + x) * 3;
       frame.data[p] = c[0];
       frame.data[p + 1] = c[1];
@@ -152,6 +171,7 @@ async function renderProfile(inputPath, outputPath, config, profile, sourceSize)
   const bg = hexToRgb(config.bg || config.background, [0, 0, 0]);
   const extractionMode = fillMode === 'cover' ? 'canvas-cover-then-grid' : 'grid-contain-fallback';
   const extractionFilter = buildExtractionFilter({ fps, fillMode, outputWidth, outputHeight, cols, rows });
+  const glyphMetrics = resolveGlyphMetrics(cellW, cellH);
 
   console.log('[telegram-render] config', {
     sourceSize,
@@ -165,9 +185,11 @@ async function renderProfile(inputPath, outputPath, config, profile, sourceSize)
     fillMode,
     extractionMode,
     glyphRenderer: 'vga',
-    glyphMatrixSize: `${VGA_W}x${VGA_H}`,
-    glyphScaleX: cellW / VGA_W,
-    glyphScaleY: cellH / VGA_H
+    glyphMatrixSize: `${GLYPH_W}x${GLYPH_H}`,
+    glyphScaleMode: 'uniform-integer',
+    glyphScale: glyphMetrics.glyphScale,
+    renderedGlyphWidth: glyphMetrics.glyphWidthPx,
+    renderedGlyphHeight: glyphMetrics.glyphHeightPx
   });
 
   await fs.promises.mkdir(path.dirname(outputPath), { recursive: true });
@@ -205,7 +227,7 @@ async function renderProfile(inputPath, outputPath, config, profile, sourceSize)
   encode.stdin.end();
   await waitForClose(encode, 'ffmpeg encode', () => encErr);
   const outputSizeBytes = (await fs.promises.stat(outputPath)).size;
-  return { outputPath, outputSizeBytes, outputWidth, outputHeight, cols, rows, cellW, cellH, fillMode, extractionMode, glyphRenderer: 'vga', glyphMatrixSize: `${VGA_W}x${VGA_H}`, profile: profile.name };
+  return { outputPath, outputSizeBytes, outputWidth, outputHeight, cols, rows, cellW, cellH, fillMode, extractionMode, glyphRenderer: 'vga', glyphMatrixSize: `${GLYPH_W}x${GLYPH_H}`, glyphScaleMode: 'uniform-integer', glyphScale: glyphMetrics.glyphScale, renderedGlyphWidth: glyphMetrics.glyphWidthPx, renderedGlyphHeight: glyphMetrics.glyphHeightPx, profile: profile.name };
 }
 
 async function renderTelegramVideo(inputPath, outputPath, config = {}) {
@@ -229,4 +251,4 @@ async function renderTelegramVideo(inputPath, outputPath, config = {}) {
   throw lastError || new Error('RENDER_FAILED');
 }
 
-module.exports = { renderTelegramVideo, buildExtractionFilter, GLYPHS_8X12 };
+module.exports = { renderTelegramVideo, buildExtractionFilter, GLYPHS_8X16 };
