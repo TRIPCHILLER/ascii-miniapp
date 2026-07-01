@@ -1304,6 +1304,17 @@ function parseRenderInitDataUserId(req) {
   return String(user.id);
 }
 
+function parseTelegramRenderConfig(input) {
+  if (!input) return {};
+  if (typeof input === 'object') return input;
+  try {
+    const parsed = JSON.parse(String(input));
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch (_) {
+    return {};
+  }
+}
+
 app.post('/api/render-video-job', (req, res, next) => {
   if (!renderLimits.TG_BACKGROUND_RENDER_ENABLED) {
     return res.status(404).json({ ok: false, error: 'TG_BACKGROUND_RENDER_DISABLED' });
@@ -1341,7 +1352,8 @@ app.post('/api/render-video-job', (req, res, next) => {
       });
     }
 
-    const requestedFps = clampInt(req.body?.fps, 1, renderLimits.TG_RENDER_MAX_FPS, renderLimits.TG_RENDER_MAX_FPS);
+    const renderConfig = parseTelegramRenderConfig(req.body?.renderConfig);
+    const requestedFps = clampInt(renderConfig.fps ?? req.body?.fps, 1, renderLimits.TG_RENDER_MAX_FPS, renderLimits.TG_RENDER_MAX_FPS);
     const jobIdHint = `pending_${Date.now().toString(36)}`;
     workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), `ascii-render-job-${jobIdHint}-`));
     const safeName = (f.originalname || 'input.video').replace(/[^\w.\-]+/g, '_');
@@ -1349,7 +1361,7 @@ app.post('/api/render-video-job', (req, res, next) => {
     await fs.promises.rename(f.path, inputPath);
     f.path = '';
 
-    const job = renderQueue.enqueue({ userId, workspaceDir, inputPath, fps: requestedFps, durationSec });
+    const job = renderQueue.enqueue({ userId, workspaceDir, inputPath, fps: requestedFps, durationSec, renderConfig });
     workspaceDir = '';
     return res.status(202).json({
       ok: true,

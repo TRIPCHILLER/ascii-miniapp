@@ -8016,12 +8016,33 @@ async function asciiVisorTestTelegramRenderJob() {
   try {
     const filename = state.sourceFilename || file.name || 'video.bin';
     const fps = Math.max(1, Math.min(60, Math.round(Number(state.fps || 30))));
+    const source = currentSource();
+    const renderConfig = {
+      charset: String(state.charset || state.renderCharset10 || ''),
+      renderCharset10: String(state.renderCharset10 || ''),
+      widthChars: Math.max(1, Math.round(Number(state.widthChars || 0))),
+      contrast: Number(state.contrast),
+      gamma: Number(state.gamma),
+      fg: String(state.color || app.out?.style?.color || '#8ac7ff'),
+      color: String(state.color || app.out?.style?.color || '#8ac7ff'),
+      bg: String(state.background || app.stage?.style?.backgroundColor || '#000000'),
+      background: String(state.background || app.stage?.style?.backgroundColor || '#000000'),
+      invert: !!state.invert,
+      fps,
+      source: source ? {
+        width: source.w,
+        height: source.h,
+        kind: source.kind,
+        orientation: source.w === source.h ? 'square' : (source.h > source.w ? 'portrait' : 'landscape')
+      } : null
+    };
     const form = new FormData();
     form.append('file', file, filename);
     form.append('filename', filename);
     form.append('initData', initData);
     form.append('initdata', initData);
     form.append('fps', String(fps));
+    form.append('renderConfig', JSON.stringify(renderConfig));
 
     const res = await fetch(`${API_BASE}/api/render-video-job`, {
       method: 'POST',

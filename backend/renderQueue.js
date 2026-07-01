@@ -36,7 +36,7 @@ function createRenderQueue({ sendMessage, sendVideoToUser, deduct, renderTelegra
     return !!job && (job.status === 'queued' || job.status === 'active');
   }
 
-  function enqueue({ userId, workspaceDir, inputPath, fps, durationSec }) {
+  function enqueue({ userId, workspaceDir, inputPath, fps, durationSec, renderConfig }) {
     const uid = String(userId || '').trim();
     if (!uid) throw new Error('userId required');
     if (hasOpenJobForUser(uid)) {
@@ -53,6 +53,7 @@ function createRenderQueue({ sendMessage, sendVideoToUser, deduct, renderTelegra
       inputPath,
       fps,
       durationSec,
+      renderConfig: renderConfig && typeof renderConfig === 'object' ? renderConfig : {},
       status: 'queued',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
