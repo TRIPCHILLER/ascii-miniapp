@@ -701,6 +701,13 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   text-transform:uppercase;
 }
 
+#busy .busy-ok-button,
+#busy .busy-ok-button:focus,
+#busy .busy-ok-button:hover,
+#busy .busy-ok-button:active{
+  text-decoration:none;
+}
+
 #busy .busy-ok-button{
   appearance:none;
   border:0;
@@ -721,8 +728,6 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   background:transparent;
   color:#fff;
   outline:none;
-  text-decoration:underline;
-  text-underline-offset:4px;
 }
 
 #busy .busy-ok-button:active{
