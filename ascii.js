@@ -751,7 +751,7 @@ let DITHER_ENABLED = false;
   const state = {
     facing: 'user',         // какая камера для мобилок
     mirror: true,           // режим рисования: true = отразить по X (НЕ-зеркало)
-    widthChars: isMobile ? 75 : 150,
+    widthChars: isMobile ? 50 : 150,
     contrast: 2.00,
     gamma: 0.90,
     fps: 30,
@@ -5954,14 +5954,14 @@ function applyWidthLimitsForMode(init = false) {
     }
   } else {
     // Десктоп оставляем как было
-    min = 75; max = 150;
+    min = 50; max = 150;
   }
 
   app.ui.width.min = min;
   app.ui.width.max = max;
 
   // Не сбиваем текущий выбор: мягко зажимаем в новые границы
-  const fallbackStart = isMobile ? 75 : 150;
+  const fallbackStart = isMobile ? 50 : 150;
   if (init && (state.widthChars == null)) {
     state.widthChars = fallbackStart;
   }
