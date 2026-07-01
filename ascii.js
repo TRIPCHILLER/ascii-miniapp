@@ -9589,6 +9589,18 @@ async function doSave() {
       return;
     }
     if (window.Telegram?.WebApp?.initData && state.sourceVideoFile) {
+      const hasEnoughImpulses = await ensureEnoughBalanceBeforeExport('video', 15);
+      if (!hasEnoughImpulses) return;
+      const videoDurationSec = Number(app.vid?.duration || 0) || await getVideoDurationSec(state.sourceVideoFile);
+      if (Number.isFinite(videoDurationSec) && videoDurationSec > 10) {
+        showAsciiPopup({
+          type: 'error',
+          sound: 'error',
+          title: 'ВИДЕО ДЛИННЕЕ ЛИМИТА',
+          message: 'BACKGROUND-РЕНДЕР ПОКА ПОДДЕРЖИВАЕТ ДО 10 СЕК.'
+        });
+        return;
+      }
       console.log('[telegram-background-render] save-button-start');
       await startTelegramBackgroundVideoRender();
       return;
