@@ -214,6 +214,8 @@ const {
   sendAnimationToUser,
   probeVideo
 } = require('./store');
+const { renderTelegramVideo } = require('./renderTelegramVideo');
+const { renderQueue } = require('./renderQueue');
 const storageStats = getStorageStats();
 console.log('[startup] data-stats', {
   balances_users: storageStats.balances,
@@ -1419,6 +1421,44 @@ const uploadHandler = [
 app.post('/api/upload', ...uploadHandler);
 app.post('/upload', ...uploadHandler);
 
+
+
+app.post('/api/render-video-job', upload.any(), async (req, res) => {
+  const files = Array.isArray(req.files) ? req.files : [];
+  const f = files.find(x => x.fieldname === 'file') || files.find(x => x.fieldname === 'document') || files[0];
+  if (!f) return res.status(400).json({ ok:false, error:'NO_FILE' });
+  const initDataUserId = maybeUpsertUserFromInitData(req);
+  const userId = String(initDataUserId || req.body?.telegramId || req.body?.userId || '');
+  if (!userId) {
+    try { if (f.path) await fs.promises.rm(f.path, { force: true }); } catch {}
+    return res.status(400).json({ ok:false, error:'USER_ID_REQUIRED' });
+  }
+
+  let renderConfig = {};
+  try { renderConfig = JSON.parse(String(req.body?.renderConfig || '{}')); } catch { renderConfig = {}; }
+  const jobId = crypto.randomBytes(8).toString('hex');
+  const sourcePath = f.path;
+  const sourceName = String(req.body?.sourceFilename || f.originalname || 'source-video');
+  renderQueue.add(async () => {
+    const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), 'trip-bg-render-'));
+    const outMp4 = path.join(tmpdir, `${jobId}.mp4`);
+    try {
+      console.log('[render-video-job] start', { jobId, userId, sourceName, queue: renderQueue.stats() });
+      await renderTelegramVideo(sourcePath, outMp4, renderConfig);
+      const outputSizeBytes = (() => { try { return fs.statSync(outMp4).size; } catch { return null; } })();
+      const sent = await sendVideoToUser(userId, outMp4, { caption: '#ascii_video_render' });
+      console.log('[render-video-job] sent', { jobId, ok: !!sent?.ok, outputSizeBytes });
+    } catch (err) {
+      console.error('[render-video-job] failed', { jobId, userId, error: err?.message || err });
+      try { await sendMessage(userId, 'РЕНДЕР ВИДЕО НЕ УДАЛСЯ. ПОПРОБУЙ ЕЩЁ РАЗ.'); } catch (_) {}
+    } finally {
+      try { if (sourcePath) await fs.promises.rm(sourcePath, { force: true }); } catch {}
+      try { await fs.promises.rm(tmpdir, { recursive: true, force: true }); } catch {}
+    }
+  }).catch((err) => console.error('[render-video-job] queue error', { jobId, error: err?.message || err }));
+
+  return res.json({ ok:true, queued:true, jobId, queue: renderQueue.stats() });
+});
 
 app.post('/api/ascii-text', upload.any(), async (req, res) => {
   const files = Array.isArray(req.files) ? req.files : [];
