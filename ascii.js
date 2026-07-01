@@ -88,6 +88,45 @@ function busyHide(force = false){
   if (app.ui.busy) app.ui.busy.hidden = true;
 }
 
+let busyQueueHideTimer = null;
+
+function hideQueuedRenderBusy(){
+  if (busyQueueHideTimer) {
+    clearTimeout(busyQueueHideTimer);
+    busyQueueHideTimer = null;
+  }
+  const busy = app?.ui?.busy;
+  if (!busy) return;
+  busy.querySelector('.busy-ok-button')?.remove();
+  busyLock = false;
+  busyHide(true);
+}
+
+function showQueuedRenderBusy(){
+  const busy = app?.ui?.busy;
+  const text = app?.ui?.busyText;
+  if (!busy || !text) return;
+
+  if (busyQueueHideTimer) clearTimeout(busyQueueHideTimer);
+  busy.querySelector('.busy-ok-button')?.remove();
+
+  busyLock = true;
+  text.textContent = 'РЕНДЕР ВИДЕО ПОСТАВЛЕН В ОЧЕРЕДЬ\nМОЖНО ЗАКРЫТЬ ОКНО\nРЕЗУЛЬТАТ ПРИДЁТ В ЧАТ';
+
+  const okButton = document.createElement('button');
+  okButton.type = 'button';
+  okButton.className = 'busy-ok-button';
+  okButton.textContent = 'OK';
+  okButton.addEventListener('click', hideQueuedRenderBusy, { once: true });
+
+  const box = busy.querySelector('.busy-box') || busy;
+  box.appendChild(okButton);
+  busy.hidden = false;
+  okButton.focus({ preventScroll: true });
+
+  busyQueueHideTimer = setTimeout(hideQueuedRenderBusy, 5000);
+}
+
 let busyTextAnimationToken = 0;
 
 function startBusyServiceTextAnimation(targetText, {
@@ -7241,6 +7280,7 @@ async function asciiVisorTestTelegramRenderJob() {
     background: String(state.background || '#000000'),
     invert: !!state.invert,
     fps: renderFps,
+    fillMode: 'cover',
     source: {
       width: sourceWidth,
       height: sourceHeight,
@@ -9332,6 +9372,28 @@ async function doSave() {
     const hasEnoughImpulses = await ensureEnoughBalanceBeforeExport('video', 15);
     if (!hasEnoughImpulses) return;
     hudSet('VIDEO: запись… (дождитесь окончания)');
+    const isTelegramMiniApp = !!(window.Telegram?.WebApp?.initData);
+    if (isTelegramMiniApp && state.sourceVideoFile) {
+      const stopBusyQueueAnimation = startBusyServiceTextAnimation('ПОСТАНОВКА РЕНДЕРА В ОЧЕРЕДЬ', { withDots: true });
+      try {
+        busyLock = true;
+        await asciiVisorTestTelegramRenderJob();
+        stopBusyQueueAnimation();
+        showQueuedRenderBusy();
+      } catch (err) {
+        stopBusyQueueAnimation();
+        console.warn('[render-video-job] failed:', err);
+        busyLock = false;
+        busyHide(true);
+        showAsciiPopup({
+          type: 'error',
+          sound: 'error',
+          title: 'РЕНДЕР НЕ ЗАПУЩЕН',
+          message: err?.message || 'Попробуй ещё раз.'
+        });
+      }
+      return;
+    }
     saveVideo();
   }
 }
