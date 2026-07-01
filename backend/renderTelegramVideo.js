@@ -27,8 +27,10 @@ let fontRenderProbePromise = null;
 const DEFAULT_CHARSET = ' .:-=+*#%@';
 const GLYPH_W = 8;
 const GLYPH_H = 16;
-const DEFAULT_CELL_W = 8;
+const DEFAULT_CELL_W = 9;
 const DEFAULT_CELL_H = 16;
+const FONT_CELL_W = 9;
+const FONT_CELL_H = 16;
 
 const GLYPHS_8X16 = {
   ' ': ['00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000'],
@@ -195,7 +197,7 @@ async function probeFontRender() {
     return {
       fontRenderAvailable,
       selectedFontPath,
-      glyphRenderer: fontRenderAvailable ? 'font-system' : 'bitmap-fallback',
+      glyphRenderer: fontRenderAvailable ? 'font-atlas' : 'bitmap-fallback',
       rendererBackend,
       reason: fontRenderAvailable ? null : 'NO_SYSTEM_FONT_RENDERER',
       fontProbeInkPixels: tools[rendererBackend]?.inkPixels || 0,
@@ -254,6 +256,134 @@ async function renderFrameSystemPpm(gray, opts, fontProbe) {
   } finally {
     try { await fs.promises.rm(tmp, { force: true }); } catch {}
   }
+}
+
+function extractPpmRgb(buffer, width, height) {
+  const ppm = parsePpmP6(buffer);
+  if (!ppm || ppm.width !== width || ppm.height !== height) return null;
+  return buffer.subarray(ppm.dataOffset, ppm.dataOffset + ppm.dataLength);
+}
+
+function countMaskInk(mask) {
+  let inkPixels = 0;
+  for (let i = 0; i < mask.length; i += 1) {
+    if (mask[i] > 0) inkPixels += 1;
+  }
+  return inkPixels;
+}
+
+function bitmapGlyphMask(ch, cellW, cellH) {
+  const mask = Buffer.alloc(cellW * cellH);
+  const glyph = GLYPHS_8X16[ch] || GLYPHS_8X16['#'];
+  const { glyphScale, glyphWidthPx, glyphHeightPx, glyphOffsetX, glyphOffsetY } = resolveGlyphMetrics(cellW, cellH);
+  for (let y = 0; y < cellH; y += 1) {
+    for (let x = 0; x < cellW; x += 1) {
+      const glyphX = x - glyphOffsetX;
+      const glyphY = y - glyphOffsetY;
+      if (glyphX >= 0 && glyphX < glyphWidthPx && glyphY >= 0 && glyphY < glyphHeightPx) {
+        const gx = Math.floor(glyphX / glyphScale);
+        const gy = Math.floor(glyphY / glyphScale);
+        const row = glyph[gy] || GLYPHS_8X16[' '][0];
+        if (row.charCodeAt(gx) === 49) mask[y * cellW + x] = 255;
+      }
+    }
+  }
+  return mask;
+}
+
+async function renderGlyphMaskWithFont(ch, opts, fontProbe) {
+  if (ch === ' ') return Buffer.alloc(opts.cellW * opts.cellH);
+  const pointSize = Math.max(1, Math.floor(opts.cellH));
+  const tmp = path.join('/tmp', `ascii-glyph-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.txt`);
+  await fs.promises.writeFile(tmp, ch);
+  try {
+    let ppmBuffer;
+    if (fontProbe.rendererBackend === 'magick' || fontProbe.rendererBackend === 'convert') {
+      ppmBuffer = await runRenderer(fontProbe.rendererBackend, [
+        '-size', `${opts.cellW}x${opts.cellH}`,
+        `xc:${rgbCss([0, 0, 0])}`,
+        '-font', fontProbe.selectedFontPath,
+        '-pointsize', String(pointSize),
+        '-fill', rgbCss([255, 255, 255]),
+        '-gravity', 'NorthWest',
+        '-annotate', '+0+0', `@${tmp}`,
+        '-trim',
+        '+repage',
+        '-background', 'black',
+        '-gravity', 'Center',
+        '-extent', `${opts.cellW}x${opts.cellH}`,
+        'ppm:-'
+      ], '');
+    } else {
+      const filter = `color=c=black:s=${opts.cellW}x${opts.cellH}:d=0.1,drawtext=fontfile='${escapeDrawtextPath(fontProbe.selectedFontPath)}':textfile='${escapeDrawtextPath(tmp)}':fontsize=${pointSize}:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2:expansion=none`;
+      const { stdout } = await exec('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', filter, '-frames:v', '1', '-f', 'image2pipe', '-vcodec', 'ppm', 'pipe:1'], { encoding: 'buffer', timeout: 5000, maxBuffer: opts.cellW * opts.cellH * 4 + 4096 });
+      ppmBuffer = stdout;
+    }
+    const rgb = extractPpmRgb(ppmBuffer, opts.cellW, opts.cellH);
+    if (!rgb) return null;
+    const mask = Buffer.alloc(opts.cellW * opts.cellH);
+    for (let i = 0, j = 0; i < rgb.length; i += 3, j += 1) {
+      mask[j] = Math.max(rgb[i], rgb[i + 1], rgb[i + 2]);
+    }
+    return countMaskInk(mask) > 0 ? mask : null;
+  } finally {
+    try { await fs.promises.rm(tmp, { force: true }); } catch {}
+  }
+}
+
+async function buildGlyphAtlas(opts, fontProbe) {
+  const atlas = new Map();
+  const missingGlyphs = [];
+  const uniqueChars = Array.from(new Set(Array.from(opts.charset)));
+  const atlasInkPixels = {};
+  for (const ch of uniqueChars) {
+    let mask = fontProbe.fontRenderAvailable ? await renderGlyphMaskWithFont(ch, opts, fontProbe) : null;
+    if (!mask) {
+      missingGlyphs.push(ch);
+      mask = bitmapGlyphMask(ch, opts.cellW, opts.cellH);
+    }
+    atlas.set(ch, mask);
+  }
+  for (const ch of ['@', '+', '%', '#']) {
+    let mask = atlas.get(ch);
+    if (!mask) {
+      mask = fontProbe.fontRenderAvailable ? await renderGlyphMaskWithFont(ch, opts, fontProbe) : null;
+      if (!mask) mask = bitmapGlyphMask(ch, opts.cellW, opts.cellH);
+    }
+    atlasInkPixels[ch] = countMaskInk(mask);
+  }
+  return { atlas, atlasGlyphCount: atlas.size, missingGlyphs, atlasInkPixels };
+}
+
+function renderFrameAtlasPpm(gray, opts, atlas) {
+  const { cols, rows, outputWidth, outputHeight, cellW, cellH, charset, fg, bg, contrast, gamma, invert } = opts;
+  const data = Buffer.alloc(outputWidth * outputHeight * 3);
+  for (let i = 0; i < outputWidth * outputHeight; i += 1) {
+    data[i * 3] = bg[0];
+    data[i * 3 + 1] = bg[1];
+    data[i * 3 + 2] = bg[2];
+  }
+  const shades = Math.max(1, charset.length - 1);
+  for (let y = 0; y < rows; y += 1) {
+    for (let x = 0; x < cols; x += 1) {
+      let lum = (gray[y * cols + x] || 0) / 255;
+      lum = Math.pow(Math.max(0, Math.min(1, (lum - 0.5) * contrast + 0.5)), 1 / gamma);
+      if (invert) lum = 1 - lum;
+      const ch = charset[Math.max(0, Math.min(shades, Math.round(lum * shades)))] || ' ';
+      const mask = atlas.get(ch) || atlas.get('#') || bitmapGlyphMask(ch, cellW, cellH);
+      for (let gy = 0; gy < cellH; gy += 1) {
+        for (let gx = 0; gx < cellW; gx += 1) {
+          const alpha = mask[gy * cellW + gx] / 255;
+          if (alpha <= 0) continue;
+          const p = ((y * cellH + gy) * outputWidth + x * cellW + gx) * 3;
+          data[p] = Math.round(bg[0] + (fg[0] - bg[0]) * alpha);
+          data[p + 1] = Math.round(bg[1] + (fg[1] - bg[1]) * alpha);
+          data[p + 2] = Math.round(bg[2] + (fg[2] - bg[2]) * alpha);
+        }
+      }
+    }
+  }
+  return Buffer.concat([Buffer.from(`P6\n${outputWidth} ${outputHeight}\n255\n`), data]);
 }
 
 function resolveGlyphMetrics(cellW, cellH) {
@@ -318,7 +448,7 @@ function resolveGridAndCell(config, outputWidth, outputHeight) {
   if (Number.isFinite(widthCharsRaw) && widthCharsRaw > 0) {
     const cols = clampInt(widthCharsRaw, 24, 260, 80);
     const cellW = Math.max(1, Math.floor(outputWidth / cols));
-    const cellH = Math.max(1, Math.round(cellW * 2));
+    const cellH = Math.max(1, Math.round(cellW * FONT_CELL_H / FONT_CELL_W));
     const rows = Math.max(1, Math.floor(outputHeight / cellH));
     return { cols, rows, cellW, cellH, widthChars: cols, gridSource: 'widthChars' };
   }
@@ -351,6 +481,22 @@ async function renderProfile(inputPath, outputPath, config, profile, sourceSize,
   const extractionMode = fillMode === 'cover' ? 'canvas-cover-then-grid' : 'grid-contain-fallback';
   const extractionFilter = buildExtractionFilter({ fps, fillMode, outputWidth, outputHeight, cols, rows });
   const glyphMetrics = resolveGlyphMetrics(cellW, cellH);
+  const frameOpts = {
+    cols,
+    rows,
+    outputWidth,
+    outputHeight,
+    cellW,
+    cellH,
+    charset,
+    fg,
+    bg,
+    contrast: Math.max(0.1, Number(config.contrast || 1)),
+    gamma: Math.max(0.1, Number(config.gamma || 1)),
+    invert: !!config.invert
+  };
+  const atlasInfo = await buildGlyphAtlas(frameOpts, fontProbe);
+  let useAtlasRenderer = fontProbe.fontRenderAvailable && atlasInfo.atlasGlyphCount > 0;
 
   console.log('[telegram-render] config', {
     sourceSize,
@@ -365,9 +511,13 @@ async function renderProfile(inputPath, outputPath, config, profile, sourceSize,
     extractionMode,
     fontRenderAvailable: fontProbe.fontRenderAvailable,
     selectedFontPath: fontProbe.selectedFontPath,
-    glyphRenderer: fontProbe.glyphRenderer,
+    glyphRenderer: useAtlasRenderer ? 'font-atlas' : 'bitmap-fallback',
     rendererBackend: fontProbe.rendererBackend,
     reason: fontProbe.reason,
+    fontCellMetric: `${FONT_CELL_W}x${FONT_CELL_H}`,
+    atlasGlyphCount: atlasInfo.atlasGlyphCount,
+    missingGlyphs: atlasInfo.missingGlyphs,
+    atlasInkPixels: atlasInfo.atlasInkPixels,
     fontProbeInkPixels: fontProbe.fontProbeInkPixels,
     fontProbeInkRatio: fontProbe.fontProbeInkRatio,
     glyphMatrixSize: `${GLYPH_W}x${GLYPH_H}`,
@@ -388,23 +538,9 @@ async function renderProfile(inputPath, outputPath, config, profile, sourceSize,
   const encodeDone = waitForClose(encode, 'ffmpeg encode', () => encErr);
   const frameSize = cols * rows;
   let pending = Buffer.alloc(0);
-  const frameOpts = {
-    cols,
-    rows,
-    outputWidth,
-    outputHeight,
-    cellW,
-    cellH,
-    charset,
-    fg,
-    bg,
-    contrast: Math.max(0.1, Number(config.contrast || 1)),
-    gamma: Math.max(0.1, Number(config.gamma || 1)),
-    invert: !!config.invert
-  };
 
-  let useSystemRenderer = fontProbe.fontRenderAvailable;
-  let effectiveGlyphRenderer = fontProbe.glyphRenderer;
+  let useSystemRenderer = !useAtlasRenderer && fontProbe.fontRenderAvailable;
+  let effectiveGlyphRenderer = useAtlasRenderer ? 'font-atlas' : fontProbe.glyphRenderer;
   let effectiveRendererBackend = fontProbe.rendererBackend;
   let effectiveReason = fontProbe.reason;
   let firstFrameChecked = false;
@@ -416,24 +552,33 @@ async function renderProfile(inputPath, outputPath, config, profile, sourceSize,
     while (pending.length >= frameSize) {
       const gray = pending.subarray(0, frameSize);
       pending = pending.subarray(frameSize);
-      let ppm = useSystemRenderer
-        ? await renderFrameSystemPpm(gray, frameOpts, fontProbe)
-        : renderFrameBitmapPpm(gray, frameOpts);
+      let ppm = useAtlasRenderer
+        ? renderFrameAtlasPpm(gray, frameOpts, atlasInfo.atlas)
+        : (useSystemRenderer ? await renderFrameSystemPpm(gray, frameOpts, fontProbe) : renderFrameBitmapPpm(gray, frameOpts));
 
-      if (useSystemRenderer && !firstFrameChecked) {
+      if ((useAtlasRenderer || useSystemRenderer) && !firstFrameChecked) {
         const firstFrameInk = validateRenderedPpmHasInk(ppm, bg);
         firstFrameChecked = true;
         firstFrameInkPixels = firstFrameInk.inkPixels;
         firstFrameInkRatio = firstFrameInk.inkRatio;
         console.log('[telegram-render] first-frame-ink-check', {
-          glyphRenderer: firstFrameInk.ok ? 'font-system' : 'bitmap-fallback',
+          glyphRenderer: firstFrameInk.ok ? (useAtlasRenderer ? 'font-atlas' : 'font-system') : 'bitmap-fallback',
           selectedFontPath: fontProbe.selectedFontPath,
           rendererBackend: fontProbe.rendererBackend,
+          fontCellMetric: `${FONT_CELL_W}x${FONT_CELL_H}`,
+          cellW,
+          cellH,
+          cols,
+          rows,
+          atlasGlyphCount: atlasInfo.atlasGlyphCount,
+          missingGlyphs: atlasInfo.missingGlyphs,
+          atlasInkPixels: atlasInfo.atlasInkPixels,
           firstFrameInkPixels,
           firstFrameInkRatio,
           reason: firstFrameInk.ok ? null : FONT_RENDER_NO_INK
         });
         if (!firstFrameInk.ok) {
+          useAtlasRenderer = false;
           useSystemRenderer = false;
           effectiveGlyphRenderer = 'bitmap-fallback';
           effectiveRendererBackend = 'bitmap-fallback';
@@ -450,7 +595,7 @@ async function renderProfile(inputPath, outputPath, config, profile, sourceSize,
   encode.stdin.end();
   await encodeDone;
   const outputSizeBytes = (await fs.promises.stat(outputPath)).size;
-  return { outputPath, outputSizeBytes, outputWidth, outputHeight, cols, rows, cellW, cellH, fillMode, extractionMode, glyphRenderer: effectiveGlyphRenderer, rendererBackend: effectiveRendererBackend, selectedFontPath: fontProbe.selectedFontPath, reason: effectiveReason, fontProbeInkPixels: fontProbe.fontProbeInkPixels, fontProbeInkRatio: fontProbe.fontProbeInkRatio, firstFrameInkPixels, firstFrameInkRatio, glyphMatrixSize: `${GLYPH_W}x${GLYPH_H}`, glyphScaleMode: 'uniform-integer', glyphScale: glyphMetrics.glyphScale, renderedGlyphWidth: glyphMetrics.glyphWidthPx, renderedGlyphHeight: glyphMetrics.glyphHeightPx, profile: profile.name };
+  return { outputPath, outputSizeBytes, outputWidth, outputHeight, cols, rows, cellW, cellH, fillMode, extractionMode, glyphRenderer: effectiveGlyphRenderer, rendererBackend: effectiveRendererBackend, selectedFontPath: fontProbe.selectedFontPath, reason: effectiveReason, fontCellMetric: `${FONT_CELL_W}x${FONT_CELL_H}`, atlasGlyphCount: atlasInfo.atlasGlyphCount, missingGlyphs: atlasInfo.missingGlyphs, atlasInkPixels: atlasInfo.atlasInkPixels, fontProbeInkPixels: fontProbe.fontProbeInkPixels, fontProbeInkRatio: fontProbe.fontProbeInkRatio, firstFrameInkPixels, firstFrameInkRatio, glyphMatrixSize: `${GLYPH_W}x${GLYPH_H}`, glyphScaleMode: 'uniform-integer', glyphScale: glyphMetrics.glyphScale, renderedGlyphWidth: glyphMetrics.glyphWidthPx, renderedGlyphHeight: glyphMetrics.glyphHeightPx, profile: profile.name };
 }
 
 async function renderTelegramVideo(inputPath, outputPath, config = {}) {
