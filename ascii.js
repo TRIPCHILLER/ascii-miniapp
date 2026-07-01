@@ -109,6 +109,12 @@ function hideTransientPanelsForQueuedRender(){
   });
 }
 
+function setBusyStatusText(text) {
+  busyLock = true;
+  hideTransientPanelsForQueuedRender();
+  busyShow(text);
+}
+
 function showQueuedRenderBusy(){
   const busy = app?.ui?.busy;
   const text = app?.ui?.busyText;
@@ -9589,10 +9595,18 @@ async function doSave() {
       return;
     }
     if (window.Telegram?.WebApp?.initData && state.sourceVideoFile) {
+      setBusyStatusText('АНАЛИЗ ЭНЕРГОХРАНИЛИЩА...');
       const hasEnoughImpulses = await ensureEnoughBalanceBeforeExport('video', 15);
-      if (!hasEnoughImpulses) return;
+      if (!hasEnoughImpulses) {
+        busyLock = false;
+        busyHide(true);
+        return;
+      }
+      setBusyStatusText('ПРОВЕРКА ПАРАМЕТРОВ ВИДЕО...');
       const videoDurationSec = Number(app.vid?.duration || 0) || await getVideoDurationSec(state.sourceVideoFile);
       if (Number.isFinite(videoDurationSec) && videoDurationSec > 10) {
+        busyLock = false;
+        busyHide(true);
         showAsciiPopup({
           type: 'error',
           sound: 'error',
@@ -9601,6 +9615,7 @@ async function doSave() {
         });
         return;
       }
+      setBusyStatusText('СБОРКА СИМВОЛЬНОЙ МАТРИЦЫ...\nПЕРЕДАЧА В ОЧЕРЕДЬ...');
       console.log('[telegram-background-render] save-button-start');
       await startTelegramBackgroundVideoRender();
       return;
