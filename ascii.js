@@ -9591,18 +9591,18 @@ async function doSave() {
     const hasGif = !!(state.gifFrames && state.gifFrames.length);
     const hasVideo = !!(app.vid && (app.vid.src || app.vid.srcObject));
     if (!hasGif && !hasVideo) {
-      showAsciiPopup({ type:'info', title:'НЕТ ВИДЕО', message:'Нет выбранного видео.' });
+      showAsciiPopup({ type:'info', title:'ЗДЕСЬ ПУСТО...', message:'Я Н3 ВИЖУ ФР4ГМ3НТ0В ДЛ9 0БР4Б0ТКИ.' });
       return;
     }
     if (window.Telegram?.WebApp?.initData && state.sourceVideoFile) {
-      setBusyStatusText('АНАЛИЗ ЭНЕРГОХРАНИЛИЩА...');
+      setBusyStatusText('4Н4ЛИЗ ЭН3РГ0ХР4НИЛИЩ4...');
       const hasEnoughImpulses = await ensureEnoughBalanceBeforeExport('video', 15);
       if (!hasEnoughImpulses) {
         busyLock = false;
         busyHide(true);
         return;
       }
-      setBusyStatusText('ПРОВЕРКА ПАРАМЕТРОВ ВИДЕО...');
+      setBusyStatusText('ПР0В3РК4 П4Р4М3ТР0В ВИД30...');
       const videoDurationSec = Number(app.vid?.duration || 0) || await getVideoDurationSec(state.sourceVideoFile);
       if (Number.isFinite(videoDurationSec) && videoDurationSec > 10) {
         busyLock = false;
@@ -9610,12 +9610,12 @@ async function doSave() {
         showAsciiPopup({
           type: 'error',
           sound: 'error',
-          title: 'ВИДЕО ДЛИННЕЕ ЛИМИТА',
-          message: 'BACKGROUND-РЕНДЕР ПОКА ПОДДЕРЖИВАЕТ ДО 10 СЕК.'
+          title: '9 Н3 М0ГУ ЭТ0Г0 СД3Л4ТЬ...',
+          message: 'ПР30БР4З0В4НИ3 П0ДД3РЖИВ43Т ФР4ГМ3НТЫ Д0 10 СЕК.'
         });
         return;
       }
-      setBusyStatusText('СБОРКА СИМВОЛЬНОЙ МАТРИЦЫ...\nПЕРЕДАЧА В ОЧЕРЕДЬ...');
+      setBusyStatusText('СБ0РК4 СИМВ0ЛЬН0Й М4ТРИЦЫ...\nП3Р3Д4Ч4 В 0Ч3Р3ДЬ...');
       console.log('[telegram-background-render] save-button-start');
       await startTelegramBackgroundVideoRender();
       return;
