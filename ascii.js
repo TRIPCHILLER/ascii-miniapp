@@ -7972,13 +7972,50 @@ async function getVideoDurationSec(file) {
 
 let telegramRenderJobTestInFlight = false;
 
-function showTelegramRenderJobTestPopup(message, type = 'info') {
+function showTelegramRenderJobTestPopup(message, type = 'info', details = '') {
   showAsciiPopup({
     type,
     sound: type === 'error' ? 'error' : undefined,
     title: message,
-    message: ''
+    message: details
   });
+}
+
+let telegramRenderQueuedOverlayTimer = null;
+
+function hideTelegramRenderQueuedOverlay() {
+  if (telegramRenderQueuedOverlayTimer) {
+    clearTimeout(telegramRenderQueuedOverlayTimer);
+    telegramRenderQueuedOverlayTimer = null;
+  }
+  const button = document.getElementById('telegramRenderQueuedOk');
+  if (button) button.remove();
+  busyLock = false;
+  busyHide(true);
+}
+
+function showTelegramRenderQueuedOverlay() {
+  if (!app?.ui?.busy || !app?.ui?.busyText) {
+    showTelegramRenderJobTestPopup('РЕНДЕР ВИДЕО ПОСТАВЛЕН В ОЧЕРЕДЬ', 'success', 'МОЖНО ЗАКРЫТЬ ОКНО\nРЕЗУЛЬТАТ ПРИДЁТ В ЧАТ');
+    return;
+  }
+
+  hideTelegramRenderQueuedOverlay();
+  busyLock = true;
+  busyShow('РЕНДЕР ВИДЕО ПОСТАВЛЕН В ОЧЕРЕДЬ\nМОЖНО ЗАКРЫТЬ ОКНО\nРЕЗУЛЬТАТ ПРИДЁТ В ЧАТ');
+  app.ui.busyText.style.whiteSpace = 'pre-line';
+
+  const box = app.ui.busy.querySelector('.busy-box') || app.ui.busy;
+  const button = document.createElement('button');
+  button.id = 'telegramRenderQueuedOk';
+  button.type = 'button';
+  button.className = 'busy-ok-button';
+  button.textContent = 'OK';
+  button.addEventListener('click', hideTelegramRenderQueuedOverlay, { once: true });
+  box.appendChild(button);
+  try { button.focus({ preventScroll: true }); } catch (_) {}
+
+  telegramRenderQueuedOverlayTimer = setTimeout(hideTelegramRenderQueuedOverlay, 5000);
 }
 
 async function asciiVisorTestTelegramRenderJob() {
@@ -7992,7 +8029,7 @@ async function asciiVisorTestTelegramRenderJob() {
   const file = state.sourceVideoFile;
 
   if (!file || state.mode !== 'video') {
-    showTelegramRenderJobTestPopup('ВИДЕО НЕ ПРОЧИТАНО', 'error');
+    showTelegramRenderJobTestPopup('РЕНДЕР НЕ ЗАПУЩЕН', 'error', 'ВИДЕО НЕ ПРОЧИТАНО');
     return null;
   }
 
@@ -8029,6 +8066,7 @@ async function asciiVisorTestTelegramRenderJob() {
       background: String(state.background || app.stage?.style?.backgroundColor || '#000000'),
       invert: !!state.invert,
       fps,
+      fillMode: 'cover',
       source: source ? {
         width: source.w,
         height: source.h,
@@ -8054,16 +8092,17 @@ async function asciiVisorTestTelegramRenderJob() {
     try { json = JSON.parse(raw || '{}'); } catch (_) {}
 
     if (res.status === 202 || json?.ok || json?.status === 'queued') {
-      showTelegramRenderJobTestPopup('РЕНДЕР ЗАПУЩЕН', 'success');
+      showTelegramRenderQueuedOverlay();
       return json;
     }
 
     const code = String(json?.error || '');
-    showTelegramRenderJobTestPopup(errorMessages[code] || 'ВИДЕО НЕ ПРОЧИТАНО', 'error');
+    const details = String(json?.message || json?.details || code || raw || '').trim();
+    showTelegramRenderJobTestPopup('РЕНДЕР НЕ ЗАПУЩЕН', 'error', errorMessages[code] || details);
     return json;
   } catch (error) {
     console.error('[TELEGRAM RENDER JOB TEST]', error);
-    showTelegramRenderJobTestPopup('ВИДЕО НЕ ПРОЧИТАНО', 'error');
+    showTelegramRenderJobTestPopup('РЕНДЕР НЕ ЗАПУЩЕН', 'error', error?.message || 'ВИДЕО НЕ ПРОЧИТАНО');
     return null;
   } finally {
     telegramRenderJobTestInFlight = false;

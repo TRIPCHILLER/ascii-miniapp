@@ -701,6 +701,25 @@ body, .toolbar, .panel, .btn, label, output, select, option {
   text-transform:uppercase;
 }
 
+#busy .busy-ok-button{
+  min-width:96px;
+  padding:10px 18px;
+  border:1px solid rgba(255,255,255,.85);
+  border-radius:0;
+  background:rgba(0,0,0,.45);
+  color:#fff;
+  font-family:'PxPlus IBM VGA', monospace;
+  font-size:16px;
+  letter-spacing:.08em;
+  cursor:pointer;
+  text-transform:uppercase;
+}
+
+#busy .busy-ok-button:focus-visible{
+  outline:2px solid #fff;
+  outline-offset:3px;
+}
+
 /* === CUSTOM LOGO SPINNER === */
 .busy-spinner {
   position: relative;
