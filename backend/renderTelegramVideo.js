@@ -13,10 +13,15 @@ const {
 
 const exec = promisify(execFile);
 const FONT_CANDIDATES = [
+  'assets/PxPlus IBM VGA.ttf',
+  'assets/PxPlus IBM VGA.otf',
+  'assets/BetterVCR.ttf',
+  'assets/BetterVCR.otf',
   'assets/PxPlus IBM VGA.woff2',
   'assets/BetterVCR.woff2',
   'assets/MS Gothic.woff2'
 ];
+const FONT_RENDER_NO_INK = 'FONT_RENDER_NO_INK';
 const REPO_ROOT = path.resolve(__dirname, '..');
 let fontRenderProbePromise = null;
 const DEFAULT_CHARSET = ' .:-=+*#%@';
@@ -97,6 +102,52 @@ function escapeDrawtextPath(value) {
   return String(value).replace(/\\/g, '\\\\').replace(/:/g, '\\:').replace(/'/g, "\\'");
 }
 
+function parsePpmP6(buffer) {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 16) return null;
+  let offset = 0;
+  const tokens = [];
+  while (tokens.length < 4 && offset < buffer.length) {
+    while (offset < buffer.length) {
+      const ch = buffer[offset];
+      if (ch === 35) {
+        while (offset < buffer.length && buffer[offset] !== 10) offset += 1;
+      } else if (ch === 9 || ch === 10 || ch === 13 || ch === 32) {
+        offset += 1;
+      } else {
+        break;
+      }
+    }
+    const start = offset;
+    while (offset < buffer.length) {
+      const ch = buffer[offset];
+      if (ch === 9 || ch === 10 || ch === 13 || ch === 32 || ch === 35) break;
+      offset += 1;
+    }
+    if (offset > start) tokens.push(buffer.toString('ascii', start, offset));
+  }
+  if (offset < buffer.length && (buffer[offset] === 9 || buffer[offset] === 10 || buffer[offset] === 13 || buffer[offset] === 32)) offset += 1;
+  const width = parseInt(tokens[1], 10);
+  const height = parseInt(tokens[2], 10);
+  const max = parseInt(tokens[3], 10);
+  if (tokens[0] !== 'P6' || !Number.isFinite(width) || !Number.isFinite(height) || max !== 255) return null;
+  const dataLength = width * height * 3;
+  if (buffer.length - offset < dataLength) return null;
+  return { width, height, dataOffset: offset, dataLength };
+}
+
+function validateRenderedPpmHasInk(ppmBuffer, bgRgb) {
+  const ppm = parsePpmP6(ppmBuffer);
+  if (!ppm) return { ok: false, inkPixels: 0, inkRatio: 0, pixelCount: 0 };
+  let inkPixels = 0;
+  const pixelCount = ppm.width * ppm.height;
+  const bg = Array.isArray(bgRgb) ? bgRgb : [0, 0, 0];
+  for (let p = ppm.dataOffset; p < ppm.dataOffset + ppm.dataLength; p += 3) {
+    if (ppmBuffer[p] !== bg[0] || ppmBuffer[p + 1] !== bg[1] || ppmBuffer[p + 2] !== bg[2]) inkPixels += 1;
+  }
+  const minInkPixels = Math.max(2, Math.ceil(pixelCount * 0.001));
+  return { ok: inkPixels >= minInkPixels, inkPixels, inkRatio: pixelCount ? inkPixels / pixelCount : 0, pixelCount };
+}
+
 async function commandExists(command) {
   try {
     await exec(command, ['-version'], { encoding: 'utf8', timeout: 3000, maxBuffer: 1024 * 1024 });
@@ -109,19 +160,19 @@ async function commandExists(command) {
 async function probeMagickRenderer(command, fontPath) {
   try {
     const stdout = await runRenderer(command, ['-size', '16x16', `xc:${rgbCss([0, 0, 0])}`, '-font', fontPath, '-pointsize', '12', '-fill', rgbCss([255, 255, 255]), '-gravity', 'NorthWest', '-annotate', '+0+0', '@-', 'ppm:-'], '@');
-    return Buffer.isBuffer(stdout) && stdout.length > 16;
+    return validateRenderedPpmHasInk(stdout, [0, 0, 0]);
   } catch {
-    return false;
+    return { ok: false, inkPixels: 0, inkRatio: 0, pixelCount: 0 };
   }
 }
 
 async function probeFfmpegDrawtext(fontPath) {
-  const filter = `color=c=black:s=16x16:d=0.1,drawtext=fontfile='${escapeDrawtextPath(fontPath)}':text='@':fontsize=12:fontcolor=white:x=0:y=0`;
+  const filter = `color=c=black:s=16x16:d=0.1,drawtext=fontfile='${escapeDrawtextPath(fontPath)}':text='@':fontsize=12:fontcolor=white:x=0:y=0:expansion=none`;
   try {
     const { stdout } = await exec('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', filter, '-frames:v', '1', '-f', 'image2pipe', '-vcodec', 'ppm', 'pipe:1'], { encoding: 'buffer', timeout: 5000, maxBuffer: 1024 * 1024 });
-    return Buffer.isBuffer(stdout) && stdout.length > 16;
+    return validateRenderedPpmHasInk(stdout, [0, 0, 0]);
   } catch {
-    return false;
+    return { ok: false, inkPixels: 0, inkRatio: 0, pixelCount: 0 };
   }
 }
 
@@ -132,14 +183,14 @@ async function probeFontRender() {
     const hasMagick = await commandExists('magick');
     const hasConvert = await commandExists('convert');
     const tools = {
-      magick: selectedFontPath && hasMagick ? await probeMagickRenderer('magick', selectedFontPath) : false,
-      convert: selectedFontPath && hasConvert ? await probeMagickRenderer('convert', selectedFontPath) : false,
-      ffmpegDrawtext: selectedFontPath ? await probeFfmpegDrawtext(selectedFontPath) : false
+      magick: selectedFontPath && hasMagick ? await probeMagickRenderer('magick', selectedFontPath) : { ok: false, inkPixels: 0, inkRatio: 0, pixelCount: 0 },
+      convert: selectedFontPath && hasConvert ? await probeMagickRenderer('convert', selectedFontPath) : { ok: false, inkPixels: 0, inkRatio: 0, pixelCount: 0 },
+      ffmpegDrawtext: selectedFontPath ? await probeFfmpegDrawtext(selectedFontPath) : { ok: false, inkPixels: 0, inkRatio: 0, pixelCount: 0 }
     };
     let rendererBackend = 'bitmap-fallback';
-    if (tools.magick) rendererBackend = 'magick';
-    else if (tools.convert) rendererBackend = 'convert';
-    else if (tools.ffmpegDrawtext) rendererBackend = 'ffmpeg-drawtext';
+    if (tools.magick.ok) rendererBackend = 'magick';
+    else if (tools.convert.ok) rendererBackend = 'convert';
+    else if (tools.ffmpegDrawtext.ok) rendererBackend = 'ffmpeg-drawtext';
     const fontRenderAvailable = rendererBackend !== 'bitmap-fallback';
     return {
       fontRenderAvailable,
@@ -147,6 +198,8 @@ async function probeFontRender() {
       glyphRenderer: fontRenderAvailable ? 'font-system' : 'bitmap-fallback',
       rendererBackend,
       reason: fontRenderAvailable ? null : 'NO_SYSTEM_FONT_RENDERER',
+      fontProbeInkPixels: tools[rendererBackend]?.inkPixels || 0,
+      fontProbeInkRatio: tools[rendererBackend]?.inkRatio || 0,
       tools
     };
   })();
@@ -195,7 +248,7 @@ async function renderFrameSystemPpm(gray, opts, fontProbe) {
   const tmp = path.join('/tmp', `ascii-render-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.txt`);
   await fs.promises.writeFile(tmp, text);
   try {
-    const filter = `color=c=${rgbHex(opts.bg)}:s=${opts.outputWidth}x${opts.outputHeight}:d=0.1,drawtext=fontfile='${escapeDrawtextPath(fontProbe.selectedFontPath)}':textfile='${escapeDrawtextPath(tmp)}':fontsize=${opts.cellH}:fontcolor=${rgbHex(opts.fg)}:x=0:y=0:line_spacing=0`;
+    const filter = `color=c=${rgbHex(opts.bg)}:s=${opts.outputWidth}x${opts.outputHeight}:d=0.1,drawtext=fontfile='${escapeDrawtextPath(fontProbe.selectedFontPath)}':textfile='${escapeDrawtextPath(tmp)}':fontsize=${opts.cellH}:fontcolor=${rgbHex(opts.fg)}:x=0:y=0:line_spacing=0:expansion=none`;
     const { stdout } = await exec('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', filter, '-frames:v', '1', '-f', 'image2pipe', '-vcodec', 'ppm', 'pipe:1'], { encoding: 'buffer', timeout: 10000, maxBuffer: opts.outputWidth * opts.outputHeight * 4 + 4096 });
     return stdout;
   } finally {
@@ -315,6 +368,8 @@ async function renderProfile(inputPath, outputPath, config, profile, sourceSize,
     glyphRenderer: fontProbe.glyphRenderer,
     rendererBackend: fontProbe.rendererBackend,
     reason: fontProbe.reason,
+    fontProbeInkPixels: fontProbe.fontProbeInkPixels,
+    fontProbeInkRatio: fontProbe.fontProbeInkRatio,
     glyphMatrixSize: `${GLYPH_W}x${GLYPH_H}`,
     glyphScaleMode: 'uniform-integer',
     glyphScale: glyphMetrics.glyphScale,
@@ -348,14 +403,45 @@ async function renderProfile(inputPath, outputPath, config, profile, sourceSize,
     invert: !!config.invert
   };
 
+  let useSystemRenderer = fontProbe.fontRenderAvailable;
+  let effectiveGlyphRenderer = fontProbe.glyphRenderer;
+  let effectiveRendererBackend = fontProbe.rendererBackend;
+  let effectiveReason = fontProbe.reason;
+  let firstFrameChecked = false;
+  let firstFrameInkPixels = null;
+  let firstFrameInkRatio = null;
+
   for await (const chunk of extract.stdout) {
     pending = Buffer.concat([pending, chunk]);
     while (pending.length >= frameSize) {
       const gray = pending.subarray(0, frameSize);
       pending = pending.subarray(frameSize);
-      const ppm = fontProbe.fontRenderAvailable
+      let ppm = useSystemRenderer
         ? await renderFrameSystemPpm(gray, frameOpts, fontProbe)
         : renderFrameBitmapPpm(gray, frameOpts);
+
+      if (useSystemRenderer && !firstFrameChecked) {
+        const firstFrameInk = validateRenderedPpmHasInk(ppm, bg);
+        firstFrameChecked = true;
+        firstFrameInkPixels = firstFrameInk.inkPixels;
+        firstFrameInkRatio = firstFrameInk.inkRatio;
+        console.log('[telegram-render] first-frame-ink-check', {
+          glyphRenderer: firstFrameInk.ok ? 'font-system' : 'bitmap-fallback',
+          selectedFontPath: fontProbe.selectedFontPath,
+          rendererBackend: fontProbe.rendererBackend,
+          firstFrameInkPixels,
+          firstFrameInkRatio,
+          reason: firstFrameInk.ok ? null : FONT_RENDER_NO_INK
+        });
+        if (!firstFrameInk.ok) {
+          useSystemRenderer = false;
+          effectiveGlyphRenderer = 'bitmap-fallback';
+          effectiveRendererBackend = 'bitmap-fallback';
+          effectiveReason = FONT_RENDER_NO_INK;
+          ppm = renderFrameBitmapPpm(gray, frameOpts);
+        }
+      }
+
       if (!encode.stdin.write(ppm)) await new Promise((resolve) => encode.stdin.once('drain', resolve));
     }
   }
@@ -364,7 +450,7 @@ async function renderProfile(inputPath, outputPath, config, profile, sourceSize,
   encode.stdin.end();
   await encodeDone;
   const outputSizeBytes = (await fs.promises.stat(outputPath)).size;
-  return { outputPath, outputSizeBytes, outputWidth, outputHeight, cols, rows, cellW, cellH, fillMode, extractionMode, glyphRenderer: fontProbe.glyphRenderer, rendererBackend: fontProbe.rendererBackend, selectedFontPath: fontProbe.selectedFontPath, glyphMatrixSize: `${GLYPH_W}x${GLYPH_H}`, glyphScaleMode: 'uniform-integer', glyphScale: glyphMetrics.glyphScale, renderedGlyphWidth: glyphMetrics.glyphWidthPx, renderedGlyphHeight: glyphMetrics.glyphHeightPx, profile: profile.name };
+  return { outputPath, outputSizeBytes, outputWidth, outputHeight, cols, rows, cellW, cellH, fillMode, extractionMode, glyphRenderer: effectiveGlyphRenderer, rendererBackend: effectiveRendererBackend, selectedFontPath: fontProbe.selectedFontPath, reason: effectiveReason, fontProbeInkPixels: fontProbe.fontProbeInkPixels, fontProbeInkRatio: fontProbe.fontProbeInkRatio, firstFrameInkPixels, firstFrameInkRatio, glyphMatrixSize: `${GLYPH_W}x${GLYPH_H}`, glyphScaleMode: 'uniform-integer', glyphScale: glyphMetrics.glyphScale, renderedGlyphWidth: glyphMetrics.glyphWidthPx, renderedGlyphHeight: glyphMetrics.glyphHeightPx, profile: profile.name };
 }
 
 async function renderTelegramVideo(inputPath, outputPath, config = {}) {
@@ -375,6 +461,8 @@ async function renderTelegramVideo(inputPath, outputPath, config = {}) {
     glyphRenderer: fontProbe.glyphRenderer,
     rendererBackend: fontProbe.rendererBackend,
     reason: fontProbe.reason,
+    fontProbeInkPixels: fontProbe.fontProbeInkPixels,
+    fontProbeInkRatio: fontProbe.fontProbeInkRatio,
     tools: fontProbe.tools
   });
   const sourceSize = await probeVideoSize(inputPath);
