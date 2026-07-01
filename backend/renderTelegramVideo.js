@@ -4,13 +4,19 @@ const { execFile, spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const { promisify } = require('util');
-const exec = promisify(execFile);
+const {
+  RENDER_OUTPUT_SAFE_LIMIT_BYTES,
+  getRenderProfiles,
+  resolveOrientation,
+  clampRenderFps
+} = require('./renderLimits');
 
-const DEFAULT_OUTPUT_WIDTH = 720;
-const DEFAULT_OUTPUT_HEIGHT = 1280;
+const exec = promisify(execFile);
 const DEFAULT_CHARSET = ' .:-=+*#%@';
 const VGA_W = 8;
 const VGA_H = 12;
+const DEFAULT_CELL_W = 8;
+const DEFAULT_CELL_H = 16;
 
 const GLYPHS_8X12 = {
   ' ': ['00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000','00000000'],
@@ -54,17 +60,35 @@ function buildExtractionFilter({ fps, fillMode, outputWidth, outputHeight, cols,
   return `fps=${fps},scale=${outputWidth}:${outputHeight}:force_original_aspect_ratio=increase,crop=${outputWidth}:${outputHeight},scale=${cols}:${rows},format=gray`;
 }
 
+function resolveRenderParams(inputPath, config, sourceSize) {
+  const source = config?.source || {};
+  const orientation = resolveOrientation({
+    width: source.width || config.sourceWidth || sourceSize.width,
+    height: source.height || config.sourceHeight || sourceSize.height,
+    sourceOrientation: source.orientation || config.sourceOrientation
+  });
+  const profiles = getRenderProfiles(orientation);
+  return { orientation, profiles, inputPath };
+}
+
+function resolveCharset(config) {
+  const src = String(config.renderCharset10 || config.charset || DEFAULT_CHARSET);
+  const chars = Array.from(src).filter((ch) => Object.prototype.hasOwnProperty.call(GLYPHS_8X12, ch));
+  return chars.length ? chars.join('') : DEFAULT_CHARSET;
+}
+
 function drawGlyph(frame, ch, x0, y0, cellW, cellH, fg, bg) {
   const glyph = GLYPHS_8X12[ch] || GLYPHS_8X12['#'];
-  for (let y = 0; y < cellH; y++) {
+  for (let y = 0; y < cellH; y += 1) {
     const gy = Math.min(VGA_H - 1, Math.floor((y / cellH) * VGA_H));
     const row = glyph[gy] || GLYPHS_8X12[' '][0];
-    for (let x = 0; x < cellW; x++) {
+    for (let x = 0; x < cellW; x += 1) {
       const gx = Math.min(VGA_W - 1, Math.floor((x / cellW) * VGA_W));
-      const on = row.charCodeAt(gx) === 49;
-      const c = on ? fg : bg;
+      const c = row.charCodeAt(gx) === 49 ? fg : bg;
       const p = ((y0 + y) * frame.width + x0 + x) * 3;
-      frame.data[p] = c[0]; frame.data[p + 1] = c[1]; frame.data[p + 2] = c[2];
+      frame.data[p] = c[0];
+      frame.data[p + 1] = c[1];
+      frame.data[p + 2] = c[2];
     }
   }
 }
@@ -72,12 +96,14 @@ function drawGlyph(frame, ch, x0, y0, cellW, cellH, fg, bg) {
 function renderFramePpm(gray, opts) {
   const { cols, rows, outputWidth, outputHeight, cellW, cellH, charset, fg, bg, contrast, gamma, invert } = opts;
   const data = Buffer.alloc(outputWidth * outputHeight * 3);
-  for (let i = 0; i < outputWidth * outputHeight; i++) {
-    data[i * 3] = bg[0]; data[i * 3 + 1] = bg[1]; data[i * 3 + 2] = bg[2];
+  for (let i = 0; i < outputWidth * outputHeight; i += 1) {
+    data[i * 3] = bg[0];
+    data[i * 3 + 1] = bg[1];
+    data[i * 3 + 2] = bg[2];
   }
   const shades = Math.max(1, charset.length - 1);
-  for (let y = 0; y < rows; y++) {
-    for (let x = 0; x < cols; x++) {
+  for (let y = 0; y < rows; y += 1) {
+    for (let x = 0; x < cols; x += 1) {
       let lum = (gray[y * cols + x] || 0) / 255;
       lum = Math.pow(Math.max(0, Math.min(1, (lum - 0.5) * contrast + 0.5)), 1 / gamma);
       if (invert) lum = 1 - lum;
@@ -88,27 +114,51 @@ function renderFramePpm(gray, opts) {
   return Buffer.concat([Buffer.from(`P6\n${outputWidth} ${outputHeight}\n255\n`), data]);
 }
 
-async function renderTelegramVideo(inputPath, outputPath, config = {}) {
-  const fps = clampInt(config.fps, 5, 60, 24);
-  const outputWidth = clampInt(config.outputWidth || config.width, 160, 2160, DEFAULT_OUTPUT_WIDTH);
-  const outputHeight = clampInt(config.outputHeight || config.height, 160, 3840, DEFAULT_OUTPUT_HEIGHT);
-  const cellW = clampInt(config.cellW, 4, 64, 8);
-  const cellH = clampInt(config.cellH, 6, 96, 16);
+function waitForClose(child, label, getErr) {
+  return new Promise((resolve, reject) => {
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(getErr() || `${label} exit ${code}`));
+    });
+  });
+}
+
+async function renderProfile(inputPath, outputPath, config, profile, sourceSize) {
+  const fps = clampRenderFps(config.fps);
+  const outputWidth = profile.width;
+  const outputHeight = profile.height;
+  const cellW = clampInt(config.cellW, 4, 64, DEFAULT_CELL_W);
+  const cellH = clampInt(config.cellH, 6, 96, DEFAULT_CELL_H);
   const cols = Math.max(1, Math.floor(outputWidth / cellW));
   const rows = Math.max(1, Math.floor(outputHeight / cellH));
   const fillMode = String(config.fillMode || 'cover').toLowerCase() === 'contain' ? 'contain' : 'cover';
-  const charset = Array.from(String(config.renderCharset10 || config.charset || DEFAULT_CHARSET)).filter((ch) => Object.prototype.hasOwnProperty.call(GLYPHS_8X12, ch)).join('') || DEFAULT_CHARSET;
+  const charset = resolveCharset(config);
   const fg = hexToRgb(config.fg || config.color, [255, 255, 255]);
   const bg = hexToRgb(config.bg || config.background, [0, 0, 0]);
-  const source = await probeVideoSize(inputPath);
-  const extractionFilter = buildExtractionFilter({ fps, fillMode, outputWidth, outputHeight, cols, rows });
   const extractionMode = fillMode === 'cover' ? 'canvas-cover-then-grid' : 'grid-contain-fallback';
-  console.log('[telegram-render] config', { sourceSize: source, outputCanvas: { width: outputWidth, height: outputHeight }, cols, rows, cellW, cellH, fillMode, extractionMode, glyphRenderer: 'vga', glyphMatrixSize: `${VGA_W}x${VGA_H}`, glyphScaleX: cellW / VGA_W, glyphScaleY: cellH / VGA_H });
+  const extractionFilter = buildExtractionFilter({ fps, fillMode, outputWidth, outputHeight, cols, rows });
+
+  console.log('[telegram-render] config', {
+    sourceSize,
+    outputCanvas: { width: outputWidth, height: outputHeight, profile: profile.name },
+    cols,
+    rows,
+    cellW,
+    cellH,
+    fillMode,
+    extractionMode,
+    glyphRenderer: 'vga',
+    glyphMatrixSize: `${VGA_W}x${VGA_H}`,
+    glyphScaleX: cellW / VGA_W,
+    glyphScaleY: cellH / VGA_H
+  });
 
   await fs.promises.mkdir(path.dirname(outputPath), { recursive: true });
   const extract = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-i', inputPath, '-vf', extractionFilter, '-f', 'rawvideo', '-pix_fmt', 'gray', 'pipe:1'], { stdio: ['ignore', 'pipe', 'pipe'] });
-  const encode = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-framerate', String(fps), '-f', 'image2pipe', '-vcodec', 'ppm', '-i', 'pipe:0', '-an', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-y', outputPath], { stdio: ['pipe', 'ignore', 'pipe'] });
-  let extErr = ''; let encErr = '';
+  const encode = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-framerate', String(fps), '-f', 'image2pipe', '-vcodec', 'ppm', '-i', 'pipe:0', '-an', '-c:v', 'libx264', '-preset', 'medium', '-crf', '17', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-y', outputPath], { stdio: ['pipe', 'ignore', 'pipe'] });
+  let extErr = '';
+  let encErr = '';
   extract.stderr.on('data', (d) => { extErr += d.toString(); });
   encode.stderr.on('data', (d) => { encErr += d.toString(); });
   const frameSize = cols * rows;
@@ -118,15 +168,49 @@ async function renderTelegramVideo(inputPath, outputPath, config = {}) {
     while (pending.length >= frameSize) {
       const gray = pending.subarray(0, frameSize);
       pending = pending.subarray(frameSize);
-      encode.stdin.write(renderFramePpm(gray, { cols, rows, outputWidth, outputHeight, cellW, cellH, charset, fg, bg, contrast: Math.max(0.1, Number(config.contrast || 1)), gamma: Math.max(0.1, Number(config.gamma || 1)), invert: !!config.invert }));
+      encode.stdin.write(renderFramePpm(gray, {
+        cols,
+        rows,
+        outputWidth,
+        outputHeight,
+        cellW,
+        cellH,
+        charset,
+        fg,
+        bg,
+        contrast: Math.max(0.1, Number(config.contrast || 1)),
+        gamma: Math.max(0.1, Number(config.gamma || 1)),
+        invert: !!config.invert
+      }));
     }
   });
-  const waitExtract = new Promise((resolve, reject) => extract.on('close', (code) => code === 0 ? resolve() : reject(new Error(extErr || `ffmpeg extract exit ${code}`))));
-  const waitEncode = new Promise((resolve, reject) => encode.on('close', (code) => code === 0 ? resolve() : reject(new Error(encErr || `ffmpeg encode exit ${code}`))));
-  await waitExtract;
+
+  await waitForClose(extract, 'ffmpeg extract', () => extErr);
   encode.stdin.end();
-  await waitEncode;
-  return { outputPath, outputWidth, outputHeight, cols, rows, cellW, cellH, fillMode, extractionMode, glyphRenderer: 'vga', glyphMatrixSize: `${VGA_W}x${VGA_H}` };
+  await waitForClose(encode, 'ffmpeg encode', () => encErr);
+  const outputSizeBytes = (await fs.promises.stat(outputPath)).size;
+  return { outputPath, outputSizeBytes, outputWidth, outputHeight, cols, rows, cellW, cellH, fillMode, extractionMode, glyphRenderer: 'vga', glyphMatrixSize: `${VGA_W}x${VGA_H}`, profile: profile.name };
+}
+
+async function renderTelegramVideo(inputPath, outputPath, config = {}) {
+  const sourceSize = await probeVideoSize(inputPath);
+  const { orientation, profiles } = resolveRenderParams(inputPath, config, sourceSize);
+  let lastResult = null;
+  let lastError = null;
+  for (const profile of profiles) {
+    try {
+      const result = await renderProfile(inputPath, outputPath, config, profile, sourceSize);
+      lastResult = { ...result, orientation };
+      if (result.outputSizeBytes <= RENDER_OUTPUT_SAFE_LIMIT_BYTES) return lastResult;
+      console.log('[telegram-render] output-too-large-try-next-profile', { profile: profile.name, outputSizeBytes: result.outputSizeBytes, limit: RENDER_OUTPUT_SAFE_LIMIT_BYTES });
+    } catch (err) {
+      lastError = err;
+      console.error('[telegram-render] profile-failed', { profile: profile.name, error: err?.message || err });
+    }
+    try { await fs.promises.rm(outputPath, { force: true }); } catch {}
+  }
+  if (lastResult) return lastResult;
+  throw lastError || new Error('RENDER_FAILED');
 }
 
 module.exports = { renderTelegramVideo, buildExtractionFilter, GLYPHS_8X12 };
