@@ -7422,7 +7422,7 @@ async function buildPreviewGlyphAtlas() {
   };
 }
 
-async function asciiVisorTestTelegramRenderJob() {
+async function startTelegramBackgroundVideoRender() {
   const tgWebApp = window.Telegram?.WebApp;
   const sourceVideoFile = state.sourceVideoFile;
 
@@ -7481,26 +7481,56 @@ async function asciiVisorTestTelegramRenderJob() {
     let json = null;
     try { json = JSON.parse(text || '{}'); } catch (_) { json = null; }
     if (!res.ok) {
-      const message = json?.error || text || `HTTP ${res.status}`;
-      throw new Error(String(message).slice(0, 500));
+      const errorCode = json?.error || '';
+      const message = errorCode || text || `HTTP ${res.status}`;
+      const err = new Error(String(message).slice(0, 500));
+      err.code = errorCode;
+      err.status = res.status;
+      err.payload = json;
+      throw err;
     }
+    console.log('[telegram-background-render] queued');
     showQueuedRenderBusy();
     return json || text;
   } catch (err) {
+    console.log('[telegram-background-render] failed', err);
     console.warn('[render-video-job] failed:', err);
     busyLock = false;
     busyHide(true);
-    showAsciiPopup({
-      type: 'error',
-      sound: 'error',
-      title: 'РЕНДЕР НЕ ЗАПУЩЕН',
-      message: err?.message || 'Попробуй ещё раз.'
-    });
+
+    const code = err?.code || err?.payload?.error || err?.message || '';
+    if (err?.status === 402 || code === 'INSUFFICIENT_FUNDS') {
+      showAsciiPopup({
+        type: 'error',
+        title: 'НЕДОСТАТОЧНО ЭНЕРГИИ',
+        message: `Для преобразования требуется: ${err?.payload?.need ?? 15}`,
+        extra: `В энергохранилище: ${err?.payload?.balance ?? '—'}`
+      });
+    } else if (code === 'RENDER_JOB_ALREADY_ACTIVE') {
+      showAsciiPopup({
+        type: 'error',
+        sound: 'error',
+        title: 'РЕНДЕР УЖЕ В ОЧЕРЕДИ ИЛИ ВЫПОЛНЯЕТСЯ'
+      });
+    } else if (code === 'VIDEO_TOO_LONG') {
+      showAsciiPopup({
+        type: 'error',
+        sound: 'error',
+        title: 'ВИДЕО ДЛИННЕЕ ЛИМИТА'
+      });
+    } else {
+      showAsciiPopup({
+        type: 'error',
+        sound: 'error',
+        title: 'РЕНДЕР НЕ ЗАПУЩЕН',
+        message: err?.message || 'Попробуй ещё раз.'
+      });
+    }
     throw err;
   }
 }
 
-window.asciiVisorTestTelegramRenderJob = asciiVisorTestTelegramRenderJob;
+window.asciiVisorTestTelegramRenderJob = startTelegramBackgroundVideoRender;
 
 // Универсальная отправка: в Telegram → на сервер; иначе → локальная загрузка
 async function downloadBlob(blob, filename) {
@@ -9556,6 +9586,23 @@ async function doSave() {
     const hasVideo = !!(app.vid && (app.vid.src || app.vid.srcObject));
     if (!hasGif && !hasVideo) {
       showAsciiPopup({ type:'info', title:'НЕТ ВИДЕО', message:'Нет выбранного видео.' });
+      return;
+    }
+    if (window.Telegram?.WebApp?.initData && state.sourceVideoFile) {
+      const hasEnoughImpulses = await ensureEnoughBalanceBeforeExport('video', 15);
+      if (!hasEnoughImpulses) return;
+      const videoDurationSec = Number(app.vid?.duration || 0) || await getVideoDurationSec(state.sourceVideoFile);
+      if (Number.isFinite(videoDurationSec) && videoDurationSec > 10) {
+        showAsciiPopup({
+          type: 'error',
+          sound: 'error',
+          title: 'ВИДЕО ДЛИННЕЕ ЛИМИТА',
+          message: 'BACKGROUND-РЕНДЕР ПОКА ПОДДЕРЖИВАЕТ ДО 10 СЕК.'
+        });
+        return;
+      }
+      console.log('[telegram-background-render] save-button-start');
+      await startTelegramBackgroundVideoRender();
       return;
     }
     const hasEnoughImpulses = await ensureEnoughBalanceBeforeExport('video', 15);
