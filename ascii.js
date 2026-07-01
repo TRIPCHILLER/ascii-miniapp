@@ -7436,7 +7436,7 @@ async function startTelegramBackgroundVideoRender() {
   form.append('initdata', tgWebApp?.initData || '');
   form.append('initData', tgWebApp?.initData || '');
   form.append('mediatype', 'video');
-  const renderFps = Math.max(5, Math.min(60, Math.round(state.fps || 30)));
+  const renderFps = Math.max(5, Math.min(30, Math.round(state.fps || 30)));
   form.append('fps', String(renderFps));
   const sourceWidth = Math.max(0, Math.round(Number(app.vid?.videoWidth || 0)));
   const sourceHeight = Math.max(0, Math.round(Number(app.vid?.videoHeight || 0)));
