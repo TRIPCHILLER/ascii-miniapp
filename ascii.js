@@ -7296,19 +7296,33 @@ async function asciiVisorTestTelegramRenderJob() {
   form.append('sourceSizeBytes', String(Number(state.sourceSizeBytes || sourceVideoFile.size || 0)));
   form.append('sourceIsGif', state.sourceIsGif ? '1' : '0');
 
-  const res = await fetch(`${API_BASE}/api/render-video-job`, {
-    method: 'POST',
-    body: form,
-    headers: applyTelegramInitDataHeader({})
-  });
-  const text = await res.text();
-  let json = null;
-  try { json = JSON.parse(text || '{}'); } catch (_) { json = null; }
-  if (!res.ok) {
-    const message = json?.error || text || `HTTP ${res.status}`;
-    throw new Error(String(message).slice(0, 500));
+  try {
+    const res = await fetch(`${API_BASE}/api/render-video-job`, {
+      method: 'POST',
+      body: form,
+      headers: applyTelegramInitDataHeader({})
+    });
+    const text = await res.text();
+    let json = null;
+    try { json = JSON.parse(text || '{}'); } catch (_) { json = null; }
+    if (!res.ok) {
+      const message = json?.error || text || `HTTP ${res.status}`;
+      throw new Error(String(message).slice(0, 500));
+    }
+    showQueuedRenderBusy();
+    return json || text;
+  } catch (err) {
+    console.warn('[render-video-job] failed:', err);
+    busyLock = false;
+    busyHide(true);
+    showAsciiPopup({
+      type: 'error',
+      sound: 'error',
+      title: 'РЕНДЕР НЕ ЗАПУЩЕН',
+      message: err?.message || 'Попробуй ещё раз.'
+    });
+    throw err;
   }
-  return json || text;
 }
 
 window.asciiVisorTestTelegramRenderJob = asciiVisorTestTelegramRenderJob;
@@ -9372,28 +9386,6 @@ async function doSave() {
     const hasEnoughImpulses = await ensureEnoughBalanceBeforeExport('video', 15);
     if (!hasEnoughImpulses) return;
     hudSet('VIDEO: запись… (дождитесь окончания)');
-    const isTelegramMiniApp = !!(window.Telegram?.WebApp?.initData);
-    if (isTelegramMiniApp && state.sourceVideoFile) {
-      const stopBusyQueueAnimation = startBusyServiceTextAnimation('ПОСТАНОВКА РЕНДЕРА В ОЧЕРЕДЬ', { withDots: true });
-      try {
-        busyLock = true;
-        await asciiVisorTestTelegramRenderJob();
-        stopBusyQueueAnimation();
-        showQueuedRenderBusy();
-      } catch (err) {
-        stopBusyQueueAnimation();
-        console.warn('[render-video-job] failed:', err);
-        busyLock = false;
-        busyHide(true);
-        showAsciiPopup({
-          type: 'error',
-          sound: 'error',
-          title: 'РЕНДЕР НЕ ЗАПУЩЕН',
-          message: err?.message || 'Попробуй ещё раз.'
-        });
-      }
-      return;
-    }
     saveVideo();
   }
 }
