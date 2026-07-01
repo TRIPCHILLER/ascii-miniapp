@@ -1484,8 +1484,11 @@ app.post('/api/render-video-job', upload.any(), async (req, res) => {
     const jobId = crypto.randomBytes(8).toString('hex');
     const sourcePath = f.path;
     const sourceName = String(req.body?.sourceFilename || f.originalname || 'source-video');
-    await sendMessage(userId, 'РЕНДЕР ВИДЕО ПОСТАВЛЕН В ОЧЕРЕДЬ.');
-
+        await sendMessage(
+  userId,
+  '<pre><code class="language-SYSTEM-MESSAGE">[⏳] ВИД30-ФР4ГМ3НТ 0ТПР4ВЛ3Н В 0Ч3Р3ДЬ Н4 ПР30БР4З0В4НИ3 ...</code></pre>',
+  { parse_mode: 'HTML' }
+);
     renderQueue.add({
       userId,
       jobId,
@@ -1494,7 +1497,12 @@ app.post('/api/render-video-job', upload.any(), async (req, res) => {
         const outMp4 = path.join(tmpdir, `${jobId}.mp4`);
         try {
           console.log('[render-video-job] start', { jobId, userId, sourceName, queue: renderQueue.stats() });
-          await sendMessage(userId, 'РЕНДЕР ВИДЕО СТАРТОВАЛ.');
+          
+          await sendMessage(
+  userId,
+  '<pre><code class="language-SYSTEM-MESSAGE">ПР30БР4З0В4НИ3 Н4Ч4Т0. МН3 М0Ж3Т П0ТР3Б0В4ТЬСЯ Н3К0Т0Р03 ВР3М9 ...</code></pre>',
+  { parse_mode: 'HTML' }
+);        
           const result = await renderTelegramVideo(sourcePath, outMp4, renderConfig);
           if (Number(result.outputSizeBytes || 0) > RENDER_OUTPUT_SAFE_LIMIT_BYTES) {
             throw new Error(`RENDER_OUTPUT_TOO_LARGE:${result.outputSizeBytes}`);
@@ -1507,7 +1515,11 @@ app.post('/api/render-video-job', upload.any(), async (req, res) => {
           console.log('[render-video-job] sent-and-charged', { jobId, userId, outputSizeBytes: result.outputSizeBytes, balance: getBalance(userId) });
         } catch (err) {
           console.error('[render-video-job] failed', { jobId, userId, error: err?.message || err });
-          try { await sendMessage(userId, 'РЕНДЕР ВИДЕО НЕ УДАЛСЯ. ИМПУЛЬСЫ НЕ СПИСАНЫ.'); } catch (_) {}
+          try { await sendMessage(
+  userId,
+  '<pre><code class="language-SYSTEM-MESSAGE">ПР30БР4З0В4НИ3 Н3 УД4Л0СЬ. ИМПУЛЬСЫ 0СТ4ЛИСЬ В ХР4НИЛИЩ3.</code></pre>',
+  { parse_mode: 'HTML' }
+); } catch (_) {}
         } finally {
           try { if (sourcePath) await fs.promises.rm(sourcePath, { force: true }); } catch {}
           try { await fs.promises.rm(tmpdir, { recursive: true, force: true }); } catch {}
