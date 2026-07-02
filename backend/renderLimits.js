@@ -1,7 +1,7 @@
 'use strict';
 
 const RENDER_VIDEO_COST = 15;
-const RENDER_MAX_DURATION_SEC = 10;
+const RENDER_MAX_DURATION_SEC = 15;
 const RENDER_OUTPUT_SAFE_LIMIT_BYTES = 48 * 1024 * 1024;
 const RENDER_QUEUE_CONCURRENCY = 1;
 const TG_BACKGROUND_RENDER_ENABLED = /^(1|true|yes|on)$/i.test(String(process.env.TG_BACKGROUND_RENDER_ENABLED || ''));
