@@ -9604,14 +9604,14 @@ async function doSave() {
       }
       setBusyStatusText('ПР0В3РК4 П4Р4М3ТР0В ВИД30...');
       const videoDurationSec = Number(app.vid?.duration || 0) || await getVideoDurationSec(state.sourceVideoFile);
-      if (Number.isFinite(videoDurationSec) && videoDurationSec > 10) {
+      if (Number.isFinite(videoDurationSec) && videoDurationSec > 15) {
         busyLock = false;
         busyHide(true);
         showAsciiPopup({
           type: 'error',
           sound: 'error',
           title: '9 Н3 М0ГУ ЭТ0Г0 СД3Л4ТЬ...',
-          message: 'ПР30БР4З0В4НИ3 П0ДД3РЖИВ43Т ФР4ГМ3НТЫ Д0 10 СЕК.'
+          message: 'ПР30БР4З0В4НИ3 П0ДД3РЖИВ43Т ФР4ГМ3НТЫ Д0 15 СЕК.'
         });
         return;
       }
