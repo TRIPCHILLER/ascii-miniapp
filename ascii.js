@@ -7431,12 +7431,14 @@ async function buildPreviewGlyphAtlas() {
 async function startTelegramBackgroundVideoRender() {
   const tgWebApp = window.Telegram?.WebApp;
   const sourceVideoFile = state.sourceVideoFile;
+  const clientRenderId = (window.crypto?.randomUUID?.() || `client-${Date.now()}-${Math.random().toString(16).slice(2)}`);
 
   if (!sourceVideoFile) {
     throw new Error('Сначала выбери видео в режиме ВИД30.');
   }
 
   const form = new FormData();
+  form.append('clientRenderId', clientRenderId);
   form.append('file', sourceVideoFile, state.sourceFilename || sourceVideoFile.name || 'source-video');
   form.append('filename', state.sourceFilename || sourceVideoFile.name || 'source-video');
   form.append('initdata', tgWebApp?.initData || '');
@@ -7477,11 +7479,33 @@ async function startTelegramBackgroundVideoRender() {
   form.append('sourceSizeBytes', String(Number(state.sourceSizeBytes || sourceVideoFile.size || 0)));
   form.append('sourceIsGif', state.sourceIsGif ? '1' : '0');
 
+  const requestUrl = `${API_BASE}/api/render-video-job`;
+  const renderRequestDiagnostics = {
+    clientRenderId,
+    filename: state.sourceFilename || sourceVideoFile.name || 'source-video',
+    fileSize: sourceVideoFile.size,
+    fileType: sourceVideoFile.type,
+    fileLastModified: sourceVideoFile.lastModified,
+    navigatorOnline: navigator.onLine,
+    API_BASE
+  };
+
   try {
-    const res = await fetch(`${API_BASE}/api/render-video-job`, {
+    console.log('[telegram-background-render] before fetch', {
+      ...renderRequestDiagnostics,
+      url: requestUrl,
+      at: new Date().toISOString()
+    });
+    const res = await fetch(requestUrl, {
       method: 'POST',
       body: form,
       headers: applyTelegramInitDataHeader({})
+    });
+    console.log('[telegram-background-render] after fetch', {
+      clientRenderId,
+      status: res.status,
+      ok: res.ok,
+      at: new Date().toISOString()
     });
     const text = await res.text();
     let json = null;
@@ -7495,11 +7519,16 @@ async function startTelegramBackgroundVideoRender() {
       err.payload = json;
       throw err;
     }
-    console.log('[telegram-background-render] queued');
+    console.log('[telegram-background-render] queued', { clientRenderId });
     showQueuedRenderBusy();
     return json || text;
   } catch (err) {
-    console.log('[telegram-background-render] failed', err);
+    console.log('[telegram-background-render] failed', {
+      ...renderRequestDiagnostics,
+      errName: err?.name,
+      errMessage: err?.message,
+      errStack: err?.stack
+    });
     console.warn('[render-video-job] failed:', err);
     busyLock = false;
     busyHide(true);
@@ -7529,7 +7558,9 @@ async function startTelegramBackgroundVideoRender() {
         type: 'error',
         sound: 'error',
         title: 'РЕНДЕР НЕ ЗАПУЩЕН',
-        message: err?.message || 'Попробуй ещё раз.'
+        message: err?.name === 'TypeError' && /fetch/i.test(String(err?.message || ''))
+          ? 'СЕТЕВОЙ СБОЙ ИЛИ TELEGRAM НЕ ДАЛ ПОВТОРНО ПРОЧИТАТЬ ВИДЕО. ПЕРЕВЫБЕРИ ФРАГМЕНТ И ПОВТОРИ.'
+          : (err?.message || 'Попробуй ещё раз.')
       });
     }
     throw err;
