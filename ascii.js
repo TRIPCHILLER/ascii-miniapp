@@ -9737,7 +9737,8 @@ async function doSave() {
       return;
     }
     if (window.Telegram?.WebApp?.initData && state.sourceVideoFile) {
-      setBusyStatusText('4Н4ЛИЗ ЭН3РГ0ХР4НИЛИЩ4...');
+      setBusyStatusText('АНАЛИЗ ЭНЕРГОХРАНИЛИЩА...');
+      await sleep(650);
       const hasEnoughImpulses = await ensureEnoughBalanceBeforeExport('video', 15);
       if (!hasEnoughImpulses) {
         busyLock = false;
@@ -9757,7 +9758,10 @@ async function doSave() {
         });
         return;
       }
-      setBusyStatusText('СБ0РК4 СИМВ0ЛЬН0Й М4ТРИЦЫ...\nП3Р3Д4Ч4 В 0Ч3Р3ДЬ...');
+      setBusyStatusText('СБОРКА СИМВОЛЬНОЙ МАТРИЦЫ...');
+      await sleep(650);
+      setBusyStatusText('ПЕРЕДАЧА В ОЧЕРЕДЬ...');
+      await sleep(650);
       console.log('[telegram-background-render] save-button-start');
       await startTelegramBackgroundVideoRender();
       return;

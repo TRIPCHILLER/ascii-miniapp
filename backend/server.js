@@ -1544,11 +1544,10 @@ app.post('/api/render-video-job', upload.any(), async (req, res) => {
     const sourcePath = f.path;
     const sourceName = String(req.body?.sourceFilename || f.originalname || 'source-video');
     setRenderJobStatus(clientRenderId, { status: 'queued', jobId });
-        await sendMessage(
-  userId,
-  '<pre><code class="language-SYSTEM-MESSAGE">[⏳] ВИД30-ФР4ГМ3НТ 0ТПР4ВЛ3Н В 0Ч3Р3ДЬ Н4 ПР30БР4З0В4НИ3 ...</code></pre>',
-  { parse_mode: 'HTML' }
-);
+    const statusMessageId = await sendRenderStatusMessage(
+      userId,
+      '<pre><code class="language-SYSTEM-MESSAGE">[⏳] ВИД30-ФР4ГМ3НТ 0ТПР4ВЛ3Н В 0Ч3Р3ДЬ Н4 ПР30БР4З0В4НИ3 ...</code></pre>'
+    );
     renderQueue.add({
       userId,
       jobId,
@@ -1559,11 +1558,11 @@ app.post('/api/render-video-job', upload.any(), async (req, res) => {
           setRenderJobStatus(clientRenderId, { status: 'active', jobId });
           console.log('[render-video-job] start', { jobId, clientRenderId, userId, sourceName, queue: renderQueue.stats() });
           
-          await sendMessage(
-  userId,
-  '<pre><code class="language-SYSTEM-MESSAGE">ПР30БР4З0В4НИ3 Н4Ч4Т0. МН3 М0Ж3Т П0ТР3Б0В4ТЬСЯ Н3К0Т0Р03 ВР3М9 ...</code></pre>',
-  { parse_mode: 'HTML' }
-);        
+          await editRenderStatusMessage(
+            userId,
+            statusMessageId,
+            '<pre><code class="language-SYSTEM-MESSAGE">ПР30БР4З0В4НИ3 Н4Ч4Т0. МН3 М0Ж3Т П0ТР3Б0В4ТЬСЯ Н3К0Т0Р03 ВР3М9 ...</code></pre>'
+          );
           const result = await renderTelegramVideo(sourcePath, outMp4, renderConfig);
           if (Number(result.outputSizeBytes || 0) > RENDER_OUTPUT_SAFE_LIMIT_BYTES) {
             throw new Error(`RENDER_OUTPUT_TOO_LARGE:${result.outputSizeBytes}`);
@@ -1573,16 +1572,23 @@ app.post('/api/render-video-job', upload.any(), async (req, res) => {
             throw new Error('TELEGRAM_SEND_NOT_OK');
           }
           deduct(userId, RENDER_VIDEO_COST);
+          await editRenderStatusMessage(
+            userId,
+            statusMessageId,
+            '<pre><code class="language-SYSTEM-MESSAGE">ПР30БР4З0В4НИ3 З4В3РШ3Н0. ФР4ГМ3НТ П3Р3Д4Н В Ч4Т.</code></pre>'
+          );
           setRenderJobStatus(clientRenderId, { status: 'sent', jobId, error: '' });
           console.log('[render-video-job] sent-and-charged', { jobId, clientRenderId, userId, outputSizeBytes: result.outputSizeBytes, balance: getBalance(userId) });
         } catch (err) {
           setRenderJobStatus(clientRenderId, { status: 'failed', jobId, error: err?.message || String(err || '') });
           console.error('[render-video-job] failed', { jobId, clientRenderId, userId, error: err?.message || err });
-          try { await sendMessage(
-  userId,
-  '<pre><code class="language-SYSTEM-MESSAGE">ПР30БР4З0В4НИ3 Н3 УД4Л0СЬ. ИМПУЛЬСЫ 0СТ4ЛИСЬ В ХР4НИЛИЩ3.</code></pre>',
-  { parse_mode: 'HTML' }
-); } catch (_) {}
+          try {
+            await editRenderStatusMessage(
+              userId,
+              statusMessageId,
+              '<pre><code class="language-SYSTEM-MESSAGE">ПР30БР4З0В4НИ3 Н3 УД4Л0СЬ. ИМПУЛЬСЫ 0СТ4ЛИСЬ В ХР4НИЛИЩ3.</code></pre>'
+            );
+          } catch (_) {}
         } finally {
           try { if (sourcePath) await fs.promises.rm(sourcePath, { force: true }); } catch {}
           try { await fs.promises.rm(tmpdir, { recursive: true, force: true }); } catch {}
@@ -1801,6 +1807,62 @@ function logTelegramSendError(err, { endpoint, chatId, userId, runId, messageLen
     endpoint,
     ...sanitizeTelegramError(err)
   });
+}
+
+async function sendRenderStatusMessage(userId, text) {
+  const endpoint = 'sendMessage';
+  const url = `https://api.telegram.org/bot${process.env.BOT_TOKEN}/${endpoint}`;
+  try {
+    const { data } = await axios.post(url, {
+      chat_id: String(userId),
+      text,
+      parse_mode: 'HTML'
+    });
+    return data?.result?.message_id || null;
+  } catch (err) {
+    logTelegramSendError(err, {
+      endpoint,
+      chatId: userId,
+      userId,
+      messageLength: String(text || '').length
+    });
+    return null;
+  }
+}
+
+async function editRenderStatusMessage(userId, messageId, text) {
+  if (!messageId) {
+    try {
+      await sendMessage(userId, text, { parse_mode: 'HTML' });
+    } catch (err) {
+      console.error('[render-status-send-without-message-id-failed]', sanitizeTelegramError(err));
+    }
+    return null;
+  }
+  const endpoint = 'editMessageText';
+  const url = `https://api.telegram.org/bot${process.env.BOT_TOKEN}/${endpoint}`;
+  try {
+    const { data } = await axios.post(url, {
+      chat_id: String(userId),
+      message_id: messageId,
+      text,
+      parse_mode: 'HTML'
+    });
+    return data?.result || null;
+  } catch (err) {
+    logTelegramSendError(err, {
+      endpoint,
+      chatId: userId,
+      userId,
+      messageLength: String(text || '').length
+    });
+    try {
+      await sendMessage(userId, text, { parse_mode: 'HTML' });
+    } catch (fallbackErr) {
+      console.error('[render-status-fallback-failed]', sanitizeTelegramError(fallbackErr));
+    }
+    return null;
+  }
 }
 
 async function sendMessage(chatId, text, extra = {}) {
