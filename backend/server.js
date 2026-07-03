@@ -1546,7 +1546,8 @@ app.post('/api/render-video-job', upload.any(), async (req, res) => {
     setRenderJobStatus(clientRenderId, { status: 'queued', jobId });
     const statusMessageId = await sendRenderStatusMessage(
       userId,
-      '<pre><code class="language-SYSTEM-MESSAGE">[⏳] ВИД30-ФР4ГМ3НТ 0ТПР4ВЛ3Н В 0Ч3Р3ДЬ Н4 ПР30БР4З0В4НИ3 ...</code></pre>'
+      '<pre><code class="language-SYSTEM-MESSAGE">[⏳] ВИД30-ФР4ГМ3НТ 0ТПР4ВЛ3Н В 0Ч3Р3ДЬ Н4 ПР30БР4З0В4НИ3 ...</code></pre>',
+      { jobId, clientRenderId }
     );
     renderQueue.add({
       userId,
@@ -1555,13 +1556,15 @@ app.post('/api/render-video-job', upload.any(), async (req, res) => {
         const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), 'trip-bg-render-'));
         const outMp4 = path.join(tmpdir, `${jobId}.mp4`);
         try {
+          await sleep(800);
           setRenderJobStatus(clientRenderId, { status: 'active', jobId });
           console.log('[render-video-job] start', { jobId, clientRenderId, userId, sourceName, queue: renderQueue.stats() });
           
           await editRenderStatusMessage(
             userId,
             statusMessageId,
-            '<pre><code class="language-SYSTEM-MESSAGE">ПР30БР4З0В4НИ3 Н4Ч4Т0. МН3 М0Ж3Т П0ТР3Б0В4ТЬСЯ Н3К0Т0Р03 ВР3М9 ...</code></pre>'
+            '<pre><code class="language-SYSTEM-MESSAGE">ПР30БР4З0В4НИ3 Н4Ч4Т0. МН3 М0Ж3Т П0ТР3Б0В4ТЬСЯ Н3К0Т0Р03 ВР3М9 ...</code></pre>',
+            { jobId, clientRenderId, stage: 'active' }
           );
           const result = await renderTelegramVideo(sourcePath, outMp4, renderConfig);
           if (Number(result.outputSizeBytes || 0) > RENDER_OUTPUT_SAFE_LIMIT_BYTES) {
@@ -1575,7 +1578,8 @@ app.post('/api/render-video-job', upload.any(), async (req, res) => {
           await editRenderStatusMessage(
             userId,
             statusMessageId,
-            '<pre><code class="language-SYSTEM-MESSAGE">ПР30БР4З0В4НИ3 З4В3РШ3Н0. ФР4ГМ3НТ П3Р3Д4Н В Ч4Т.</code></pre>'
+            '<pre><code class="language-SYSTEM-MESSAGE">ПР30БР4З0В4НИ3 З4В3РШ3Н0 УСП3ШН0. ФР4ГМ3НТ П3Р3Д4Н В Ч4Т.</code></pre>',
+            { jobId, clientRenderId, stage: 'success' }
           );
           setRenderJobStatus(clientRenderId, { status: 'sent', jobId, error: '' });
           console.log('[render-video-job] sent-and-charged', { jobId, clientRenderId, userId, outputSizeBytes: result.outputSizeBytes, balance: getBalance(userId) });
@@ -1586,7 +1590,8 @@ app.post('/api/render-video-job', upload.any(), async (req, res) => {
             await editRenderStatusMessage(
               userId,
               statusMessageId,
-              '<pre><code class="language-SYSTEM-MESSAGE">ПР30БР4З0В4НИ3 Н3 УД4Л0СЬ. ИМПУЛЬСЫ 0СТ4ЛИСЬ В ХР4НИЛИЩ3.</code></pre>'
+              '<pre><code class="language-SYSTEM-MESSAGE">ПР30БР4З0В4НИ3 Н3 УД4Л0СЬ. ИМПУЛЬСЫ 0СТ4ЛИСЬ В ХР4НИЛИЩ3.</code></pre>',
+              { jobId, clientRenderId, stage: 'failed' }
             );
           } catch (_) {}
         } finally {
@@ -1809,7 +1814,7 @@ function logTelegramSendError(err, { endpoint, chatId, userId, runId, messageLen
   });
 }
 
-async function sendRenderStatusMessage(userId, text) {
+async function sendRenderStatusMessage(userId, text, context = {}) {
   const endpoint = 'sendMessage';
   const url = `https://api.telegram.org/bot${process.env.BOT_TOKEN}/${endpoint}`;
   try {
@@ -1818,8 +1823,24 @@ async function sendRenderStatusMessage(userId, text) {
       text,
       parse_mode: 'HTML'
     });
-    return data?.result?.message_id || null;
+    const messageId = data?.result?.message_id || null;
+    console.log('[render-status] queued-send', {
+      jobId: context.jobId || '',
+      clientRenderId: context.clientRenderId || '',
+      userId: String(userId),
+      messageId,
+      ok: !!messageId
+    });
+    return messageId;
   } catch (err) {
+    console.error('[render-status] queued-send', {
+      jobId: context.jobId || '',
+      clientRenderId: context.clientRenderId || '',
+      userId: String(userId),
+      messageId: null,
+      ok: false,
+      error: err?.message || String(err || '')
+    });
     logTelegramSendError(err, {
       endpoint,
       chatId: userId,
@@ -1830,26 +1851,33 @@ async function sendRenderStatusMessage(userId, text) {
   }
 }
 
-async function editRenderStatusMessage(userId, messageId, text) {
+async function editRenderStatusMessage(userId, messageId, text, context = {}) {
+  const stage = ['active', 'success', 'failed'].includes(context.stage) ? context.stage : 'active';
+  const logLabel = `[render-status] edit-${stage}`;
+  const logContext = (extra = {}) => ({
+    jobId: context.jobId || '',
+    clientRenderId: context.clientRenderId || '',
+    userId: String(userId),
+    messageId: messageId || null,
+    ...extra
+  });
   if (!messageId) {
-    try {
-      await sendMessage(userId, text, { parse_mode: 'HTML' });
-    } catch (err) {
-      console.error('[render-status-send-without-message-id-failed]', sanitizeTelegramError(err));
-    }
-    return null;
+    console.error(logLabel, logContext({ ok: false, error: 'MESSAGE_ID_MISSING' }));
+    return false;
   }
   const endpoint = 'editMessageText';
   const url = `https://api.telegram.org/bot${process.env.BOT_TOKEN}/${endpoint}`;
   try {
-    const { data } = await axios.post(url, {
+    await axios.post(url, {
       chat_id: String(userId),
       message_id: messageId,
       text,
       parse_mode: 'HTML'
     });
-    return data?.result || null;
+    console.log(logLabel, logContext({ ok: true }));
+    return true;
   } catch (err) {
+    console.error(logLabel, logContext({ ok: false, error: err?.message || String(err || '') }));
     logTelegramSendError(err, {
       endpoint,
       chatId: userId,
@@ -1858,10 +1886,12 @@ async function editRenderStatusMessage(userId, messageId, text) {
     });
     try {
       await sendMessage(userId, text, { parse_mode: 'HTML' });
+      console.log('[render-status] fallback-send', logContext({ ok: true }));
     } catch (fallbackErr) {
+      console.error('[render-status] fallback-send', logContext({ ok: false, error: fallbackErr?.message || String(fallbackErr || '') }));
       console.error('[render-status-fallback-failed]', sanitizeTelegramError(fallbackErr));
     }
-    return null;
+    return false;
   }
 }
 
