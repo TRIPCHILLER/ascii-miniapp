@@ -6255,6 +6255,8 @@ function isTextMacroPresetSelected() {
   return optionLabel === 'MACRO';
 }
 
+const PIXEL2_TILE = 8;
+const PIXEL2_SIZES = [0, 1, 3, 5];
 
 function renderPixel2ShapeCanvas(src, cols, rows) {
   let sx = 0, sy = 0, sw = src.w, sh = src.h;
@@ -6272,7 +6274,8 @@ function renderPixel2ShapeCanvas(src, cols, rows) {
 
   off.width = cols;
   off.height = rows;
-  ctx.imageSmoothingEnabled = false;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
   ctx.setTransform(state.mirror ? -1 : 1, 0, 0, 1, state.mirror ? cols : 0, 0);
   ctx.drawImage(src.el, sx, sy, sw, sh, 0, 0, cols, rows);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -6281,10 +6284,8 @@ function renderPixel2ShapeCanvas(src, cols, rows) {
   const canvas = app.ui.render;
   if (!canvas) return false;
 
-  const cellH = Math.max(1, parseFloat(getComputedStyle(app.out).fontSize) || 16);
-  const cellW = Math.max(1, cellH * Math.max(0.1, measureCharAspect()));
-  const W = Math.max(1, Math.round(cols * cellW));
-  const H = Math.max(1, Math.round(rows * cellH));
+  const W = Math.max(1, cols * PIXEL2_TILE);
+  const H = Math.max(1, rows * PIXEL2_TILE);
   if (canvas.width !== W || canvas.height !== H) {
     canvas.width = W;
     canvas.height = H;
@@ -6319,13 +6320,10 @@ function renderPixel2ShapeCanvas(src, cols, rows) {
       const level = Math.max(0, Math.min(3, Math.round((Yc / 255) * 3)));
       if (!level) continue;
 
-      const cellMin = Math.min(cellW, cellH);
-      const sizeRatio = level === 1 ? 0.2 : (level === 2 ? 0.38 : 0.62);
-      const maxSize = Math.max(1, Math.floor(cellMin - 1));
-      const size = Math.min(maxSize, Math.max(1, Math.round(cellMin * sizeRatio)));
+      const size = PIXEL2_SIZES[level] || 0;
       if (size <= 0) continue;
-      const px = Math.round((x * cellW) + ((cellW - size) / 2));
-      const py = Math.round((y * cellH) + ((cellH - size) / 2));
+      const px = (x * PIXEL2_TILE) + Math.floor((PIXEL2_TILE - size) / 2);
+      const py = (y * PIXEL2_TILE) + Math.floor((PIXEL2_TILE - size) / 2);
       c.fillRect(px, py, size, size);
     }
   }
@@ -6739,6 +6737,9 @@ if (isMobile && state.mode === 'live') {
   const effectiveRatio = ratioCharWOverH;
   const targetH = w * (sourceHOverW / (1 / Math.max(1e-6, effectiveRatio)));
   let h = Math.max(1, Math.min(1000, Math.round(targetH)));
+  if (isPixel2ShapeCharset(app?.ui?.charset?.value || state.charset)) {
+    h = Math.max(1, Math.min(1000, Math.round(w * sourceHOverW)));
+  }
   if (isTextMode()) {
     const desiredCols = Math.max(25, Math.round(state.widthChars));
     const textSrcW = (isMobile && state.mode === 'live') ? (isTextMode() ? 3 : 9) : src.w;
