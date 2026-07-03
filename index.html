@@ -79,6 +79,7 @@
           <option value='а Б в Г д Е ж З и Й к Л м Н о П р С т У ф Х ц Ч ш Щ ъ Ы ь Э ю Я .  : '>КИРИJIJIИЦ4 │ аБв ...</option>
           <option value='カタサシスセソラリルレロワヲンツッー '>カタカナ</option>
           <option value='. · ▪ ■ '>P1X3L │ .·▪■</option>
+          <option value='P1X3L2_SHAPE'>P1X3L2 │ ■■■</option>
           <option value='····•○◦ '>D0TS │ .·• ○</option>
           <option value='█▓▒░'>BL0CKS │ █ ▓ ▒ ░ </option>
           <option value='CUSTOM'>(РУЧН0Й ВВ0Д)</option>
@@ -151,6 +152,7 @@
     <!-- Сцена вывода -->
 <div class="stage" id="stage">
   <pre id="out"></pre>
+  <canvas id="render" hidden></canvas>
   <!-- Плейсхолдер (иконка «дискета» + текст), показывается, пока фото/видео не выбраны -->
   <div id="placeholder" hidden>
     <div class="ph-ico">💾</div>
@@ -244,8 +246,6 @@
 <input id="filePhoto" type="file" accept=".jpg,.jpeg,.png,.webp" hidden>
 <input id="fileVideo" type="file" accept="video/*,image/gif" hidden>
 
-  <!-- Скрытый канвас для экспорта (PNG/видео) -->
-  <canvas id="render" hidden></canvas>
 <!-- Видео-источник: переносим «за экран», но не скрываем display:none -->
 <video id="vid" playsinline autoplay muted class="capture-src" aria-hidden="true"></video>
   </div>
