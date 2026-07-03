@@ -417,7 +417,7 @@ async function probeVideo(filePath) {
 
 // ==== SEND VIDEO TO TELEGRAM ====
 // @section TELEGRAM_VIDEO_UPLOAD
-async function sendVideoToUser(telegramId, filePath, { caption } = {}) {
+async function sendVideoToUser(telegramId, filePath, { caption, parse_mode } = {}) {
   if (!BOT_TOKEN) throw new Error('BOT_TOKEN is empty');
   if (!fs.existsSync(filePath)) throw new Error(`File not found: ${filePath}`);
 
@@ -426,6 +426,7 @@ async function sendVideoToUser(telegramId, filePath, { caption } = {}) {
 
   form.append('chat_id', telegramId);
   if (caption) form.append('caption', caption);
+  if (parse_mode) form.append('parse_mode', parse_mode);
   form.append('supports_streaming', 'true');
 
   // 🔎 метаданные для Telegram

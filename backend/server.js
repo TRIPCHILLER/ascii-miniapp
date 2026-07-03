@@ -1570,30 +1570,41 @@ app.post('/api/render-video-job', upload.any(), async (req, res) => {
           if (Number(result.outputSizeBytes || 0) > RENDER_OUTPUT_SAFE_LIMIT_BYTES) {
             throw new Error(`RENDER_OUTPUT_TOO_LARGE:${result.outputSizeBytes}`);
           }
-          const sent = await sendVideoToUser(userId, outMp4, { caption: '#ascii_video' });
+          const sent = await sendVideoToUser(userId, outMp4, {
+            caption: '<pre><code class="language-SYSTEM-MESSAGE">ПР30БР4З0В4НИ3 З4В3РШ3Н0 УСП3ШН0.</code></pre>',
+            parse_mode: 'HTML'
+          });
           if (!sent || sent.ok === false) {
             throw new Error('TELEGRAM_SEND_NOT_OK');
           }
           deduct(userId, RENDER_VIDEO_COST);
-          await editRenderStatusMessage(
+          console.log('[render-video-job] sent-and-charged', { jobId, clientRenderId, userId, outputSizeBytes: result.outputSizeBytes, balance: getBalance(userId) });
+          await deleteRenderStatusMessage(
             userId,
             statusMessageId,
-            '<pre><code class="language-SYSTEM-MESSAGE">ПР30БР4З0В4НИ3 З4В3РШ3Н0 УСП3ШН0. ФР4ГМ3НТ П3Р3Д4Н В Ч4Т.</code></pre>',
-            { jobId, clientRenderId, stage: 'success' }
+            {
+              jobId,
+              clientRenderId,
+              fallbackText: '<pre><code class="language-SYSTEM-MESSAGE">ПР30БР4З0В4НИ3 З4В3РШ3Н0 УСП3ШН0.</code></pre>',
+              fallbackStage: 'success'
+            }
           );
           setRenderJobStatus(clientRenderId, { status: 'sent', jobId, error: '' });
-          console.log('[render-video-job] sent-and-charged', { jobId, clientRenderId, userId, outputSizeBytes: result.outputSizeBytes, balance: getBalance(userId) });
         } catch (err) {
-          setRenderJobStatus(clientRenderId, { status: 'failed', jobId, error: err?.message || String(err || '') });
-          console.error('[render-video-job] failed', { jobId, clientRenderId, userId, error: err?.message || err });
-          try {
-            await editRenderStatusMessage(
-              userId,
-              statusMessageId,
-              '<pre><code class="language-SYSTEM-MESSAGE">ПР30БР4З0В4НИ3 Н3 УД4Л0СЬ. ИМПУЛЬСЫ 0СТ4ЛИСЬ В ХР4НИЛИЩ3.</code></pre>',
-              { jobId, clientRenderId, stage: 'failed' }
-            );
-          } catch (_) {}
+          const safeErrorCode = normalizeRenderErrorForUser(err);
+          setRenderJobStatus(clientRenderId, { status: 'failed', jobId, error: safeErrorCode });
+          console.error('[render-video-job] failed', { jobId, clientRenderId, userId, errorCode: safeErrorCode, error: err?.message || err });
+          await deleteRenderStatusMessage(
+            userId,
+            statusMessageId,
+            {
+              jobId,
+              clientRenderId,
+              fallbackText: '<pre><code class="language-SYSTEM-MESSAGE">[×] ПР30БР4З0В4НИ3 Н3 УД4Л0СЬ. ИМПУЛЬСЫ 0СТ4ЛИСЬ В ХР4НИЛИЩ3.</code></pre>',
+              fallbackStage: 'failed'
+            }
+          );
+          await sendRenderErrorMessage(userId, { jobId, clientRenderId, errorCode: safeErrorCode });
         } finally {
           try { if (sourcePath) await fs.promises.rm(sourcePath, { force: true }); } catch {}
           try { await fs.promises.rm(tmpdir, { recursive: true, force: true }); } catch {}
@@ -1891,6 +1902,81 @@ async function editRenderStatusMessage(userId, messageId, text, context = {}) {
       console.error('[render-status] fallback-send', logContext({ ok: false, error: fallbackErr?.message || String(fallbackErr || '') }));
       console.error('[render-status-fallback-failed]', sanitizeTelegramError(fallbackErr));
     }
+    return false;
+  }
+}
+
+
+function normalizeRenderErrorForUser(err) {
+  const raw = String(err?.code || err?.message || err || '').toUpperCase();
+  if (raw.includes('RENDER_OUTPUT_TOO_LARGE') || raw.includes('VIDEO_OUTPUT_TOO_LARGE')) return 'RENDER_OUTPUT_TOO_LARGE';
+  if (raw.includes('TELEGRAM_SEND_NOT_OK') || raw.includes('SENDVIDEO') || raw.includes('TELEGRAM API ERROR')) return 'TELEGRAM_SEND_NOT_OK';
+  if (raw.includes('VIDEO_PROBE_FAILED') || raw.includes('FFPROBE')) return 'VIDEO_PROBE_FAILED';
+  if (raw.includes('VIDEO_TOO_LONG') || raw.includes('DURATION')) return 'VIDEO_TOO_LONG';
+  if (raw.includes('RENDER_FAILED') || raw.includes('FFMPEG') || raw.includes('EXIT CODE')) return 'RENDER_FAILED';
+  return 'UNKNOWN_RENDER_ERROR';
+}
+
+async function deleteRenderStatusMessage(userId, messageId, context = {}) {
+  const logContext = (extra = {}) => ({
+    jobId: context.jobId || '',
+    clientRenderId: context.clientRenderId || '',
+    userId: String(userId),
+    messageId: messageId || null,
+    ...extra
+  });
+  if (!messageId) {
+    console.error('[render-status] delete-failed', logContext({ ok: false, error: 'MESSAGE_ID_MISSING' }));
+    return false;
+  }
+  const endpoint = 'deleteMessage';
+  const url = `https://api.telegram.org/bot${process.env.BOT_TOKEN}/${endpoint}`;
+  try {
+    await axios.post(url, {
+      chat_id: String(userId),
+      message_id: messageId
+    });
+    console.log('[render-status] delete-success', logContext({ ok: true }));
+    return true;
+  } catch (err) {
+    console.error('[render-status] delete-failed', logContext({ ok: false, error: err?.message || String(err || '') }));
+    logTelegramSendError(err, { endpoint, chatId: userId, userId, messageLength: 0 });
+    if (context.fallbackText) {
+      await editRenderStatusMessage(
+        userId,
+        messageId,
+        context.fallbackText,
+        { ...context, stage: context.fallbackStage || 'active' }
+      ).catch(() => false);
+    }
+    return false;
+  }
+}
+
+async function sendRenderErrorMessage(userId, { jobId, clientRenderId, errorCode } = {}) {
+  const safeCode = normalizeRenderErrorForUser(errorCode || 'UNKNOWN_RENDER_ERROR');
+  const safeJobId = String(jobId || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64) || 'UNKNOWN';
+  const safeTrace = String(clientRenderId || '').replace(/[^a-zA-Z0-9:_-]/g, '').slice(0, 128) || 'UNKNOWN';
+  const text = `<pre><code class="language-SYSTEM-MESSAGE">[×] ПР30БР4З0В4НИ3 Н3 УД4Л0СЬ.\nИМПУЛЬСЫ 0СТ4ЛИСЬ В ХР4НИЛИЩ3.\nК0Д: ${safeCode}\nJOB: ${safeJobId}\nTRACE: ${safeTrace}</code></pre>`;
+  try {
+    await sendMessage(userId, text, { parse_mode: 'HTML' });
+    console.log('[render-status] error-message-send', {
+      jobId: safeJobId,
+      clientRenderId: safeTrace,
+      userId: String(userId),
+      errorCode: safeCode,
+      ok: true
+    });
+    return true;
+  } catch (err) {
+    console.error('[render-status] error-message-send', {
+      jobId: safeJobId,
+      clientRenderId: safeTrace,
+      userId: String(userId),
+      errorCode: safeCode,
+      ok: false,
+      error: err?.message || String(err || '')
+    });
     return false;
   }
 }
