@@ -6350,6 +6350,23 @@ function resetPixel2ShapePreview() {
   if (app.out) app.out.hidden = false;
 }
 
+function hasPixel2ShapeFrame() {
+  const canvas = app?.ui?.render;
+  return isPixel2ShapeCharset(app?.ui?.charset?.value || state.charset)
+    && !!canvas
+    && !canvas.hidden
+    && canvas.width > 0
+    && canvas.height > 0;
+}
+
+function showPixel2ShapeVideoUnsupportedPopup() {
+  showAsciiPopup({
+    type: 'info',
+    title: 'P1X3L2',
+    message: 'P1X3L2 ПОКА ДОСТУПЕН ДЛЯ ПРЕДПРОСМОТРА И ФОТО. ВИДЕО-РЕНДЕР ДОБАВИМ СЛЕДУЮЩИМ ШАГОМ.'
+  });
+}
+
 function renderClassicDither(data, cols, rows) {
   const chars = Array.from(PIXEL_DITHER_CHARSET);
   const n = chars.length - 1;
@@ -7050,6 +7067,15 @@ function renderAsciiToCanvas(text, cols, rows, scale = 2.5){
 
 // PNG (режим ФОТО)
 function savePNG(){
+  if (hasPixel2ShapeFrame()) {
+    app.ui.render.toBlob(blob=>{
+      if(!blob) { showAsciiPopup({ type:'error', title:'ОШИБКА', message:'Не удалось преобразовать изображение.' }); clearShotVisualEffects(); return; }
+      downloadBlob(blob, 'ascii_visor.png');
+      hudSet('PNG: сохранено/отправлено');
+    }, 'image/png');
+    return;
+  }
+
   const full = app.out.textContent || '';
   if (!full.trim()) { showAsciiPopup({ type:'info', title:'ЗДЕСЬ ПУСТО...', message:'Мне нечего сохранять.' }); clearShotVisualEffects(); return; }
 
@@ -7530,6 +7556,11 @@ async function buildPreviewGlyphAtlas() {
 }
 
 async function startTelegramBackgroundVideoRender() {
+  if (isPixel2ShapeCharset(app?.ui?.charset?.value || state.charset)) {
+    showPixel2ShapeVideoUnsupportedPopup();
+    throw new Error('P1X3L2_VIDEO_RENDER_UNSUPPORTED');
+  }
+
   const tgWebApp = window.Telegram?.WebApp;
   const sourceVideoFile = state.sourceVideoFile;
   const clientRenderId = (window.crypto?.randomUUID?.() || `client-${Date.now()}-${Math.random().toString(16).slice(2)}`);
@@ -9844,6 +9875,10 @@ async function doSave() {
       return;
     }
     if (window.Telegram?.WebApp?.initData && state.sourceVideoFile) {
+      if (isPixel2ShapeCharset(app?.ui?.charset?.value || state.charset)) {
+        showPixel2ShapeVideoUnsupportedPopup();
+        return;
+      }
       setBusyStatusText('АНАЛИЗ ЭНЕРГОХРАНИЛИЩА...');
       await sleep(650);
       const hasEnoughImpulses = await ensureEnoughBalanceBeforeExport('video', 15);
