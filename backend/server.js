@@ -1563,7 +1563,7 @@ app.post('/api/render-video-job', upload.any(), async (req, res) => {
           await editRenderStatusMessage(
             userId,
             statusMessageId,
-            '<pre><code class="language-SYSTEM-MESSAGE">ПР30БР4З0В4НИ3 Н4Ч4Т0. МН3 М0Ж3Т П0ТР3Б0В4ТЬСЯ Н3К0Т0Р03 ВР3М9 ...</code></pre>',
+            '<pre><code class="language-SYSTEM-MESSAGE">ПР30БР4З0В4НИ3 Н4Ч4Т0.\nМН3 М0Ж3Т П0ТР3Б0В4ТЬСЯ Н3К0Т0Р03 ВР3М9 ...</code></pre>',
             { jobId, clientRenderId, stage: 'active' }
           );
           const result = await renderTelegramVideo(sourcePath, outMp4, renderConfig);
@@ -1600,7 +1600,7 @@ app.post('/api/render-video-job', upload.any(), async (req, res) => {
             {
               jobId,
               clientRenderId,
-              fallbackText: '<pre><code class="language-SYSTEM-MESSAGE">[×] ПР30БР4З0В4НИ3 Н3 УД4Л0СЬ. ИМПУЛЬСЫ 0СТ4ЛИСЬ В ХР4НИЛИЩ3.</code></pre>',
+              fallbackText: '<pre><code class="language-SYSTEM-MESSAGE">[×] ПР30БР4З0В4НИ3 Н3 УД4Л0СЬ.\nИМПУЛЬСЫ 0СТ4ЛИСЬ В ХР4НИЛИЩ3.</code></pre>',
               fallbackStage: 'failed'
             }
           );
