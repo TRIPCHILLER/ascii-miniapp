@@ -88,13 +88,7 @@ function busyHide(force = false){
   if (app.ui.busy) app.ui.busy.hidden = true;
 }
 
-let busyQueueHideTimer = null;
-
 function hideQueuedRenderBusy(){
-  if (busyQueueHideTimer) {
-    clearTimeout(busyQueueHideTimer);
-    busyQueueHideTimer = null;
-  }
   const busy = app?.ui?.busy;
   if (!busy) return;
   busy.querySelector('.busy-ok-button')?.remove();
@@ -121,7 +115,6 @@ function showQueuedRenderBusy(){
   if (!busy || !text) return;
 
   hideTransientPanelsForQueuedRender();
-  if (busyQueueHideTimer) clearTimeout(busyQueueHideTimer);
   busy.querySelector('.busy-ok-button')?.remove();
 
   busyLock = true;
@@ -138,7 +131,6 @@ function showQueuedRenderBusy(){
   busy.hidden = false;
   okButton.focus({ preventScroll: true });
 
-  busyQueueHideTimer = setTimeout(hideQueuedRenderBusy, 5000);
 }
 
 let busyTextAnimationToken = 0;
