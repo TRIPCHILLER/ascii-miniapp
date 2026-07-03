@@ -833,6 +833,10 @@ let DITHER_ENABLED = false;
   function isBlockCharset(charsetValue) {
     return String(charsetValue || '') === TEXT_CHARSETS.BLOCKS;
   }
+
+  function isPixel2ShapeCharset(charsetValue) {
+    return String(charsetValue || '') === 'P1X3L2_SHAPE';
+  }
   function isKatakanaCharset(charsetValue) {
     return /[\u30A0-\u30FF]/.test(String(charsetValue || ''));
   }
@@ -5639,7 +5643,7 @@ function rebuildRenderCharset10() {
 }
 
 function updateBinsForCurrentCharset() {
-  if (isBrailleDotsCharset(state.charset) || isBlockCharset(state.charset)) {
+  if (isBrailleDotsCharset(state.charset) || isBlockCharset(state.charset) || isPixel2ShapeCharset(state.charset)) {
     state.renderCharset10 = '';
     bins = [];
     palette = [];
@@ -6251,6 +6255,101 @@ function isTextMacroPresetSelected() {
   return optionLabel === 'MACRO';
 }
 
+
+function renderPixel2ShapeCanvas(src, cols, rows) {
+  let sx = 0, sy = 0, sw = src.w, sh = src.h;
+  if (isMobile && state.mode === 'live') {
+    const targetWH = 9 / 16;
+    const srcWH = src.w / src.h;
+    if (srcWH > targetWH) {
+      sw = Math.round(src.h * targetWH);
+      sx = Math.round((src.w - sw) / 2);
+    } else if (srcWH < targetWH) {
+      sh = Math.round(src.w / targetWH);
+      sy = Math.round((src.h - sh) / 2);
+    }
+  }
+
+  off.width = cols;
+  off.height = rows;
+  ctx.imageSmoothingEnabled = false;
+  ctx.setTransform(state.mirror ? -1 : 1, 0, 0, 1, state.mirror ? cols : 0, 0);
+  ctx.drawImage(src.el, sx, sy, sw, sh, 0, 0, cols, rows);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  const data = ctx.getImageData(0, 0, cols, rows).data;
+  const canvas = app.ui.render;
+  if (!canvas) return false;
+
+  const fitSize = getStageFitSize();
+  const cellH = Math.max(1, parseFloat(getComputedStyle(app.out).fontSize) || 16);
+  const cellW = Math.max(1, cellH * Math.max(0.1, measureCharAspect()));
+  const W = Math.max(1, Math.round(cols * cellW));
+  const H = Math.max(1, Math.round(rows * cellH));
+  if (canvas.width !== W || canvas.height !== H) {
+    canvas.width = W;
+    canvas.height = H;
+  }
+
+  const c = canvas.getContext('2d');
+  c.imageSmoothingEnabled = false;
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.fillStyle = state.background;
+  c.fillRect(0, 0, W, H);
+  c.fillStyle = state.color;
+
+  const inv = state.invert ? -1 : 1;
+  const bias = state.invert ? 255 : 0;
+  const gamma = state.gamma;
+  const contrast = state.contrast;
+  const bp = state.blackPoint;
+  const wp = state.whitePoint;
+
+  let i = 0;
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++, i += 4) {
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      let v01 = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+      v01 = ((v01 - 0.5) * contrast) + 0.5;
+      v01 = Math.min(1, Math.max(0, v01));
+      v01 = Math.pow(v01, 1 / gamma);
+      v01 = (v01 - bp) / Math.max(1e-6, (wp - bp));
+      v01 = Math.min(1, Math.max(0, v01));
+
+      const Yc = Math.max(0, Math.min(255, (bias + inv * (v01 * 255))));
+      const level = Math.max(0, Math.min(5, Math.round((Yc / 255) * 5)));
+      if (!level) continue;
+
+      const size = Math.min(level, Math.floor(cellW), Math.floor(cellH));
+      if (size <= 0) continue;
+      const px = Math.round((x * cellW) + ((cellW - size) / 2));
+      const py = Math.round((y * cellH) + ((cellH - size) / 2));
+      c.fillRect(px, py, size, size);
+    }
+  }
+
+  const scale = Math.min(fitSize.w / W, fitSize.h / H);
+  canvas.hidden = false;
+  canvas.style.position = 'absolute';
+  canvas.style.left = '50%';
+  canvas.style.top = '50%';
+  canvas.style.transformOrigin = 'center center';
+  canvas.style.transform = `translate(-50%, -50%) scale(${Number.isFinite(scale) && scale > 0 ? scale : 1})`;
+  canvas.style.backgroundColor = state.background;
+  canvas.style.imageRendering = 'pixelated';
+  canvas.style.zIndex = '1';
+  canvas.style.pointerEvents = 'none';
+  app.out.hidden = true;
+  return true;
+}
+
+function resetPixel2ShapePreview() {
+  if (app.ui.render && !app.ui.render.hidden) {
+    app.ui.render.hidden = true;
+  }
+  if (app.out) app.out.hidden = false;
+}
+
 function renderClassicDither(data, cols, rows) {
   const chars = Array.from(PIXEL_DITHER_CHARSET);
   const n = chars.length - 1;
@@ -6728,6 +6827,14 @@ function updateGifFrame(ts) {
     if (!src) return;
 
     const { w, h } = updateGridSize();
+    if (isPixel2ShapeCharset(app.ui.charset?.value || state.charset)) {
+      app.out.textContent = ' ';
+      refitFont(w, h);
+      renderPixel2ShapeCanvas(src, w, h);
+      return;
+    }
+
+    resetPixel2ShapePreview();
     const out = buildAsciiFromCurrentSource(src, w, h);
 
     if (!out) {
@@ -10026,7 +10133,9 @@ else {
   // все остальные пресеты — как раньше
   applyFontStack(FONT_STACK_MAIN, '700', false);
   forcedAspect = null;
-  if (isBrailleDotsCharset(val)) {
+  if (isPixel2ShapeCharset(val)) {
+    state.charset = 'P1X3L2_SHAPE';
+  } else if (isBrailleDotsCharset(val)) {
     state.charset = TEXT_CHARSETS.DOTS;
   } else if (isBlockCharset(val)) {
     state.charset = TEXT_CHARSETS.BLOCKS;
