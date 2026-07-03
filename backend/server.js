@@ -1556,7 +1556,7 @@ app.post('/api/render-video-job', upload.any(), async (req, res) => {
         const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), 'trip-bg-render-'));
         const outMp4 = path.join(tmpdir, `${jobId}.mp4`);
         try {
-          await sleep(800);
+          await new Promise((resolve) => setTimeout(resolve, 800));
           setRenderJobStatus(clientRenderId, { status: 'active', jobId });
           console.log('[render-video-job] start', { jobId, clientRenderId, userId, sourceName, queue: renderQueue.stats() });
           
