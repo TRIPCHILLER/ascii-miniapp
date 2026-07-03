@@ -1436,6 +1436,51 @@ async function cleanupUploadedFile(file) {
   } catch (_) {}
 }
 
+const RENDER_JOB_STATUS_TTL_MS = 30 * 60 * 1000;
+const renderJobStatuses = new Map();
+
+function cleanupRenderJobStatuses(now = Date.now()) {
+  for (const [clientRenderId, entry] of renderJobStatuses.entries()) {
+    const updatedAtMs = Date.parse(String(entry?.updatedAt || '')) || 0;
+    if (!updatedAtMs || now - updatedAtMs > RENDER_JOB_STATUS_TTL_MS) {
+      renderJobStatuses.delete(clientRenderId);
+    }
+  }
+}
+
+function setRenderJobStatus(clientRenderId, patch = {}) {
+  const id = String(clientRenderId || '').trim();
+  if (!id) return null;
+  cleanupRenderJobStatuses();
+  const prev = renderJobStatuses.get(id) || {};
+  const next = {
+    ...prev,
+    ...patch,
+    clientRenderId: id,
+    updatedAt: new Date().toISOString()
+  };
+  renderJobStatuses.set(id, next);
+  return next;
+}
+
+app.get('/api/render-video-job/status', (req, res) => {
+  cleanupRenderJobStatuses();
+  const clientRenderId = String(req.query?.clientRenderId || '').trim();
+  if (!clientRenderId) {
+    return res.status(400).json({ ok: false, found: false, error: 'CLIENT_RENDER_ID_REQUIRED' });
+  }
+  const entry = renderJobStatuses.get(clientRenderId);
+  if (!entry) return res.json({ ok: true, found: false });
+  return res.json({
+    ok: true,
+    found: true,
+    status: entry.status || '',
+    error: entry.error || '',
+    jobId: entry.jobId || '',
+    updatedAt: entry.updatedAt || ''
+  });
+});
+
 app.post('/api/render-video-job', upload.any(), async (req, res) => {
   const files = Array.isArray(req.files) ? req.files : [];
   const f = files.find(x => x.fieldname === 'file') || files.find(x => x.fieldname === 'document') || files[0];
@@ -1450,11 +1495,13 @@ app.post('/api/render-video-job', upload.any(), async (req, res) => {
     ...extra
   });
   const returnRenderJobError = async (status, payload, fileToCleanup = f, extra = {}) => {
+    setRenderJobStatus(clientRenderId, { status: 'rejected', error: payload?.error || '', jobId: extra.jobId || '' });
     console.warn('[render-video-job] early-return', logContext({ status, error: payload?.error, ...extra }));
     await cleanupUploadedFile(fileToCleanup);
     return res.status(status).json(payload);
   };
 
+  setRenderJobStatus(clientRenderId, { status: 'received' });
   console.log('[render-video-job] route-enter', logContext());
 
   if (!TG_BACKGROUND_RENDER_ENABLED) {
@@ -1496,6 +1543,7 @@ app.post('/api/render-video-job', upload.any(), async (req, res) => {
     const jobId = crypto.randomBytes(8).toString('hex');
     const sourcePath = f.path;
     const sourceName = String(req.body?.sourceFilename || f.originalname || 'source-video');
+    setRenderJobStatus(clientRenderId, { status: 'queued', jobId });
         await sendMessage(
   userId,
   '<pre><code class="language-SYSTEM-MESSAGE">[⏳] ВИД30-ФР4ГМ3НТ 0ТПР4ВЛ3Н В 0Ч3Р3ДЬ Н4 ПР30БР4З0В4НИ3 ...</code></pre>',
@@ -1508,6 +1556,7 @@ app.post('/api/render-video-job', upload.any(), async (req, res) => {
         const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), 'trip-bg-render-'));
         const outMp4 = path.join(tmpdir, `${jobId}.mp4`);
         try {
+          setRenderJobStatus(clientRenderId, { status: 'active', jobId });
           console.log('[render-video-job] start', { jobId, clientRenderId, userId, sourceName, queue: renderQueue.stats() });
           
           await sendMessage(
@@ -1524,8 +1573,10 @@ app.post('/api/render-video-job', upload.any(), async (req, res) => {
             throw new Error('TELEGRAM_SEND_NOT_OK');
           }
           deduct(userId, RENDER_VIDEO_COST);
+          setRenderJobStatus(clientRenderId, { status: 'sent', jobId, error: '' });
           console.log('[render-video-job] sent-and-charged', { jobId, clientRenderId, userId, outputSizeBytes: result.outputSizeBytes, balance: getBalance(userId) });
         } catch (err) {
+          setRenderJobStatus(clientRenderId, { status: 'failed', jobId, error: err?.message || String(err || '') });
           console.error('[render-video-job] failed', { jobId, clientRenderId, userId, error: err?.message || err });
           try { await sendMessage(
   userId,
@@ -1537,12 +1588,21 @@ app.post('/api/render-video-job', upload.any(), async (req, res) => {
           try { await fs.promises.rm(tmpdir, { recursive: true, force: true }); } catch {}
         }
       }
-    }).catch((err) => console.error('[render-video-job] queue error', { jobId, clientRenderId, userId, error: err?.message || err }));
+    }).catch((err) => {
+      setRenderJobStatus(clientRenderId, { status: 'failed', jobId, error: err?.message || String(err || '') });
+      console.error('[render-video-job] queue error', { jobId, clientRenderId, userId, error: err?.message || err });
+    });
 
     return res.json({ ok:true, queued:true, jobId, queue: renderQueue.stats(), balance });
   } catch (err) {
     await cleanupUploadedFile(f);
     const detail = formatHttpError(err);
+    if (String(err?.message || err) === 'RENDER_JOB_ALREADY_ACTIVE') {
+      setRenderJobStatus(clientRenderId, { status: 'rejected', error: 'RENDER_JOB_ALREADY_ACTIVE' });
+      console.warn('[render-video-job] queue-race-rejected', logContext({ error: 'RENDER_JOB_ALREADY_ACTIVE' }));
+      return res.status(429).json({ ok:false, error:'RENDER_JOB_ALREADY_ACTIVE' });
+    }
+    setRenderJobStatus(clientRenderId, { status: 'failed', error: detail });
     console.error('[ERR] /api/render-video-job', logContext({ error: detail }));
     return res.status(500).json({ ok:false, error:'RENDER_JOB_FAILED', detail });
   }

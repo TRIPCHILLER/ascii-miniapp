@@ -789,6 +789,8 @@ let DITHER_ENABLED = false;
     sourceSizeBytes: 0,
     sourceIsGif: false,
     sourceVideoFile: null,
+    sourceVideoBlobSnapshot: null,
+    sourceVideoFileMeta: null,
     
     isRecording: false,     // запись видео (экспорт)
     recorder: null,
@@ -7437,10 +7439,42 @@ async function startTelegramBackgroundVideoRender() {
     throw new Error('Сначала выбери видео в режиме ВИД30.');
   }
 
+  const snapshot = state.sourceVideoBlobSnapshot || null;
+  if (!snapshot && !sourceVideoFile) {
+    showAsciiPopup({
+      type: 'error',
+      sound: 'error',
+      title: 'РЕНДЕР НЕ ЗАПУЩЕН',
+      message: 'TELEGRAM ПОТЕРЯЛ ДОСТУП К ФРАГМЕНТУ. ВЫБЕРИ ВИДЕО ЗАНОВО.'
+    });
+    throw new Error('SOURCE_VIDEO_NOT_READABLE');
+  }
+
+  let uploadFile;
+  try {
+    uploadFile = new File(
+      [snapshot || sourceVideoFile],
+      state.sourceVideoFileMeta?.name || state.sourceFilename || sourceVideoFile.name || 'source-video.mp4',
+      {
+        type: state.sourceVideoFileMeta?.type || state.sourceMime || sourceVideoFile.type || 'video/mp4',
+        lastModified: state.sourceVideoFileMeta?.lastModified || Date.now()
+      }
+    );
+  } catch (fileErr) {
+    console.error('[telegram-background-render] upload file rebuild failed', fileErr);
+    showAsciiPopup({
+      type: 'error',
+      sound: 'error',
+      title: 'РЕНДЕР НЕ ЗАПУЩЕН',
+      message: 'TELEGRAM ПОТЕРЯЛ ДОСТУП К ФРАГМЕНТУ. ВЫБЕРИ ВИДЕО ЗАНОВО.'
+    });
+    throw fileErr;
+  }
+
   const form = new FormData();
   form.append('clientRenderId', clientRenderId);
-  form.append('file', sourceVideoFile, state.sourceFilename || sourceVideoFile.name || 'source-video');
-  form.append('filename', state.sourceFilename || sourceVideoFile.name || 'source-video');
+  form.append('file', uploadFile, uploadFile.name || 'source-video.mp4');
+  form.append('filename', uploadFile.name || state.sourceFilename || 'source-video.mp4');
   form.append('initdata', tgWebApp?.initData || '');
   form.append('initData', tgWebApp?.initData || '');
   form.append('mediatype', 'video');
@@ -7474,18 +7508,23 @@ async function startTelegramBackgroundVideoRender() {
     glyphAtlas
   };
   form.append('renderConfig', JSON.stringify(renderConfig));
-  form.append('sourceFilename', state.sourceFilename || sourceVideoFile.name || '');
-  form.append('sourceMime', state.sourceMime || sourceVideoFile.type || '');
-  form.append('sourceSizeBytes', String(Number(state.sourceSizeBytes || sourceVideoFile.size || 0)));
+  form.append('sourceFilename', state.sourceFilename || uploadFile.name || '');
+  form.append('sourceMime', state.sourceMime || uploadFile.type || '');
+  form.append('sourceSizeBytes', String(Number(state.sourceSizeBytes || uploadFile.size || 0)));
   form.append('sourceIsGif', state.sourceIsGif ? '1' : '0');
 
   const requestUrl = `${API_BASE}/api/render-video-job`;
   const renderRequestDiagnostics = {
     clientRenderId,
-    filename: state.sourceFilename || sourceVideoFile.name || 'source-video',
+    filename: state.sourceFilename || uploadFile.name || 'source-video',
     fileSize: sourceVideoFile.size,
     fileType: sourceVideoFile.type,
     fileLastModified: sourceVideoFile.lastModified,
+    usingSnapshot: !!snapshot,
+    snapshotSize: snapshot?.size || 0,
+    uploadFileName: uploadFile.name,
+    uploadFileSize: uploadFile.size,
+    uploadFileType: uploadFile.type,
     navigatorOnline: navigator.onLine,
     API_BASE
   };
@@ -7545,7 +7584,8 @@ async function startTelegramBackgroundVideoRender() {
       showAsciiPopup({
         type: 'error',
         sound: 'error',
-        title: 'РЕНДЕР УЖЕ В ОЧЕРЕДИ ИЛИ ВЫПОЛНЯЕТСЯ'
+        title: 'РЕНДЕР УЖЕ ВЫПОЛНЯЕТСЯ',
+        message: 'ДОЖДИСЬ РЕЗУЛЬТАТА В ЧАТЕ.'
       });
     } else if (code === 'VIDEO_TOO_LONG') {
       showAsciiPopup({
@@ -7554,16 +7594,79 @@ async function startTelegramBackgroundVideoRender() {
         title: 'ВИДЕО ДЛИННЕЕ ЛИМИТА'
       });
     } else {
+      if (err?.name === 'TypeError' && /fetch/i.test(String(err?.message || ''))) {
+        const statusResult = await checkTelegramRenderJobStatus(clientRenderId).catch((statusErr) => {
+          console.warn('[render-video-job] status-check failed:', statusErr);
+          return null;
+        });
+        if (statusResult?.found && statusResult?.status) {
+          showTelegramRenderStatusPopup(statusResult);
+        } else {
+          showAsciiPopup({
+            type: 'error',
+            sound: 'error',
+            title: 'РЕНДЕР НЕ ЗАПУЩЕН',
+            message: 'СЕТЕВОЙ СБОЙ ИЛИ TELEGRAM НЕ ДАЛ ПОВТОРНО ПРОЧИТАТЬ ВИДЕО. ПЕРЕВЫБЕРИ ФРАГМЕНТ И ПОВТОРИ.'
+          });
+        }
+      } else {
+        showAsciiPopup({
+          type: 'error',
+          sound: 'error',
+          title: 'РЕНДЕР НЕ ЗАПУЩЕН',
+          message: err?.message || 'Попробуй ещё раз.'
+        });
+      }
+    }
+    throw err;
+  }
+}
+
+
+async function checkTelegramRenderJobStatus(clientRenderId) {
+  if (!clientRenderId) return null;
+  const url = `${API_BASE}/api/render-video-job/status?clientRenderId=${encodeURIComponent(clientRenderId)}`;
+  const res = await fetch(url, { headers: applyTelegramInitDataHeader({}) });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(json?.error || `HTTP ${res.status}`);
+  return json;
+}
+
+function showTelegramRenderStatusPopup(statusResult) {
+  const status = String(statusResult?.status || '');
+  const error = String(statusResult?.error || '');
+  if (status === 'received' || status === 'queued' || status === 'active') {
+    showAsciiPopup({
+      type: 'info',
+      title: 'ФРАГМЕНТ ПРИНЯТ',
+      message: 'ПРЕОБРАЗОВАНИЕ ВЫПОЛНЯЕТСЯ. РЕЗУЛЬТАТ ПРИДЁТ В ЧАТ.'
+    });
+  } else if (status === 'sent') {
+    showAsciiPopup({
+      type: 'info',
+      title: 'ФРАГМЕНТ УЖЕ ПРЕОБРАЗОВАН',
+      message: 'ПРОВЕРЬ ЧАТ.'
+    });
+  } else if (status === 'rejected') {
+    if (error === 'RENDER_JOB_ALREADY_ACTIVE') {
       showAsciiPopup({
         type: 'error',
         sound: 'error',
-        title: 'РЕНДЕР НЕ ЗАПУЩЕН',
-        message: err?.name === 'TypeError' && /fetch/i.test(String(err?.message || ''))
-          ? 'СЕТЕВОЙ СБОЙ ИЛИ TELEGRAM НЕ ДАЛ ПОВТОРНО ПРОЧИТАТЬ ВИДЕО. ПЕРЕВЫБЕРИ ФРАГМЕНТ И ПОВТОРИ.'
-          : (err?.message || 'Попробуй ещё раз.')
+        title: 'РЕНДЕР УЖЕ ВЫПОЛНЯЕТСЯ',
+        message: 'ДОЖДИСЬ РЕЗУЛЬТАТА В ЧАТЕ.'
       });
+    } else {
+      showAsciiPopup({ type: 'error', sound: 'error', title: 'РЕНДЕР ОТКЛОНЁН', message: error || 'Попробуй ещё раз.' });
     }
-    throw err;
+  } else if (status === 'failed') {
+    showAsciiPopup({
+      type: 'error',
+      sound: 'error',
+      title: 'ПРЕОБРАЗОВАНИЕ НЕ УДАЛОСЬ',
+      message: 'ИМПУЛЬСЫ НЕ СПИСАНЫ.'
+    });
+  } else {
+    showAsciiPopup({ type: 'info', title: 'СТАТУС РЕНДЕРА', message: status || 'НЕИЗВЕСТНО' });
   }
 }
 
@@ -9432,11 +9535,27 @@ fileVideo.addEventListener('change', async (e) => {
   state.sourceSizeBytes = sourceSizeBytes;
   state.sourceIsGif = sourceIsGif;
   state.sourceVideoFile = original;
+  state.sourceVideoBlobSnapshot = null;
+  state.sourceVideoFileMeta = null;
+  try {
+    const arrayBuffer = await original.arrayBuffer();
+    state.sourceVideoBlobSnapshot = new Blob([arrayBuffer], { type: original.type || 'video/mp4' });
+    state.sourceVideoFileMeta = {
+      name: original.name,
+      type: original.type,
+      size: original.size,
+      lastModified: original.lastModified
+    };
+  } catch (snapshotErr) {
+    console.error('[MEDIA-SOURCE] video snapshot failed; fallback to original File', snapshotErr);
+  }
   console.log('[MEDIA-SOURCE] selected', {
     sourceFilename,
     sourceMime,
     sourceSizeBytes,
-    sourceIsGif
+    sourceIsGif,
+    usingSnapshot: !!state.sourceVideoBlobSnapshot,
+    snapshotSize: state.sourceVideoBlobSnapshot?.size || 0
   });
   const isGif = sourceIsGif;
 
