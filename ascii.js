@@ -6281,7 +6281,6 @@ function renderPixel2ShapeCanvas(src, cols, rows) {
   const canvas = app.ui.render;
   if (!canvas) return false;
 
-  const fitSize = getStageFitSize();
   const cellH = Math.max(1, parseFloat(getComputedStyle(app.out).fontSize) || 16);
   const cellW = Math.max(1, cellH * Math.max(0.1, measureCharAspect()));
   const W = Math.max(1, Math.round(cols * cellW));
@@ -6317,10 +6316,13 @@ function renderPixel2ShapeCanvas(src, cols, rows) {
       v01 = Math.min(1, Math.max(0, v01));
 
       const Yc = Math.max(0, Math.min(255, (bias + inv * (v01 * 255))));
-      const level = Math.max(0, Math.min(5, Math.round((Yc / 255) * 5)));
+      const level = Math.max(0, Math.min(3, Math.round((Yc / 255) * 3)));
       if (!level) continue;
 
-      const size = Math.min(level, Math.floor(cellW), Math.floor(cellH));
+      const cellMin = Math.min(cellW, cellH);
+      const sizeRatio = level === 1 ? 0.2 : (level === 2 ? 0.38 : 0.62);
+      const maxSize = Math.max(1, Math.floor(cellMin - 1));
+      const size = Math.min(maxSize, Math.max(1, Math.round(cellMin * sizeRatio)));
       if (size <= 0) continue;
       const px = Math.round((x * cellW) + ((cellW - size) / 2));
       const py = Math.round((y * cellH) + ((cellH - size) / 2));
@@ -6328,18 +6330,14 @@ function renderPixel2ShapeCanvas(src, cols, rows) {
     }
   }
 
-  const scale = Math.min(fitSize.w / W, fitSize.h / H);
   canvas.hidden = false;
   canvas.style.position = 'absolute';
-  canvas.style.left = '50%';
-  canvas.style.top = '50%';
-  canvas.style.transformOrigin = 'center center';
-  canvas.style.transform = `translate(-50%, -50%) scale(${Number.isFinite(scale) && scale > 0 ? scale : 1})`;
   canvas.style.backgroundColor = state.background;
   canvas.style.imageRendering = 'pixelated';
   canvas.style.zIndex = '1';
   canvas.style.pointerEvents = 'none';
   app.out.hidden = true;
+  fitAsciiToViewport();
   return true;
 }
 
@@ -8021,19 +8019,30 @@ async function uploadBlobToBot(blob, filename, options = {}) {
   
     // === Вписывание ASCII-блока: теперь только zoom по viewScale ===
 // === Вписывание ASCII-блока: теперь только zoom по viewScale ===
+function getViewportTransformTarget() {
+  const render = app.ui?.render;
+  if (hasPixel2ShapeFrame()) {
+    return { el: render, w: render.width, h: render.height };
+  }
+  const out = app.out;
+  return out ? { el: out, w: out.scrollWidth, h: out.scrollHeight } : null;
+}
+
 function fitAsciiToViewport(){
-  const out   = app.out;
+  const target = getViewportTransformTarget();
   const stage = app.stage;
-  if (!out || !stage) return;
+  if (!target || !target.el || !stage) return;
 
-  // 1. Сбрасываем transform/позицию, чтобы узнать реальный размер ASCII-блока
-  out.style.transform = 'translate(-50%, -50%) scale(1)';
-  out.style.left = '50%';
-  out.style.top  = '50%';
+  const el = target.el;
 
-  // 2. Реальные размеры pre c ASCII
-  const w = out.scrollWidth;
-  const h = out.scrollHeight;
+  // 1. Сбрасываем transform/позицию, чтобы узнать реальный размер ASCII-блока/canvas
+  el.style.transform = 'translate(-50%, -50%) scale(1)';
+  el.style.left = '50%';
+  el.style.top  = '50%';
+
+  // 2. Реальные размеры preview
+  const w = target.w;
+  const h = target.h;
 
   // 3. Доступные размеры сцены
   const fitSize = getStageFitSize();
@@ -8041,9 +8050,9 @@ function fitAsciiToViewport(){
   const H = fitSize.h;
 
   if (!w || !h || !W || !H) {
-    out.style.transform = 'translate(-50%, -50%) scale(1)';
-    out.style.left = '50%';
-    out.style.top  = '50%';
+    el.style.transform = 'translate(-50%, -50%) scale(1)';
+    el.style.left = '50%';
+    el.style.top  = '50%';
     return;
   }
 
@@ -8063,11 +8072,11 @@ function fitAsciiToViewport(){
   const dxPx = (0.5 - vx) * w * base;
   const dyPx = (0.5 - vy) * h * base;
 
-  // Двигаем сам #out, а transform оставляем центрирующим
-  out.style.left = `calc(50% + ${dxPx}px)`;
-  out.style.top  = `calc(50% + ${dyPx}px)`;
-  out.style.transformOrigin = '50% 50%';
-  out.style.transform = `translate(-50%, -50%) scale(${base})`;
+  // Двигаем текущий preview-элемент, а transform оставляем центрирующим
+  el.style.left = `calc(50% + ${dxPx}px)`;
+  el.style.top  = `calc(50% + ${dyPx}px)`;
+  el.style.transformOrigin = '50% 50%';
+  el.style.transform = `translate(-50%, -50%) scale(${base})`;
 }
 
 // Ограничиваем viewX/viewY так, чтобы при текущем масштабе кадр нельзя было утащить
@@ -9037,12 +9046,12 @@ app.ui.toggle.addEventListener('click', () => {
   };
 
   const getStageMetrics = () => {
-    const out = app.out;
+    const target = getViewportTransformTarget();
     const stage = app.stage;
-    if (!out || !stage) return null;
+    if (!target || !target.el || !stage) return null;
 
-    const w = out.scrollWidth;
-    const h = out.scrollHeight;
+    const w = target.w;
+    const h = target.h;
     const fitSize = getStageFitSize();
     const W = fitSize.w;
     const H = fitSize.h;
@@ -9107,12 +9116,12 @@ app.ui.toggle.addEventListener('click', () => {
     if (!pts.has(e.pointerId)) return;
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-    const out   = app.out;
+    const target = getViewportTransformTarget();
     const stage = app.stage;
-    if (!out || !stage) return;
+    if (!target || !target.el || !stage) return;
 
-    const w = out.scrollWidth;
-    const h = out.scrollHeight;
+    const w = target.w;
+    const h = target.h;
     const fitSize = getStageFitSize();
     const W = fitSize.w;
     const H = fitSize.h;
