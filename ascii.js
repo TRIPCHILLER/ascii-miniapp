@@ -6256,7 +6256,7 @@ function isTextMacroPresetSelected() {
 }
 
 const PIXEL2_TILE = 8;
-const PIXEL2_SIZES = [0, 1, 3, 5];
+const PIXEL2_SIZES = [0, 2, 5, PIXEL2_TILE];
 
 function renderPixel2ShapeCanvas(src, cols, rows) {
   let sx = 0, sy = 0, sw = src.w, sh = src.h;
