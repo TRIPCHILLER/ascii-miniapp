@@ -837,6 +837,14 @@ let DITHER_ENABLED = false;
   function isPixel2ShapeCharset(charsetValue) {
     return String(charsetValue || '') === 'P1X3L2_SHAPE';
   }
+
+  function isDots2ShapeCharset(charsetValue) {
+    return String(charsetValue || '') === 'D0TS2_SHAPE';
+  }
+
+  function isShapeTileCharset(charsetValue) {
+    return isPixel2ShapeCharset(charsetValue) || isDots2ShapeCharset(charsetValue);
+  }
   function isKatakanaCharset(charsetValue) {
     return /[\u30A0-\u30FF]/.test(String(charsetValue || ''));
   }
@@ -5643,7 +5651,7 @@ function rebuildRenderCharset10() {
 }
 
 function updateBinsForCurrentCharset() {
-  if (isBrailleDotsCharset(state.charset) || isBlockCharset(state.charset) || isPixel2ShapeCharset(state.charset)) {
+  if (isBrailleDotsCharset(state.charset) || isBlockCharset(state.charset) || isShapeTileCharset(state.charset)) {
     state.renderCharset10 = '';
     bins = [];
     palette = [];
@@ -6255,10 +6263,55 @@ function isTextMacroPresetSelected() {
   return optionLabel === 'MACRO';
 }
 
-const PIXEL2_TILE = 8;
+const SHAPE_TILE_SIZE = 8;
 const PIXEL2_SIZES = [0, 2, 4, 6];
+const DOTS2_MASKS = [
+  [],
+  [
+    'XX',
+    'XX'
+  ],
+  [
+    '.XX.',
+    'XXXX',
+    'XXXX',
+    '.XX.'
+  ],
+  [
+    '.XXXX.',
+    'XXXXXX',
+    'XXXXXX',
+    'XXXXXX',
+    'XXXXXX',
+    '.XXXX.'
+  ]
+];
 
-function renderPixel2ShapeCanvas(src, cols, rows) {
+function drawPixel2ShapeTile(ctx, tileX, tileY, level) {
+  const size = PIXEL2_SIZES[level] || 0;
+  if (size <= 0) return;
+  const px = tileX + Math.floor((SHAPE_TILE_SIZE - size) / 2);
+  const py = tileY + Math.floor((SHAPE_TILE_SIZE - size) / 2);
+  ctx.fillRect(px, py, size, size);
+}
+
+function drawDots2ShapeTile(ctx, tileX, tileY, level) {
+  const mask = DOTS2_MASKS[level] || DOTS2_MASKS[0];
+  if (!mask.length) return;
+  const maskH = mask.length;
+  const maskW = mask[0]?.length || 0;
+  const ox = tileX + Math.floor((SHAPE_TILE_SIZE - maskW) / 2);
+  const oy = tileY + Math.floor((SHAPE_TILE_SIZE - maskH) / 2);
+  for (let my = 0; my < maskH; my++) {
+    for (let mx = 0; mx < maskW; mx++) {
+      if (mask[my][mx] === 'X') {
+        ctx.fillRect(ox + mx, oy + my, 1, 1);
+      }
+    }
+  }
+}
+
+function renderShapeTileCanvas(src, cols, rows, shapeType = 'pixel2') {
   let sx = 0, sy = 0, sw = src.w, sh = src.h;
   if (isMobile && state.mode === 'live') {
     const targetWH = 9 / 16;
@@ -6284,8 +6337,8 @@ function renderPixel2ShapeCanvas(src, cols, rows) {
   const canvas = app.ui.render;
   if (!canvas) return false;
 
-  const W = Math.max(1, cols * PIXEL2_TILE);
-  const H = Math.max(1, rows * PIXEL2_TILE);
+  const W = Math.max(1, cols * SHAPE_TILE_SIZE);
+  const H = Math.max(1, rows * SHAPE_TILE_SIZE);
   if (canvas.width !== W || canvas.height !== H) {
     canvas.width = W;
     canvas.height = H;
@@ -6320,11 +6373,13 @@ function renderPixel2ShapeCanvas(src, cols, rows) {
       const level = Math.max(0, Math.min(3, Math.round((Yc / 255) * 3)));
       if (!level) continue;
 
-      const size = PIXEL2_SIZES[level] || 0;
-      if (size <= 0) continue;
-      const px = (x * PIXEL2_TILE) + Math.floor((PIXEL2_TILE - size) / 2);
-      const py = (y * PIXEL2_TILE) + Math.floor((PIXEL2_TILE - size) / 2);
-      c.fillRect(px, py, size, size);
+      const tileX = x * SHAPE_TILE_SIZE;
+      const tileY = y * SHAPE_TILE_SIZE;
+      if (shapeType === 'dots2') {
+        drawDots2ShapeTile(c, tileX, tileY, level);
+      } else {
+        drawPixel2ShapeTile(c, tileX, tileY, level);
+      }
     }
   }
 
@@ -6339,27 +6394,38 @@ function renderPixel2ShapeCanvas(src, cols, rows) {
   return true;
 }
 
-function resetPixel2ShapePreview() {
+function renderPixel2ShapeCanvas(src, cols, rows) {
+  return renderShapeTileCanvas(src, cols, rows, 'pixel2');
+}
+
+function renderDots2ShapeCanvas(src, cols, rows) {
+  return renderShapeTileCanvas(src, cols, rows, 'dots2');
+}
+
+function resetShapeTilePreview() {
   if (app.ui.render && !app.ui.render.hidden) {
     app.ui.render.hidden = true;
   }
   if (app.out) app.out.hidden = false;
 }
 
-function hasPixel2ShapeFrame() {
+function hasShapeTileFrame() {
   const canvas = app?.ui?.render;
-  return isPixel2ShapeCharset(app?.ui?.charset?.value || state.charset)
+  return isShapeTileCharset(app?.ui?.charset?.value || state.charset)
     && !!canvas
     && !canvas.hidden
     && canvas.width > 0
     && canvas.height > 0;
 }
 
-function showPixel2ShapeVideoUnsupportedPopup() {
+function showShapeTileVideoUnsupportedPopup() {
+  const charsetValue = app?.ui?.charset?.value || state.charset;
+  const isDots2 = isDots2ShapeCharset(charsetValue);
+  const title = isDots2 ? 'D0TS2' : 'P1X3L2';
   showAsciiPopup({
     type: 'info',
-    title: 'P1X3L2',
-    message: 'P1X3L2 ПОКА ДОСТУПЕН ДЛЯ ПРЕДПРОСМОТРА И ФОТО. ВИДЕО-РЕНДЕР ДОБАВИМ СЛЕДУЮЩИМ ШАГОМ.'
+    title,
+    message: `${title} ПОКА ДОСТУПЕН ДЛЯ ПРЕДПРОСМОТРА И ФОТО. ВИДЕО-РЕНДЕР ДОБАВИМ СЛЕДУЮЩИМ ШАГОМ.`
   });
 }
 
@@ -6737,7 +6803,7 @@ if (isMobile && state.mode === 'live') {
   const effectiveRatio = ratioCharWOverH;
   const targetH = w * (sourceHOverW / (1 / Math.max(1e-6, effectiveRatio)));
   let h = Math.max(1, Math.min(1000, Math.round(targetH)));
-  if (isPixel2ShapeCharset(app?.ui?.charset?.value || state.charset)) {
+  if (isShapeTileCharset(app?.ui?.charset?.value || state.charset)) {
     h = Math.max(1, Math.min(1000, Math.round(w * sourceHOverW)));
   }
   if (isTextMode()) {
@@ -6843,14 +6909,18 @@ function updateGifFrame(ts) {
     if (!src) return;
 
     const { w, h } = updateGridSize();
-    if (isPixel2ShapeCharset(app.ui.charset?.value || state.charset)) {
+    if (isShapeTileCharset(app.ui.charset?.value || state.charset)) {
       app.out.textContent = ' ';
       refitFont(w, h);
-      renderPixel2ShapeCanvas(src, w, h);
+      if (isDots2ShapeCharset(app.ui.charset?.value || state.charset)) {
+        renderDots2ShapeCanvas(src, w, h);
+      } else {
+        renderPixel2ShapeCanvas(src, w, h);
+      }
       return;
     }
 
-    resetPixel2ShapePreview();
+    resetShapeTilePreview();
     const out = buildAsciiFromCurrentSource(src, w, h);
 
     if (!out) {
@@ -7066,7 +7136,7 @@ function renderAsciiToCanvas(text, cols, rows, scale = 2.5){
 
 // PNG (режим ФОТО)
 function savePNG(){
-  if (hasPixel2ShapeFrame()) {
+  if (hasShapeTileFrame()) {
     app.ui.render.toBlob(blob=>{
       if(!blob) { showAsciiPopup({ type:'error', title:'ОШИБКА', message:'Не удалось преобразовать изображение.' }); clearShotVisualEffects(); return; }
       downloadBlob(blob, 'ascii_visor.png');
@@ -7555,9 +7625,9 @@ async function buildPreviewGlyphAtlas() {
 }
 
 async function startTelegramBackgroundVideoRender() {
-  if (isPixel2ShapeCharset(app?.ui?.charset?.value || state.charset)) {
-    showPixel2ShapeVideoUnsupportedPopup();
-    throw new Error('P1X3L2_VIDEO_RENDER_UNSUPPORTED');
+  if (isShapeTileCharset(app?.ui?.charset?.value || state.charset)) {
+    showShapeTileVideoUnsupportedPopup();
+    throw new Error('SHAPE_TILE_VIDEO_RENDER_UNSUPPORTED');
   }
 
   const tgWebApp = window.Telegram?.WebApp;
@@ -8022,7 +8092,7 @@ async function uploadBlobToBot(blob, filename, options = {}) {
 // === Вписывание ASCII-блока: теперь только zoom по viewScale ===
 function getViewportTransformTarget() {
   const render = app.ui?.render;
-  if (hasPixel2ShapeFrame()) {
+  if (hasShapeTileFrame()) {
     return { el: render, w: render.width, h: render.height };
   }
   const out = app.out;
@@ -9885,8 +9955,8 @@ async function doSave() {
       return;
     }
     if (window.Telegram?.WebApp?.initData && state.sourceVideoFile) {
-      if (isPixel2ShapeCharset(app?.ui?.charset?.value || state.charset)) {
-        showPixel2ShapeVideoUnsupportedPopup();
+      if (isShapeTileCharset(app?.ui?.charset?.value || state.charset)) {
+        showShapeTileVideoUnsupportedPopup();
         return;
       }
       setBusyStatusText('АНАЛИЗ ЭНЕРГОХРАНИЛИЩА...');
@@ -10178,8 +10248,8 @@ else {
   // все остальные пресеты — как раньше
   applyFontStack(FONT_STACK_MAIN, '700', false);
   forcedAspect = null;
-  if (isPixel2ShapeCharset(val)) {
-    state.charset = 'P1X3L2_SHAPE';
+  if (isShapeTileCharset(val)) {
+    state.charset = val;
   } else if (isBrailleDotsCharset(val)) {
     state.charset = TEXT_CHARSETS.DOTS;
   } else if (isBlockCharset(val)) {
