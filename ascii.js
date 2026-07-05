@@ -845,6 +845,15 @@ let DITHER_ENABLED = false;
   function isShapeTileCharset(charsetValue) {
     return isPixel2ShapeCharset(charsetValue) || isDots2ShapeCharset(charsetValue);
   }
+
+  function getCurrentShapeTileType(charsetValue = null) {
+    const currentValue = charsetValue !== null
+      ? charsetValue
+      : (app?.ui?.charset?.value || state.charset);
+    if (isPixel2ShapeCharset(currentValue)) return 'pixel2';
+    if (isDots2ShapeCharset(currentValue)) return 'dots2';
+    return null;
+  }
   function isKatakanaCharset(charsetValue) {
     return /[\u30A0-\u30FF]/.test(String(charsetValue || ''));
   }
@@ -5031,7 +5040,9 @@ const ARG_RESULT_REPLIES = {
         app.ui.charset.value = getDefaultImageCharsetOption();
       }
       state.lastImageSymbolSet = app.ui.charset.value || getDefaultImageCharsetOption();
-      state.charset = autoSortCharset(state.lastImageSymbolSet);
+      state.charset = isShapeTileCharset(state.lastImageSymbolSet)
+        ? state.lastImageSymbolSet
+        : autoSortCharset(state.lastImageSymbolSet);
     }
     app.ui.charset.dispatchEvent(new Event('change', { bubbles: true }));
   }
@@ -6411,7 +6422,7 @@ function resetShapeTilePreview() {
 
 function hasShapeTileFrame() {
   const canvas = app?.ui?.render;
-  return isShapeTileCharset(app?.ui?.charset?.value || state.charset)
+  return !!getCurrentShapeTileType()
     && !!canvas
     && !canvas.hidden
     && canvas.width > 0
@@ -6419,8 +6430,8 @@ function hasShapeTileFrame() {
 }
 
 function showShapeTileVideoUnsupportedPopup() {
-  const charsetValue = app?.ui?.charset?.value || state.charset;
-  const isDots2 = isDots2ShapeCharset(charsetValue);
+  const shapeType = getCurrentShapeTileType();
+  const isDots2 = shapeType === 'dots2';
   const title = isDots2 ? 'D0TS2' : 'P1X3L2';
   showAsciiPopup({
     type: 'info',
@@ -6509,6 +6520,14 @@ function buildAsciiFromCurrentSource(src, cols, rows) {
   }
 
   const cropRect = { sx, sy, sw, sh };
+  const shapeType = getCurrentShapeTileType();
+  if (shapeType) {
+    console.warn('[shape-tile-render] shape charset reached ASCII pipeline; routing to canvas renderer', { shapeType });
+    app.out.textContent = ' ';
+    refitFont(cols, rows);
+    renderShapeTileCanvas(src, cols, rows, shapeType);
+    return '';
+  }
   if (isTextMode() && isBrailleDotsCharset(app.ui.charset?.value || state.charset)) {
     return renderBrailleDots(src, cropRect, cols, rows);
   }
@@ -6803,7 +6822,7 @@ if (isMobile && state.mode === 'live') {
   const effectiveRatio = ratioCharWOverH;
   const targetH = w * (sourceHOverW / (1 / Math.max(1e-6, effectiveRatio)));
   let h = Math.max(1, Math.min(1000, Math.round(targetH)));
-  if (isShapeTileCharset(app?.ui?.charset?.value || state.charset)) {
+  if (getCurrentShapeTileType()) {
     h = Math.max(1, Math.min(1000, Math.round(w * sourceHOverW)));
   }
   if (isTextMode()) {
@@ -6909,14 +6928,11 @@ function updateGifFrame(ts) {
     if (!src) return;
 
     const { w, h } = updateGridSize();
-    if (isShapeTileCharset(app.ui.charset?.value || state.charset)) {
+    const shapeType = getCurrentShapeTileType();
+    if (shapeType) {
       app.out.textContent = ' ';
       refitFont(w, h);
-      if (isDots2ShapeCharset(app.ui.charset?.value || state.charset)) {
-        renderDots2ShapeCanvas(src, w, h);
-      } else {
-        renderPixel2ShapeCanvas(src, w, h);
-      }
+      renderShapeTileCanvas(src, w, h, shapeType);
       return;
     }
 
@@ -7625,7 +7641,7 @@ async function buildPreviewGlyphAtlas() {
 }
 
 async function startTelegramBackgroundVideoRender() {
-  if (isShapeTileCharset(app?.ui?.charset?.value || state.charset)) {
+  if (getCurrentShapeTileType()) {
     showShapeTileVideoUnsupportedPopup();
     throw new Error('SHAPE_TILE_VIDEO_RENDER_UNSUPPORTED');
   }
@@ -9955,7 +9971,7 @@ async function doSave() {
       return;
     }
     if (window.Telegram?.WebApp?.initData && state.sourceVideoFile) {
-      if (isShapeTileCharset(app?.ui?.charset?.value || state.charset)) {
+      if (getCurrentShapeTileType()) {
         showShapeTileVideoUnsupportedPopup();
         return;
       }
