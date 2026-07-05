@@ -1011,6 +1011,13 @@ let DITHER_ENABLED = false;
     return app.ui.charset?.options?.[0]?.value || '@%#*+=-:. ';
   }
 
+  function normalizeImageCharsetOption(charsetValue){
+    const value = String(charsetValue || '');
+    if (value === '. · ▪ ■ ') return 'P1X3L2_SHAPE';
+    if (value === '····•○◦ ') return 'D0TS2_SHAPE';
+    return value;
+  }
+
   function rememberCurrentCharsetByMode(){
     const currentValue = app.ui.charset?.value;
     if (isTextMode()) {
@@ -5034,7 +5041,7 @@ const ARG_RESULT_REPLIES = {
         app.ui.charset.dataset.imageModeOptions = app.ui.charset.innerHTML;
       }
       app.ui.charset.innerHTML = app.ui.charset.dataset.imageModeOptions;
-      const fallbackImage = state.lastImageSymbolSet || oldVal || getDefaultImageCharsetOption();
+      const fallbackImage = normalizeImageCharsetOption(state.lastImageSymbolSet || oldVal || getDefaultImageCharsetOption());
       app.ui.charset.value = fallbackImage;
       if (!app.ui.charset.value) {
         app.ui.charset.value = getDefaultImageCharsetOption();
@@ -10213,7 +10220,10 @@ function pickDarkGlyph() {
   return best;
 }
 app.ui.charset.addEventListener('change', e => {
-  const val = e.target.value;
+  let val = normalizeImageCharsetOption(e.target.value);
+  if (val !== e.target.value && !isTextMode()) {
+    e.target.value = val;
+  }
   rememberCurrentCharsetByMode();
 
 if (val === 'CUSTOM') {
