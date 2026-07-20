@@ -311,7 +311,7 @@ const ADMIN_ONLY_REPLY = 'Хуя ты хитрый! Только Создате�
 const PUBLIC_COMMANDS = new Set(['/start', '/balance', '/help', '/buy_energy', '/referal', '/referral']);
 const SUPPORTED_COMMANDS = new Set([
   '/start', '/balance', '/help', '/buy_energy', '/referal', '/referral',
-  '/who', '/who_refs', '/stats', '/all', '/say', '/penalise', '/punish', '/send', '/emoji_id'
+  '/who', '/who_refs', '/stats', '/say', '/penalise', '/punish', '/send', '/emoji_id'
 ]);
 const app = express();
 
@@ -2577,34 +2577,6 @@ if (/^\/who_refs(?:@[\w_]+)?\s+(.+)$/i.test(text)) {
   return res.json({ ok:true });
 }
 
-// --------- /all (только для админа) ---------
-if (/^\/all(?:@[\w_]+)?\s+([\s\S]+)$/i.test(text)) {
-  if (!isAdmin) {
-    await sendMessage(fromId, ADMIN_ONLY_REPLY);
-    return res.json({ ok:true });
-  }
-  const broadcastText = String(text.match(/^\/all(?:@[\w_]+)?\s+([\s\S]+)$/i)[1] || '');
-  const formattedText = applyMiniFormatting(broadcastText);
-  const balancesObj = readJsonObjectSafe(BAL_FILE);
-  const recipients = Object.keys(balancesObj);
-  let successCount = 0;
-  let failCount = 0;
-  for (const uid of recipients) {
-    try {
-      await sendMessage(String(uid), formattedText, { parse_mode: 'HTML', disable_web_page_preview: true });
-      successCount += 1;
-    } catch (e) {
-      failCount += 1;
-    }
-    await sleep(34);
-  }
-  await sendMessage(
-    fromId,
-    applyMiniFormatting(`Рассылка завершена: ✅ ${successCount} | ❌ ${failCount}`),
-    { parse_mode: 'HTML', disable_web_page_preview: true }
-  );
-  return res.json({ ok:true });
-}
     // /buy_energy — показать пакеты
     if (text === '/buy_energy') {
       const kb = {
